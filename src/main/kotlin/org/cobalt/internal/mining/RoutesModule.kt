@@ -2030,7 +2030,10 @@ object RoutesModule : Module("Routes") {
     val point = aimPoint ?: resolveWarpAimPoint(level, player, target)
     val range = EtherwarpLogic.getEtherwarpRange().toDouble() + 0.5
     if (eye.distanceToSqr(point) > range * range) return false
-    return hasLineOfSight(level, player, target, point)
+    // Use etherwarp's own raycast — standard line-of-sight misses blocks that
+    // etherwarp passes through (carpets, vines, flowers, etc.)
+    val result = EtherwarpLogic.getEtherwarpResultSneaking()
+    return result.succeeded && result.pos == target
   }
 
   private fun isStandingOnWarpTarget(player: Player, target: BlockPos): Boolean {

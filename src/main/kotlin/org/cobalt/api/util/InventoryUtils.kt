@@ -39,6 +39,21 @@ object InventoryUtils {
   }
 
   @JvmStatic
+  fun swapSlotWithHotbar(slot: Int, hotbarSlot: Int) {
+    if (hotbarSlot !in 0..8) return
+    val player = player ?: return
+    val handler = player.containerMenu
+
+    interactionManager?.handleInventoryMouseClick(
+      handler.containerId,
+      slot,
+      hotbarSlot,
+      ClickType.SWAP,
+      player
+    )
+  }
+
+  @JvmStatic
   fun findItemInHotbar(name: String): Int {
     val player = player ?: return -1
     val inventory = player.inventory

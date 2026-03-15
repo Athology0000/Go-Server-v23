@@ -1,12 +1,15 @@
 package org.cobalt.internal.combat
 
 import java.util.UUID
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
 import java.awt.Color
+import net.minecraft.ChatFormatting
 import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 import net.minecraft.client.multiplayer.ClientLevel
 import net.minecraft.core.BlockPos
 import net.minecraft.world.entity.LivingEntity
@@ -18,6 +21,7 @@ import org.cobalt.api.event.annotation.SubscribeEvent
 import org.cobalt.api.event.impl.client.TickEvent
 import org.cobalt.api.event.impl.render.WorldRenderEvent
 import org.cobalt.api.module.Module
+import org.cobalt.api.module.setting.inGroup
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.InfoSetting
 import org.cobalt.api.module.setting.impl.InfoType
@@ -29,6 +33,7 @@ import org.cobalt.api.util.AngleUtils
 import org.cobalt.api.util.ChatUtils
 import org.cobalt.api.util.InventoryUtils
 import org.cobalt.api.util.MouseUtils
+import org.cobalt.api.util.getLoreLines
 import org.cobalt.api.util.render.Render3D
 import org.cobalt.api.pathfinder.minecraft.MinecraftPathingRules
 import org.cobalt.internal.helper.Config
@@ -130,6 +135,18 @@ object CombatMacroModule : Module("Combat Macro") {
     ""
   )
 
+  private val cryptZombieSlayer = CheckboxSetting(
+    "Crypt Zombie Slayer",
+    "Crypt Slayer flow: farm zombies/ghouls until Slayer boss is detected in tab, then focus boss.",
+    false
+  )
+
+  private val slayerStatus = TextSetting(
+    "Slayer Status",
+    "Current Crypt Slayer state.",
+    "Off"
+  )
+
   private val searchRange = SliderSetting(
     "Search Range",
     "Max distance to search for targets.",
@@ -188,6 +205,36 @@ object CombatMacroModule : Module("Combat Macro") {
     "Auto Heal",
     "Auto-use a healing item when health is low.",
     true
+  )
+
+  private val autoWandOfAtonement = CheckboxSetting(
+    "Wand Of Atonement",
+    "Use Wand of Atonement for auto-heal. Auto-enables when the item is detected in hotbar.",
+    false
+  )
+
+  private val autoZombieSword = CheckboxSetting(
+    "Zombie Sword",
+    "Use Zombie Sword variants for auto-heal. Auto-enables when the item is detected in hotbar.",
+    false
+  )
+
+  private val autoOverflux = CheckboxSetting(
+    "Overflux",
+    "Use Overflux when the Slayer boss spawns. Auto-enables when the item is detected in hotbar.",
+    false
+  )
+
+  private val autoRagnarok = CheckboxSetting(
+    "Ragnarok",
+    "Use Ragnarok when the Slayer boss spawns. Auto-enables when the item is detected in hotbar.",
+    false
+  )
+
+  private val autoSwordOfBadHealth = CheckboxSetting(
+    "Sword Of Bad Health",
+    "Use Sword of Bad Health during the Slayer boss fight. Auto-enables when the item is detected in hotbar.",
+    false
   )
 
   private val healAtHealth = SliderSetting(
@@ -268,8 +315,45 @@ object CombatMacroModule : Module("Combat Macro") {
   )
 
   val isActive: Boolean get() = enabled.value
+  val isRunning: Boolean get() = enabled.value
+  val modeDisplay: String get() = if (cryptZombieSlayer.value) "Slayer Macro" else "Combat Macro"
+  val slayerDisplay: String get() = if (cryptZombieSlayer.value) slayerStatus.value else "Disabled"
+  val statusDisplay: String
+    get() =
+      when {
+        !enabled.value -> "Off"
+        cryptZombieSlayer.value -> slayerStatus.value
+        currentTargetId != null && startedPath && DuskPathfinder.isActive() -> "Pathing To Target"
+        currentTargetId != null -> "Engaging Target"
+        startedPath && DuskPathfinder.isActive() -> "Pathing"
+        else -> "Searching"
+      }
+  val targetDisplay: String
+    get() {
+      val activeTargetName = resolveCurrentTargetName()
+      if (!activeTargetName.isNullOrBlank()) {
+        return activeTargetName
+      }
+      if (cryptZombieSlayer.value) {
+        return if (slayerBossActive) "Slayer Boss" else "Zombie / Ghoul"
+      }
+      val filter = targetName.value.trim()
+      return if (filter.isNotEmpty()) filter else "Nearest Mob"
+    }
+  val targetHealthDisplay: String
+    get() {
+      val target = resolveCurrentTarget() ?: return "-- / --"
+      return "${formatHudHealth(target.health)} / ${formatHudHealth(target.maxHealth)}"
+    }
+  val targetHealthRatio: Float
+    get() {
+      val target = resolveCurrentTarget() ?: return 0f
+      val maxHealth = target.maxHealth.coerceAtLeast(1f)
+      return (target.health.coerceAtLeast(0f) / maxHealth).coerceIn(0f, 1f)
+    }
 
   fun startForAutomation(mobName: String) {
+    cryptZombieSlayer.value = false
     targetName.value = mobName
     whitelistOnly.value = false
     enabled.value = true
@@ -300,12 +384,35 @@ object CombatMacroModule : Module("Combat Macro") {
   private var startAreaOrigin: BlockPos? = null
   private var pendingHealRelease = false
   private var pendingHealRestoreSlot = -1
+  private var slayerBossActive = false
+  private var slayerBossLastSeenTick = 0L
+  private var slayerOverfluxUsedThisBoss = false
+  private var slayerRagnarokUsedThisBoss = false
+  private var slayerLastBadHealthUseTick = -1L
+  private var slayerLastOverfluxUseTick = -1L
+  private var slayerLastRagnarokUseTick = -1L
+  private var slayerLastTabScanTick = -1L
+  private var slayerTabCache: List<String> = emptyList()
+  private var slayerNeedsQuestRestart = false
+  private var slayerLastBatphoneAttemptTick = -1L
+  private var slayerLastBatphoneUseTick = -1L
+  private var slayerLastGuiActionTick = -1L
+  private var slayerWarnNoBatphoneTick = -1L
+  private var slayerModeEnabled = false
+  private var wandWasInHotbar = false
+  private var zombieSwordWasInHotbar = false
+  private var overfluxWasInHotbar = false
+  private var ragnarokWasInHotbar = false
+  private var badHealthWasInHotbar = false
 
   init {
+    assignSettingGroups()
     addSetting(
       enabled,
       info,
       targetName,
+      cryptZombieSlayer,
+      slayerStatus,
       searchRange,
       minCps,
       maxCps,
@@ -314,6 +421,11 @@ object CombatMacroModule : Module("Combat Macro") {
       stayNearStart,
       startAreaRadius,
       autoHeal,
+      autoWandOfAtonement,
+      autoZombieSword,
+      autoOverflux,
+      autoRagnarok,
+      autoSwordOfBadHealth,
       healAtHealth,
       stuckTicksSetting,
       warpOnStuck,
@@ -327,6 +439,40 @@ object CombatMacroModule : Module("Combat Macro") {
       lastKillText
     )
     EventBus.register(this)
+  }
+
+  private fun assignSettingGroups() {
+    enabled.inGroup(TAB_COMBAT_GROUP)
+    info.inGroup(TAB_COMBAT_GROUP)
+    targetName.inGroup(TAB_COMBAT_GROUP)
+    searchRange.inGroup(TAB_COMBAT_GROUP)
+    minCps.inGroup(TAB_COMBAT_GROUP)
+    maxCps.inGroup(TAB_COMBAT_GROUP)
+    attackRange.inGroup(TAB_COMBAT_GROUP)
+    chaseStopBuffer.inGroup(TAB_COMBAT_GROUP)
+    stayNearStart.inGroup(TAB_COMBAT_GROUP)
+    startAreaRadius.inGroup(TAB_COMBAT_GROUP)
+    stuckTicksSetting.inGroup(TAB_COMBAT_GROUP)
+    warpOnStuck.inGroup(TAB_COMBAT_GROUP)
+    requireLos.inGroup(TAB_COMBAT_GROUP)
+    aimTolerance.inGroup(TAB_COMBAT_GROUP)
+    minAttackCooldown.inGroup(TAB_COMBAT_GROUP)
+    stuckRepathTries.inGroup(TAB_COMBAT_GROUP)
+    autoLearnLastKill.inGroup(TAB_COMBAT_GROUP)
+    whitelistOnly.inGroup(TAB_COMBAT_GROUP)
+    learnedWhitelistText.inGroup(TAB_COMBAT_GROUP)
+    lastKillText.inGroup(TAB_COMBAT_GROUP)
+
+    cryptZombieSlayer.inGroup(TAB_SLAYER_GROUP)
+    slayerStatus.inGroup(TAB_SLAYER_GROUP)
+
+    autoHeal.inGroup(TAB_AUTO_ITEMS_GROUP)
+    autoWandOfAtonement.inGroup(TAB_AUTO_ITEMS_GROUP)
+    autoZombieSword.inGroup(TAB_AUTO_ITEMS_GROUP)
+    autoOverflux.inGroup(TAB_AUTO_ITEMS_GROUP)
+    autoRagnarok.inGroup(TAB_AUTO_ITEMS_GROUP)
+    autoSwordOfBadHealth.inGroup(TAB_AUTO_ITEMS_GROUP)
+    healAtHealth.inGroup(TAB_AUTO_ITEMS_GROUP)
   }
 
   @SubscribeEvent
@@ -343,13 +489,27 @@ object CombatMacroModule : Module("Combat Macro") {
     }
 
     val player = mc.player ?: return
+    syncAutoItemToggles(player)
     if (startedPath && !DuskPathfinder.isActive()) {
       startedPath = false
       lastTargetPos = null
     }
     syncLearnedWhitelistFromSetting()
-    if (!whitelistOnly.value) {
+    if (cryptZombieSlayer.value && !slayerModeEnabled) {
+      slayerModeEnabled = true
+      slayerNeedsQuestRestart = true
+      slayerLastBatphoneAttemptTick = -1L
+      slayerLastBatphoneUseTick = -1L
+      slayerLastGuiActionTick = -1L
+    }
+    if (!cryptZombieSlayer.value) {
+      slayerModeEnabled = false
+    }
+    if (!cryptZombieSlayer.value && !whitelistOnly.value) {
       whitelistOnly.value = true
+    }
+    if (cryptZombieSlayer.value && whitelistOnly.value) {
+      whitelistOnly.value = false
     }
     if (!enabled.value) {
       stopMacro()
@@ -359,6 +519,19 @@ object CombatMacroModule : Module("Combat Macro") {
     val level = mc.level ?: return
     PathfindingModule.ensureEnabledForAutomation("combat macro")
     updateKillTracking(level)
+    if (cryptZombieSlayer.value) {
+      updateSlayerBossState(level.gameTime)
+      if (handleMaddoxGui(level.gameTime)) {
+        return
+      }
+      if (tryRestartSlayerQuest(player, level.gameTime)) {
+        return
+      }
+    } else {
+      slayerStatus.value = "Off"
+      clearSlayerBossState(false)
+      slayerNeedsQuestRestart = false
+    }
 
     if (player.isDeadOrDying || player.health <= 0f) {
       stopMacro()
@@ -374,7 +547,8 @@ object CombatMacroModule : Module("Combat Macro") {
       return
     }
 
-    val target = resolveTarget(player) ?: run {
+    val target = if (cryptZombieSlayer.value) resolveSlayerTarget(player, level) else resolveTarget(player)
+    if (target == null) {
       if (startedPath && DuskPathfinder.isActive()) {
         DuskPathfinder.stop(mc, "No target found.")
       }
@@ -389,6 +563,9 @@ object CombatMacroModule : Module("Combat Macro") {
     val inCloseChaseRange = dist <= attackRange.value + chaseStopBuffer.value
 
     ensurePreferredWeapon(player, target, level.gameTime)
+    if (cryptZombieSlayer.value) {
+      tryUseSlayerSupportItems(player, target, level.gameTime)
+    }
 
     if (inCloseChaseRange) {
       val rotation = AngleUtils.getRotation(target)
@@ -478,6 +655,385 @@ object CombatMacroModule : Module("Combat Macro") {
       currentTargetId = best.uuid
     }
     return best
+  }
+
+  private fun resolveSlayerTarget(player: Player, level: ClientLevel): LivingEntity? {
+    val blacklisted = builtInBlacklistedNames
+    val startOrigin =
+      if (stayNearStart.value) {
+        startAreaOrigin ?: player.blockPosition().also { startAreaOrigin = it }
+      } else {
+        null
+      }
+    val startAreaRangeSq = startAreaRadius.value * startAreaRadius.value
+    val searchRangeSq = searchRange.value * searchRange.value
+    var bestBoss: LivingEntity? = null
+    var bestBossDist = Double.POSITIVE_INFINITY
+    var bestFarmMob: LivingEntity? = null
+    var bestFarmMobDist = Double.POSITIVE_INFINITY
+
+    for (entity in level.entitiesForRendering()) {
+      val living = entity as? LivingEntity ?: continue
+      if (!isValidTarget(living, player, blacklisted, "", true)) continue
+
+      val name = normalizeNameForMatch(living.name.string)
+      val isBoss = isSlayerBossName(name)
+      val isFarmMob = isSlayerFarmMobName(name)
+      if (!isBoss && !isFarmMob) continue
+
+      if (startOrigin != null) {
+        val ox = living.x - (startOrigin.x + 0.5)
+        val oz = living.z - (startOrigin.z + 0.5)
+        if (ox * ox + oz * oz > startAreaRangeSq) continue
+      }
+
+      val dx = living.x - player.x
+      val dy = living.y - player.y
+      val dz = living.z - player.z
+      val distSq = dx * dx + dy * dy + dz * dz
+      if (distSq > searchRangeSq) continue
+
+      if (isBoss && distSq < bestBossDist) {
+        bestBoss = living
+        bestBossDist = distSq
+      }
+      if (isFarmMob && distSq < bestFarmMobDist) {
+        bestFarmMob = living
+        bestFarmMobDist = distSq
+      }
+    }
+
+    if (bestBoss != null) {
+      onSlayerBossDetected(level.gameTime)
+    } else if (slayerBossActive && level.gameTime - slayerBossLastSeenTick > SLAYER_BOSS_ENTITY_LOST_TICKS) {
+      clearSlayerBossState()
+    }
+
+    val selected = if (slayerBossActive) bestBoss else bestBoss ?: bestFarmMob
+    if (selected != null) {
+      currentTargetId = selected.uuid
+    }
+    return selected
+  }
+
+  private fun updateSlayerBossState(nowTick: Long) {
+    val tabLines = readTabListLines(nowTick)
+    val hasBossTabLine = tabLines.any { line -> SLAYER_BOSS_TAB_KEYWORDS.any { keyword -> line.contains(keyword) } }
+    val hasClearTabLine = tabLines.any { line -> SLAYER_BOSS_CLEAR_KEYWORDS.any { keyword -> line.contains(keyword) } }
+    val hasQuestTabLine = tabLines.any { line -> SLAYER_QUEST_TAB_KEYWORDS.any { keyword -> line.contains(keyword) } }
+
+    if (hasBossTabLine) {
+      onSlayerBossDetected(nowTick)
+      slayerNeedsQuestRestart = false
+    } else {
+      if (hasClearTabLine) {
+        if (slayerBossActive) {
+          clearSlayerBossState()
+        }
+        slayerNeedsQuestRestart = true
+      } else if (hasQuestTabLine) {
+        slayerNeedsQuestRestart = false
+      }
+      if (slayerBossActive && nowTick - slayerBossLastSeenTick > SLAYER_BOSS_TAB_LOST_TICKS) {
+        clearSlayerBossState()
+      }
+    }
+
+    slayerStatus.value =
+      when {
+        slayerBossActive -> "Boss Active"
+        slayerNeedsQuestRestart -> "Restarting Quest"
+        else -> "Farming Zombies"
+      }
+  }
+
+  private fun onSlayerBossDetected(nowTick: Long) {
+    val wasActive = slayerBossActive
+    slayerBossActive = true
+    slayerBossLastSeenTick = nowTick
+    slayerNeedsQuestRestart = false
+    if (!wasActive) {
+      slayerOverfluxUsedThisBoss = false
+      slayerRagnarokUsedThisBoss = false
+      slayerLastBadHealthUseTick = -1L
+      ChatUtils.sendMessage("Combat macro: Slayer boss detected.")
+    }
+  }
+
+  private fun clearSlayerBossState(announce: Boolean = true) {
+    if (slayerBossActive && announce) {
+      ChatUtils.sendMessage("Combat macro: Slayer boss no longer detected.")
+    }
+    slayerBossActive = false
+    slayerBossLastSeenTick = 0L
+    slayerOverfluxUsedThisBoss = false
+    slayerRagnarokUsedThisBoss = false
+    slayerLastBadHealthUseTick = -1L
+  }
+
+  private fun tryUseSlayerSupportItems(player: Player, target: LivingEntity, nowTick: Long) {
+    if (!slayerBossActive) return
+    if (!isSlayerBossName(normalizeNameForMatch(target.name.string))) return
+    if (pendingHealRelease || pendingHealRestoreSlot >= 0) return
+
+    if (autoOverflux.value && !slayerOverfluxUsedThisBoss && nowTick - slayerLastOverfluxUseTick >= SLAYER_OVERFLUX_COOLDOWN_TICKS) {
+      if (useHotbarUtilityItem(player, SLAYER_OVERFLUX_KEYWORDS)) {
+        slayerOverfluxUsedThisBoss = true
+        slayerLastOverfluxUseTick = nowTick
+        return
+      }
+    }
+
+    if (autoRagnarok.value && !slayerRagnarokUsedThisBoss && nowTick - slayerLastRagnarokUseTick >= SLAYER_RAGNAROK_COOLDOWN_TICKS) {
+      if (useHotbarUtilityItem(player, SLAYER_RAGNAROK_KEYWORDS)) {
+        slayerRagnarokUsedThisBoss = true
+        slayerLastRagnarokUseTick = nowTick
+        return
+      }
+    }
+
+    if (autoSwordOfBadHealth.value && nowTick - slayerLastBadHealthUseTick >= SLAYER_BAD_HEALTH_REUSE_TICKS) {
+      if (useHotbarUtilityItem(player, SLAYER_BAD_HEALTH_KEYWORDS)) {
+        slayerLastBadHealthUseTick = nowTick
+      }
+    }
+  }
+
+  private fun tryRestartSlayerQuest(player: Player, nowTick: Long): Boolean {
+    if (!slayerNeedsQuestRestart || slayerBossActive) return false
+    if (isLikelyMaddoxScreen(nowTick)) return true
+    if (mc.screen is AbstractContainerScreen<*>) return false
+    if (pendingHealRelease || pendingHealRestoreSlot >= 0) return true
+    if (slayerLastBatphoneAttemptTick >= 0L && nowTick - slayerLastBatphoneAttemptTick < SLAYER_BATPHONE_RETRY_TICKS) {
+      return true
+    }
+
+    var batphoneSlot = findHotbarSlotByKeywords(player, SLAYER_BATPHONE_KEYWORDS)
+    if (batphoneSlot !in 0..8) {
+      val moved = moveBatphoneToHotbar(player)
+      if (!moved) {
+        slayerStatus.value = "Need Maddox Batphone"
+        if (slayerWarnNoBatphoneTick < 0L || nowTick - slayerWarnNoBatphoneTick >= SLAYER_NO_BATPHONE_WARN_TICKS) {
+          slayerWarnNoBatphoneTick = nowTick
+          ChatUtils.sendMessage("Combat macro: Maddox Batphone not found in inventory/hotbar.")
+        }
+        slayerLastBatphoneAttemptTick = nowTick
+        return true
+      }
+      batphoneSlot = findHotbarSlotByKeywords(player, SLAYER_BATPHONE_KEYWORDS)
+    }
+
+    if (batphoneSlot !in 0..8) {
+      slayerLastBatphoneAttemptTick = nowTick
+      return true
+    }
+
+    if (useHotbarUtilityItem(player, SLAYER_BATPHONE_KEYWORDS)) {
+      slayerLastBatphoneAttemptTick = nowTick
+      slayerLastBatphoneUseTick = nowTick
+      slayerStatus.value = "Calling Maddox..."
+      return true
+    }
+
+    return false
+  }
+
+  private fun handleMaddoxGui(nowTick: Long): Boolean {
+    if (!slayerNeedsQuestRestart) return false
+    if (!isLikelyMaddoxScreen(nowTick)) return false
+    if (nowTick - slayerLastGuiActionTick < SLAYER_GUI_ACTION_COOLDOWN_TICKS) return true
+
+    val player = mc.player ?: return true
+    val menu = player.containerMenu
+    val actionSlot = findMaddoxMenuActionSlot(menu.slots)
+    if (actionSlot >= 0) {
+      InventoryUtils.clickSlot(actionSlot)
+      slayerLastGuiActionTick = nowTick
+      slayerLastBatphoneAttemptTick = nowTick
+      slayerStatus.value = "Restarting Slayer..."
+      return true
+    }
+
+    if (slayerLastBatphoneUseTick >= 0L && nowTick - slayerLastBatphoneUseTick >= SLAYER_MADDOX_GUI_TIMEOUT_TICKS) {
+      player.closeContainer()
+      slayerLastGuiActionTick = nowTick
+      slayerLastBatphoneAttemptTick = nowTick
+      return true
+    }
+
+    return true
+  }
+
+  private fun isLikelyMaddoxScreen(nowTick: Long): Boolean {
+    val screen = mc.screen as? AbstractContainerScreen<*> ?: return false
+    val title = normalizeNameForMatch(screen.title.string)
+    if (SLAYER_MADDOX_SCREEN_KEYWORDS.any { keyword -> title.contains(keyword) }) return true
+    return slayerLastBatphoneUseTick >= 0L && nowTick - slayerLastBatphoneUseTick <= SLAYER_MADDOX_GUI_TIMEOUT_TICKS
+  }
+
+  private fun moveBatphoneToHotbar(player: Player): Boolean {
+    val sourceSlot = findFirstContainerSlotByKeywords(player.containerMenu.slots, SLAYER_BATPHONE_KEYWORDS) ?: return false
+    if (sourceSlot in PLAYER_HOTBAR_MENU_SLOT_START..PLAYER_HOTBAR_MENU_SLOT_END) return true
+
+    val targetHotbarSlot = findBestHotbarSwapSlot(player)
+    InventoryUtils.swapSlotWithHotbar(sourceSlot, targetHotbarSlot)
+    return true
+  }
+
+  private fun findFirstContainerSlotByKeywords(
+    slots: List<net.minecraft.world.inventory.Slot>,
+    keywords: Array<String>
+  ): Int? {
+    for (slot in slots) {
+      if (!slot.hasItem()) continue
+      val normalizedName = normalizeNameForMatch(slot.item.hoverName.string)
+      if (keywords.any { keyword -> normalizedName.contains(keyword) }) {
+        return slot.index
+      }
+    }
+    return null
+  }
+
+  private fun findBestHotbarSwapSlot(player: Player): Int {
+    val inventory = player.inventory
+    for (i in 0..8) {
+      if (inventory.getItem(i).isEmpty) {
+        return i
+      }
+    }
+    return inventory.selectedSlot.coerceIn(0, 8)
+  }
+
+  private fun findMaddoxMenuActionSlot(slots: List<net.minecraft.world.inventory.Slot>): Int {
+    var revenantSlot = -1
+    var restartSlot = -1
+    var confirmSlot = -1
+
+    for (slot in slots) {
+      if (!slot.hasItem()) continue
+      val stack = slot.item
+      val name = normalizeNameForMatch(stack.hoverName.string)
+      val lore = stack.getLoreLines().joinToString(" ") { normalizeNameForMatch(it.string) }
+      val text = "$name $lore"
+
+      val hasRevenantKeyword = SLAYER_MADDOX_REVENANT_KEYWORDS.any { keyword -> text.contains(keyword) }
+      val hasRestartKeyword = SLAYER_MADDOX_RESTART_KEYWORDS.any { keyword -> text.contains(keyword) }
+      val hasConfirmKeyword = SLAYER_MADDOX_CONFIRM_KEYWORDS.any { keyword -> text.contains(keyword) }
+
+      if (hasConfirmKeyword && hasRevenantKeyword) return slot.index
+      if (hasRestartKeyword && hasRevenantKeyword) return slot.index
+
+      if (hasRevenantKeyword && revenantSlot == -1) {
+        revenantSlot = slot.index
+      }
+      if (hasRestartKeyword && restartSlot == -1) {
+        restartSlot = slot.index
+      }
+      if (hasConfirmKeyword && confirmSlot == -1) {
+        confirmSlot = slot.index
+      }
+    }
+
+    return when {
+      confirmSlot >= 0 -> confirmSlot
+      restartSlot >= 0 -> restartSlot
+      revenantSlot >= 0 -> revenantSlot
+      else -> -1
+    }
+  }
+
+  private fun useHotbarUtilityItem(player: Player, keywords: Array<String>): Boolean {
+    val slot = findHotbarSlotByKeywords(player, keywords)
+    if (slot !in 0..8) return false
+
+    val previousSlot = player.inventory.selectedSlot
+    if (previousSlot != slot) {
+      mc.options.keyHotbarSlots[slot].setDown(true)
+      mc.options.keyHotbarSlots[slot].setDown(false)
+    }
+
+    mc.options.keyUse?.setDown(true)
+    pendingHealRelease = true
+    pendingHealRestoreSlot = if (previousSlot != slot) previousSlot else -1
+    return true
+  }
+
+  private fun findHotbarSlotByKeywords(player: Player, keywords: Array<String>): Int {
+    val inventory = player.inventory
+    for (i in 0..8) {
+      val stack = inventory.getItem(i)
+      if (stack.isEmpty) continue
+      val normalizedName = normalizeNameForMatch(stack.hoverName?.string.orEmpty())
+      if (keywords.any { keyword -> normalizedName.contains(keyword) }) {
+        return i
+      }
+    }
+    return -1
+  }
+
+  private fun isSlayerBossName(normalizedName: String): Boolean {
+    return SLAYER_BOSS_ENTITY_KEYWORDS.any { keyword -> normalizedName.contains(keyword) }
+  }
+
+  private fun isSlayerFarmMobName(normalizedName: String): Boolean {
+    return SLAYER_FARM_MOB_KEYWORDS.any { keyword -> normalizedName.contains(keyword) }
+  }
+
+  private fun readTabListLines(nowTick: Long): List<String> {
+    if (slayerLastTabScanTick >= 0L && nowTick - slayerLastTabScanTick < SLAYER_TAB_SCAN_INTERVAL_TICKS) {
+      return slayerTabCache
+    }
+    slayerLastTabScanTick = nowTick
+    val connection = mc.connection ?: run {
+      slayerTabCache = emptyList()
+      return slayerTabCache
+    }
+    slayerTabCache =
+      try {
+        resolveTabEntries(connection)
+          .mapNotNull { resolveEntryDisplayName(it) }
+          .map { ChatFormatting.stripFormatting(it)?.lowercase(Locale.ROOT)?.trim() ?: "" }
+          .filter { it.isNotBlank() }
+      } catch (_: Exception) {
+        emptyList()
+      }
+    return slayerTabCache
+  }
+
+  private fun resolveTabEntries(connection: Any): List<Any> {
+    for (name in listOf("listPlayerEntries", "getListedOnlinePlayers", "getOnlinePlayers")) {
+      val method = connection.javaClass.methods.firstOrNull { it.name == name && it.parameterCount == 0 } ?: continue
+      val result = runCatching { method.invoke(connection) }.getOrNull() ?: continue
+      when (result) {
+        is Collection<*> -> return result.filterNotNull()
+        is Iterable<*> -> return result.filterNotNull()
+      }
+    }
+    return emptyList()
+  }
+
+  private fun resolveEntryDisplayName(entry: Any): String? {
+    for (name in listOf("getTabListDisplayName", "tabListDisplayName", "getDisplayName", "displayName")) {
+      val method = entry.javaClass.methods.firstOrNull { it.name == name && it.parameterCount == 0 } ?: continue
+      val text = coerceText(runCatching { method.invoke(entry) }.getOrNull())
+      if (!text.isNullOrBlank()) return text
+    }
+    for (name in listOf("getProfile", "getGameProfile", "profile")) {
+      val method = entry.javaClass.methods.firstOrNull { it.name == name && it.parameterCount == 0 } ?: continue
+      val profile = runCatching { method.invoke(entry) }.getOrNull() ?: continue
+      val nameMethod = profile.javaClass.methods.firstOrNull { it.name == "getName" && it.parameterCount == 0 } ?: continue
+      val profileName = runCatching { nameMethod.invoke(profile) as? String }.getOrNull()
+      if (!profileName.isNullOrBlank()) return profileName
+    }
+    return null
+  }
+
+  private fun coerceText(value: Any?): String? {
+    if (value == null) return null
+    if (value is String) return value
+    val m = value.javaClass.methods.firstOrNull { it.name == "getString" && it.parameterCount == 0 }
+    val raw = m?.let { runCatching { it.invoke(value) }.getOrNull() }
+    return if (raw is String) raw else value.toString()
   }
 
   private fun isValidTarget(
@@ -630,6 +1186,72 @@ object CombatMacroModule : Module("Combat Macro") {
     return sanitizeTargetName(raw).lowercase()
   }
 
+  private fun resolveCurrentTarget(): LivingEntity? {
+    val level = mc.level ?: return null
+    val targetId = currentTargetId ?: return null
+    val liveTarget = level.entitiesForRendering().firstOrNull { it.uuid == targetId } as? LivingEntity ?: return null
+    if (!liveTarget.isAlive || liveTarget.health <= 0f) return null
+    return liveTarget
+  }
+
+  private fun resolveCurrentTargetName(): String? {
+    return resolveCurrentTarget()?.let { target ->
+      sanitizeTargetName(target.name.string).ifBlank { null }
+    }
+  }
+
+  private fun formatHudHealth(value: Float): String {
+    val rounded = (value * 10f).toInt() / 10f
+    return if (rounded % 1f == 0f) {
+      rounded.toInt().toString()
+    } else {
+      rounded.toString()
+    }
+  }
+
+  private fun syncAutoItemToggles(player: Player) {
+    var changed = false
+
+    val wandInHotbar = findHotbarSlotByKeywords(player, SLAYER_WAND_OF_ATONEMENT_KEYWORDS) in 0..8
+    if (wandInHotbar && !wandWasInHotbar && !autoWandOfAtonement.value) {
+      autoWandOfAtonement.value = true
+      changed = true
+    }
+    wandWasInHotbar = wandInHotbar
+
+    val zombieSwordInHotbar = findHotbarSlotByKeywords(player, SLAYER_ZOMBIE_SWORD_KEYWORDS) in 0..8
+    if (zombieSwordInHotbar && !zombieSwordWasInHotbar && !autoZombieSword.value) {
+      autoZombieSword.value = true
+      changed = true
+    }
+    zombieSwordWasInHotbar = zombieSwordInHotbar
+
+    val overfluxInHotbar = findHotbarSlotByKeywords(player, SLAYER_OVERFLUX_KEYWORDS) in 0..8
+    if (overfluxInHotbar && !overfluxWasInHotbar && !autoOverflux.value) {
+      autoOverflux.value = true
+      changed = true
+    }
+    overfluxWasInHotbar = overfluxInHotbar
+
+    val ragnarokInHotbar = findHotbarSlotByKeywords(player, SLAYER_RAGNAROK_KEYWORDS) in 0..8
+    if (ragnarokInHotbar && !ragnarokWasInHotbar && !autoRagnarok.value) {
+      autoRagnarok.value = true
+      changed = true
+    }
+    ragnarokWasInHotbar = ragnarokInHotbar
+
+    val badHealthInHotbar = findHotbarSlotByKeywords(player, SLAYER_BAD_HEALTH_KEYWORDS) in 0..8
+    if (badHealthInHotbar && !badHealthWasInHotbar && !autoSwordOfBadHealth.value) {
+      autoSwordOfBadHealth.value = true
+      changed = true
+    }
+    badHealthWasInHotbar = badHealthInHotbar
+
+    if (changed) {
+      Config.saveModulesConfig()
+    }
+  }
+
   private fun syncLearnedWhitelistFromSetting() {
     val raw = learnedWhitelistText.value
     if (raw == lastSyncedWhitelistRaw) return
@@ -706,30 +1328,21 @@ object CombatMacroModule : Module("Combat Macro") {
   }
 
   private fun findHealHotbarSlot(player: Player): Int {
-    val inventory = player.inventory
-    for (i in 0..8) {
-      val stack = inventory.getItem(i)
-      if (stack.isEmpty) continue
-      val name = stack.hoverName?.string.orEmpty()
-      if (isHealingItemName(name)) {
-        return i
+    if (autoWandOfAtonement.value) {
+      val wandSlot = findHotbarSlotByKeywords(player, SLAYER_WAND_OF_ATONEMENT_KEYWORDS)
+      if (wandSlot in 0..8) {
+        return wandSlot
       }
     }
+
+    if (autoZombieSword.value) {
+      val zombieSwordSlot = findHotbarSlotByKeywords(player, SLAYER_ZOMBIE_SWORD_KEYWORDS)
+      if (zombieSwordSlot in 0..8) {
+        return zombieSwordSlot
+      }
+    }
+
     return -1
-  }
-
-  private fun isHealingItemName(rawName: String): Boolean {
-    val normalized = rawName
-      .lowercase()
-      .replace(Regex("[^a-z0-9]+"), " ")
-      .trim()
-
-    return normalized.contains("wand of mending") ||
-      normalized.contains("wand of restoration") ||
-      normalized.contains("wand of atonement") ||
-      normalized.contains("zombie sword") ||
-      normalized.contains("gloomlock grimoire") ||
-      normalized.contains("healing wand")
   }
 
   private fun currentTargetRenderColor(): Color {
@@ -892,12 +1505,37 @@ object CombatMacroModule : Module("Combat Macro") {
       pendingHealRelease = false
     }
     pendingHealRestoreSlot = -1
+    slayerStatus.value = "Off"
+    clearSlayerBossState(false)
+    slayerLastTabScanTick = -1L
+    slayerTabCache = emptyList()
+    slayerNeedsQuestRestart = false
+    slayerLastBatphoneAttemptTick = -1L
+    slayerLastBatphoneUseTick = -1L
+    slayerLastGuiActionTick = -1L
+    slayerWarnNoBatphoneTick = -1L
+    slayerModeEnabled = false
   }
 
+  private const val TAB_COMBAT_GROUP = "Combat Macro"
+  private const val TAB_SLAYER_GROUP = "Slayer Macro"
+  private const val TAB_AUTO_ITEMS_GROUP = "Auto Items"
   private const val KILL_CANDIDATE_TTL_TICKS = 80L
   private const val KILL_DISAPPEAR_CONFIRM_TICKS = 2L
   private const val DRILL_WARN_INTERVAL_TICKS = 60L
   private const val AUTO_HEAL_COOLDOWN_TICKS = 20L
+  private const val SLAYER_TAB_SCAN_INTERVAL_TICKS = 5L
+  private const val SLAYER_BOSS_TAB_LOST_TICKS = 30L
+  private const val SLAYER_BOSS_ENTITY_LOST_TICKS = 20L
+  private const val SLAYER_OVERFLUX_COOLDOWN_TICKS = 600L
+  private const val SLAYER_RAGNAROK_COOLDOWN_TICKS = 400L
+  private const val SLAYER_BAD_HEALTH_REUSE_TICKS = 80L
+  private const val SLAYER_BATPHONE_RETRY_TICKS = 30L
+  private const val SLAYER_MADDOX_GUI_TIMEOUT_TICKS = 60L
+  private const val SLAYER_GUI_ACTION_COOLDOWN_TICKS = 5L
+  private const val SLAYER_NO_BATPHONE_WARN_TICKS = 200L
+  private const val PLAYER_HOTBAR_MENU_SLOT_START = 36
+  private const val PLAYER_HOTBAR_MENU_SLOT_END = 44
   private const val DEFAULT_WHITELIST_ENTRY = "ice walker"
   private const val MIN_PATH_START_INTERVAL_TICKS = 1L
   private const val TARGET_REPATH_DISTANCE_SQ = 2.25
@@ -909,6 +1547,21 @@ object CombatMacroModule : Module("Combat Macro") {
   private const val TARGET_BOX_CYCLE_MS = 4000L
   private const val TARGET_BOX_ALPHA = 170
   private const val TARGET_BOX_INFLATE = 0.08
+  private val SLAYER_BOSS_ENTITY_KEYWORDS = arrayOf("revenant horror", "atoned horror", "deformed revenant")
+  private val SLAYER_FARM_MOB_KEYWORDS = arrayOf("zombie", "crypt ghoul", "golden ghoul")
+  private val SLAYER_BOSS_TAB_KEYWORDS = arrayOf("slay the boss", "revenant horror", "atoned horror")
+  private val SLAYER_BOSS_CLEAR_KEYWORDS = arrayOf("boss slain", "slayer quest complete")
+  private val SLAYER_QUEST_TAB_KEYWORDS = arrayOf("slayer quest", "zombie slayer", "revenant horror")
+  private val SLAYER_WAND_OF_ATONEMENT_KEYWORDS = arrayOf("wand of atonement")
+  private val SLAYER_ZOMBIE_SWORD_KEYWORDS = arrayOf("zombie sword")
+  private val SLAYER_OVERFLUX_KEYWORDS = arrayOf("overflux")
+  private val SLAYER_RAGNAROK_KEYWORDS = arrayOf("ragnarok", "ragnorak")
+  private val SLAYER_BAD_HEALTH_KEYWORDS = arrayOf("sword of bad health")
+  private val SLAYER_BATPHONE_KEYWORDS = arrayOf("maddox batphone", "batphone")
+  private val SLAYER_MADDOX_SCREEN_KEYWORDS = arrayOf("maddox", "slayer")
+  private val SLAYER_MADDOX_REVENANT_KEYWORDS = arrayOf("revenant horror", "zombie slayer", "revenant")
+  private val SLAYER_MADDOX_RESTART_KEYWORDS = arrayOf("restart", "start quest", "begin quest", "start slayer")
+  private val SLAYER_MADDOX_CONFIRM_KEYWORDS = arrayOf("confirm", "click to confirm")
   private val CYAN_COLOR = Color(0, 255, 255)
   private val PINK_COLOR = Color(255, 105, 180)
 }

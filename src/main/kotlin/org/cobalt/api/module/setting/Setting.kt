@@ -29,6 +29,11 @@ abstract class Setting<T>(
   open var value: T,
 ) : ReadWriteProperty<SettingsContainer, T>, PropertyDelegateProvider<SettingsContainer, ReadWriteProperty<SettingsContainer, T>> {
 
+  /**
+   * Optional UI grouping label used by config panels to organize settings into tabs/sections.
+   */
+  open var uiGroup: String = DEFAULT_UI_GROUP
+
   open val defaultValue: T
     get() = value
 
@@ -48,4 +53,12 @@ abstract class Setting<T>(
   abstract fun read(element: JsonElement)
   abstract fun write(): JsonElement
 
+  companion object {
+    const val DEFAULT_UI_GROUP: String = "General"
+  }
+}
+
+fun <T, S : Setting<T>> S.inGroup(group: String): S {
+  uiGroup = group.trim().ifBlank { Setting.DEFAULT_UI_GROUP }
+  return this
 }

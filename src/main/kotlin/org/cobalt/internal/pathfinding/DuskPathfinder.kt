@@ -67,7 +67,7 @@ private const val NAVMESH_SCAN_RADIUS = 4
 private const val NAVMESH_SCAN_VERTICAL = 2
 private const val NAVMESH_REPATH_TICKS = 10
 private const val PATH_TAG = "pathfinding"
-private const val STUCK_TICKS_LIMIT = 15
+private const val STUCK_TICKS_LIMIT = 8
 private const val STUCK_MOVEMENT_EPS = 5.0e-5
 private const val REPATH_INTERVAL_TICKS = 60
 private const val MIN_SOFT_REPATH_ATTEMPT_TICKS = 20L
@@ -77,9 +77,9 @@ private const val PASSED_DOT_RATIO = 0.1
 private const val PASSED_DISTANCE_EPS = 0.5
 private const val SPLINE_ADVANCE_EPS = 0.25
 private const val BEHIND_YAW_DEGREES = 120.0
-private const val BEHIND_TICKS_LIMIT = 10
+private const val BEHIND_TICKS_LIMIT = 6
 private const val BEHIND_DIST_EPS = 0.05
-private const val NO_PROGRESS_TICKS_LIMIT = 30
+private const val NO_PROGRESS_TICKS_LIMIT = 20
 private const val NO_PROGRESS_EPS = 0.02
 private const val FORCE_DIRECT_TICKS = 30
 private const val SPLINE_FOLLOW_EPS = 0.9
@@ -108,8 +108,8 @@ private const val WALL_AVOID_STRAFE = 0.75f
 private const val WALL_AVOID_FORWARD = 0.3f
 private const val PATH_CACHE_TTL_TICKS = 60
 private const val PATH_CACHE_MAX = 512
-private const val AVOID_STUCK_TTL_TICKS = 400L
-private const val AVOID_STUCK_RADIUS = 1
+private const val AVOID_STUCK_TTL_TICKS = 800L
+private const val AVOID_STUCK_RADIUS = 2
 private const val ETHERWARP_COOLDOWN_TICKS = 40L
 private const val ETHERWARP_ALIGN_TICKS = 6
 private const val ETHERWARP_SNEAK_TICKS = 2
@@ -146,6 +146,7 @@ private var moveVectorField: Field? = null
 private var keyPressesField: Field? = null
 private var inputClass: Class<*>? = null
 private var stuckTicks = 0
+private var stuckJumpAttempted = false
 private var lastPosX = 0.0
 private var lastPosY = 0.0
 private var lastPosZ = 0.0
@@ -1625,6 +1626,14 @@ private fun handleStuck(
 			"Path",
 			"Stuck: no movement for ${stuckTicks} ticks at ${player.blockX} ${player.blockY} ${player.blockZ}$targetText"
 		)
+		// First attempt: try a jump to dislodge from ledges/edges
+		if (player.onGround() && !stuckJumpAttempted) {
+			stuckJumpAttempted = true
+			jumpHoldTicks = JUMP_HOLD_TICKS
+			stuckTicks = 0
+			return true
+		}
+		stuckJumpAttempted = false
 		if (attemptEscapeHole(client, level, player, waypoint)) {
 			stuckTicks = 0
 			return true
@@ -2699,6 +2708,7 @@ private fun updateLastPos(player: net.minecraft.client.player.LocalPlayer) {
 
 private fun resetStuck() {
 	stuckTicks = 0
+	stuckJumpAttempted = false
 	hasLastPos = false
 	pauseTicks = 0
 	behindTicks = 0

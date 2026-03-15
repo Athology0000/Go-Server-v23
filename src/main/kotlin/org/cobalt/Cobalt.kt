@@ -10,6 +10,7 @@ import org.cobalt.api.module.ModuleManager
 import org.cobalt.api.notification.NotificationManager
 import org.cobalt.api.rotation.RotationExecutor
 import org.cobalt.api.util.TickScheduler
+import org.cobalt.internal.combat.CombatHudModule
 import org.cobalt.internal.combat.CombatMacroModule
 import org.cobalt.internal.command.MainCommand
 import org.cobalt.internal.dungeons.DungeonsModule
@@ -55,6 +56,7 @@ object Cobalt : ClientModInitializer {
         VeinDirectionModule,
         AutoLanternModule,
         CombatMacroModule,
+        CombatHudModule,
         DungeonsModule,
         EtherwarpHelperModule,
         LeftClickEtherwarpModule,

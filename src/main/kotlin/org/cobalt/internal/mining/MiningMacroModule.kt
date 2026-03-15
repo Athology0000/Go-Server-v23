@@ -18,20 +18,29 @@ import org.cobalt.api.module.setting.impl.InfoSetting
 import org.cobalt.api.module.setting.impl.InfoType
 import org.cobalt.api.module.setting.impl.ModeSetting
 import org.cobalt.api.module.setting.impl.SliderSetting
+import org.cobalt.api.event.impl.render.WorldRenderEvent
 import org.cobalt.api.rotation.RotationExecutor
 import org.cobalt.api.util.AngleUtils
+import org.cobalt.internal.pathfinding.HeadRotationModule
 import org.cobalt.api.util.ChatUtils
 import org.cobalt.api.util.InventoryUtils
 import org.cobalt.api.pathfinder.minecraft.MinecraftPathingRules
 import org.cobalt.internal.etherwarp.EtherwarpLogic
 import org.cobalt.internal.pathfinding.DuskPathfinder
-import org.cobalt.internal.pathfinding.HeadRotationModule
 import org.cobalt.internal.pathfinding.PathfindingModule
 import org.cobalt.internal.rotation.RotationsModule
 
 object MiningMacroModule : Module("Mining Macro") {
 
   private val mc: Minecraft = Minecraft.getInstance()
+
+  // Frame-based rotation — target set in onTick, applied every render frame via onFrame.
+  private var frameRotTarget:     Vec3?  = null
+  private var frameRotSpeedScale: Float  = 1f
+  private var frameRotAccelScale: Float  = 1f
+  private var frameRotPitchStep:  Float  = 3.5f
+  private var frameRotMaxSpeed:   Float  = 100f
+  private var frameRotMaxAccel:   Float  = 220f
 
   private val enabled = CheckboxSetting(
     "Enabled",
@@ -744,16 +753,12 @@ object MiningMacroModule : Module("Mining Macro") {
   }
 
   private fun startMining(player: Player, target: BlockPos) {
-    val aim = Vec3(target.x + 0.5, target.y + 0.5, target.z + 0.5)
-    RotationExecutor.stopRotating()
-    applyHeadRotation(
-      player, aim,
-      maxSpeedScale = RotationsModule.sample(RotationsModule.miningSpeedScale.value).toFloat(),
-      accelScale = RotationsModule.sample(RotationsModule.miningAccelScale.value).toFloat(),
-      maxPitchStep = RotationsModule.sample(RotationsModule.miningPitchStep.value).toFloat(),
-      maxTurnSpeed = RotationsModule.sample(RotationsModule.miningMaxSpeed.value).toFloat(),
-      maxTurnAccel = RotationsModule.sample(RotationsModule.miningMaxAccel.value).toFloat(),
-    )
+    frameRotTarget     = Vec3(target.x + 0.5, target.y + 0.5, target.z + 0.5)
+    frameRotSpeedScale = RotationsModule.sample(RotationsModule.miningSpeedScale.value).toFloat()
+    frameRotAccelScale = RotationsModule.sample(RotationsModule.miningAccelScale.value).toFloat()
+    frameRotPitchStep  = RotationsModule.sample(RotationsModule.miningPitchStep.value).toFloat()
+    frameRotMaxSpeed   = RotationsModule.sample(RotationsModule.miningMaxSpeed.value).toFloat()
+    frameRotMaxAccel   = RotationsModule.sample(RotationsModule.miningMaxAccel.value).toFloat()
     mc.options.keyAttack?.setDown(true)
     miningActive = true
   }
@@ -763,6 +768,7 @@ object MiningMacroModule : Module("Mining Macro") {
       mc.options.keyAttack?.setDown(false)
       miningActive = false
     }
+    frameRotTarget = null
   }
 
   private fun tryPlaceLantern(
@@ -1019,13 +1025,15 @@ object MiningMacroModule : Module("Mining Macro") {
     }
 
     val targetCenter = Vec3(target.x + 0.5, target.y + 0.5, target.z + 0.5)
-    val (yawError, pitchError) = applyHeadRotation(
-      player, targetCenter,
-      maxSpeedScale = RotationsModule.sample(RotationsModule.warpSpeedScale.value).toFloat(),
-      accelScale = RotationsModule.sample(RotationsModule.warpAccelScale.value).toFloat(),
-      maxTurnSpeed = RotationsModule.sample(RotationsModule.miningMaxSpeed.value).toFloat(),
-      maxTurnAccel = RotationsModule.sample(RotationsModule.miningMaxAccel.value).toFloat(),
-    )
+    frameRotTarget     = targetCenter
+    frameRotSpeedScale = RotationsModule.sample(RotationsModule.warpSpeedScale.value).toFloat()
+    frameRotAccelScale = RotationsModule.sample(RotationsModule.warpAccelScale.value).toFloat()
+    frameRotPitchStep  = RotationsModule.sample(RotationsModule.miningPitchStep.value).toFloat()
+    frameRotMaxSpeed   = RotationsModule.sample(RotationsModule.miningMaxSpeed.value).toFloat()
+    frameRotMaxAccel   = RotationsModule.sample(RotationsModule.miningMaxAccel.value).toFloat()
+    val targetRotation = AngleUtils.getRotation(targetCenter)
+    val yawError   = abs(AngleUtils.getRotationDelta(player.yRot, targetRotation.yaw)).toDouble()
+    val pitchError = abs(targetRotation.pitch - player.xRot).toDouble()
 
     when (warpStage) {
       0 -> {
@@ -1066,34 +1074,53 @@ object MiningMacroModule : Module("Mining Macro") {
     }
   }
 
+  @SubscribeEvent
+  fun onFrame(@Suppress("UNUSED_PARAMETER") event: WorldRenderEvent.Last) {
+    val target = frameRotTarget ?: return
+    val player = mc.player ?: return
+    applyHeadRotation(
+      player, target,
+      maxSpeedScale = frameRotSpeedScale,
+      accelScale    = frameRotAccelScale,
+      maxPitchStep  = frameRotPitchStep,
+      maxTurnSpeed  = frameRotMaxSpeed,
+      maxTurnAccel  = frameRotMaxAccel,
+    )
+  }
+
   private fun applyHeadRotation(
     player: Player,
     target: Vec3,
     maxSpeedScale: Float = 1f,
-    accelScale: Float = 1f,
-    maxPitchStep: Float = 6f,
-    maxTurnSpeed: Float = 100f,
-    maxTurnAccel: Float = 220f,
+    accelScale: Float    = 1f,
+    maxPitchStep: Float  = 6f,
+    maxTurnSpeed: Float  = 100f,
+    maxTurnAccel: Float  = 220f,
   ): Pair<Double, Double> {
     val targetRotation = AngleUtils.getRotation(target)
     val yawDelta = AngleUtils.getRotationDelta(player.yRot, targetRotation.yaw)
-    val yawStep = HeadRotationModule.computeTurnDelta(yawDelta, maxSpeedScale = maxSpeedScale, accelScale = accelScale, maxTurnSpeed = maxTurnSpeed, maxTurnAccel = maxTurnAccel)
-    player.yRot = AngleUtils.normalizeAngle(player.yRot + yawStep)
+    val yawStep  = HeadRotationModule.computeTurnDelta(
+      yawDelta,
+      maxSpeedScale = maxSpeedScale,
+      accelScale    = accelScale,
+      maxTurnSpeed  = maxTurnSpeed,
+      maxTurnAccel  = maxTurnAccel,
+    )
+    player.yRot     = AngleUtils.normalizeAngle(player.yRot + yawStep)
     player.yHeadRot = player.yRot
     player.yBodyRot = player.yRot
 
-    // Use accelerated pitch smoothing so rapid target switches don't snap
-    val rawPitchDelta = (targetRotation.pitch - player.xRot)
-    val pitchStep = HeadRotationModule.computePitchDelta(
-      rawPitchDelta,
+    val pitchDelta = targetRotation.pitch - player.xRot
+    val pitchStep  = HeadRotationModule.computePitchDelta(
+      pitchDelta,
       maxSpeedScale = maxSpeedScale,
-      accelScale = accelScale,
+      accelScale    = accelScale,
       maxPitchSpeed = maxPitchStep * 20f,
       maxPitchAccel = maxPitchStep * 60f,
     )
     player.xRot = (player.xRot + pitchStep).coerceIn(-89.9f, 89.9f)
 
-    val yawError = abs(AngleUtils.getRotationDelta(player.yRot, targetRotation.yaw)).toDouble()
+    val yawError   = abs(AngleUtils.getRotationDelta(player.yRot, targetRotation.yaw)).toDouble()
     val pitchError = abs(targetRotation.pitch - player.xRot).toDouble()
     return yawError to pitchError
   }
@@ -1104,6 +1131,7 @@ object MiningMacroModule : Module("Mining Macro") {
     warpStage = 0
     warpTarget = null
     warpStageTicks = 0
+    frameRotTarget = null
   }
 
   private fun ensureEtherwarpHotbarSelected(): Boolean {

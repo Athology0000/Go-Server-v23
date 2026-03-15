@@ -7,11 +7,22 @@ import org.cobalt.api.module.ModuleManager
 import org.cobalt.api.ui.theme.ThemeManager
 import org.cobalt.api.util.ui.NVGRenderer
 import org.cobalt.internal.loader.AddonLoader
-import org.cobalt.internal.mining.MiningModule
+import org.cobalt.internal.mining.AutoLanternModule
+import org.cobalt.internal.mining.CommissionHudModule
+import org.cobalt.internal.mining.CommissionMacroModule
 import org.cobalt.internal.mining.FairyModule
-import org.cobalt.internal.mining.RoutesModule
 import org.cobalt.internal.mining.MiningMacroModule
+import org.cobalt.internal.mining.MiningModule
+import org.cobalt.internal.mining.RoutesModule
+import org.cobalt.internal.mining.VeinDirectionModule
 import org.cobalt.internal.combat.CombatMacroModule
+import org.cobalt.internal.visual.BlockOutlineModule
+import org.cobalt.internal.visual.BlockOverlayModule
+import org.cobalt.internal.visual.DarkModeModule
+import org.cobalt.internal.visual.FreecamModule
+import org.cobalt.internal.visual.FullBrightModule
+import org.cobalt.internal.visual.HotbarOverlayModule
+import org.cobalt.internal.visual.OrbitFreecamModule
 import org.cobalt.internal.ui.UIComponent
 import org.cobalt.internal.ui.components.UIAddonEntry
 import org.cobalt.internal.ui.components.UITopbar
@@ -88,86 +99,71 @@ internal class UIAddonList : UIPanel(
 
     val addonModules = AddonLoader.getAddons().flatMap { it.second.getModules() }.toSet()
     val builtinModules = ModuleManager.getModules().filter { it !in addonModules }
-    val miningModules =
-      builtinModules.filter {
-        it == MiningModule ||
-          it == MiningMacroModule ||
-          it == FairyModule ||
-          it == RoutesModule ||
-          it.name.equals("Mining", ignoreCase = true) ||
-          it.name.equals("Mining Macro", ignoreCase = true) ||
-          it.name.equals("Fairy", ignoreCase = true) ||
-          it.name.equals("Routes", ignoreCase = true)
-      }
-    val combatModules =
-      builtinModules.filter {
-        it == CombatMacroModule || it.name.equals("Combat", ignoreCase = true)
-      }
-    val remainingBuiltinModules = builtinModules.filter { it !in miningModules && it !in combatModules }
+
+    val miningModules = builtinModules.filter {
+      it == MiningModule || it == MiningMacroModule || it == FairyModule ||
+        it == RoutesModule || it == CommissionMacroModule || it == CommissionHudModule ||
+        it == VeinDirectionModule || it == AutoLanternModule
+    }
+
+    val combatModules = builtinModules.filter {
+      it == CombatMacroModule || it.name.equals("Combat HUD", ignoreCase = true)
+    }
+
+    val visualModules = builtinModules.filter {
+      it == FullBrightModule || it == DarkModeModule || it == FreecamModule ||
+        it == OrbitFreecamModule || it == BlockOverlayModule || it == BlockOutlineModule ||
+        it == HotbarOverlayModule ||
+        it.name.equals("Watermark", ignoreCase = true) ||
+        it.name.equals("Inventory HUD", ignoreCase = true)
+    }
+
+    val coreModules = builtinModules.filter {
+      it !in miningModules && it !in combatModules && it !in visualModules
+    }
 
     val version = FabricLoader.getInstance()
       .getModContainer("cobalt")
       .map { it.metadata.version.friendlyString }
       .orElse("builtin")
 
-    if (miningModules.isNotEmpty()) {
-      val miningMetadata = AddonMetadata(
-        id = "cobalt-mining",
-        name = "Mining",
-        version = version,
-        entrypoints = emptyList(),
-        mixins = emptyList()
-      )
+    // Added in reverse display order (each add(0, …) pushes to front).
+    // Final display order: Mining → Combat → Visuals → Core → external addons
 
-      val miningAddon = object : Addon() {
+    if (coreModules.isNotEmpty()) {
+      val meta = AddonMetadata("cobalt", "Core", version, emptyList(), emptyList())
+      entries.add(0, UIAddonEntry(meta, object : Addon() {
         override fun onLoad() {}
-
         override fun onUnload() {}
+        override fun getModules() = coreModules
+      }))
+    }
 
-        override fun getModules() = miningModules
-      }
-
-      entries.add(0, UIAddonEntry(miningMetadata, miningAddon))
+    if (visualModules.isNotEmpty()) {
+      val meta = AddonMetadata("cobalt-visuals", "Visuals", version, emptyList(), emptyList())
+      entries.add(0, UIAddonEntry(meta, object : Addon() {
+        override fun onLoad() {}
+        override fun onUnload() {}
+        override fun getModules() = visualModules
+      }))
     }
 
     if (combatModules.isNotEmpty()) {
-      val combatMetadata = AddonMetadata(
-        id = "cobalt-combat",
-        name = "Combat",
-        version = version,
-        entrypoints = emptyList(),
-        mixins = emptyList()
-      )
-
-      val combatAddon = object : Addon() {
+      val meta = AddonMetadata("cobalt-combat", "Combat", version, emptyList(), emptyList())
+      entries.add(0, UIAddonEntry(meta, object : Addon() {
         override fun onLoad() {}
-
         override fun onUnload() {}
-
         override fun getModules() = combatModules
-      }
-
-      entries.add(0, UIAddonEntry(combatMetadata, combatAddon))
+      }))
     }
 
-    if (remainingBuiltinModules.isNotEmpty()) {
-      val builtinMetadata = AddonMetadata(
-        id = "cobalt",
-        name = "Dutt Client",
-        version = version,
-        entrypoints = emptyList(),
-        mixins = emptyList()
-      )
-
-      val builtinAddon = object : Addon() {
+    if (miningModules.isNotEmpty()) {
+      val meta = AddonMetadata("cobalt-mining", "Mining", version, emptyList(), emptyList())
+      entries.add(0, UIAddonEntry(meta, object : Addon() {
         override fun onLoad() {}
-
         override fun onUnload() {}
-
-        override fun getModules() = remainingBuiltinModules
-      }
-
-      entries.add(0, UIAddonEntry(builtinMetadata, builtinAddon))
+        override fun getModules() = miningModules
+      }))
     }
 
     return entries

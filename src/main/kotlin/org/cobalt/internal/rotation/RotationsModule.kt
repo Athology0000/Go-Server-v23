@@ -65,7 +65,7 @@ object RotationsModule : Module("Rotations") {
     "Mining Accel Scale", "Accel scale multiplier while mining.", Pair(0.6, 1.0), 0.1, 2.0
   )
   val miningPitchStep = RangeSetting(
-    "Mining Pitch Step", "Max pitch step per tick while mining.", Pair(2.5, 4.5), 0.5, 15.0
+    "Mining Pitch Step", "Max pitch step per frame while mining.", Pair(2.5, 4.5), 0.5, 15.0
   )
 
   // --- Warp ---

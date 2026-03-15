@@ -2,6 +2,7 @@ package org.cobalt.internal.ui.panel.panels
 
 import org.cobalt.api.addon.Addon
 import org.cobalt.api.addon.AddonMetadata
+import org.cobalt.api.module.setting.Setting
 import org.cobalt.api.module.setting.impl.*
 import org.cobalt.api.ui.theme.ThemeManager
 import org.cobalt.api.util.ui.NVGRenderer
@@ -25,6 +26,14 @@ internal class UIModuleList(
   height = 600F
 ) {
 
+  private data class SettingsTabHitbox(
+    val name: String,
+    val x: Float,
+    val y: Float,
+    val width: Float,
+    val height: Float,
+  )
+
   private val topBar = UITopbar("Modules")
   private val backButton = UIBackButton()
 
@@ -44,25 +53,14 @@ internal class UIModuleList(
   )
 
   private var module = modules.first()
+  private var settingsTabs = emptyList<String>()
+  private var selectedSettingsTab = Setting.DEFAULT_UI_GROUP
+  private var tabHitboxes = emptyList<SettingsTabHitbox>()
 
   /**
    * Settings list (right side)
    */
-  private var settings = module.getSettings()
-    .map {
-      when (it) {
-        is ActionSetting -> UIActionSetting(it)
-        is CommandHotkeySetting -> UICommandHotkeySetting(it)
-        is CheckboxSetting -> UICheckboxSetting(it)
-        is ColorSetting -> UIColorSetting(it)
-        is InfoSetting -> UIInfoSetting(it)
-        is KeyBindSetting -> UIKeyBindSetting(it)
-        is ModeSetting -> UIModeSetting(it)
-        is RangeSetting -> UIRangeSetting(it)
-        is SliderSetting -> UISliderSetting(it)
-        else -> UITextSetting(it as TextSetting)
-      }
-    }
+  private var settings = emptyList<UIComponent>()
 
   private val settingsScroll = ScrollHandler()
   private val settingsLayout = GridLayout(
@@ -73,10 +71,12 @@ internal class UIModuleList(
   )
 
   init {
-    components.addAll(settings)
     components.addAll(modules)
     components.add(backButton)
     components.add(topBar)
+
+    refreshTabs(resetSelection = true)
+    rebuildSettings(resetScroll = false)
 
     topBar.searchChanged { searchText ->
       modules = if (searchText.isEmpty()) {
@@ -97,6 +97,8 @@ internal class UIModuleList(
       } else {
         components.removeAll(settings)
         settings = emptyList()
+        settingsTabs = emptyList()
+        tabHitboxes = emptyList()
       }
     }
   }
@@ -139,12 +141,23 @@ internal class UIModuleList(
     NVGRenderer.popScissor()
 
     val settingsStartX = x + width / 4F + 20F
+    val settingsRegionWidth = width * 3F / 4F - 40F
+    val showTabs = shouldShowTabs()
 
-    settingsScroll.setMaxScroll(settingsLayout.contentHeight(settings.size) - 15F, visibleHeight + 35F)
-    NVGRenderer.pushScissor(settingsStartX, startY - 35F, width * 3F / 4F - 40F, visibleHeight + 35F)
+    if (showTabs) {
+      renderSettingsTabs(settingsStartX, startY - TAB_BAR_HEIGHT - TAB_BAR_GAP, settingsRegionWidth)
+    } else {
+      tabHitboxes = emptyList()
+    }
+
+    val settingsViewY = if (showTabs) startY else startY - 35F
+    val settingsViewHeight = if (showTabs) visibleHeight else visibleHeight + 35F
+
+    settingsScroll.setMaxScroll(settingsLayout.contentHeight(settings.size) - 15F, settingsViewHeight)
+    NVGRenderer.pushScissor(settingsStartX, settingsViewY, settingsRegionWidth, settingsViewHeight)
 
     val settingsScrollOffset = settingsScroll.getOffset()
-    settingsLayout.layout(settingsStartX, startY - 35F - settingsScrollOffset, settings)
+    settingsLayout.layout(settingsStartX, settingsViewY - settingsScrollOffset, settings)
     settings.forEach(UIComponent::render)
 
     NVGRenderer.popScissor()
@@ -155,6 +168,21 @@ internal class UIModuleList(
         is UIColorSetting -> setting.drawColorPicker()
       }
     }
+  }
+
+  override fun mouseClicked(button: Int): Boolean {
+    if (button == 0 && shouldShowTabs()) {
+      val hit = tabHitboxes.firstOrNull { tab ->
+        isHoveringOver(tab.x, tab.y, tab.width, tab.height)
+      }
+      if (hit != null && hit.name != selectedSettingsTab) {
+        selectedSettingsTab = hit.name
+        rebuildSettings()
+        return true
+      }
+    }
+
+    return super.mouseClicked(button)
   }
 
   override fun mouseScrolled(horizontalAmount: Double, verticalAmount: Double): Boolean {
@@ -177,6 +205,8 @@ internal class UIModuleList(
   }
 
   fun setModule(module: UIModule) {
+    val moduleChanged = this.module != module
+
     modules.forEach {
       when {
         it == module -> module.setSelected()
@@ -185,34 +215,107 @@ internal class UIModuleList(
     }
 
     this.module = module
-    components.removeAll(settings)
-
-    this.settings = module.getSettings()
-      .filter {
-        if (topBar.getSearchText().isEmpty()) {
-          true
-        } else {
-          val searchLower = topBar.getSearchText().lowercase()
-
-          it.name.lowercase().contains(searchLower) || it.description.lowercase().contains(searchLower)
-        }
-      }
-      .map {
-        when (it) {
-        is ActionSetting -> UIActionSetting(it)
-        is CommandHotkeySetting -> UICommandHotkeySetting(it)
-        is CheckboxSetting -> UICheckboxSetting(it)
-        is ColorSetting -> UIColorSetting(it)
-        is InfoSetting -> UIInfoSetting(it)
-        is KeyBindSetting -> UIKeyBindSetting(it)
-          is ModeSetting -> UIModeSetting(it)
-          is RangeSetting -> UIRangeSetting(it)
-          is SliderSetting -> UISliderSetting(it)
-          else -> UITextSetting(it as TextSetting)
-        }
-      }.also {
-        components.addAll(it)
-      }
+    refreshTabs(resetSelection = moduleChanged)
+    rebuildSettings()
   }
 
+  private fun refreshTabs(resetSelection: Boolean) {
+    val groups = module.getSettings()
+      .map { setting -> setting.uiGroup.ifBlank { Setting.DEFAULT_UI_GROUP } }
+      .distinct()
+
+    settingsTabs = if (groups.isEmpty()) listOf(Setting.DEFAULT_UI_GROUP) else groups
+    if (resetSelection || selectedSettingsTab !in settingsTabs) {
+      selectedSettingsTab = settingsTabs.first()
+    }
+    tabHitboxes = emptyList()
+  }
+
+  private fun shouldShowTabs(): Boolean {
+    return settingsTabs.size > 1 && topBar.getSearchText().isEmpty()
+  }
+
+  private fun rebuildSettings(resetScroll: Boolean = true) {
+    components.removeAll(settings)
+    settings = filteredSettings().map(::toComponent)
+    components.addAll(settings)
+    if (resetScroll) {
+      settingsScroll.reset()
+    }
+  }
+
+  private fun filteredSettings(): List<Setting<*>> {
+    val searchLower = topBar.getSearchText().trim().lowercase()
+    return module.getSettings().filter { setting ->
+      val matchesSearch = searchLower.isEmpty() ||
+        setting.name.lowercase().contains(searchLower) ||
+        setting.description.lowercase().contains(searchLower)
+      if (!matchesSearch) {
+        return@filter false
+      }
+
+      if (searchLower.isNotEmpty() || settingsTabs.size <= 1) {
+        return@filter true
+      }
+
+      val group = setting.uiGroup.ifBlank { Setting.DEFAULT_UI_GROUP }
+      group == selectedSettingsTab
+    }
+  }
+
+  private fun toComponent(setting: Setting<*>): UIComponent {
+    return when (setting) {
+      is ActionSetting -> UIActionSetting(setting)
+      is CommandHotkeySetting -> UICommandHotkeySetting(setting)
+      is CheckboxSetting -> UICheckboxSetting(setting)
+      is ColorSetting -> UIColorSetting(setting)
+      is InfoSetting -> UIInfoSetting(setting)
+      is KeyBindSetting -> UIKeyBindSetting(setting)
+      is ModeSetting -> UIModeSetting(setting)
+      is RangeSetting -> UIRangeSetting(setting)
+      is SliderSetting -> UISliderSetting(setting)
+      else -> UITextSetting(setting as TextSetting)
+    }
+  }
+
+  private fun renderSettingsTabs(startX: Float, y: Float, maxWidth: Float) {
+    val hitboxes = ArrayList<SettingsTabHitbox>(settingsTabs.size)
+    var cursorX = startX
+    val maxX = startX + maxWidth
+
+    for (tab in settingsTabs) {
+      val tabWidth = NVGRenderer.textWidth(tab, TAB_TEXT_SIZE) + TAB_HORIZONTAL_PADDING * 2F
+      if (cursorX + tabWidth > maxX) {
+        break
+      }
+
+      val selected = tab == selectedSettingsTab
+      val hovering = isHoveringOver(cursorX, y, tabWidth, TAB_BAR_HEIGHT)
+      val bgColor = when {
+        selected -> ThemeManager.currentTheme.selectedOverlay
+        hovering -> ThemeManager.currentTheme.overlay
+        else -> ThemeManager.currentTheme.controlBg
+      }
+      val borderColor = if (selected) ThemeManager.currentTheme.accent else ThemeManager.currentTheme.controlBorder
+      val textColor = if (selected) ThemeManager.currentTheme.accent else ThemeManager.currentTheme.text
+
+      NVGRenderer.rect(cursorX, y, tabWidth, TAB_BAR_HEIGHT, bgColor, 5F)
+      NVGRenderer.hollowRect(cursorX, y, tabWidth, TAB_BAR_HEIGHT, 1F, borderColor, 5F)
+      NVGRenderer.text(tab, cursorX + TAB_HORIZONTAL_PADDING, y + TAB_TEXT_Y, TAB_TEXT_SIZE, textColor)
+
+      hitboxes.add(SettingsTabHitbox(tab, cursorX, y, tabWidth, TAB_BAR_HEIGHT))
+      cursorX += tabWidth + TAB_GAP
+    }
+
+    tabHitboxes = hitboxes
+  }
+
+  companion object {
+    private const val TAB_BAR_HEIGHT = 24F
+    private const val TAB_HORIZONTAL_PADDING = 10F
+    private const val TAB_GAP = 8F
+    private const val TAB_TEXT_SIZE = 12F
+    private const val TAB_TEXT_Y = 5F
+    private const val TAB_BAR_GAP = 8F
+  }
 }

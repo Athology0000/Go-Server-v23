@@ -1,8 +1,11 @@
 package org.cobalt.api.pathfinder.pathing.processing.impl
 
+import kotlin.math.abs
+import kotlin.math.max
 import kotlin.math.sqrt
 import net.minecraft.client.Minecraft
 import net.minecraft.core.BlockPos
+import net.minecraft.world.level.Level
 import org.cobalt.api.pathfinder.pathing.processing.Cost
 import org.cobalt.api.pathfinder.pathing.processing.NodeProcessor
 import org.cobalt.api.pathfinder.pathing.processing.context.EvaluationContext
@@ -20,6 +23,11 @@ class MinecraftPathProcessor : NodeProcessor {
 
   companion object {
     private const val DEFAULT_MOB_JUMP_HEIGHT = 1.125 // WalkNodeEvaluator
+    private const val LOW_CEILING_PENALTY = 0.08
+    private const val ADJACENT_WALL_PENALTY = 0.14
+    private const val ADJACENT_CORNER_PENALTY = 0.1
+    private const val SECOND_RING_WALL_PENALTY = 0.045
+    private const val SECOND_RING_CORNER_PENALTY = 0.028
   }
 
   override fun isValid(context: EvaluationContext): Boolean {
@@ -83,22 +91,7 @@ class MinecraftPathProcessor : NodeProcessor {
     }
 
     val blockPos = BlockPos(currentPos.flooredX, currentPos.flooredY, currentPos.flooredZ)
-
-    // i dont want it to like tight corners so more cost
-    var crampedPenalty = 0.0
-    for (i in 2..3) {
-      if (level.getBlockState(blockPos.above(i)).canOcclude()) {
-        crampedPenalty += 0.1 / i.toDouble()
-      }
-    }
-    if (level.getBlockState(blockPos.west()).canOcclude() ||
-      level.getBlockState(blockPos.east()).canOcclude() ||
-      level.getBlockState(blockPos.north()).canOcclude() ||
-      level.getBlockState(blockPos.south()).canOcclude()
-    ) {
-      crampedPenalty += 0.05
-    }
-    additionalCost += crampedPenalty
+    additionalCost += calculateClearancePenalty(level, blockPos)
 
     // just make stuff smoother no more zigzags
     val gpPos = context.grandparentPathPosition
@@ -117,6 +110,48 @@ class MinecraftPathProcessor : NodeProcessor {
     }
 
     return Cost.of(additionalCost)
+  }
+
+  // Prefer tiles with horizontal body clearance so the shared walker stops hugging walls.
+  private fun calculateClearancePenalty(level: Level, blockPos: BlockPos): Double {
+    var penalty = 0.0
+
+    for (headOffset in 0..1) {
+      for (dx in -2..2) {
+        for (dz in -2..2) {
+          if (dx == 0 && dz == 0) continue
+
+          val samplePos = blockPos.offset(dx, headOffset, dz)
+          if (!hasBlockingCollision(level, samplePos)) continue
+
+          val absX = abs(dx)
+          val absZ = abs(dz)
+          val chebyshev = max(absX, absZ)
+          val axial = absX == 0 || absZ == 0
+          val basePenalty =
+            when {
+              chebyshev <= 1 && axial -> ADJACENT_WALL_PENALTY
+              chebyshev <= 1 -> ADJACENT_CORNER_PENALTY
+              axial -> SECOND_RING_WALL_PENALTY
+              else -> SECOND_RING_CORNER_PENALTY
+            }
+
+          penalty += if (headOffset == 0) basePenalty else basePenalty * 0.85
+        }
+      }
+    }
+
+    for (i in 2..3) {
+      if (hasBlockingCollision(level, blockPos.above(i))) {
+        penalty += LOW_CEILING_PENALTY / (i - 1).toDouble()
+      }
+    }
+
+    return penalty
+  }
+
+  private fun hasBlockingCollision(level: Level, pos: BlockPos): Boolean {
+    return !level.getBlockState(pos).getCollisionShape(level, pos).isEmpty
   }
 
 }
