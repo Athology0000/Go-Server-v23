@@ -1,11 +1,15 @@
 package org.cobalt.internal.visual
 
+import kotlin.math.cos
 import kotlin.math.sin
 import net.minecraft.client.Minecraft
 import org.cobalt.api.event.EventBus
 import org.cobalt.api.event.annotation.SubscribeEvent
 import org.cobalt.api.event.impl.render.GuiRenderEvent
-import org.cobalt.api.event.impl.render.NvgEvent
+import org.cobalt.api.hud.HudAnchor
+import org.cobalt.api.hud.HudElement
+import org.cobalt.api.hud.HudModuleManager
+import org.cobalt.api.hud.hudElement
 import org.cobalt.api.module.Module
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.util.ui.NVGRenderer
@@ -23,121 +27,107 @@ object HotbarOverlayModule : Module("Liquid Hotbar") {
 
   val isEnabled: Boolean get() = enabledSetting.value
 
+  private lateinit var hudRef: HudElement
+
+  /**
+   * Width/height expressed in screen pixels so getScreenPosition() returns exact screen coords.
+   * minScale = maxScale = 1 disables resize; the element is drag-only.
+   */
+  val hotbarHud = hudElement("liquid-hotbar", "Liquid Hotbar", "Draggable liquid glass hotbar") {
+    anchor   = HudAnchor.BOTTOM_CENTER
+    offsetX  = 0f
+    offsetY  = 0f
+    minScale = 1f
+    maxScale = 1f
+
+    // Base size in screen pixels — tracks guiScale so position stays correct
+    width  { mc.window.guiScale.toFloat() * 182f }
+    height { mc.window.guiScale.toFloat() * 22f  }
+
+    render { _, _, _ ->
+      if (!isEnabled) return@render
+      val sc  = mc.window.guiScale.toFloat()
+      val bw  = sc * 182f
+      val bh  = sc * 22f
+      val rad = 4f * sc
+
+      // Selected slot dark rounded overlay (on top of items — intentional)
+      val sel = mc.player?.inventory?.selectedSlot ?: 0
+      NVGRenderer.rect((1f + sel.toFloat() * 20f) * sc, sc, 20f * sc, 20f * sc, 0x55000000.toInt(), 4f * sc)
+
+      // Rotating gradient border — same animation as inventory HUD
+      val angle  = (System.currentTimeMillis() % 12000L).toFloat() / 12000f * (Math.PI * 2.0).toFloat()
+      val shiftX = cos(angle) * (bw * 0.45f)
+      val shiftY = sin(angle) * (bh * 0.45f)
+      NVGRenderer.hollowGradientRectShifted(
+        0f, 0f, bw, bh,
+        sc * 1.5f,
+        0xFF2DE2FF.toInt(),
+        0xFFFF6ACD.toInt(),
+        Gradient.LeftToRight,
+        rad, shiftX, shiftY
+      )
+
+      // Off-hand border (same gradient, synced angle)
+      if (mc.player?.offhandItem?.isEmpty == false) {
+        val ow      = 24f * sc
+        val ox      = -29f * sc
+        val oShiftX = cos(angle) * (ow * 0.45f)
+        val oShiftY = sin(angle) * (bh * 0.45f)
+        NVGRenderer.hollowGradientRectShifted(
+          ox, 0f, ow, bh,
+          sc * 1.5f,
+          0xFF2DE2FF.toInt(),
+          0xFFFF6ACD.toInt(),
+          Gradient.LeftToRight,
+          rad, oShiftX, oShiftY
+        )
+      }
+    }
+  }
+
   init {
     addSetting(enabledSetting)
+    hudRef = hotbarHud
     EventBus.register(this)
   }
 
   /**
-   * GuiRenderEvent fires at TAIL of Gui.render().
-   * We draw the dark glass fill first so items rendered immediately after appear on top of it.
-   * No NVG here — NvgEvent always fires later, so any NVG fill would land on top of items.
+   * GuiRenderEvent — fills + items, drawn before NVG so items sit below
+   * the decorative NVG border and selected overlay.
    */
   @SubscribeEvent
   fun onGui(event: GuiRenderEvent) {
     if (!isEnabled || mc.screen != null) return
     val player = mc.player ?: return
 
-    val gw = mc.window.guiScaledWidth
-    val gh = mc.window.guiScaledHeight
-    val gx = gw / 2 - 91   // vanilla hotbar left edge (GUI scaled units)
-    val gy = gh - 22         // vanilla hotbar top edge
+    val window   = mc.window
+    val guiScale = window.guiScale.toFloat()
+    val (sx, sy) = hudRef.getScreenPosition(window.screenWidth.toFloat(), window.screenHeight.toFloat())
 
-    // ── Dark glass fill ──────────────────────────────────────────────────────
-    // alpha=0x60 (~37%), very dark navy. Covers vanilla grey background cleanly.
-    event.graphics.fill(gx, gy, gx + 182, gy + 22, 0x60050E18.toInt())
+    // Convert screen-pixel position to GUI coordinates for GuiGraphics
+    val gx = (sx / guiScale).toInt()
+    val gy = (sy / guiScale).toInt()
 
-    // ── Selected slot darker highlight ───────────────────────────────────────
-    val sel = player.inventory.selectedSlot
-    event.graphics.fill(gx + 1 + sel * 20, gy + 1,
-                        gx + 1 + sel * 20 + 20, gy + 21, 0x50102840.toInt())
+    // Dark grey glass fill — matches inventory HUD panelColor
+    event.graphics.fill(gx, gy, gx + 182, gy + 22, 0x50101010.toInt())
 
-    // ── Off-hand fill (if occupied) ──────────────────────────────────────────
     val offhand = player.offhandItem
     if (!offhand.isEmpty) {
-      event.graphics.fill(gx - 29, gy, gx - 5, gy + 22, 0x60050E18.toInt())
+      event.graphics.fill(gx - 29, gy, gx - 5, gy + 22, 0x50101010.toInt())
     }
 
-    // ── Items ─ rendered AFTER fills so they sit on top ──────────────────────
+    // Items rendered after fills so they sit on top of the glass
     for (slot in 0..8) {
       val stack = player.inventory.getItem(slot)
       if (stack.isEmpty) continue
-      val ix = gx + 1 + slot * 20 + 2   // vanilla-exact item position
-      val iy = gy + 3
-      event.graphics.renderItem(stack, ix, iy)
-      event.graphics.renderItemDecorations(mc.font, stack, ix, iy)
+      event.graphics.renderItem(stack, gx + 1 + slot * 20 + 2, gy + 3)
+      event.graphics.renderItemDecorations(mc.font, stack, gx + 1 + slot * 20 + 2, gy + 3)
     }
 
     if (!offhand.isEmpty) {
       event.graphics.renderItem(offhand, gx - 29 + 4, gy + 3)
       event.graphics.renderItemDecorations(mc.font, offhand, gx - 29 + 4, gy + 3)
     }
-  }
-
-  /**
-   * NvgEvent fires after Gui.render() — only thin border/glow decorations live here.
-   * No fills so items from onGui are never obscured.
-   */
-  @SubscribeEvent
-  fun onNvg(event: NvgEvent) {
-    if (!isEnabled || mc.screen != null) return
-    val player = mc.player ?: return
-
-    val sw = mc.window.screenWidth.toFloat()
-    val sh = mc.window.screenHeight.toFloat()
-    val sc = mc.window.guiScale.toFloat()
-    val gw = mc.window.guiScaledWidth.toFloat()
-    val gh = mc.window.guiScaledHeight.toFloat()
-    val t  = System.currentTimeMillis() / 1000.0
-
-    val hx = (gw / 2f - 91f) * sc
-    val hy = (gh - 22f) * sc
-    val hw = 182f * sc
-    val hh = 22f * sc
-    val rad = 4f * sc
-
-    NVGRenderer.beginFrame(sw, sh)
-
-    // ── Animated outer border ─────────────────────────────────────────────────
-    // Slow pulse on the base border brightness
-    val basePulse = (sin(t * 1.1) * 0.22 + 0.78).toFloat()
-    val baseAlpha = (basePulse * 0x72).toInt()  // max 0x72 = 114
-    NVGRenderer.hollowRect(hx, hy, hw, hh, sc * 0.9f, (baseAlpha shl 24) or 0x6699CC, rad)
-
-    // Brighter inner border ring for depth
-    val innerAlpha = (basePulse * 0x38).toInt()
-    NVGRenderer.hollowRect(hx + sc, hy + sc, hw - sc * 2f, hh - sc * 2f,
-      sc * 0.6f, (innerAlpha shl 24) or 0x99CCEE, 0f)
-
-    // Sweeping shine that travels left→right along the top edge
-    val shineFrac  = ((sin(t * 0.65) + 1.0) / 2.0).toFloat()  // 0..1
-    val shineHalfW = 55f * sc
-    val shineX     = hx + shineFrac * (hw - shineHalfW * 2f)
-    NVGRenderer.gradientRect(shineX, hy - sc * 0.3f, shineHalfW, sc * 2f,
-      0x00BBDDFF, 0x65BBDDFF, Gradient.LeftToRight, 0f)
-    NVGRenderer.gradientRect(shineX + shineHalfW, hy - sc * 0.3f, shineHalfW, sc * 2f,
-      0x65BBDDFF, 0x00BBDDFF, Gradient.LeftToRight, 0f)
-
-    // ── Selected slot animated border ────────────────────────────────────────
-    val sel       = player.inventory.selectedSlot
-    val selPulse  = (sin(t * 2.0) * 0.30 + 0.70).toFloat()
-    val selAlpha  = (selPulse * 210f).toInt()
-    val slotX     = hx + (1f + sel.toFloat() * 20f) * sc
-    val slotY     = hy + sc
-    // Glow halo behind selection
-    NVGRenderer.hollowRect(slotX - sc, slotY - sc, 22f * sc, 22f * sc,
-      sc * 1.5f, ((selAlpha / 3) shl 24) or 0x88BBFF, rad)
-    // Crisp inner selection ring
-    NVGRenderer.hollowRect(slotX, slotY, 20f * sc, 20f * sc,
-      sc * 0.9f, (selAlpha shl 24) or 0xAADDFF, 3f * sc)
-
-    // ── Off-hand border ──────────────────────────────────────────────────────
-    if (!player.offhandItem.isEmpty) {
-      val ox = hx - 29f * sc
-      val ow = 24f * sc
-      NVGRenderer.hollowRect(ox, hy, ow, hh, sc * 0.9f, (baseAlpha shl 24) or 0x6699CC, rad)
-    }
-
-    NVGRenderer.endFrame()
   }
 }

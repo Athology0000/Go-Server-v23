@@ -1064,6 +1064,8 @@ object RoutesModule : Module("Routes") {
     mineTarget = null
     minePathTarget = null
     action = RouteAction.MINE
+    // Hold sneak for the entire mine phase to prevent falling off vein ledges.
+    mc.options.keyShift?.setDown(true)
     // Face mine1 so the player looks into the vein from the start
     val mine1Center = Vec3(point.pos.x + 0.5, point.pos.y + 0.5, point.pos.z + 0.5)
     RotationExecutor.rotateTo(AngleUtils.getRotation(mine1Center), rotationStrategy)
@@ -1137,9 +1139,8 @@ object RoutesModule : Module("Routes") {
     val target = selectMineTarget(level, player, mineBlocks)
     if (target != null) {
       mineTarget = target
-      if (DuskPathfinder.isActive()) {
-        DuskPathfinder.stop(mc, "Mining.")
-      }
+      // Keep pathfinder running so the player continues moving while mining.
+      // The drill fires while moving through the vein rather than stopping per block.
       startMining(target, level.gameTime)
       return
     }
@@ -1161,6 +1162,7 @@ object RoutesModule : Module("Routes") {
   private fun finishMine(reason: String) {
     ChatUtils.sendMessage(reason)
     stopMiningKeys()
+    mc.options.keyShift?.setDown(false)
     RotationExecutor.stopRotating()
     resetMineState()
     completePoint()
@@ -1179,6 +1181,9 @@ object RoutesModule : Module("Routes") {
       chainedMineEndIndex = -1
     }
     stopMiningKeys()
+    if (completedPoint?.type == RoutePointType.MINE) {
+      mc.options.keyShift?.setDown(false)
+    }
     RotationExecutor.stopRotating()
     resetMineState()
 
@@ -1205,24 +1210,9 @@ object RoutesModule : Module("Routes") {
   }
 
   private fun advanceRouteIndexForLoop(): Boolean {
-    // If a mining loop was detected, wrap back to the loop start once we pass the loop end
-    if (loopStartIndex >= 0 && loopEndIndex > loopStartIndex) {
-      if (routeIndex > loopEndIndex) {
-        routeIndex = loopStartIndex
-        chainedMineEndIndex = -1
-        return true
-      }
-      if (routeIndex < routePoints.size) return true
-      // routeIndex == routePoints.size (loopEnd was the last point)
-      routeIndex = loopStartIndex
-      chainedMineEndIndex = -1
-      return true
-    }
-
     if (routeIndex < routePoints.size) return true
-    if (!loopRoute.value || routePoints.isEmpty()) {
-      return false
-    }
+    if (!loopRoute.value || routePoints.isEmpty()) return false
+    // Loop is on: restart from the very beginning (point 0 = warp to forge/camp).
     routeIndex = 0
     chainedMineEndIndex = -1
     return true
@@ -1235,18 +1225,11 @@ object RoutesModule : Module("Routes") {
    * to [loopEndIndex] (inclusive) are the repeating mining loop.
    */
   private fun detectMiningLoop() {
+    // Auto-loop detection removed: intersection points in a route no longer create
+    // implicit loops. Looping is controlled exclusively by the Loop Route setting,
+    // which always restarts from index 0 (the forge/camp warp at the route start).
     loopStartIndex = -1
     loopEndIndex = -1
-    if (routePoints.size < 3) return
-    for (i in routePoints.indices) {
-      for (j in (i + 2) until routePoints.size) {
-        if (routePoints[i].pos == routePoints[j].pos) {
-          loopStartIndex = i
-          loopEndIndex = j
-          return
-        }
-      }
-    }
   }
 
   private fun tryStartMineToMineTransition(completedPoint: RoutePoint?): Boolean {

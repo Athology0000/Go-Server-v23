@@ -34,8 +34,10 @@ class InventoryHudModule : Module("Inventory HUD") {
   private val slotRadius = 5f
   private val borderThickness = 1.5f
   private val baseScale = 1.46f
-  private val itemNudgeX = 3f
-  private val itemNudgeY = -0.1f
+  private val itemNudgeX = 0f
+  private val itemNudgeY = 0f
+
+  private lateinit var backgroundSetting: CheckboxSetting
 
   private val outlineStart = 0xFF2DE2FF.toInt()
   private val outlineEnd = 0xFFFF6ACD.toInt()
@@ -53,6 +55,7 @@ class InventoryHudModule : Module("Inventory HUD") {
     offsetY = 24f
 
     val background = setting(CheckboxSetting("Background", "Show panel background", true))
+    backgroundSetting = background
 
     width {
       val rows = 3
@@ -83,33 +86,19 @@ class InventoryHudModule : Module("Inventory HUD") {
       val width = uiPadding * 2 + cols * uiSlotSize + (cols - 1) * uiSlotGap
       val height = uiPadding * 2 + rows * uiSlotSize + (rows - 1) * uiSlotGap
 
-      if (background.value) {
-        NVGRenderer.rect(0f, 0f, width, height, panelColor, uiBorderRadius)
-      }
-      val angle = (System.currentTimeMillis() % 12000L).toFloat() / 12000f * (Math.PI * 2.0).toFloat()
+      // Panel + slot fills are drawn in onGuiRender (GuiGraphics) before items,
+      // so items always render on top. Only the border lives here in NVG.
+      val angle  = (System.currentTimeMillis() % 12000L).toFloat() / 12000f * (Math.PI * 2.0).toFloat()
       val shiftX = kotlin.math.cos(angle) * (width * 0.45f)
       val shiftY = kotlin.math.sin(angle) * (height * 0.45f)
       NVGRenderer.hollowGradientRectShifted(
-        0f,
-        0f,
-        width,
-        height,
+        0f, 0f, width, height,
         uiBorderThickness,
-        outlineStart,
-        outlineEnd,
+        outlineStart, outlineEnd,
         Gradient.LeftToRight,
         uiBorderRadius,
-        shiftX,
-        shiftY
+        shiftX, shiftY
       )
-
-      for (row in 0 until rows) {
-        for (col in 0 until cols) {
-          val slotX = uiPadding + col * (uiSlotSize + uiSlotGap)
-          val slotY = uiPadding + row * (uiSlotSize + uiSlotGap)
-          NVGRenderer.rect(slotX, slotY, uiSlotSize, uiSlotSize, slotColor, uiSlotRadius)
-        }
-      }
 
     }
 
@@ -155,9 +144,26 @@ class InventoryHudModule : Module("Inventory HUD") {
     GlStateManager._enableBlend()
     GlStateManager._blendFuncSeparate(770, 771, 1, 0)
 
-    val baseX = if (   poseActive) 0f else originX
+    val baseX = if (poseActive) 0f else originX
     val baseY = if (poseActive) 0f else originY
     val coordScale = if (poseActive) 1f else renderScale
+
+    // ── Panel + slot fills drawn BEFORE items so items render on top ──────────
+    // (NVG renders after GuiRenderEvent, so any NVG fill would land on top of items)
+    if (backgroundSetting.value) {
+      val pw = (inventoryHud.getScaledWidth()  / guiScaleX).roundToInt()
+      val ph = (inventoryHud.getScaledHeight() / guiScaleY).roundToInt()
+      graphics.fill(originX.toInt(), originY.toInt(), originX.toInt() + pw, originY.toInt() + ph, panelColor)
+    }
+    for (row in 0 until rows) {
+      for (col in 0 until cols) {
+        val sbX = (baseX + (padding + col * (slotSize + slotGap)) * coordScale).roundToInt()
+        val sbY = (baseY + (padding + row * (slotSize + slotGap)) * coordScale).roundToInt()
+        val sbW = (slotSize * coordScale).roundToInt()
+        graphics.fill(sbX, sbY, sbX + sbW, sbY + sbW, slotColor)
+      }
+    }
+
     for (i in 0 until 27) {
       val inventoryIndex = i + 9
       val stack = inventory.getItem(inventoryIndex)
