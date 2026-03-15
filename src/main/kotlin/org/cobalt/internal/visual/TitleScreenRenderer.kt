@@ -199,16 +199,23 @@ object TitleScreenRenderer {
       Triple(x, y, o.phase)
     }
 
-    for ((a, b) in connections) {
-      val phase    = a * 3.7 + b * 2.1
-      val boltSeed = ((t * 8).toLong() * 31L + phase.toLong() * 17L)
-      val flicker  = sin(t * 5.5 + phase)
-      val alpha    = ((flicker * 0.55 + 0.55) * 160).toInt().coerceIn(0, 160)
-      if (alpha > 8) {
-        drawLightningBolt(pos[a].first, pos[a].second,
-                          pos[b].first, pos[b].second,
-                          alpha, boltSeed, sw)
-      }
+    // One bolt at a time — each connection holds for BOLT_SLOT_SEC then fades out.
+    val slotProgress = (t % BOLT_SLOT_SEC) / BOLT_SLOT_SEC  // 0..1 within current slot
+    val slotIdx      = (t / BOLT_SLOT_SEC).toLong()
+    val (a, b)       = connections[(slotIdx % connections.size).toInt()]
+    val boltSeed     = slotIdx * 131L + a * 31L + b * 17L
+
+    // Quick fade-in (first 12%), hold, slow fade-out (last 25%)
+    val alpha = when {
+      slotProgress < 0.12 -> (slotProgress / 0.12 * 85).toInt()
+      slotProgress > 0.75 -> ((1.0 - (slotProgress - 0.75) / 0.25) * 85).toInt()
+      else                -> 85
+    }.coerceIn(0, 85)
+
+    if (alpha > 4) {
+      drawLightningBolt(pos[a].first, pos[a].second,
+                        pos[b].first, pos[b].second,
+                        alpha, boltSeed, sw)
     }
 
     for ((x, y, phase) in pos) {
@@ -217,6 +224,8 @@ object TitleScreenRenderer {
       NVGRenderer.circle(x, y, sw * 0.003f * pulse, ((pulse * 230).toInt() shl 24) or 0xAADDFF)
     }
   }
+
+  private const val BOLT_SLOT_SEC = 3.5
 
   /**
    * Jagged lightning bolt via midpoint displacement.
@@ -238,7 +247,7 @@ object TitleScreenRenderer {
         val dy  = pts[i + 1][1] - pts[i][1]
         val len = sqrt(dx * dx + dy * dy)
         if (len > 0f) {
-          val jitter = (rng.nextFloat() - 0.5f) * len * 0.52f
+          val jitter = (rng.nextFloat() - 0.5f) * len * 0.90f
           next.add(floatArrayOf(mx + (-dy / len) * jitter, my + (dx / len) * jitter))
         } else {
           next.add(floatArrayOf(mx, my))
