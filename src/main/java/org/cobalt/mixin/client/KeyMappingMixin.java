@@ -42,7 +42,10 @@ public class KeyMappingMixin {
       return;
     }
     if (self == mc.options.keyShift) {
-      cir.setReturnValue(MovementManager.hasForcedMovement && MovementManager.forcedShift);
+      // Allow manual crouch unless automation is explicitly forcing shift.
+      if (MovementManager.hasForcedMovement && MovementManager.forcedShift) {
+        cir.setReturnValue(true);
+      }
       return;
     }
     if (self == mc.options.keySprint) {

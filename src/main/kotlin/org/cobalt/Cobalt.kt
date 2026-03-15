@@ -21,13 +21,20 @@ import org.cobalt.internal.mining.MiningModule
 import org.cobalt.internal.mining.FairyModule
 import org.cobalt.internal.mining.RoutesModule
 import org.cobalt.internal.mining.MiningMacroModule
+import org.cobalt.internal.mining.CommissionHudModule
+import org.cobalt.internal.mining.CommissionMacroModule
+import org.cobalt.internal.mining.VeinDirectionModule
+import org.cobalt.internal.mining.AutoLanternModule
 import org.cobalt.internal.pathfinding.PathfindingModule
 import org.cobalt.internal.qol.QolModule
 import org.cobalt.internal.visual.BlockOverlayModule
 import org.cobalt.internal.visual.BlockOutlineModule
 import org.cobalt.internal.visual.DarkModeModule
+import org.cobalt.internal.visual.FreecamModule
 import org.cobalt.internal.visual.FullBrightModule
+import org.cobalt.internal.rotation.RotationsModule
 import org.cobalt.internal.visual.OrbitFreecamModule
+import org.cobalt.internal.visual.TitleScreenRenderer
 
 @Suppress("UNUSED")
 object Cobalt : ClientModInitializer {
@@ -42,6 +49,10 @@ object Cobalt : ClientModInitializer {
         FairyModule,
         RoutesModule,
         MiningMacroModule,
+        CommissionMacroModule,
+        CommissionHudModule,
+        VeinDirectionModule,
+        AutoLanternModule,
         CombatMacroModule,
         DungeonsModule,
         EtherwarpHelperModule,
@@ -49,10 +60,12 @@ object Cobalt : ClientModInitializer {
         PathfindingModule,
         FullBrightModule,
         DarkModeModule,
+        FreecamModule,
         OrbitFreecamModule,
         BlockOverlayModule,
         BlockOutlineModule,
-        QolModule
+        QolModule,
+        RotationsModule
       )
     )
 
@@ -66,7 +79,7 @@ object Cobalt : ClientModInitializer {
 
     listOf(
       TickScheduler, MainCommand, NotificationManager,
-      RotationExecutor, HudModuleManager,
+      RotationExecutor, HudModuleManager, TitleScreenRenderer,
     ).forEach { EventBus.register(it) }
     Config.loadModulesConfig()
     EventBus.register(this)

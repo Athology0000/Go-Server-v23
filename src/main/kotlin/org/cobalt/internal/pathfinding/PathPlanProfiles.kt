@@ -13,11 +13,12 @@ object PathPlanProfiles {
 
   const val DEFAULT_ID = "default"
   const val DEEP_ID = "deep"
+  const val COMBAT_ID = "combat"
 
   val DEFAULT: PathPlanProfile =
     PathPlanProfile(
       id = DEFAULT_ID,
-      maxIterations = 45000,
+      maxIterations = 9000,
       maxLength = 0,
       async = false,
       fallback = true,
@@ -36,7 +37,26 @@ object PathPlanProfiles {
   val DEEP: PathPlanProfile =
     PathPlanProfile(
       id = DEEP_ID,
-      maxIterations = 120000,
+      maxIterations = 18000,
+      maxLength = 0,
+      async = false,
+      fallback = false,
+      providerFactory = { MinecraftNavigationProvider() },
+      neighborStrategy = MinecraftParkourNeighborStrategy,
+      heuristicWeights = HeuristicWeights(1.0, 0.0, 0.0, 0.5),
+      heuristicStrategy = LinearHeuristicStrategy(),
+      processorFactories = listOf(
+        { AvoidanceProcessor() },
+        { MinecraftParkourProcessor() },
+        { MinecraftPathProcessor() }
+      ),
+      pathfinderFactory = { config -> AStarPathfinder(config) }
+    )
+
+  val COMBAT: PathPlanProfile =
+    PathPlanProfile(
+      id = COMBAT_ID,
+      maxIterations = 9000,
       maxLength = 0,
       async = false,
       fallback = false,

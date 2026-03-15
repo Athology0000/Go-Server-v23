@@ -5,7 +5,6 @@ import kotlin.math.max
 import kotlin.random.Random
 import net.minecraft.client.Minecraft
 import net.minecraft.client.KeyMapping
-import net.minecraft.client.player.LocalPlayer
 import org.cobalt.api.event.EventBus
 import org.cobalt.api.event.annotation.SubscribeEvent
 import org.cobalt.api.event.impl.client.MouseEvent
@@ -75,7 +74,7 @@ object LeftClickEtherwarpModule : Module("Left Click Etherwarp") {
     if (!enabled.value) return
     if (sequenceActive) return
 
-    val player = mc.player ?: return
+    mc.player ?: return
     if (mc.level == null) return
     if (mc.screen != null) return
     if (!EtherwarpLogic.holdingEtherwarpItem()) return
@@ -87,10 +86,10 @@ object LeftClickEtherwarpModule : Module("Left Click Etherwarp") {
     if (etherResult.pos == null || !etherResult.succeeded) return
 
     lastEtherwarp = now
-    runEtherwarpSequence(player)
+    runEtherwarpSequence()
   }
 
-  private fun runEtherwarpSequence(player: LocalPlayer) {
+  private fun runEtherwarpSequence() {
     if (sequenceActive) return
     val sneakKey = mc.options.keyShift ?: return
     val useKey = mc.options.keyUse ?: return
@@ -111,22 +110,6 @@ object LeftClickEtherwarpModule : Module("Left Click Etherwarp") {
         sequenceActive = false
         return@schedule
       }
-      if (!player.isShiftKeyDown) {
-        TickScheduler.schedule(1) {
-          if (!sequenceActive || id != sequenceId || !enabled.value) {
-            releaseKeys()
-            sequenceActive = false
-            return@schedule
-          }
-          if (player.isShiftKeyDown) {
-            executeRightClick(sneakKey, useKey, processingTicks, id)
-          } else {
-            releaseKeys()
-            sequenceActive = false
-          }
-        }
-        return@schedule
-      }
       executeRightClick(sneakKey, useKey, processingTicks, id)
     }
   }
@@ -139,7 +122,6 @@ object LeftClickEtherwarpModule : Module("Left Click Etherwarp") {
     }
 
     useKey.setDown(true)
-    mc.player?.let { it.swing(it.usedItemHand) }
 
     TickScheduler.schedule(1) {
       useKey.setDown(false)

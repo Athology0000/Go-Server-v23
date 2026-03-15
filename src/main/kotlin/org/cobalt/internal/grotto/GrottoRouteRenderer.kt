@@ -14,7 +14,6 @@ import net.minecraft.client.renderer.LightTexture
 import net.minecraft.client.gui.Font
 import net.minecraft.commands.arguments.EntityAnchorArgument
 import net.minecraft.core.BlockPos
-import net.minecraft.world.InteractionHand
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.level.ClipContext
 import net.minecraft.world.level.Level
@@ -26,6 +25,7 @@ import org.cobalt.api.event.annotation.SubscribeEvent
 import org.cobalt.api.event.impl.client.TickEvent
 import org.cobalt.api.event.impl.render.WorldRenderEvent
 import org.cobalt.api.util.InventoryUtils
+import org.cobalt.api.util.TickScheduler
 import org.cobalt.api.util.render.Render3D
 import org.cobalt.internal.pathfinding.OverlayRenderEngine
 import org.cobalt.internal.mining.FairyModule
@@ -180,7 +180,8 @@ object GrottoRouteRenderer {
     player.lookAt(EntityAnchorArgument.Anchor.EYES, next)
 
     InventoryUtils.holdHotbarSlot(HOTBAR_SECOND_LAST)
-    client.gameMode?.useItem(player, InteractionHand.MAIN_HAND)
+    client.options.keyUse?.setDown(true)
+    TickScheduler.schedule(1L) { client.options.keyUse?.setDown(false) }
     return true
   }
 

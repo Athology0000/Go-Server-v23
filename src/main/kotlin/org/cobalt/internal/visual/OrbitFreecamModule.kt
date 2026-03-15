@@ -7,6 +7,7 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 import net.minecraft.client.CameraType
 import net.minecraft.client.Minecraft
+import net.minecraft.client.multiplayer.ClientLevel
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.decoration.ArmorStand
 import org.cobalt.api.event.EventBus
@@ -18,6 +19,8 @@ import org.cobalt.api.module.setting.impl.SliderSetting
 import org.cobalt.api.util.ChatUtils
 
 object OrbitFreecamModule : Module("Orbit Freecam") {
+
+  private const val ORBIT_CAMERA_ID = -910001
 
   private val enabled = CheckboxSetting(
     "Enabled",
@@ -92,6 +95,8 @@ object OrbitFreecamModule : Module("Orbit Freecam") {
     EventBus.register(this)
   }
 
+  fun isEnabled(): Boolean = enabled.value
+
   @SubscribeEvent
   fun onTick(@Suppress("UNUSED_PARAMETER") event: TickEvent.Start) {
     if (!enabled.value) {
@@ -99,8 +104,15 @@ object OrbitFreecamModule : Module("Orbit Freecam") {
       return
     }
 
+    // Only one freecam mode should control the camera at a time.
+    if (FreecamModule.isEnabled()) {
+      enabled.value = false
+      disableOrbit()
+      return
+    }
+
     val player = mc.player
-    val level = mc.level
+    val level = mc.level as? ClientLevel
     if (player == null || level == null) {
       disableOrbit()
       return
@@ -113,6 +125,18 @@ object OrbitFreecamModule : Module("Orbit Freecam") {
         ChatUtils.sendMessage("Orbit freecam failed to start.")
         return
       }
+    }
+
+    val camera = orbitCamera ?: run {
+      enabled.value = false
+      disableOrbit()
+      return
+    }
+
+    if (mc.cameraEntity !== camera) {
+      enabled.value = false
+      disableOrbit()
+      return
     }
 
     val now = System.nanoTime()
@@ -130,7 +154,6 @@ object OrbitFreecamModule : Module("Orbit Freecam") {
     val orbitX = centerX + cos(angleRad) * radius.value
     val orbitZ = centerZ + sin(angleRad) * radius.value
 
-    val camera = orbitCamera ?: return
     camera.setPos(orbitX, orbitY, orbitZ)
 
     val lookX = centerX - orbitX
@@ -145,29 +168,32 @@ object OrbitFreecamModule : Module("Orbit Freecam") {
     camera.xRotO = pitch
   }
 
-  private fun enableOrbit(level: net.minecraft.world.level.Level): Boolean {
+  private fun enableOrbit(level: ClientLevel): Boolean {
     if (active) return true
 
     val player = mc.player ?: return false
-    val cameraEntity = getCameraEntity()
-    savedCameraEntity = cameraEntity ?: mc.player
+    savedCameraEntity = mc.cameraEntity ?: player
     savedCameraType = mc.options.cameraType
 
+    level.removeEntity(ORBIT_CAMERA_ID, Entity.RemovalReason.DISCARDED)
+
     val anchor = ArmorStand(level, player.x, player.eyeY, player.z)
+    anchor.setId(ORBIT_CAMERA_ID)
     anchor.setNoGravity(true)
     anchor.setInvisible(true)
     anchor.noPhysics = true
     anchor.setSilent(true)
+    anchor.setYRot(player.yRot)
+    anchor.setXRot(player.xRot)
+    level.addEntity(anchor)
+
     orbitCamera = anchor
 
     if (forceFirstPerson.value) {
       mc.options.cameraType = CameraType.FIRST_PERSON
     }
 
-    if (!setCameraEntity(anchor)) {
-      orbitCamera = null
-      return false
-    }
+    mc.cameraEntity = anchor
 
     active = true
     lastNs = 0L
@@ -179,97 +205,20 @@ object OrbitFreecamModule : Module("Orbit Freecam") {
 
     val restore = savedCameraEntity ?: mc.player
     if (restore != null) {
-      setCameraEntity(restore)
+      mc.cameraEntity = restore
     }
     savedCameraType?.let { mc.options.cameraType = it }
 
-    orbitCamera?.discard()
+    val level = mc.level as? ClientLevel
+    orbitCamera?.let { camera ->
+      level?.removeEntity(camera.id, Entity.RemovalReason.DISCARDED)
+    }
+
     orbitCamera = null
     savedCameraEntity = null
     savedCameraType = null
     active = false
     angleRad = 0.0
     lastNs = 0L
-  }
-
-  private fun getCameraEntity(): Entity? {
-    val publicMethod = mc.javaClass.methods.firstOrNull {
-      it.name.equals("getCameraEntity", ignoreCase = true) && it.parameterCount == 0
-    }
-    if (publicMethod != null) {
-      try {
-        return publicMethod.invoke(mc) as? Entity
-      } catch (_: Exception) {
-      }
-    }
-
-    val declaredMethod = mc.javaClass.declaredMethods.firstOrNull {
-      it.name.equals("getCameraEntity", ignoreCase = true) && it.parameterCount == 0
-    }
-    if (declaredMethod != null) {
-      try {
-        declaredMethod.isAccessible = true
-        return declaredMethod.invoke(mc) as? Entity
-      } catch (_: Exception) {
-      }
-    }
-
-    val field = mc.javaClass.declaredFields.firstOrNull {
-      it.name.equals("cameraEntity", ignoreCase = true) ||
-        Entity::class.java.isAssignableFrom(it.type)
-    }
-    if (field != null) {
-      try {
-        field.isAccessible = true
-        return field.get(mc) as? Entity
-      } catch (_: Exception) {
-      }
-    }
-
-    return null
-  }
-
-  private fun setCameraEntity(entity: Entity): Boolean {
-    val publicMethod = mc.javaClass.methods.firstOrNull {
-      it.name.equals("setCameraEntity", ignoreCase = true) &&
-        it.parameterCount == 1 &&
-        Entity::class.java.isAssignableFrom(it.parameterTypes[0])
-    }
-    if (publicMethod != null) {
-      try {
-        publicMethod.invoke(mc, entity)
-        return true
-      } catch (_: Exception) {
-      }
-    }
-
-    val declaredMethod = mc.javaClass.declaredMethods.firstOrNull {
-      it.name.equals("setCameraEntity", ignoreCase = true) &&
-        it.parameterCount == 1 &&
-        Entity::class.java.isAssignableFrom(it.parameterTypes[0])
-    }
-    if (declaredMethod != null) {
-      try {
-        declaredMethod.isAccessible = true
-        declaredMethod.invoke(mc, entity)
-        return true
-      } catch (_: Exception) {
-      }
-    }
-
-    val field = mc.javaClass.declaredFields.firstOrNull {
-      it.name.equals("cameraEntity", ignoreCase = true) ||
-        Entity::class.java.isAssignableFrom(it.type)
-    }
-    if (field != null) {
-      try {
-        field.isAccessible = true
-        field.set(mc, entity)
-        return true
-      } catch (_: Exception) {
-      }
-    }
-
-    return false
   }
 }

@@ -233,9 +233,8 @@ object EtherwarpLogic {
   }
 
   fun canEtherwarp(): Boolean {
-    val player = mc.player ?: return false
+    mc.player ?: return false
     if (mc.level == null) return false
-    if (player.isShiftKeyDown) return false
     val screen = mc.screen ?: return true
     return screen.javaClass.simpleName == "ChatScreen"
   }

@@ -37,6 +37,9 @@ internal object RoutePointPopup {
   )
 
   fun open() {
+    if (mc.screen != null) {
+      mc.setScreen(null)
+    }
     visible = true
     lockPlayer(true)
     MouseUtils.ungrabMouse()
@@ -50,7 +53,9 @@ internal object RoutePointPopup {
       RoutesModule.cancelPendingPick()
     }
     lockPlayer(false)
-    MouseUtils.grabMouse()
+    if (mc.screen == null) {
+      MouseUtils.grabMouse()
+    }
   }
 
   private fun select(type: RoutesModule.RoutePointType) {
@@ -61,7 +66,11 @@ internal object RoutePointPopup {
   @SubscribeEvent
   fun onRender(@Suppress("UNUSED_PARAMETER") event: NvgEvent) {
     if (!visible) return
-    if (mc.screen != null) return
+    if (mc.screen != null) {
+      lockPlayer(false)
+      visible = false
+      return
+    }
 
     val window = mc.window
     val width = window.screenWidth.toFloat()
@@ -129,6 +138,11 @@ internal object RoutePointPopup {
   @SubscribeEvent
   fun onTick(@Suppress("UNUSED_PARAMETER") event: TickEvent.Start) {
     if (!visible) return
+    if (mc.screen != null) {
+      lockPlayer(false)
+      visible = false
+      return
+    }
     lockPlayer(true)
   }
 

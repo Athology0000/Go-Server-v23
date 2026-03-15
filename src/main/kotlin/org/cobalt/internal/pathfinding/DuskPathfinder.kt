@@ -19,7 +19,6 @@ import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.Vec2
 import net.minecraft.world.phys.Vec3
 import org.apache.logging.log4j.LogManager
-import org.cobalt.api.util.MouseUtils
 import org.cobalt.api.notification.NotificationManager
 import org.cobalt.api.pathfinder.minecraft.MinecraftPathingRules
 import org.cobalt.api.pathfinder.pathing.result.PathState
@@ -51,7 +50,7 @@ private const val DEBUG_CHAT = false
 private const val DEBUG_TICK_CHAT = false
 private const val DEBUG_TICK_FILE = false
 private const val DEBUG_LOG_INTERVAL_TICKS = 20
-private const val OVERLAY_UPDATE_INTERVAL_TICKS = 2
+private const val OVERLAY_UPDATE_INTERVAL_TICKS = 5
 private const val STRAFE_DEADZONE = 0.15f
 private const val ROTATE_ONLY_YAW_DEGREES = 100.0
 private const val ROTATE_TARGET_RESPONSE = 8.0
@@ -70,7 +69,10 @@ private const val NAVMESH_REPATH_TICKS = 10
 private const val PATH_TAG = "pathfinding"
 private const val STUCK_TICKS_LIMIT = 15
 private const val STUCK_MOVEMENT_EPS = 5.0e-5
-private const val REPATH_INTERVAL_TICKS = 20
+private const val REPATH_INTERVAL_TICKS = 60
+private const val MIN_SOFT_REPATH_ATTEMPT_TICKS = 20L
+private const val MIN_HARD_REPATH_ATTEMPT_TICKS = 10L
+private const val MIN_PLAN_ATTEMPT_TICKS = 8L
 private const val PASSED_DOT_RATIO = 0.1
 private const val PASSED_DISTANCE_EPS = 0.5
 private const val SPLINE_ADVANCE_EPS = 0.25
@@ -80,8 +82,18 @@ private const val BEHIND_DIST_EPS = 0.05
 private const val NO_PROGRESS_TICKS_LIMIT = 30
 private const val NO_PROGRESS_EPS = 0.02
 private const val FORCE_DIRECT_TICKS = 30
-private const val SPLINE_FOLLOW_EPS = 0.35
-private const val SPLINE_LOOKAHEAD = 0.5
+private const val SPLINE_FOLLOW_EPS = 0.9
+private const val SPLINE_LOOKAHEAD = 1.15
+private const val SPLINE_MIN_LOOKAHEAD = 0.35
+private const val SPLINE_LEDGE_BLEND_T = 0.92
+private const val SPLINE_STRAFE_MIN_SCALE = 0.22f
+private const val SPLINE_SEGMENT_SEARCH = 3
+private const val STRAFE_ASSIST_MIN_DESIRED = 0.18f
+private const val STRAFE_ASSIST_STRENGTH = 0.62f
+private const val STRAFE_ASSIST_SPLINE_STRENGTH = 0.78f
+private const val STRAFE_ASSIST_OVERRIDE_EPS = 0.12f
+private const val STRAFE_ASSIST_FORWARD_MIN = 0.42f
+private const val STRAFE_ASSIST_FORWARD_MIN_SPLINE = 0.5f
 private const val BELOW_TARGET_Y_GAP = 2
 private const val BELOW_TICKS_LIMIT = 20
 private const val NEARBY_REPATH_RADIUS = 2
@@ -106,7 +118,7 @@ private const val ETHERWARP_OPPORTUNITY_INTERVAL = 60L
 private const val ETHERWARP_OPPORTUNITY_CHANCE = 0.35
 private const val ETHERWARP_MIN_GAIN_SQ = 64.0
 private const val ETHERWARP_MIN_DISTANCE_SQ = 100.0
-private const val DEBUG_ETHERWARP = true
+private const val DEBUG_ETHERWARP = false
 private const val ETHERWARP_RENDER_TAG = "etherwarp"
 private const val ETHERWARP_CLIMB_THRESHOLD = 7
 private const val REMOTE_STEP_DISTANCE = 32.0
@@ -114,7 +126,12 @@ private const val REMOTE_STEP_MIN = 10.0
 private const val REMOTE_STEP_SCAN_RADIUS = 6
 private const val REMOTE_STEP_SCAN_VERTICAL = 3
 private const val ROLLING_PATH_NODE_AHEAD = 5
-private const val ROLLING_SEGMENT_DISTANCE = 24.0
+private const val ROLLING_SEGMENT_DISTANCE = 16.0
+private const val COMBAT_MIN_PLAN_ATTEMPT_TICKS = 2L
+private const val COMBAT_STRAFE_LOOK_MODE = true
+private const val COMBAT_STRAFE_CAP = 0.45f
+private const val COMBAT_STRAFE_SCALE = 0.6f
+private const val COMBAT_FORWARD_MIN = 0.34f
 
 private var target: BlockPos? = null
 private var path: MutableList<BlockPos> = mutableListOf()
@@ -156,6 +173,8 @@ private var debugStrafeScale = 0.0
 private var debugRepathReason = "-"
 private var debugRepathTick = 0L
 private var debugLogTick = 0L
+private var lastRepathAttemptTick = 0L
+private var lastPlanAttemptTick = 0L
 private var smoothedForward = 0f
 private var smoothedStrafe = 0f
 private var smoothedTargetYaw: Double? = null
@@ -199,6 +218,8 @@ private val logger = LogManager.getLogger("dutt-client")
 private val profiles =
 	ConcurrentHashMap<String, PathPlanProfile>().apply {
 		this[PathPlanProfiles.DEFAULT.id] = PathPlanProfiles.DEFAULT
+		this[PathPlanProfiles.DEEP.id] = PathPlanProfiles.DEEP
+		this[PathPlanProfiles.COMBAT.id] = PathPlanProfiles.COMBAT
 	}
 
 private data class PathCacheKey(val dimension: String, val profileId: String, val start: Long, val goal: Long)
@@ -250,10 +271,24 @@ fun start(client: Minecraft, rawTarget: BlockPos): Boolean {
 fun start(client: Minecraft, rawTarget: BlockPos, profileId: String): Boolean {
 	val level = client.level ?: return false
 	val player = client.player ?: return false
+	val nowTick = level.gameTime
+	val profile = resolveProfile(profileId)
+	val minPlanAttemptTicks =
+		if (profile.id == PathPlanProfiles.COMBAT_ID) {
+			COMBAT_MIN_PLAN_ATTEMPT_TICKS
+		} else {
+			MIN_PLAN_ATTEMPT_TICKS
+		}
 	val start = player.blockPosition()
 	val resolvedTarget = MinecraftPathingRules.resolveTarget(level, rawTarget) ?: run {
 		notify(client, "Target is not walkable.")
 		DebugLog.status(client, "Path", "Failed: target not walkable.")
+		return false
+	}
+	if (active && target == resolvedTarget && path.isNotEmpty()) {
+		return true
+	}
+	if (active && lastPlanAttemptTick != 0L && nowTick - lastPlanAttemptTick < minPlanAttemptTicks) {
 		return false
 	}
 	if (start == resolvedTarget) {
@@ -262,8 +297,8 @@ fun start(client: Minecraft, rawTarget: BlockPos, profileId: String): Boolean {
 		return false
 	}
 
-	val profile = resolveProfile(profileId)
 	currentProfileId = profile.id
+	lastPlanAttemptTick = nowTick
 	val newPath = planRollingPath(level, start, resolvedTarget, profile)
 	if (newPath.isEmpty()) {
 		notify(client, "No path found.")
@@ -445,20 +480,26 @@ fun start(client: Minecraft, rawTarget: BlockPos, profileId: String): Boolean {
 			return
 		}
 		val spline = if (forceDirectTicks > 0) null else resolveSplineTarget(player)
+		if (!recovering && spline != null && spline.segmentIndex > pathIndex) {
+			pathIndex = spline.segmentIndex.coerceIn(0, path.lastIndex)
+		}
 		var targetX = spline?.x ?: (waypoint.x + 0.5)
 		var targetY = spline?.y ?: (waypoint.y + 0.5)
 		var targetZ = spline?.z ?: (waypoint.z + 0.5)
 		val dy = waypoint.y - player.blockY
-		if (!recovering && dy > ETHERWARP_CLIMB_THRESHOLD) {
+		val combatStrafeLookMode = isCombatStrafeLookMode()
+		if (!combatStrafeLookMode && !recovering && dy > ETHERWARP_CLIMB_THRESHOLD) {
 			if (attemptEtherwarp(client, level, player, currentTarget, "climb")) {
 				updateLastPos(player)
 				return
 			}
 		}
-		resolveMoveTarget(level, player, waypoint, currentTarget)?.let { moveTarget ->
-			targetX = moveTarget.x + 0.5
-			targetY = moveTarget.y + 0.5
-			targetZ = moveTarget.z + 0.5
+		if (spline == null || spline.t >= SPLINE_LEDGE_BLEND_T) {
+			resolveMoveTarget(level, player, waypoint, currentTarget)?.let { moveTarget ->
+				targetX = moveTarget.x + 0.5
+				targetY = moveTarget.y + 0.5
+				targetZ = moveTarget.z + 0.5
+			}
 		}
 		val dx = targetX - player.x
 		val dz = targetZ - player.z
@@ -485,7 +526,7 @@ fun start(client: Minecraft, rawTarget: BlockPos, profileId: String): Boolean {
 		if (!recovering && gameTime % REPATH_INTERVAL_TICKS == 0L) {
 			val currentEstimate = heuristic(player.blockPosition(), currentTarget)
 			val pathEstimate = heuristic(waypoint, currentTarget)
-			if (currentEstimate + 2 < pathEstimate) {
+			if (currentEstimate + 10 < pathEstimate) {
 				attemptRepath(client, level, player, "shortcut", currentTarget, hard = false)
 			}
 		}
@@ -559,7 +600,7 @@ fun start(client: Minecraft, rawTarget: BlockPos, profileId: String): Boolean {
 		updateLastPos(player)
 		return
 	}
-	if (!recovering && attemptOpportunisticEtherwarp(client, level, player, currentTarget)) {
+	if (!combatStrafeLookMode && !recovering && attemptOpportunisticEtherwarp(client, level, player, currentTarget)) {
 		updateLastPos(player)
 		return
 	}
@@ -589,7 +630,10 @@ fun start(client: Minecraft, rawTarget: BlockPos, profileId: String): Boolean {
 		}
 		val isFinalNode = !recovering && pathIndex >= path.lastIndex
 		val finalHold = isFinalNode && waypointDist2 <= FINAL_ARRIVE_DISTANCE * FINAL_ARRIVE_DISTANCE
-		var move = computeMoveInput(player.yRot.toDouble(), dx, dz)
+		var move = computeMoveInput(player.yRot.toDouble(), dx, dz, preferSplineTracking = spline != null)
+		if (!combatStrafeLookMode) {
+			move = applyStrafeAssist(level, player, dx, dz, move, preferSplineTracking = spline != null)
+		}
 		if (finalHold) {
 			move = 0f to max(move.second, 0f)
 		}
@@ -700,6 +744,8 @@ fun start(client: Minecraft, rawTarget: BlockPos, profileId: String): Boolean {
 		etherwarpStageTicks = 0
 		etherwarpRepathTick = 0L
 		lastNavMeshTick = 0L
+		lastRepathAttemptTick = 0L
+		lastPlanAttemptTick = 0L
 		applyMovement(client, player.input, 0f, 0f, false, false, false)
 		MovementManager.clearForcedMovement()
 	}
@@ -904,47 +950,119 @@ private fun isAtTarget(
 }
 
 
-private data class SplineTarget(val x: Double, val y: Double, val z: Double, val t: Double)
+private data class SplineTarget(val x: Double, val y: Double, val z: Double, val t: Double, val segmentIndex: Int)
+
+private data class SplineProjection(
+	val segmentIndex: Int,
+	val t: Double,
+	val x: Double,
+	val y: Double,
+	val z: Double,
+	val distSq: Double
+)
 
 private fun resolveSplineTarget(player: net.minecraft.client.player.LocalPlayer): SplineTarget? {
-	if (checkpoints.isEmpty()) {
+	if (path.isEmpty()) {
 		return null
 	}
-	if (checkpointIndex >= checkpoints.lastIndex) {
+	if (pathIndex !in 0 until path.lastIndex) {
 		return null
 	}
-	val a = checkpoints[checkpointIndex]
-	val b = checkpoints[checkpointIndex + 1]
+	val startIndex = pathIndex.coerceIn(0, path.lastIndex - 1)
+	val endIndex = minOf(path.lastIndex - 1, startIndex + SPLINE_SEGMENT_SEARCH)
+	var best: SplineProjection? = null
+	for (i in startIndex..endIndex) {
+		val projection = projectToSplineSegment(player, i) ?: continue
+		if (best == null || projection.distSq < (best?.distSq ?: Double.POSITIVE_INFINITY)) {
+			best = projection
+		}
+	}
+	val anchor = best ?: return null
+
+	val lookahead =
+		if (anchor.distSq <= SPLINE_FOLLOW_EPS * SPLINE_FOLLOW_EPS) {
+			SPLINE_LOOKAHEAD
+		} else {
+			SPLINE_MIN_LOOKAHEAD
+		}
+	return advanceSplineLookahead(anchor, lookahead)
+}
+
+private fun projectToSplineSegment(
+	player: net.minecraft.client.player.LocalPlayer,
+	segmentIndex: Int
+): SplineProjection? {
+	if (segmentIndex !in 0 until path.lastIndex) {
+		return null
+	}
+	val a = path[segmentIndex]
+	val b = path[segmentIndex + 1]
 	val ax = a.x + 0.5
 	val ay = a.y + 0.5
 	val az = a.z + 0.5
 	val bx = b.x + 0.5
 	val by = b.y + 0.5
 	val bz = b.z + 0.5
-	val px = player.x
-	val pz = player.z
+
 	val abx = bx - ax
 	val abz = bz - az
 	val lenSq = abx * abx + abz * abz
 	if (lenSq <= 1.0e-6) {
-		return SplineTarget(ax, ay, az, 0.0)
+		val dx = player.x - ax
+		val dz = player.z - az
+		return SplineProjection(segmentIndex, 0.0, ax, ay, az, dx * dx + dz * dz)
 	}
-	val t = ((px - ax) * abx + (pz - az) * abz) / lenSq
+
+	val t = ((player.x - ax) * abx + (player.z - az) * abz) / lenSq
 	val clamped = t.coerceIn(0.0, 1.0)
-	var useT = clamped
-	val x = ax + abx * useT
-	val z = az + abz * useT
-	val dx = px - x
-	val dz = pz - z
-	if (dx * dx + dz * dz <= SPLINE_FOLLOW_EPS * SPLINE_FOLLOW_EPS) {
-		val len = kotlin.math.sqrt(lenSq)
-		val advance = (SPLINE_LOOKAHEAD / len).coerceAtLeast(0.0)
-		useT = (useT + advance).coerceIn(0.0, 1.0)
+	val x = ax + abx * clamped
+	val z = az + abz * clamped
+	val y = ay + (by - ay) * clamped
+	val dx = player.x - x
+	val dz = player.z - z
+	return SplineProjection(segmentIndex, clamped, x, y, z, dx * dx + dz * dz)
+}
+
+private fun advanceSplineLookahead(anchor: SplineProjection, lookahead: Double): SplineTarget {
+	var segmentIndex = anchor.segmentIndex
+	var segmentT = anchor.t
+	var remaining = lookahead.coerceAtLeast(0.0)
+
+	while (remaining > 1.0e-4 && segmentIndex < path.lastIndex) {
+		val a = path[segmentIndex]
+		val b = path[segmentIndex + 1]
+		val ax = a.x + 0.5
+		val ay = a.y + 0.5
+		val az = a.z + 0.5
+		val bx = b.x + 0.5
+		val by = b.y + 0.5
+		val bz = b.z + 0.5
+		val segDx = bx - ax
+		val segDz = bz - az
+		val segLen = sqrt(segDx * segDx + segDz * segDz)
+		if (segLen <= 1.0e-6) {
+			segmentIndex++
+			segmentT = 0.0
+			continue
+		}
+
+		val toEnd = (1.0 - segmentT) * segLen
+		if (remaining <= toEnd) {
+			segmentT = (segmentT + remaining / segLen).coerceIn(0.0, 1.0)
+			val x = ax + segDx * segmentT
+			val z = az + segDz * segmentT
+			val y = ay + (by - ay) * segmentT
+			val localT = if (segmentIndex == pathIndex) segmentT else 1.0
+			return SplineTarget(x, y, z, localT, segmentIndex)
+		}
+
+		remaining -= toEnd
+		segmentIndex++
+		segmentT = 0.0
 	}
-	val finalX = ax + abx * useT
-	val finalZ = az + abz * useT
-	val finalY = ay + (by - ay) * useT
-	return SplineTarget(finalX, finalY, finalZ, useT)
+
+	val end = path.last()
+	return SplineTarget(end.x + 0.5, end.y + 0.5, end.z + 0.5, 1.0, path.lastIndex)
 }
 
 private fun checkPassedCheckpointRepath(
@@ -1057,7 +1175,9 @@ private fun checkPassedCheckpointRepath(
 		options.keyLeft.setDown(leftPressed)
 		options.keyRight.setDown(rightPressed)
 		options.keyJump.setDown(jump)
-		options.keyShift.setDown(shift)
+		if (shift) {
+			options.keyShift.setDown(true)
+		}
 		options.keySprint.setDown(sprint)
 	}
 
@@ -1101,7 +1221,13 @@ private fun isJumpEdge(level: Level, pos: BlockPos, dir: Direction, waypoint: Bl
 	return false
 }
 
-	private fun computeMoveInput(yawDegrees: Double, dx: Double, dz: Double): Pair<Float, Float> {
+	private fun computeMoveInput(
+		yawDegrees: Double,
+		dx: Double,
+		dz: Double,
+		preferSplineTracking: Boolean = false
+	): Pair<Float, Float> {
+		val combatStrafeLookMode = isCombatStrafeLookMode()
 		val len = sqrt(dx * dx + dz * dz)
 		if (len < 1.0e-4) {
 			return 0f to 0f
@@ -1113,7 +1239,7 @@ private fun isJumpEdge(level: Level, pos: BlockPos, dir: Direction, waypoint: Bl
 		debugDelta = delta
 		val absDelta = kotlin.math.abs(delta)
 		val allowBackward = allowBackwardTicks > 0
-		if (absDelta > ROTATE_ONLY_YAW_DEGREES && !allowBackward) {
+		if (absDelta > ROTATE_ONLY_YAW_DEGREES && !allowBackward && !combatStrafeLookMode) {
 			// Let rotation catch up before moving when target is far behind.
 			debugStrafeScale = 0.0
 			debugDot = 0.0
@@ -1133,15 +1259,23 @@ private fun isJumpEdge(level: Level, pos: BlockPos, dir: Direction, waypoint: Bl
 
 		var forward = (dirX * forwardX + dirZ * forwardZ).toFloat().coerceIn(-1f, 1f)
 		var strafe = (dirX * rightX + dirZ * rightZ).toFloat().coerceIn(-1f, 1f)
-		if (absDelta > 70.0) {
-			strafe = 0f
-		} else if (absDelta > 45.0) {
-			strafe *= 0.35f
+		if (!combatStrafeLookMode) {
+			if (absDelta > 70.0) {
+				strafe = 0f
+			} else if (absDelta > 45.0) {
+				strafe *= 0.35f
+			}
 		}
 
 		val angleScale = ((absDelta - 6.0) / AUTO_STEER_MAX_DEGREES).coerceIn(0.0, 1.0)
 		val distScale = ((len - 0.6) / 2.0).coerceIn(0.0, 1.0)
-		val scale = (angleScale * distScale).toFloat()
+		val baseScale = (angleScale * distScale).toFloat()
+		val scale =
+			if (preferSplineTracking && len > 0.7) {
+				max(baseScale, SPLINE_STRAFE_MIN_SCALE)
+			} else {
+				baseScale
+			}
 		debugStrafeScale = scale.toDouble()
 
 		if (!allowBackward && forward < 0f) {
@@ -1150,6 +1284,12 @@ private fun isJumpEdge(level: Level, pos: BlockPos, dir: Direction, waypoint: Bl
 			forward = forward.coerceIn(-0.8f, 1f)
 		}
 		strafe *= scale
+		if (combatStrafeLookMode) {
+			strafe = (strafe * COMBAT_STRAFE_SCALE).coerceIn(-COMBAT_STRAFE_CAP, COMBAT_STRAFE_CAP)
+			if (len > 1.2) {
+				forward = max(forward, COMBAT_FORWARD_MIN)
+			}
+		}
 		if (kotlin.math.abs(strafe) < STRAFE_DEADZONE) strafe = 0f
 
 		debugDot = forward.toDouble()
@@ -1280,6 +1420,84 @@ private fun isJumpEdge(level: Level, pos: BlockPos, dir: Direction, waypoint: Bl
 		val newStrafe = if (chooseRight) WALL_AVOID_STRAFE else -WALL_AVOID_STRAFE
 		val newForward = forward.coerceAtMost(WALL_AVOID_FORWARD)
 		return newStrafe to newForward
+	}
+
+	private fun applyStrafeAssist(
+		level: Level,
+		player: net.minecraft.client.player.LocalPlayer,
+		dx: Double,
+		dz: Double,
+		move: Pair<Float, Float>,
+		preferSplineTracking: Boolean
+	): Pair<Float, Float> {
+		if (!player.onGround()) {
+			return move
+		}
+		val len = sqrt(dx * dx + dz * dz)
+		if (len < 0.35) {
+			return move
+		}
+
+		val dirX = dx / len
+		val dirZ = dz / len
+		val yawRad = Math.toRadians(player.yRot.toDouble())
+		val rightX = -kotlin.math.cos(yawRad)
+		val rightZ = -kotlin.math.sin(yawRad)
+		val desiredStrafe = (dirX * rightX + dirZ * rightZ).toFloat().coerceIn(-1f, 1f)
+		if (kotlin.math.abs(desiredStrafe) < STRAFE_ASSIST_MIN_DESIRED) {
+			return move
+		}
+		if (!canStrafeToward(level, player, desiredStrafe > 0f)) {
+			return move
+		}
+
+		val strafeStrength =
+			if (preferSplineTracking) {
+				STRAFE_ASSIST_SPLINE_STRENGTH
+			} else {
+				STRAFE_ASSIST_STRENGTH
+			}
+		val targetStrafe = (desiredStrafe * strafeStrength).coerceIn(-1f, 1f)
+		val assistedStrafe =
+			if (kotlin.math.abs(move.first) <= STRAFE_ASSIST_OVERRIDE_EPS) {
+				targetStrafe
+			} else {
+				(move.first + (targetStrafe - move.first) * 0.55f).coerceIn(-1f, 1f)
+			}
+
+		val minForward =
+			if (preferSplineTracking) {
+				STRAFE_ASSIST_FORWARD_MIN_SPLINE
+			} else {
+				STRAFE_ASSIST_FORWARD_MIN
+			}
+		val assistedForward = max(move.second, minForward).coerceIn(-1f, 1f)
+		return assistedStrafe to assistedForward
+	}
+
+	private fun canStrafeToward(
+		level: Level,
+		player: net.minecraft.client.player.LocalPlayer,
+		right: Boolean
+	): Boolean {
+		val origin = player.blockPosition()
+		val facing = Direction.fromYRot(player.yRot.toDouble())
+		val sideDir = if (right) facing.clockWise else facing.counterClockWise
+
+		val side = origin.relative(sideDir)
+		val sideAhead = side.relative(facing)
+		val sideClear =
+			MinecraftPathingRules.isPassable(level, side) &&
+				MinecraftPathingRules.isPassable(level, side.above()) &&
+				MinecraftPathingRules.isPassable(level, sideAhead) &&
+				MinecraftPathingRules.isPassable(level, sideAhead.above())
+		if (!sideClear) {
+			return false
+		}
+
+		val sideWalkable = MinecraftPathingRules.isWalkable(level, side)
+		val sideAheadWalkable = MinecraftPathingRules.isWalkable(level, sideAhead)
+		return sideWalkable || sideAheadWalkable
 	}
 
 	private fun wrapDegrees(degrees: Double): Double {
@@ -1907,15 +2125,18 @@ private fun handleEtherwarp(
 		}
 		1 -> {
 			if (etherwarpStageTicks >= ETHERWARP_SNEAK_TICKS) {
-				MouseUtils.rightClick()
+				client.options.keyUse?.setDown(true)
 				etherwarpStage = 2
 				etherwarpStageTicks = 0
-				etherwarpLog(client, "stage 1 -> 2 (right click).")
+				etherwarpLog(client, "stage 1 -> 2 (use key down).")
 			} else {
 				etherwarpStageTicks++
 			}
 		}
 		else -> {
+			if (etherwarpStageTicks == 0) {
+				client.options.keyUse?.setDown(false)
+			}
 			if (etherwarpStageTicks >= ETHERWARP_POST_TICKS) {
 				client.options.keyShift.setDown(false)
 				etherwarpActive = false
@@ -2508,6 +2729,10 @@ private fun resetProgress() {
 		return current + (target - current) * rate
 	}
 
+	private fun isCombatStrafeLookMode(): Boolean {
+		return COMBAT_STRAFE_LOOK_MODE && currentProfileId == PathPlanProfiles.COMBAT_ID
+	}
+
 	private fun smoothRotate(player: net.minecraft.client.player.LocalPlayer, targetYaw: Float) {
 		val baseTarget = targetYaw.toDouble()
 		var basePitch = debugLookPitch
@@ -2546,6 +2771,15 @@ private fun resetProgress() {
 		hard: Boolean,
 		allowSame: Boolean = true
 	): Boolean {
+		val nowTick = level.gameTime
+		val minGap = if (hard) MIN_HARD_REPATH_ATTEMPT_TICKS else MIN_SOFT_REPATH_ATTEMPT_TICKS
+		if (lastRepathAttemptTick != 0L && nowTick - lastRepathAttemptTick < minGap) {
+			return false
+		}
+		lastRepathAttemptTick = nowTick
+		if (lastPlanAttemptTick != 0L && nowTick - lastPlanAttemptTick < MIN_PLAN_ATTEMPT_TICKS) {
+			return false
+		}
 		val forwardPos = player.blockPosition().relative(Direction.fromYRot(player.yRot.toDouble()))
 		val forwardState = level.getBlockState(forwardPos)
 		val forwardId = BuiltInRegistries.BLOCK.getKey(forwardState.block).toString()
@@ -2569,6 +2803,7 @@ private fun resetProgress() {
 			}
 			return false
 		}
+		lastPlanAttemptTick = nowTick
 		val newPath = planRollingPath(level, repathStart, finalGoal, resolveProfile(currentProfileId))
 		if (newPath.isNotEmpty()) {
 			val changed = !isSamePath(newPath)
@@ -2704,6 +2939,11 @@ private fun resetProgress() {
 		val resolved = MinecraftPathingRules.resolveTarget(level, finalGoal) ?: finalGoal
 		val profile = resolveProfile(currentProfileId)
 		val start = player.blockPosition()
+		val nowTick = level.gameTime
+		if (lastPlanAttemptTick != 0L && nowTick - lastPlanAttemptTick < MIN_PLAN_ATTEMPT_TICKS) {
+			return false
+		}
+		lastPlanAttemptTick = nowTick
 		val newPath = planRollingPath(level, start, resolved, profile)
 		if (newPath.isNotEmpty()) {
 			target = resolved
