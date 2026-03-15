@@ -33,6 +33,7 @@ import org.cobalt.internal.visual.DarkModeModule
 import org.cobalt.internal.visual.FreecamModule
 import org.cobalt.internal.visual.FullBrightModule
 import org.cobalt.internal.rotation.RotationsModule
+import org.cobalt.internal.visual.HotbarOverlayModule
 import org.cobalt.internal.visual.OrbitFreecamModule
 import org.cobalt.internal.visual.TitleScreenRenderer
 
@@ -65,7 +66,8 @@ object Cobalt : ClientModInitializer {
         BlockOverlayModule,
         BlockOutlineModule,
         QolModule,
-        RotationsModule
+        RotationsModule,
+        HotbarOverlayModule
       )
     )
 

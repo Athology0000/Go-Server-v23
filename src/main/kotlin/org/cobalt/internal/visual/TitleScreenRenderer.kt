@@ -257,9 +257,9 @@ object TitleScreenRenderer {
       pts.clear(); pts.addAll(next)
     }
 
-    val glowW  = sw * 0.0025f
-    val coreW  = sw * 0.0007f
-    val gAlpha = (alpha * 0.22f).toInt()
+    val glowW  = sw * 0.0015f
+    val coreW  = sw * 0.0004f
+    val gAlpha = (alpha * 0.14f).toInt()
 
     for (i in 0 until pts.size - 1) {
       val ax = pts[i][0]; val ay = pts[i][1]
@@ -271,8 +271,8 @@ object TitleScreenRenderer {
       NVGRenderer.push()
       NVGRenderer.translate(ax, ay)
       NVGRenderer.rotate(angle)
-      NVGRenderer.rect(0f, -glowW, len, glowW * 2f, (gAlpha shl 24) or 0x5588CC, 0f)
-      NVGRenderer.rect(0f, -coreW, len, coreW * 2f, (alpha shl 24) or 0xCCEEFF, 0f)
+      NVGRenderer.rect(0f, -glowW, len, glowW * 2f, (gAlpha shl 24) or 0x4477BB, 0f)
+      NVGRenderer.rect(0f, -coreW, len, coreW * 2f, (alpha shl 24) or 0xBBDDFF, 0f)
       NVGRenderer.pop()
     }
   }
