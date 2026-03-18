@@ -37,6 +37,8 @@ object PetDisplayModule : Module("Pet Display") {
         render { x, y, _ ->
             if (!enabled.value) return@render
 
+            val now   = System.currentTimeMillis()
+            val twoPi = (Math.PI * 2.0).toFloat()
             val w = 180f
             val h = hudHeight()
             val radius = h / 2f
@@ -45,10 +47,10 @@ object PetDisplayModule : Module("Pet Display") {
 
             // Glow layers
             if (glowPulseSetting.value) {
-                val t = (System.currentTimeMillis() % 3000L).toFloat() / 3000f
-                val pulse = 0.6f + 0.4f * cos(t * Math.PI.toFloat() * 2f)
+                val t = (now % 3000L).toFloat() / 3000f
+                val pulse = 0.6f + 0.4f * cos(t * twoPi)
                 for (i in 3 downTo 1) {
-                    val alpha = ((0x18.toFloat() * pulse) * i / 3).toInt().coerceIn(0, 0x30)
+                    val alpha = ((0x44.toFloat() * pulse) * i / 3).toInt().coerceIn(0, 0x44)
                     NVGRenderer.hollowRect(
                         x - i * 1.5f, y - i * 1.5f,
                         w + i * 3f, h + i * 3f,
@@ -63,7 +65,7 @@ object PetDisplayModule : Module("Pet Display") {
             NVGRenderer.rect(x, y, w, h, 0xFF0A0F2E.toInt(), radius)
 
             // Animated border
-            val angle  = (System.currentTimeMillis() % 8000L).toFloat() / 8000f * (Math.PI.toFloat() * 2f)
+            val angle  = (now % 8000L).toFloat() / 8000f * twoPi
             val shiftX = cos(angle) * (w * 0.4f)
             NVGRenderer.hollowGradientRectShifted(
                 x, y, w, h, 1.5f,
@@ -110,8 +112,8 @@ object PetDisplayModule : Module("Pet Display") {
                 val ratio = (data.xpCurrent.toFloat() / data.xpRequired.toFloat()).coerceIn(0f, 1f)
                 if (ratio > 0f) {
                     val fillW = (barW * ratio).coerceAtLeast(barR * 2f)
-                    val shimT  = (System.currentTimeMillis() % 2000L).toFloat() / 2000f
-                    val shimShift = cos(shimT * Math.PI.toFloat() * 2f) * fillW * 0.3f
+                    val shimT  = (now % 2000L).toFloat() / 2000f
+                    val shimShift = cos(shimT * twoPi) * fillW * 0.3f
 
                     NVGRenderer.pushScissor(barX, barY, fillW, barH)
                     NVGRenderer.gradientRect(

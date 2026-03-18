@@ -71,7 +71,7 @@ object PetTabListParser {
         }
 
         if (name.isEmpty()) return null
-        return PetData(name, level, heldItem, xpCurrent, xpRequired, level >= 100)
+        return PetData(name, level, heldItem, xpCurrent, xpRequired, xpRequired == 0L && level > 0)
     }
 
     private fun stripFormatting(text: String): String =
