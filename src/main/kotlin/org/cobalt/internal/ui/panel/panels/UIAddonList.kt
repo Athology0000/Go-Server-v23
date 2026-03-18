@@ -16,6 +16,7 @@ import org.cobalt.internal.mining.MiningModule
 import org.cobalt.internal.mining.RoutesModule
 import org.cobalt.internal.mining.VeinDirectionModule
 import org.cobalt.internal.combat.CombatMacroModule
+import org.cobalt.internal.garden.GardenMacroModule
 import org.cobalt.internal.visual.BlockOutlineModule
 import org.cobalt.internal.visual.BlockOverlayModule
 import org.cobalt.internal.visual.DarkModeModule
@@ -23,6 +24,7 @@ import org.cobalt.internal.visual.FreecamModule
 import org.cobalt.internal.visual.FullBrightModule
 import org.cobalt.internal.visual.HotbarOverlayModule
 import org.cobalt.internal.visual.OrbitFreecamModule
+import org.cobalt.internal.visual.PetDisplayModule
 import org.cobalt.internal.ui.UIComponent
 import org.cobalt.internal.ui.components.UIAddonEntry
 import org.cobalt.internal.ui.components.UITopbar
@@ -113,13 +115,17 @@ internal class UIAddonList : UIPanel(
     val visualModules = builtinModules.filter {
       it == FullBrightModule || it == DarkModeModule || it == FreecamModule ||
         it == OrbitFreecamModule || it == BlockOverlayModule || it == BlockOutlineModule ||
-        it == HotbarOverlayModule ||
+        it == HotbarOverlayModule || it == PetDisplayModule ||
         it.name.equals("Watermark", ignoreCase = true) ||
         it.name.equals("Inventory HUD", ignoreCase = true)
     }
 
+    val gardenModules = builtinModules.filter {
+      it == GardenMacroModule
+    }
+
     val coreModules = builtinModules.filter {
-      it !in miningModules && it !in combatModules && it !in visualModules
+      it !in miningModules && it !in combatModules && it !in visualModules && it !in gardenModules
     }
 
     val version = FabricLoader.getInstance()
@@ -154,6 +160,15 @@ internal class UIAddonList : UIPanel(
         override fun onLoad() {}
         override fun onUnload() {}
         override fun getModules() = combatModules
+      }))
+    }
+
+    if (gardenModules.isNotEmpty()) {
+      val meta = AddonMetadata("cobalt-garden", "Garden", version, emptyList(), emptyList())
+      entries.add(0, UIAddonEntry(meta, object : Addon() {
+        override fun onLoad() {}
+        override fun onUnload() {}
+        override fun getModules() = gardenModules
       }))
     }
 
