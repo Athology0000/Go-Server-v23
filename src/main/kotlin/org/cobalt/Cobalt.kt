@@ -36,6 +36,7 @@ import org.cobalt.internal.visual.FullBrightModule
 import org.cobalt.internal.rotation.RotationsModule
 import org.cobalt.internal.visual.HotbarOverlayModule
 import org.cobalt.internal.visual.OrbitFreecamModule
+import org.cobalt.internal.visual.PetDisplayModule
 import org.cobalt.internal.visual.TitleScreenRenderer
 
 @Suppress("UNUSED")
@@ -69,7 +70,8 @@ object Cobalt : ClientModInitializer {
         BlockOutlineModule,
         QolModule,
         RotationsModule,
-        HotbarOverlayModule
+        HotbarOverlayModule,
+        PetDisplayModule
       )
     )
 
