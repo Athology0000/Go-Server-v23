@@ -22,7 +22,7 @@ object PestCleaningSequencer {
                 mc.execute { ScriptBridge.setSpawn() }
                 Thread.sleep(300)
 
-                if (GardenConfig.autoWardrobeEnabled) {
+                if (GardenConfig.autoWardrobeEnabled && GardenConfig.autoWardrobePest) {
                     GearManager.swapForPest()
                     Thread.sleep(2000)
                 }
@@ -33,12 +33,29 @@ object PestCleaningSequencer {
                 }
 
                 mc.execute { ScriptBridge.startPestScript(GardenConfig.pestScript) }
-                Thread.sleep(500)
+
+                // Wait for pests to actually clear before returning to farming
+                val deadline = System.currentTimeMillis() + 180_000L
+                while (System.currentTimeMillis() < deadline) {
+                    Thread.sleep(2000)
+                    val alive = PestTabListParser.parse().alivePests
+                    if (alive < GardenConfig.pestThreshold) break
+                }
+
+                // Swap back to farming gear
+                if (GardenConfig.autoWardrobeEnabled && GardenConfig.autoWardrobePest) {
+                    GearManager.swapForFarming()
+                    Thread.sleep(1500)
+                }
+
+                // Give Taunahi a moment to stop its script
+                Thread.sleep(GardenConfig.gardenWarpDelayMs.coerceAtLeast(500L))
 
             } catch (_: InterruptedException) {
                 Thread.currentThread().interrupt()
             } finally {
                 isRunning = false
+                PestManager.startCooldown(10_000L)
                 mc.execute { onComplete() }
             }
         }
