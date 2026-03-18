@@ -17,8 +17,6 @@ object PetDisplayModule : Module("Pet Display") {
     private val mc = Minecraft.getInstance()
 
     private val enabled = CheckboxSetting("Enabled", "Show the pet display HUD.", true)
-    private val showHeldItem = CheckboxSetting("Show Held Item", "Display the pet's held item.", true)
-    private val glowPulse = CheckboxSetting("Glow Pulse", "Animate the border glow.", true)
 
     val petHud = hudElement("pet-display", "Pet Display", "Animated pet info HUD") {
         anchor  = HudAnchor.BOTTOM_RIGHT
@@ -62,7 +60,7 @@ object PetDisplayModule : Module("Pet Display") {
             }
 
             // Background pill
-            NVGRenderer.rect(x, y, w, h, 0xE60A0F2E.toInt(), radius)
+            NVGRenderer.rect(x, y, w, h, 0xFF0A0F2E.toInt(), radius)
 
             // Animated border
             val angle  = (System.currentTimeMillis() % 8000L).toFloat() / 8000f * (Math.PI.toFloat() * 2f)
@@ -133,7 +131,7 @@ object PetDisplayModule : Module("Pet Display") {
     }
 
     init {
-        addSetting(enabled, showHeldItem, glowPulse)
+        addSetting(enabled)
         EventBus.register(this)
     }
 
