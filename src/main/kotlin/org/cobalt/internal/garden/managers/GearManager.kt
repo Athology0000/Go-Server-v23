@@ -11,10 +11,10 @@ object GearManager {
     fun swapForPest() {
         isSwapping = true
         try {
-            if (GardenConfig.autoWardrobeEnabled)
+            if (GardenConfig.autoWardrobeEnabled && GardenConfig.autoWardrobePest)
                 WardrobeManager.swapTo(WardrobeManager.LoadoutType.PEST)
-            if (GardenConfig.pestArmor.isNotBlank())
-                EquipmentManager.swapTo(GardenConfig.pestArmor)
+            if (GardenConfig.autoEquipment && GardenConfig.pestEquipment.isNotBlank())
+                EquipmentManager.swapTo(GardenConfig.pestEquipment)
         } finally { isSwapping = false }
     }
 
@@ -23,18 +23,18 @@ object GearManager {
         try {
             if (GardenConfig.autoWardrobeEnabled)
                 WardrobeManager.swapTo(WardrobeManager.LoadoutType.FARMING)
-            if (GardenConfig.farmingArmor.isNotBlank())
-                EquipmentManager.swapTo(GardenConfig.farmingArmor)
+            if (GardenConfig.autoEquipment && GardenConfig.farmingEquipment.isNotBlank())
+                EquipmentManager.swapTo(GardenConfig.farmingEquipment)
         } finally { isSwapping = false }
     }
 
     fun swapForVisitor() {
         isSwapping = true
         try {
-            if (GardenConfig.autoWardrobeEnabled)
+            if (GardenConfig.autoWardrobeEnabled && GardenConfig.autoWardrobeVisitor)
                 WardrobeManager.swapTo(WardrobeManager.LoadoutType.VISITOR)
-            if (GardenConfig.visitorArmor.isNotBlank())
-                EquipmentManager.swapTo(GardenConfig.visitorArmor)
+            if (GardenConfig.autoEquipment && GardenConfig.visitorEquipment.isNotBlank())
+                EquipmentManager.swapTo(GardenConfig.visitorEquipment)
         } finally { isSwapping = false }
     }
 }

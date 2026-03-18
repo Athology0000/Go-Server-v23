@@ -55,51 +55,91 @@ object GardenMacroModule : Module("Garden Macro") {
     private val enabledSetting = CheckboxSetting("Enabled", "Run the garden macro.", false)
 
     // Scripts
-    private val farmScriptSetting    = TextSetting("Farm Script",    "Taunahi script name for farming (e.g. netherwart:1).",      "netherwart:1").inGroup("Scripts")
-    private val pestScriptSetting    = TextSetting("Pest Script",    "Taunahi script name for pest cleaning.",                    "misc:pestCleaner").inGroup("Scripts")
-    private val returnScriptSetting  = TextSetting("Return Script",  "Taunahi script name to run after pest clean.",              "misc:visitor").inGroup("Scripts")
-    private val visitorScriptSetting = TextSetting("Visitor Script", "Taunahi script name for visitors.",                        "misc:visitor").inGroup("Scripts")
+    private val farmScriptSetting    = TextSetting("Farm Script",    "Taunahi script name for farming (e.g. netherwart:1).",  "netherwart:1").inGroup("Scripts")
+    private val pestScriptSetting    = TextSetting("Pest Script",    "Taunahi script name for pest cleaning.",                "misc:pestCleaner").inGroup("Scripts")
+    private val returnScriptSetting  = TextSetting("Return Script",  "Taunahi script name to run after pest clean.",          "misc:visitor").inGroup("Scripts")
+    private val visitorScriptSetting = TextSetting("Visitor Script", "Taunahi script name for visitors.",                    "misc:visitor").inGroup("Scripts")
 
     // Pest
-    private val pestThresholdSetting = SliderSetting("Pest Threshold", "Alive count to trigger cleaning.", 4.0, 1.0, 8.0, step = 1.0).inGroup("Pest")
-    private val aotvEnabledSetting   = CheckboxSetting("AOTV to Roof",  "Teleport to roof before pest clean.", false).inGroup("Pest")
-    private val aotvPlotsSetting     = TextSetting("AOTV Plots",     "Comma-separated plot names.",       "").inGroup("Pest")
-    private val prepSwapSetting      = CheckboxSetting("Prep Swap",     "Swap gear before threshold hit.",   false).inGroup("Pest")
-    private val roofPitchSetting     = SliderSetting("Roof Pitch",     "Camera pitch for roof teleport.",   -80.0, -90.0, 90.0).inGroup("Pest")
+    private val pestThresholdSetting      = SliderSetting("Pest Threshold",       "Alive pest count to trigger cleaning.",           4.0,  1.0, 8.0,   step = 1.0).inGroup("Pest")
+    private val triggerPestOnChatSetting  = CheckboxSetting("Trigger Pest On Chat","Trigger pest clean from chat message.",           true).inGroup("Pest")
+    private val pestChatTriggerDelaySetting = SliderSetting("Pest Chat Delay",    "Ms to wait after chat trigger before cleaning.",   0.0,  0.0, 5000.0).inGroup("Pest")
+    private val aotvEnabledSetting        = CheckboxSetting("AOTV to Roof",        "Teleport to roof before pest clean.",              false).inGroup("Pest")
+    private val roofPitchSetting          = SliderSetting("Roof Pitch",            "Camera pitch for roof teleport.",                  -80.0, -90.0, 90.0).inGroup("Pest")
+    private val aotvRoofPitchHumanizationSetting = SliderSetting("Roof Pitch Humanization", "Random pitch offset for AOTV.", 3.0, 0.0, 10.0, step = 1.0).inGroup("Pest")
+    private val prepSwapSetting           = CheckboxSetting("Prep Swap",            "Swap gear before threshold hit.",                  false).inGroup("Pest")
+    private val aotvPlotsSetting          = TextSetting("AOTV Plots",               "Comma-separated plot names.",                      "").inGroup("Pest")
+    private val breakBlocksBeforeAotvSetting = CheckboxSetting("Break Blocks Before AOTV", "Break blocks before AOTV teleport.", false).inGroup("Pest")
+    private val delayPestForCropFeverSetting = CheckboxSetting("Delay Pest For Crop Fever", "Wait for crop fever to expire before pest.", false).inGroup("Pest")
+    private val enablePlotTpRewarpSetting = CheckboxSetting("Enable Plot TP Rewarp", "Re-warp to garden after plot teleport.", false).inGroup("Pest")
+    private val holdWUntilWallSetting     = CheckboxSetting("Hold W Until Wall",    "Hold forward key until hitting a wall.",           false).inGroup("Pest")
+    private val plotTpNumberSetting       = TextSetting("Plot TP Number",            "Plot number to teleport to.",                      "0").inGroup("Pest")
 
     // Visitor
-    private val autoVisitorSetting = CheckboxSetting("Auto Visitor", "Handle visitor offers automatically.", false).inGroup("Visitor")
+    private val autoVisitorSetting    = CheckboxSetting("Auto Visitor",    "Handle visitor offers automatically.", false).inGroup("Visitor")
+    private val visitorThresholdSetting = SliderSetting("Visitor Threshold", "Time in seconds before handling visitor.", 5.0, 1.0, 30.0, step = 1.0).inGroup("Visitor")
 
     // Wardrobe
-    private val autoWardrobeSetting   = CheckboxSetting("Auto Wardrobe",   "Swap wardrobe slots automatically.",   false).inGroup("Wardrobe")
-    private val farmingSlotSetting    = SliderSetting("Farming Slot",   "Wardrobe slot for farming.",          1.0, 1.0, 18.0, step = 1.0).inGroup("Wardrobe")
-    private val pestSlotSetting       = SliderSetting("Pest Slot",      "Wardrobe slot for pest cleaning.",    2.0, 1.0, 18.0, step = 1.0).inGroup("Wardrobe")
-    private val visitorSlotSetting    = SliderSetting("Visitor Slot",   "Wardrobe slot for visitors.",         3.0, 1.0, 18.0, step = 1.0).inGroup("Wardrobe")
+    private val autoWardrobeSetting        = CheckboxSetting("Auto Wardrobe",        "Master toggle for automatic wardrobe swaps.",  false).inGroup("Wardrobe")
+    private val autoWardrobePestSetting    = CheckboxSetting("Auto Wardrobe (Pest)",    "Swap wardrobe slot when going to pest.",     true).inGroup("Wardrobe")
+    private val autoWardrobeVisitorSetting = CheckboxSetting("Auto Wardrobe (Visitor)", "Swap wardrobe slot for visitors.",          false).inGroup("Wardrobe")
+    private val farmingSlotSetting         = SliderSetting("Farming Slot",   "Wardrobe slot for farming.",        1.0, 1.0, 18.0, step = 1.0).inGroup("Wardrobe")
+    private val pestSlotSetting            = SliderSetting("Pest Slot",      "Wardrobe slot for pest cleaning.",  2.0, 1.0, 18.0, step = 1.0).inGroup("Wardrobe")
+    private val visitorSlotSetting         = SliderSetting("Visitor Slot",   "Wardrobe slot for visitors.",       3.0, 1.0, 18.0, step = 1.0).inGroup("Wardrobe")
 
-    // Equipment
-    private val farmingArmorSetting = TextSetting("Farming Armor", "Armor set name for farming.",   "").inGroup("Equipment")
-    private val pestArmorSetting    = TextSetting("Pest Armor",    "Armor set name for pest.",      "").inGroup("Equipment")
-    private val visitorArmorSetting = TextSetting("Visitor Armor", "Armor set name for visitors.",  "").inGroup("Equipment")
-    private val swapDelaySetting    = SliderSetting("Swap Delay", "Ms between equipment swaps.", 300.0, 0.0, 2000.0).inGroup("Equipment")
+    // Equipment (Skyblock equipment slots: bracelet, cloak, belt, necklace)
+    private val autoEquipmentSetting    = CheckboxSetting("Auto Equipment",     "Automatically swap Skyblock equipment items.", true).inGroup("Equipment")
+    private val farmingEquipmentSetting = TextSetting("Farming Equipment", "Equipment preset name for farming.",  "").inGroup("Equipment")
+    private val pestEquipmentSetting    = TextSetting("Pest Equipment",    "Equipment preset name for pest.",     "").inGroup("Equipment")
+    private val visitorEquipmentSetting = TextSetting("Visitor Equipment", "Equipment preset name for visitors.", "").inGroup("Equipment")
+    private val swapDelaySetting        = SliderSetting("Swap Delay",      "Ms between equipment swaps.",         300.0, 0.0, 2000.0).inGroup("Equipment")
+
+    // Rod
+    private val autoRodPestCdSetting       = CheckboxSetting("Auto Rod (Pest CD)",       "Use rod when pest cooldown is active.",  false).inGroup("Rod")
+    private val autoRodPestSpawnSetting    = CheckboxSetting("Auto Rod (Pest Spawn)",    "Use rod when pest spawns.",              false).inGroup("Rod")
+    private val autoRodReturnToFarmSetting = CheckboxSetting("Auto Rod (Return To Farm)","Use rod when returning to farm.",        false).inGroup("Rod")
+    private val rodSwapDelaySetting        = SliderSetting("Rod Swap Delay", "Ms to wait between rod swaps.", 100.0, 0.0, 2000.0).inGroup("Rod")
 
     // Economy
-    private val bazaarRefreshSetting = SliderSetting("Bazaar Refresh", "Seconds between Bazaar updates.", 120.0, 30.0, 600.0).inGroup("Economy")
-    private val georgeRaritySetting  = TextSetting("George Rarity", "Rarities to sell (LEGENDARY,MYTHIC).", "LEGENDARY").inGroup("Economy")
-    private val bookLevelSetting     = SliderSetting("Book Level", "Enchant level to combine books at.", 5.0, 1.0, 10.0, step = 1.0).inGroup("Economy")
-    private val junkItemsSetting     = TextSetting("Junk Items", "Comma-separated item names to drop.", "").inGroup("Economy")
-    private val cookieItemSetting    = TextSetting("Cookie Item", "Item name to use booster cookie on.", "").inGroup("Economy")
+    private val autoGeorgeSellSetting      = CheckboxSetting("Auto George Sell",    "Automatically sell pets to George.",        false).inGroup("Economy")
+    private val georgeRaritySetting        = TextSetting("George Rarity",            "Rarities to sell (LEGENDARY,MYTHIC).",      "LEGENDARY").inGroup("Economy")
+    private val georgeSellThresholdSetting = SliderSetting("George Sell Threshold", "Rarity level (1-6) to sell at.",             3.0, 1.0, 6.0, step = 1.0).inGroup("Economy")
+    private val autoBookCombineSetting     = CheckboxSetting("Auto Book Combine",   "Automatically combine enchanted books.",     false).inGroup("Economy")
+    private val bookLevelSetting           = SliderSetting("Book Level",             "Enchant level to combine books at.",         5.0, 1.0, 10.0, step = 1.0).inGroup("Economy")
+    private val bookThresholdSetting       = SliderSetting("Book Threshold",         "Number of books before triggering combine.", 7.0, 1.0, 20.0, step = 1.0).inGroup("Economy")
+    private val bookCombineDelaySetting    = SliderSetting("Book Combine Delay",     "Ms to wait between book combine actions.",  300.0, 0.0, 2000.0).inGroup("Economy")
+    private val alwaysActiveCombineSetting = CheckboxSetting("Always Active Combine","Combine books even when not farming.",      false).inGroup("Economy")
+    private val autoDropJunkSetting        = CheckboxSetting("Auto Drop Junk",       "Automatically drop junk items.",            false).inGroup("Economy")
+    private val junkItemsSetting           = TextSetting("Junk Items",               "Comma-separated item names to drop.",       "Fruit Bowl,Farming Exp Boost,Sunder VI").inGroup("Economy")
+    private val junkThresholdSetting       = SliderSetting("Junk Threshold",         "Stack size before dropping junk.",          3.0, 1.0, 64.0, step = 1.0).inGroup("Economy")
+    private val junkItemDropDelaySetting   = SliderSetting("Junk Drop Delay",        "Ms to wait between dropping items.",        300.0, 0.0, 2000.0).inGroup("Economy")
+    private val autoBoosterCookieSetting   = CheckboxSetting("Auto Booster Cookie",  "Automatically use booster cookies.",        true).inGroup("Economy")
+    private val boosterCookieItemsSetting  = TextSetting("Cookie Items",             "Comma-separated items to use cookies on.",  "Atmospheric Filter,Squeaky Toy,Beady Eyes,Clipped Wings,Overclocker,Mantid Claw,Flowering Bouquet,Bookworm,Chirping Stereo,Firefly,Capsule,Vinyl").inGroup("Economy")
+    private val cookieItemSetting          = TextSetting("Cookie Item",              "Single item to apply booster cookie to.",   "").inGroup("Economy")
+    private val autoStashManagerSetting    = CheckboxSetting("Auto Stash Manager",   "Automatically manage stash storage.",       false).inGroup("Economy")
+    private val bazaarRefreshSetting       = SliderSetting("Bazaar Refresh",         "Seconds between Bazaar price updates.",     120.0, 30.0, 600.0).inGroup("Economy")
 
     // Rest
-    private val workDurationSetting  = SliderSetting("Work Duration",  "Minutes to farm before resting.",   60.0, 1.0, 240.0).inGroup("Rest")
-    private val workOffsetSetting    = SliderSetting("Work Offset",    "Random offset for work duration.",   5.0, 0.0, 30.0).inGroup("Rest")
-    private val breakDurationSetting = SliderSetting("Break Duration", "Minutes to rest before resuming.",  10.0, 1.0, 60.0).inGroup("Rest")
-    private val breakOffsetSetting   = SliderSetting("Break Offset",   "Random offset for break duration.",  2.0, 0.0, 15.0).inGroup("Rest")
+    private val workDurationSetting            = SliderSetting("Work Duration",              "Minutes to farm before resting.",      60.0, 1.0, 240.0).inGroup("Rest")
+    private val workOffsetSetting              = SliderSetting("Work Offset",                "Random offset for work duration.",      5.0, 0.0, 30.0).inGroup("Rest")
+    private val breakDurationSetting           = SliderSetting("Break Duration",             "Minutes to rest before resuming.",     10.0, 1.0, 60.0).inGroup("Rest")
+    private val breakOffsetSetting             = SliderSetting("Break Offset",               "Random offset for break duration.",     2.0, 0.0, 15.0).inGroup("Rest")
+    private val persistSessionTimerSetting     = CheckboxSetting("Persist Session Timer",    "Keep session timer across restarts.",  true).inGroup("Rest")
+    private val autoResumeAfterDynamicRestSetting = CheckboxSetting("Auto Resume After Rest","Automatically resume after rest ends.", true).inGroup("Rest")
 
     // Advanced
-    private val hideFilteredChatSetting = CheckboxSetting("Hide Chat Spam", "Filter bot-related chat messages.", false).inGroup("Advanced")
-    private val maxRecoverySetting      = SliderSetting("Max Recovery", "Max auto-reconnect attempts.",     15.0, 1.0, 30.0, step = 1.0).inGroup("Advanced")
-    private val reconnectMinSetting     = SliderSetting("Reconnect Min", "Min seconds before reconnecting.", 30.0, 5.0, 120.0).inGroup("Advanced")
-    private val reconnectMaxSetting     = SliderSetting("Reconnect Max", "Max seconds before reconnecting.", 60.0, 5.0, 120.0).inGroup("Advanced")
+    private val hideFilteredChatSetting           = CheckboxSetting("Hide Chat Spam",          "Filter bot-related chat messages.",     false).inGroup("Advanced")
+    private val guiOnlyInGardenSetting            = CheckboxSetting("GUI Only In Garden",       "Only show GUI when in the garden.",     true).inGroup("Advanced")
+    private val autoRecoverUnexpectedDisconnectSetting = CheckboxSetting("Auto Recover Disconnect", "Reconnect after unexpected disconnects.", true).inGroup("Advanced")
+    private val maxRecoverySetting                = SliderSetting("Max Recovery",               "Max auto-reconnect attempts.",          15.0, 1.0, 30.0, step = 1.0).inGroup("Advanced")
+    private val reconnectMinSetting               = SliderSetting("Reconnect Min",              "Min seconds before reconnecting.",      30.0, 5.0, 120.0).inGroup("Advanced")
+    private val reconnectMaxSetting               = SliderSetting("Reconnect Max",              "Max seconds before reconnecting.",      60.0, 5.0, 120.0).inGroup("Advanced")
+    private val rotationTimeSetting               = SliderSetting("Rotation Time",              "Ms for camera rotation movements.",    500.0, 50.0, 2000.0).inGroup("Advanced")
+    private val guiClickDelaySetting              = SliderSetting("GUI Click Delay",            "Ms to wait between GUI clicks.",       500.0, 50.0, 2000.0).inGroup("Advanced")
+    private val additionalRandomDelaySetting      = SliderSetting("Additional Random Delay",    "Extra random ms added to GUI actions.", 0.0, 0.0, 1000.0).inGroup("Advanced")
+    private val gardenWarpDelaySetting            = SliderSetting("Garden Warp Delay",          "Ms to wait after warping to garden.",  1000.0, 0.0, 5000.0).inGroup("Advanced")
+    private val unflyModeSetting                  = TextSetting("Unfly Mode",                   "DOUBLE_TAP_SPACE or SNEAK.",            "DOUBLE_TAP_SPACE").inGroup("Advanced")
+    private val petTrackerListSetting             = TextSetting("Pet Tracker List",             "Pets to track (ID:Name:Level:Rarity).", "PET_ROSE_DRAGON:Rose Dragon:200:LEGENDARY").inGroup("Advanced")
 
     // ── HUD ───────────────────────────────────────────────────────────────────
     private val hudWidth = 200f
@@ -132,14 +172,36 @@ object GardenMacroModule : Module("Garden Macro") {
     init {
         addSetting(
             enabledSetting,
+            // Scripts
             farmScriptSetting, pestScriptSetting, returnScriptSetting, visitorScriptSetting,
-            pestThresholdSetting, aotvEnabledSetting, aotvPlotsSetting, prepSwapSetting, roofPitchSetting,
-            autoVisitorSetting,
-            autoWardrobeSetting, farmingSlotSetting, pestSlotSetting, visitorSlotSetting,
-            farmingArmorSetting, pestArmorSetting, visitorArmorSetting, swapDelaySetting,
-            bazaarRefreshSetting, georgeRaritySetting, bookLevelSetting, junkItemsSetting, cookieItemSetting,
+            // Pest
+            pestThresholdSetting, triggerPestOnChatSetting, pestChatTriggerDelaySetting,
+            aotvEnabledSetting, roofPitchSetting, aotvRoofPitchHumanizationSetting,
+            prepSwapSetting, aotvPlotsSetting, breakBlocksBeforeAotvSetting, delayPestForCropFeverSetting,
+            enablePlotTpRewarpSetting, holdWUntilWallSetting, plotTpNumberSetting,
+            // Visitor
+            autoVisitorSetting, visitorThresholdSetting,
+            // Wardrobe
+            autoWardrobeSetting, autoWardrobePestSetting, autoWardrobeVisitorSetting,
+            farmingSlotSetting, pestSlotSetting, visitorSlotSetting,
+            // Equipment
+            autoEquipmentSetting, farmingEquipmentSetting, pestEquipmentSetting, visitorEquipmentSetting, swapDelaySetting,
+            // Rod
+            autoRodPestCdSetting, autoRodPestSpawnSetting, autoRodReturnToFarmSetting, rodSwapDelaySetting,
+            // Economy
+            autoGeorgeSellSetting, georgeRaritySetting, georgeSellThresholdSetting,
+            autoBookCombineSetting, bookLevelSetting, bookThresholdSetting, bookCombineDelaySetting, alwaysActiveCombineSetting,
+            autoDropJunkSetting, junkItemsSetting, junkThresholdSetting, junkItemDropDelaySetting,
+            autoBoosterCookieSetting, boosterCookieItemsSetting, cookieItemSetting,
+            autoStashManagerSetting, bazaarRefreshSetting,
+            // Rest
             workDurationSetting, workOffsetSetting, breakDurationSetting, breakOffsetSetting,
-            hideFilteredChatSetting, maxRecoverySetting, reconnectMinSetting, reconnectMaxSetting
+            persistSessionTimerSetting, autoResumeAfterDynamicRestSetting,
+            // Advanced
+            hideFilteredChatSetting, guiOnlyInGardenSetting,
+            autoRecoverUnexpectedDisconnectSetting, maxRecoverySetting, reconnectMinSetting, reconnectMaxSetting,
+            rotationTimeSetting, guiClickDelaySetting, additionalRandomDelaySetting, gardenWarpDelaySetting,
+            unflyModeSetting, petTrackerListSetting
         )
 
         EventBus.register(this)
@@ -147,33 +209,92 @@ object GardenMacroModule : Module("Garden Macro") {
 
     // ── GardenConfig sync ─────────────────────────────────────────────────────
     private fun syncConfig() {
-        GardenConfig.pestThreshold       = pestThresholdSetting.value.toInt()
-        GardenConfig.aotvEnabled         = aotvEnabledSetting.value
-        GardenConfig.roofPitch           = roofPitchSetting.value
-        GardenConfig.autoWardrobeEnabled = autoWardrobeSetting.value
-        GardenConfig.farmingWardrobeSlot = farmingSlotSetting.value.toInt()
-        GardenConfig.pestWardrobeSlot    = pestSlotSetting.value.toInt()
-        GardenConfig.visitorWardrobeSlot = visitorSlotSetting.value.toInt()
-        GardenConfig.farmingArmor        = farmingArmorSetting.value
-        GardenConfig.pestArmor           = pestArmorSetting.value
-        GardenConfig.visitorArmor        = visitorArmorSetting.value
-        GardenConfig.swapDelayMs         = swapDelaySetting.value.toLong()
-        GardenConfig.farmScript          = farmScriptSetting.value
-        GardenConfig.pestScript          = pestScriptSetting.value
-        GardenConfig.returnScript        = returnScriptSetting.value
-        GardenConfig.visitorScript       = visitorScriptSetting.value
-        GardenConfig.georgeRarity        = georgeRaritySetting.value
-        GardenConfig.bookCombineLevel    = bookLevelSetting.value.toInt()
-        GardenConfig.junkItems           = junkItemsSetting.value
-        GardenConfig.cookieItem          = cookieItemSetting.value
-        GardenConfig.workDurationMins    = workDurationSetting.value.toLong()
-        GardenConfig.workOffsetMins      = workOffsetSetting.value.toLong()
-        GardenConfig.breakDurationMins   = breakDurationSetting.value.toLong()
-        GardenConfig.breakOffsetMins     = breakOffsetSetting.value.toLong()
-        GardenConfig.maxRecoveryAttempts = maxRecoverySetting.value.toInt()
-        GardenConfig.reconnectDelayMin   = reconnectMinSetting.value.toLong()
-        GardenConfig.reconnectDelayMax   = reconnectMaxSetting.value.toLong()
-        GardenConfig.bazaarRefreshSecs   = bazaarRefreshSetting.value.toLong()
+        // Scripts
+        GardenConfig.farmScript   = farmScriptSetting.value
+        GardenConfig.pestScript   = pestScriptSetting.value
+        GardenConfig.returnScript = returnScriptSetting.value
+        GardenConfig.visitorScript = visitorScriptSetting.value
+
+        // Pest
+        GardenConfig.pestThreshold            = pestThresholdSetting.value.toInt()
+        GardenConfig.triggerPestOnChat        = triggerPestOnChatSetting.value
+        GardenConfig.pestChatTriggerDelayMs   = pestChatTriggerDelaySetting.value.toLong()
+        GardenConfig.aotvEnabled              = aotvEnabledSetting.value
+        GardenConfig.roofPitch                = roofPitchSetting.value
+        GardenConfig.aotvRoofPitchHumanization = aotvRoofPitchHumanizationSetting.value.toInt()
+        GardenConfig.breakBlocksBeforeAotv    = breakBlocksBeforeAotvSetting.value
+        GardenConfig.delayPestForCropFever    = delayPestForCropFeverSetting.value
+        GardenConfig.enablePlotTpRewarp       = enablePlotTpRewarpSetting.value
+        GardenConfig.holdWUntilWall           = holdWUntilWallSetting.value
+        GardenConfig.plotTpNumber             = plotTpNumberSetting.value
+
+        // Visitor
+        GardenConfig.visitorThreshold = visitorThresholdSetting.value.toInt()
+
+        // Wardrobe
+        GardenConfig.autoWardrobeEnabled  = autoWardrobeSetting.value
+        GardenConfig.autoWardrobePest     = autoWardrobePestSetting.value
+        GardenConfig.autoWardrobeVisitor  = autoWardrobeVisitorSetting.value
+        GardenConfig.farmingWardrobeSlot  = farmingSlotSetting.value.toInt()
+        GardenConfig.pestWardrobeSlot     = pestSlotSetting.value.toInt()
+        GardenConfig.visitorWardrobeSlot  = visitorSlotSetting.value.toInt()
+
+        // Equipment
+        GardenConfig.autoEquipment    = autoEquipmentSetting.value
+        GardenConfig.farmingEquipment = farmingEquipmentSetting.value
+        GardenConfig.pestEquipment    = pestEquipmentSetting.value
+        GardenConfig.visitorEquipment = visitorEquipmentSetting.value
+        GardenConfig.swapDelayMs      = swapDelaySetting.value.toLong()
+
+        // Rod
+        GardenConfig.autoRodPestCd        = autoRodPestCdSetting.value
+        GardenConfig.autoRodPestSpawn     = autoRodPestSpawnSetting.value
+        GardenConfig.autoRodReturnToFarm  = autoRodReturnToFarmSetting.value
+        GardenConfig.rodSwapDelayMs       = rodSwapDelaySetting.value.toLong()
+
+        // Economy
+        GardenConfig.autoGeorgeSell       = autoGeorgeSellSetting.value
+        GardenConfig.georgeRarity         = georgeRaritySetting.value
+        GardenConfig.georgeSellThreshold  = georgeSellThresholdSetting.value.toInt()
+        GardenConfig.autoBookCombine      = autoBookCombineSetting.value
+        GardenConfig.bookCombineLevel     = bookLevelSetting.value.toInt()
+        GardenConfig.bookThreshold        = bookThresholdSetting.value.toInt()
+        GardenConfig.bookCombineDelayMs   = bookCombineDelaySetting.value.toLong()
+        GardenConfig.alwaysActiveCombine  = alwaysActiveCombineSetting.value
+        GardenConfig.autoDropJunk         = autoDropJunkSetting.value
+        GardenConfig.junkItems            = junkItemsSetting.value
+        GardenConfig.junkThreshold        = junkThresholdSetting.value.toInt()
+        GardenConfig.junkItemDropDelayMs  = junkItemDropDelaySetting.value.toLong()
+        GardenConfig.autoBoosterCookie    = autoBoosterCookieSetting.value
+        GardenConfig.boosterCookieItems   = boosterCookieItemsSetting.value
+        GardenConfig.cookieItem           = cookieItemSetting.value
+        GardenConfig.autoStashManager     = autoStashManagerSetting.value
+        GardenConfig.bazaarRefreshSecs    = bazaarRefreshSetting.value.toLong()
+
+        // Rest
+        GardenConfig.workDurationMins            = workDurationSetting.value.toLong()
+        GardenConfig.workOffsetMins              = workOffsetSetting.value.toLong()
+        GardenConfig.breakDurationMins           = breakDurationSetting.value.toLong()
+        GardenConfig.breakOffsetMins             = breakOffsetSetting.value.toLong()
+        GardenConfig.persistSessionTimer         = persistSessionTimerSetting.value
+        GardenConfig.autoResumeAfterDynamicRest  = autoResumeAfterDynamicRestSetting.value
+
+        // Recovery
+        GardenConfig.autoRecoverUnexpectedDisconnect = autoRecoverUnexpectedDisconnectSetting.value
+        GardenConfig.maxRecoveryAttempts         = maxRecoverySetting.value.toInt()
+        GardenConfig.reconnectDelayMin           = reconnectMinSetting.value.toLong()
+        GardenConfig.reconnectDelayMax           = reconnectMaxSetting.value.toLong()
+
+        // Advanced timing
+        GardenConfig.rotationTimeMs          = rotationTimeSetting.value.toLong()
+        GardenConfig.guiClickDelayMs         = guiClickDelaySetting.value.toLong()
+        GardenConfig.additionalRandomDelayMs = additionalRandomDelaySetting.value.toLong()
+        GardenConfig.gardenWarpDelayMs       = gardenWarpDelaySetting.value.toLong()
+        GardenConfig.unflyMode               = unflyModeSetting.value
+        GardenConfig.petTrackerList          = petTrackerListSetting.value
+
+        // Misc
+        GardenConfig.guiOnlyInGarden = guiOnlyInGardenSetting.value
     }
 
     // ── Events ────────────────────────────────────────────────────────────────
@@ -198,10 +319,14 @@ object GardenMacroModule : Module("Garden Macro") {
         // Disconnect detection
         val connected = mc.connection != null
         if (!connected && wasConnected && state != GardenState.RECOVERING && state != GardenState.RESTING) {
-            setState(GardenState.RECOVERING)
-            RecoveryManager.onDisconnect {
-                setState(GardenState.FARMING)
-                ScriptBridge.startFarming(GardenConfig.farmScript)
+            if (GardenConfig.autoRecoverUnexpectedDisconnect) {
+                setState(GardenState.RECOVERING)
+                RecoveryManager.onDisconnect {
+                    setState(GardenState.FARMING)
+                    ScriptBridge.startFarming(GardenConfig.farmScript)
+                }
+            } else {
+                stopMacro()
             }
         }
         wasConnected = connected
@@ -246,8 +371,12 @@ object GardenMacroModule : Module("Garden Macro") {
         if (DynamicRestManager.shouldRest()) {
             setState(GardenState.RESTING)
             DynamicRestManager.startRest {
-                setState(GardenState.FARMING)
-                ScriptBridge.startFarming(GardenConfig.farmScript)
+                if (GardenConfig.autoResumeAfterDynamicRest) {
+                    setState(GardenState.FARMING)
+                    ScriptBridge.startFarming(GardenConfig.farmScript)
+                } else {
+                    stopMacro()
+                }
             }
             return
         }
@@ -261,19 +390,19 @@ object GardenMacroModule : Module("Garden Macro") {
 
         // AUTOSELLING — priority: George > BookCombine > Junk
         if (autosellingManager == null) {
-            if (GeorgeManager.shouldSell()) {
+            if (GardenConfig.autoGeorgeSell && GeorgeManager.shouldSell()) {
                 autosellingManager = "george"
                 setState(GardenState.AUTOSELLING)
                 GeorgeManager.startSell { autosellingManager = null; setState(GardenState.FARMING) }
                 return
             }
-            if (BookCombineManager.shouldCombine()) {
+            if (GardenConfig.autoBookCombine && BookCombineManager.shouldCombine()) {
                 autosellingManager = "book"
                 setState(GardenState.AUTOSELLING)
                 BookCombineManager.startCombine { autosellingManager = null; setState(GardenState.FARMING) }
                 return
             }
-            if (JunkManager.shouldDrop()) {
+            if (GardenConfig.autoDropJunk && JunkManager.shouldDrop()) {
                 autosellingManager = "junk"
                 setState(GardenState.AUTOSELLING)
                 JunkManager.startDrop { autosellingManager = null; setState(GardenState.FARMING) }
@@ -291,7 +420,8 @@ object GardenMacroModule : Module("Garden Macro") {
         }
 
         // Pest cleaning trigger
-        if (!CropFeverManager.shouldDelay() && PestManager.update(GardenConfig.pestThreshold)) {
+        val cropFeverDelay = GardenConfig.delayPestForCropFever && CropFeverManager.shouldDelay()
+        if (!cropFeverDelay && PestManager.update(GardenConfig.pestThreshold)) {
             setState(GardenState.CLEANING)
             PestCleaningSequencer.startSequence { setState(GardenState.FARMING) }
         }
@@ -299,7 +429,9 @@ object GardenMacroModule : Module("Garden Macro") {
 
     private fun startMacro() {
         syncConfig()
-        sessionStartTime = System.currentTimeMillis()
+        if (!GardenConfig.persistSessionTimer) {
+            sessionStartTime = System.currentTimeMillis()
+        }
         state = GardenState.FARMING
         // Reset all managers
         listOf<() -> Unit>(

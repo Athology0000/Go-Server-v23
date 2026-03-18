@@ -20,7 +20,7 @@ object PetTabListParser {
         private set
 
     private val PET_NAME_LEVEL = Regex(
-        """(?:\[Lv[.\s]*(\d+)]\s*(.+?)|(.+?)\s*\[Lv[.\s]*(\d+)])""",
+        """(?:\[Lv[\s]*(\d+)]\s*(.+)|(.+?)\s*\[Lv[\s]*(\d+)])""",
         RegexOption.IGNORE_CASE
     )
     private val PET_ITEM = Regex(
@@ -28,12 +28,12 @@ object PetTabListParser {
         RegexOption.IGNORE_CASE
     )
     private val PET_XP = Regex(
-        """(?:pet\s+)?xp:\s*([\d,]+)\s*/\s*([\d,]+)""",
+        """(?:pet\s+)?(?:xp|exp):\s*([\d,]+)\s*/\s*([\d,]+)""",
         RegexOption.IGNORE_CASE
     )
 
     fun update() {
-        val gui = mc.gui ?: return
+        val gui = mc.gui
         val tabOverlay = gui.tabList as? TabOverlayAccessor ?: return
 
         val rawText = buildString {
