@@ -10,6 +10,9 @@ import org.cobalt.api.event.impl.client.MouseEvent
 import org.cobalt.api.event.impl.client.TickEvent
 import org.cobalt.api.event.impl.render.WorldRenderEvent
 import net.minecraft.world.InteractionHand
+import net.minecraft.world.phys.Vec3
+import org.cobalt.internal.pathfinding.OverlayRenderEngine
+import org.cobalt.internal.pathfinding.PathSplineRenderer
 import org.cobalt.api.module.setting.impl.SliderSetting
 import org.cobalt.api.module.Module
 import org.cobalt.api.module.setting.impl.ActionSetting
@@ -31,6 +34,12 @@ object PathfindingModule : Module("Pathfinding") {
 
   private val mc: Minecraft = Minecraft.getInstance()
   private var moduleOwnsPath = false
+  private var cachedSpline: PathSplineRenderer.SplineResult? = null
+  private var lastNodesRef: List<Vec3>? = null
+
+  private val COLOR_PATH_NORMAL = OverlayRenderEngine.Color(0, 200, 255, 220)   // cyan
+  private val COLOR_PATH_AOTV   = OverlayRenderEngine.Color(255, 160, 0, 220)   // orange
+  private val COLOR_HEAD_RAY    = OverlayRenderEngine.Color(255, 255, 255, 200)  // white
 
   val enabled = CheckboxSetting(
     "Enabled",
@@ -226,8 +235,43 @@ object PathfindingModule : Module("Pathfinding") {
   }
 
   @SubscribeEvent
-  fun onRender(@Suppress("UNUSED_PARAMETER") event: WorldRenderEvent.Last) {
-    // Path overlay rendering handled by NativePathfinder's C++ state machine
+  fun onRender(event: WorldRenderEvent.Last) {
+    if (!enabled.value) return
+    val player = mc.player ?: return
+    val level  = mc.level  ?: return
+
+    // Head-direction ray from eye position along crosshair
+    OverlayRenderEngine.clearTag("head-ray")
+    val eye  = player.getEyePosition()
+    val look = player.getLookAngle()
+    OverlayRenderEngine.addLine(
+      level,
+      eye.x, eye.y, eye.z,
+      eye.x + look.x * 5.0, eye.y + look.y * 5.0, eye.z + look.z * 5.0,
+      COLOR_HEAD_RAY, 1.5f, durationTicks = 1, tag = "head-ray"
+    )
+
+    // Spline path rendering — rebuild only when path nodes change
+    val nodes = NativePathfinder.cachedPathNodes
+    if (nodes !== lastNodesRef) {
+      lastNodesRef = nodes
+      cachedSpline = if (nodes.size >= 2) PathSplineRenderer.buildSpline(nodes) else null
+      OverlayRenderEngine.clearTag("path-spline")
+    }
+
+    val spline = cachedSpline ?: return
+    val pts  = spline.points
+    val isAv = spline.isAotv
+    for (i in 0 until pts.size - 1) {
+      val a = pts[i]; val b = pts[i + 1]
+      val color = if (isAv[i]) COLOR_PATH_AOTV else COLOR_PATH_NORMAL
+      OverlayRenderEngine.addLine(
+        level,
+        a.x, a.y + 0.05, a.z,
+        b.x, b.y + 0.05, b.z,
+        color, 2.0f, durationTicks = 3, tag = "path-spline"
+      )
+    }
   }
 
   fun ensureEnabledForAutomation(source: String) {
@@ -267,6 +311,9 @@ object PathfindingModule : Module("Pathfinding") {
     NativePathfinder.stop()
     moduleOwnsPath = false
     MovementManager.setMovementLock(false)
+    cachedSpline = null
+    lastNodesRef = null
+    OverlayRenderEngine.clearTag("path-spline")
   }
 
   private fun nativeActive(): Boolean {
