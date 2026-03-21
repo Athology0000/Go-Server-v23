@@ -75,6 +75,37 @@ java {
   }
 }
 
+// ── Native DLL build (Windows, requires VS2022 + CMake) ───────────────────────
+val nativesDir = file("natives")
+val dllReleasePath = file("natives/build/Release/cobalt_pathfinder.dll")
+val dllResourceDest = file("src/main/resources/natives/windows")
+
+tasks.register<Exec>("buildNative") {
+  group = "build"
+  description = "Compiles cobalt_pathfinder.dll via CMake (requires VS2022 + CMake installed)."
+  workingDir = nativesDir
+  commandLine(
+    "cmd", "/c",
+    "cmake -B build -G \"Visual Studio 17 2022\" -A x64 && cmake --build build --config Release"
+  )
+  onlyIf { !dllReleasePath.exists() }
+}
+
+tasks.register<Copy>("copyNativeDll") {
+  group = "build"
+  description = "Copies the built cobalt_pathfinder.dll into resources."
+  dependsOn("buildNative")
+  from(dllReleasePath)
+  into(dllResourceDest)
+  onlyIf { dllReleasePath.exists() }
+}
+
+tasks.named("processResources") {
+  dependsOn("copyNativeDll")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 tasks.register<Copy>("collectObfLibs") {
   group = "build"
   description = "Copies compile classpath jars to build/obf-libs for Skidfuscator -li."
