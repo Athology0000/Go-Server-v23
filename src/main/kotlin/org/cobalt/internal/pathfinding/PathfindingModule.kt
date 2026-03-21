@@ -2,7 +2,6 @@ package org.cobalt.internal.pathfinding
 
 import java.util.Locale
 import net.minecraft.client.Minecraft
-import net.minecraft.core.BlockPos
 import org.cobalt.api.hud.HudAnchor
 import org.cobalt.api.hud.hudElement
 import org.cobalt.api.event.EventBus
@@ -192,24 +191,25 @@ object PathfindingModule : Module("Pathfinding") {
   fun onTick(@Suppress("UNUSED_PARAMETER") event: TickEvent.Start) {
     org.cobalt.internal.pathfinding.DebugLog.debugFileEnabled = debugFileLogging.value
     if (!enabled.value) {
-      if (DuskPathfinder.isActive()) {
-        DuskPathfinder.stop(mc, "Pathfinding disabled.")
+      if (nativeActive()) {
+        org.cobalt.api.pathfinder.jni.NativePathfinder.stop()
+        MovementManager.setMovementLock(false)
+        MovementManager.setLookLock(false)
       }
-      MovementManager.setMovementLock(false)
-      MovementManager.setLookLock(false)
       return
     }
-    val active = DuskPathfinder.isActive()
-    MovementManager.setMovementLock(active)
-    MovementManager.setLookLock(active)
-    DuskPathfinder.tick(mc)
+    val cmd = org.cobalt.api.pathfinder.jni.NativePathfinder.tick()
+    if (cmd != null) {
+      cmd.applyToPlayer()
+    } else {
+      MovementManager.setMovementLock(false)
+      MovementManager.setLookLock(false)
+    }
   }
 
   @SubscribeEvent
-  fun onRender(event: WorldRenderEvent.Last) {
-    if (!enabled.value) return
-    DuskPathfinder.renderTick()
-    DuskPathfinder.render(event.context)
+  fun onRender(@Suppress("UNUSED_PARAMETER") event: WorldRenderEvent.Last) {
+    // Path overlay rendering handled by NativePathfinder's C++ state machine
   }
 
   fun ensureEnabledForAutomation(source: String) {
@@ -227,7 +227,7 @@ object PathfindingModule : Module("Pathfinding") {
     val y = parseCoordinate(targetY.value) ?: return invalidTarget("Y", targetY.value)
     val z = parseCoordinate(targetZ.value) ?: return invalidTarget("Z", targetZ.value)
 
-    DuskPathfinder.start(mc, BlockPos.containing(x, y, z))
+    org.cobalt.api.pathfinder.jni.NativePathfinder.setTarget(x, y, z)
   }
 
   fun setTargetOnly(x: Double, y: Double, z: Double) {
@@ -240,11 +240,19 @@ object PathfindingModule : Module("Pathfinding") {
     if (!enabled.value) {
       ensureEnabledForAutomation("pathfinding")
     }
-    DuskPathfinder.start(mc, BlockPos.containing(x, y, z))
+    org.cobalt.api.pathfinder.jni.NativePathfinder.setTarget(x, y, z)
   }
 
   fun stopPath() {
-    DuskPathfinder.stop(mc, "Stopped.")
+    org.cobalt.api.pathfinder.jni.NativePathfinder.stop()
+    MovementManager.setMovementLock(false)
+  }
+
+  private fun nativeActive(): Boolean {
+    val s = org.cobalt.api.pathfinder.jni.NativePathfinder.status
+    return s != org.cobalt.api.pathfinder.jni.PathStatus.IDLE &&
+           s != org.cobalt.api.pathfinder.jni.PathStatus.ARRIVED &&
+           s != org.cobalt.api.pathfinder.jni.PathStatus.FAILED
   }
 
   fun setTargetAtPlayer() {

@@ -23,7 +23,6 @@ import org.cobalt.api.util.getLoreLines
 import org.cobalt.internal.combat.CombatMacroModule
 import org.cobalt.api.pathfinder.jni.NativePathfinder
 import org.cobalt.api.util.player.MovementManager
-import org.cobalt.internal.pathfinding.PathPlanProfiles
 
 object CommissionMacroModule : Module("Commission Macro") {
 

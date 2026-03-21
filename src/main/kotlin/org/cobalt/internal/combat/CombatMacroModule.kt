@@ -44,7 +44,6 @@ import org.cobalt.api.pathfinder.jni.MovementProfile
 import org.cobalt.api.pathfinder.jni.NativePathfinder
 import org.cobalt.api.pathfinder.jni.PathStatus
 import org.cobalt.api.util.player.MovementManager
-import org.cobalt.internal.pathfinding.PathPlanProfiles
 import org.cobalt.internal.pathfinding.PathfindingModule
 import org.cobalt.internal.helper.WalkbackBridge
 import org.cobalt.internal.rotation.RotationsModule
