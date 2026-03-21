@@ -42,6 +42,6 @@ private:
     void addEtherwarp(const Vec3i& from, std::vector<PathNode>& out) const;
 
     float adjacentCost(const Vec3i& pos) const;
-    float clearanceCost(int x, int y, int z) const;
+    float clearanceCost(const Vec3i& pos) const;
     bool clearanceOk(int x, int y, int z) const;
 };

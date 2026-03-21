@@ -16,13 +16,14 @@ float MovementExpander::adjacentCost(const Vec3i& pos) const {
     return c;
 }
 
-float MovementExpander::clearanceCost(int x, int y, int z) const {
+float MovementExpander::clearanceCost(const Vec3i& pos) const {
     int open = 0;
     for (int i = 0; i < 4; i++) {
-        if (world_.isPassable(x + DX4[i], y, z + DZ4[i])) open++;
+        if (world_.getBlock(pos.x + DX4[i], pos.y, pos.z + DZ4[i]) == BT_AIR) open++;
     }
-    // open=4 free, open=3 -> +0.1, open=2 -> +0.3, open=1 -> +0.5
-    static const float penalty[5] = {0.5f, 0.5f, 0.3f, 0.1f, 0.0f};
+    // Penalty by lateral clearance: open air neighbors at same Y
+    // open=0 dead-end: +0.7, open=1: +0.5, open=2: +0.3, open=3: +0.1, open=4 free: +0.0
+    static const float penalty[5] = {0.7f, 0.5f, 0.3f, 0.1f, 0.0f};
     return penalty[open];
 }
 
@@ -38,7 +39,7 @@ void MovementExpander::addWalkSprint(const Vec3i& from, std::vector<PathNode>& o
         bool lowCeiling = !world_.isPassable(nx, from.y + 2, nz);
         ActionType act = lowCeiling ? ActionType::WALK : ActionType::SPRINT;
         float base = lowCeiling ? costs_.walk : costs_.sprint;
-        out.push_back({{nx, from.y, nz}, act, base + adjacentCost({nx, from.y, nz}) + clearanceCost(nx, from.y, nz)});
+        out.push_back({{nx, from.y, nz}, act, base + adjacentCost({nx, from.y, nz}) + clearanceCost({nx, from.y, nz})});
     }
 }
 
@@ -49,6 +50,7 @@ void MovementExpander::addJumps(const Vec3i& from, std::vector<PathNode>& out) c
         int ny = from.y + 1;
         if (!world_.isSolid(nx, ny - 1, nz)) continue;
         if (!clearanceOk(nx, ny, nz)) continue;
+        // clearanceCost intentionally omitted for jumps — landing geometry differs from corridor walking
         out.push_back({{nx, ny, nz}, ActionType::JUMP, costs_.jump + adjacentCost({nx, ny, nz})});
     }
     // Sprint-jump gap (2–4 blocks)
@@ -80,6 +82,7 @@ void MovementExpander::addFall(const Vec3i& from, std::vector<PathNode>& out) co
         int drop = from.y - landY;
         if (drop <= 0 || drop > 23) continue;
         float c = drop * costs_.fall + adjacentCost({nx, landY, nz});
+        // clearanceCost intentionally omitted for falls — landing clearance less critical for centering
         out.push_back({{nx, landY, nz}, ActionType::FALL, c});
     }
 }
