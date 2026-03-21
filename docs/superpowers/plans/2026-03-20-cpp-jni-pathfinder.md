@@ -237,8 +237,6 @@ class WorldAccessor {
 public:
     // Called each tick before planning/execution
     void setBuffer(const uint8_t* buf, int bx, int by, int bz);
-    // env + global ref to a Java object with method getBlock(int,int,int):int
-    void setCallbackEnv(JNIEnv* env, jobject callbackRef, jmethodID getBlockMethod);
 
     uint8_t getBlock(int x, int y, int z) const;
     bool isSolid(int x, int y, int z) const;
@@ -257,9 +255,6 @@ public:
 private:
     const uint8_t* buffer_ = nullptr;
     int bx_ = 0, by_ = 0, bz_ = 0;
-    JNIEnv* env_ = nullptr;
-    jobject cbObj_ = nullptr;
-    jmethodID cbMethod_ = nullptr;
 
     bool inBuffer(int x, int y, int z) const;
     uint8_t bufferAt(int x, int y, int z) const;
@@ -276,9 +271,6 @@ void WorldAccessor::setBuffer(const uint8_t* buf, int bx, int by, int bz) {
     buffer_ = buf; bx_ = bx; by_ = by; bz_ = bz;
 }
 
-void WorldAccessor::setCallbackEnv(JNIEnv* env, jobject cb, jmethodID m) {
-    env_ = env; cbObj_ = cb; cbMethod_ = m;
-}
 
 bool WorldAccessor::inBuffer(int x, int y, int z) const {
     return buffer_ &&
@@ -1002,8 +994,7 @@ public:
 
     PathCommand tick(const WorldAccessor& world,
                      double px, double py, double pz,
-                     float yaw, float pitch, bool onGround,
-                     JNIEnv* env, jobject cbObj, jmethodID cbMethod);
+                     float yaw, float pitch, bool onGround);
 
     PathStatus getStatus() const { return status_; }
 
@@ -1104,8 +1095,7 @@ PathCommand PathExecutor::buildCommand(double px, double py, double pz,
 
 PathCommand PathExecutor::tick(const WorldAccessor& world,
                                 double px, double py, double pz,
-                                float yaw, float pitch, bool onGround,
-                                JNIEnv* env, jobject cbObj, jmethodID cbMethod) {
+                                float yaw, float pitch, bool onGround) {
     stuck_.update(px, py, pz);
 
     switch (status_) {
@@ -1184,11 +1174,10 @@ class PathfinderEngine {
 public:
     PathfinderEngine();
 
-    PathCommand update(JNIEnv* env, const uint8_t* worldBuf,
+    PathCommand update(const uint8_t* worldBuf,
                        int bx, int by, int bz,
                        double px, double py, double pz,
-                       float yaw, float pitch, bool onGround,
-                       jobject cbObj, jmethodID cbMethod);
+                       float yaw, float pitch, bool onGround);
 
     void setRoute(const double* waypointData, int count, bool loop, int profile);
     void setTarget(double x, double y, double z);
@@ -1208,15 +1197,12 @@ private:
 
 PathfinderEngine::PathfinderEngine() {}
 
-PathCommand PathfinderEngine::update(JNIEnv* env,
-                                      const uint8_t* buf,
+PathCommand PathfinderEngine::update(const uint8_t* buf,
                                       int bx, int by, int bz,
                                       double px, double py, double pz,
-                                      float yaw, float pitch, bool onGround,
-                                      jobject cbObj, jmethodID cbMethod) {
+                                      float yaw, float pitch, bool onGround) {
     world_.setBuffer(buf, bx, by, bz);
-    world_.setCallbackEnv(env, cbObj, cbMethod);
-    return executor_.tick(world_, px, py, pz, yaw, pitch, onGround, env, cbObj, cbMethod);
+    return executor_.tick(world_, px, py, pz, yaw, pitch, onGround);
 }
 
 void PathfinderEngine::setRoute(const double* data, int count, bool loop, int profile) {
@@ -1280,10 +1266,9 @@ Java_org_cobalt_pathfinder_NativePathfinderBridge_update(JNIEnv* env, jclass,
 
     jbyte* buf = env->GetByteArrayElements(worldBuf, nullptr);
 
-    // No JNI callback for now (buffer-only mode)
     PathCommand cmd = ((PathfinderEngine*)handle)->update(
-        env, (const uint8_t*)buf, bx, by, bz,
-        px, py, pz, yaw, pitch, onGround, nullptr, nullptr);
+        (const uint8_t*)buf, bx, by, bz,
+        px, py, pz, yaw, pitch, onGround);
 
     env->ReleaseByteArrayElements(worldBuf, buf, JNI_ABORT);
 
@@ -1397,7 +1382,6 @@ public class NativePathfinderBridge {
     public static native void    destroyEngine(long handle);
     public static native void    setRoute(long handle, double[] waypoints, boolean loop, int profile);
     public static native void    setTarget(long handle, double x, double y, double z);
-    public static native void    setArrivalRadius(long handle, double radius);
     public static native int[]   update(long handle, byte[] worldBuffer,
                                          int bx, int by, int bz,
                                          double px, double py, double pz,
@@ -1418,12 +1402,12 @@ git commit -m "feat: add NativePathfinderBridge and NativeLoader (Java JNI bridg
 ## Task 10: Kotlin API
 
 **Files:**
-- Create: `src/main/kotlin/org/cobalt/api/pathfinder/native/PathStatus.kt`
-- Create: `src/main/kotlin/org/cobalt/api/pathfinder/native/ActionType.kt`
-- Create: `src/main/kotlin/org/cobalt/api/pathfinder/native/MovementProfile.kt`
-- Create: `src/main/kotlin/org/cobalt/api/pathfinder/native/PathCommand.kt`
-- Create: `src/main/kotlin/org/cobalt/api/pathfinder/native/WorldBufferSerializer.kt`
-- Create: `src/main/kotlin/org/cobalt/api/pathfinder/native/NativePathfinder.kt`
+- Create: `src/main/kotlin/org/cobalt/api/pathfinder/jni/PathStatus.kt`
+- Create: `src/main/kotlin/org/cobalt/api/pathfinder/jni/ActionType.kt`
+- Create: `src/main/kotlin/org/cobalt/api/pathfinder/jni/MovementProfile.kt`
+- Create: `src/main/kotlin/org/cobalt/api/pathfinder/jni/PathCommand.kt`
+- Create: `src/main/kotlin/org/cobalt/api/pathfinder/jni/WorldBufferSerializer.kt`
+- Create: `src/main/kotlin/org/cobalt/api/pathfinder/jni/NativePathfinder.kt`
 
 - [ ] **Step 1: Create enum files**
 
@@ -1508,11 +1492,12 @@ import net.minecraft.tags.FluidTags
 import net.minecraft.world.level.block.LadderBlock
 import net.minecraft.world.level.block.LiquidBlock
 
+data class WorldBufferResult(val buf: ByteArray, val bx: Int, val by: Int, val bz: Int)
+
 object WorldBufferSerializer {
     private const val W = 64; private const val H = 32; private const val D = 64
 
-    /** Returns (buffer, originX, originY, originZ) */
-    fun serialize(px: Double, py: Double, pz: Double): Triple<ByteArray, Int, Int, Int> {
+    fun serialize(px: Double, py: Double, pz: Double): WorldBufferResult {
         val level = Minecraft.getInstance().level
         val buf = ByteArray(W * H * D)
         val bx = px.toInt() - W / 2
@@ -1535,7 +1520,7 @@ object WorldBufferSerializer {
                 buf[x + z * W + y * W * D] = bt
             }
         }
-        return Triple(buf, bx, by, bz)
+        return WorldBufferResult(buf, bx, by, bz)
     }
 }
 ```
@@ -1574,7 +1559,8 @@ object NativePathfinder {
     /** Call once per TickEvent.Start. Returns null when IDLE. */
     fun tick(): PathCommand? {
         val player = Minecraft.getInstance().player ?: return null
-        val (buf, bx, by, bz) = WorldBufferSerializer.serialize(player.x, player.y, player.z)
+        val result = WorldBufferSerializer.serialize(player.x, player.y, player.z)
+        val (buf, bx, by, bz) = result
         val r = NativePathfinderBridge.update(
             handle, buf, bx, by, bz,
             player.x, player.y, player.z,
@@ -1597,7 +1583,7 @@ object NativePathfinder {
 
 - [ ] **Step 5: Commit**
 ```bash
-git add src/main/kotlin/org/cobalt/api/pathfinder/native/
+git add src/main/kotlin/org/cobalt/api/pathfinder/jni/
 git commit -m "feat: add NativePathfinder Kotlin API and WorldBufferSerializer"
 ```
 
