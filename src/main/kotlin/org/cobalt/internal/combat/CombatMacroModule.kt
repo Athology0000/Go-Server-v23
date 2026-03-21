@@ -40,7 +40,10 @@ import org.cobalt.api.util.getLoreLines
 import org.cobalt.api.util.render.Render3D
 import org.cobalt.api.pathfinder.minecraft.MinecraftPathingRules
 import org.cobalt.internal.helper.Config
-import org.cobalt.internal.pathfinding.DuskPathfinder
+import org.cobalt.api.pathfinder.jni.MovementProfile
+import org.cobalt.api.pathfinder.jni.NativePathfinder
+import org.cobalt.api.pathfinder.jni.PathStatus
+import org.cobalt.api.util.player.MovementManager
 import org.cobalt.internal.pathfinding.PathPlanProfiles
 import org.cobalt.internal.pathfinding.PathfindingModule
 import org.cobalt.internal.helper.WalkbackBridge
@@ -368,9 +371,9 @@ object CombatMacroModule : Module("Combat Macro") {
       when {
         !enabled.value -> "Off"
         cryptZombieSlayer.value -> slayerStatus.value
-        currentTargetId != null && startedPath && DuskPathfinder.isActive() -> "Pathing To Target"
+        currentTargetId != null && startedPath && nativeActive() -> "Pathing To Target"
         currentTargetId != null -> "Engaging Target"
-        startedPath && DuskPathfinder.isActive() -> "Pathing"
+        startedPath && nativeActive() -> "Pathing"
         else -> "Searching"
       }
   val targetDisplay: String
@@ -577,9 +580,12 @@ object CombatMacroModule : Module("Combat Macro") {
 
     val player = mc.player ?: return
     syncAutoItemToggles(player)
-    if (startedPath && !DuskPathfinder.isActive()) {
+    if (startedPath && !nativeActive()) {
       startedPath = false
       lastTargetPos = null
+    }
+    if (startedPath && nativeActive()) {
+      NativePathfinder.tick()?.applyToPlayer()
     }
     syncLearnedWhitelistFromSetting()
     if (cryptZombieSlayer.value && !slayerModeEnabled) {
@@ -602,7 +608,7 @@ object CombatMacroModule : Module("Combat Macro") {
         }
         if (!alreadyInCrypt) {
           // Warp hub first so the walkback route starts from the correct origin
-          DuskPathfinder.stop(mc, null)
+          nativeStop()
           mc.player?.connection?.sendCommand("warp hub")
           slayerEnteredCrypt = false
           slayerWalkInDelayUntilTick = (mc.level?.gameTime ?: 0L) + SLAYER_WALKIN_WARP_DELAY_TICKS
@@ -716,7 +722,7 @@ object CombatMacroModule : Module("Combat Macro") {
         slayerEnteredCrypt = true   // confirmed inside — enable recovery trigger
       } else if (slayerEnteredCrypt) {
         // Was inside the crypt but now isn't — recover via hub warp
-        DuskPathfinder.stop(mc, null)
+        nativeStop()
         (player as? net.minecraft.client.player.LocalPlayer)?.connection?.sendCommand("warp hub")
         ChatUtils.sendMessage("Combat macro: outside crypt, warping hub for walkback.")
         startAreaOrigin = null
@@ -738,10 +744,11 @@ object CombatMacroModule : Module("Combat Macro") {
         val bossPos = slayerBossLastPos
         if (bossPos != null) {
           val bossBlockPos = BlockPos(bossPos.x.toInt(), bossPos.y.toInt(), bossPos.z.toInt())
-          if (!DuskPathfinder.isActive() || lastTargetPos != bossBlockPos) {
+          if (!nativeActive() || lastTargetPos != bossBlockPos) {
             if (level.gameTime - lastPathStartTick >= MIN_PATH_START_INTERVAL_TICKS) {
               lastPathStartTick = level.gameTime
-              val started = DuskPathfinder.start(mc, bossBlockPos, PathPlanProfiles.COMBAT_ID)
+              NativePathfinder.setTarget(bossBlockPos.x + 0.5, bossBlockPos.y.toDouble(), bossBlockPos.z + 0.5)
+              val started = true
               if (started) {
                 lastTargetPos = bossBlockPos
                 startedPath = true
@@ -762,19 +769,19 @@ object CombatMacroModule : Module("Combat Macro") {
         if (dx * dx + dy * dy + dz * dz < 9.0) {
           cryptPatrolIndex = (cryptPatrolIndex + 1) % CRYPT_PATROL_WAYPOINTS.size
         }
-        if (!DuskPathfinder.isActive() || lastTargetPos != dest) {
+        if (!nativeActive() || lastTargetPos != dest) {
           if (level.gameTime - lastPathStartTick >= MIN_PATH_START_INTERVAL_TICKS) {
             lastPathStartTick = level.gameTime
-            val started = DuskPathfinder.start(mc, dest, PathPlanProfiles.COMBAT_ID)
-            if (started) { lastTargetPos = dest; startedPath = true }
+            NativePathfinder.setTarget(dest.x + 0.5, dest.y.toDouble(), dest.z + 0.5)
+            lastTargetPos = dest; startedPath = true
           }
         }
         currentTargetId = null
         return
       }
 
-      if (startedPath && DuskPathfinder.isActive()) {
-        DuskPathfinder.stop(mc, "No target found.")
+      if (startedPath && nativeActive()) {
+        nativeStop()
       }
       startedPath = false
       lastTargetPos = null
@@ -802,8 +809,8 @@ object CombatMacroModule : Module("Combat Macro") {
     }
 
     if (inAttackRange) {
-      if (!oneTapMode.value && startedPath && DuskPathfinder.isActive()) {
-        DuskPathfinder.stop(mc, "Target in range.")
+      if (!oneTapMode.value && startedPath && nativeActive()) {
+        nativeStop()
       }
       if (!oneTapMode.value) {
         startedPath = false
@@ -815,7 +822,7 @@ object CombatMacroModule : Module("Combat Macro") {
       val targetPos = target.blockPosition()
       val last = lastTargetPos
       val targetMovedFar = last == null || last.distSqr(targetPos) > TARGET_REPATH_DISTANCE_SQ
-      if (!DuskPathfinder.isActive() || targetMovedFar) {
+      if (!nativeActive() || targetMovedFar) {
         if (level.gameTime - lastPathStartTick >= MIN_PATH_START_INTERVAL_TICKS) {
           lastPathStartTick = level.gameTime
           val started = startCombatPathToTarget(level, targetPos)
@@ -824,7 +831,7 @@ object CombatMacroModule : Module("Combat Macro") {
             startedPath = true
           } else {
             startedPath = false
-            if (!DuskPathfinder.isActive()) {
+            if (!nativeActive()) {
               lastTargetPos = null
             }
           }
@@ -1118,7 +1125,7 @@ object CombatMacroModule : Module("Combat Macro") {
             cryptPatrolIndex = -1  // already in crypt, resume patrol from nearest
             slayerEnteredCrypt = true
           } else {
-            DuskPathfinder.stop(mc, null)
+            nativeStop()
             player.connection?.sendCommand("warp hub")
             slayerEnteredCrypt = false
             slayerWalkInDelayUntilTick = nowTick + SLAYER_WALKIN_WARP_DELAY_TICKS
@@ -1216,10 +1223,11 @@ object CombatMacroModule : Module("Combat Macro") {
     if (lootEntity == null) {
       // No loot bag found yet — walk to death pos and keep waiting
       val targetPos = BlockPos(deathPos.x.toInt(), deathPos.y.toInt(), deathPos.z.toInt())
-      if (!DuskPathfinder.isActive() || lastTargetPos != targetPos) {
+      if (!nativeActive() || lastTargetPos != targetPos) {
         if (nowTick - lastPathStartTick >= MIN_PATH_START_INTERVAL_TICKS) {
           lastPathStartTick = nowTick
-          val started = DuskPathfinder.start(mc, targetPos, PathPlanProfiles.COMBAT_ID)
+          NativePathfinder.setTarget(targetPos.x + 0.5, targetPos.y.toDouble(), targetPos.z + 0.5)
+          val started = true
           if (started) {
             lastTargetPos = targetPos
             startedPath = true
@@ -1230,8 +1238,8 @@ object CombatMacroModule : Module("Combat Macro") {
     }
 
     // Loot entity found — stop pathing, look at it and right-click
-    if (startedPath && DuskPathfinder.isActive()) {
-      DuskPathfinder.stop(mc, "Loot bag found.")
+    if (startedPath && nativeActive()) {
+      nativeStop()
       startedPath = false
     }
 
@@ -1242,10 +1250,10 @@ object CombatMacroModule : Module("Combat Macro") {
 
     if (distSq > SLAYER_LOOT_CLAIM_RANGE_SQ) {
       val targetPos = lootEntity.blockPosition()
-      if (!DuskPathfinder.isActive()) {
+      if (!nativeActive()) {
         if (nowTick - lastPathStartTick >= MIN_PATH_START_INTERVAL_TICKS) {
           lastPathStartTick = nowTick
-          DuskPathfinder.start(mc, targetPos, PathPlanProfiles.COMBAT_ID)
+          NativePathfinder.setTarget(targetPos.x + 0.5, targetPos.y.toDouble(), targetPos.z + 0.5)
           lastTargetPos = targetPos
           startedPath = true
         }
@@ -1564,11 +1572,11 @@ object CombatMacroModule : Module("Combat Macro") {
       return false
     }
 
-    val pathAlreadyReturning = startedPath && lastTargetPos == origin && DuskPathfinder.isActive()
+    val pathAlreadyReturning = startedPath && lastTargetPos == origin && nativeActive()
     if (!pathAlreadyReturning && level.gameTime - lastPathStartTick >= MIN_PATH_START_INTERVAL_TICKS) {
       lastPathStartTick = level.gameTime
-      val started = DuskPathfinder.start(mc, origin, PathPlanProfiles.COMBAT_ID)
-      if (started) {
+      NativePathfinder.setTarget(origin.x + 0.5, origin.y.toDouble(), origin.z + 0.5)
+      if (true) {
         lastTargetPos = origin
         startedPath = true
       }
@@ -1889,7 +1897,7 @@ object CombatMacroModule : Module("Combat Macro") {
     inAttackRange: Boolean,
     level: ClientLevel
   ) {
-    if (inAttackRange || !startedPath || !DuskPathfinder.isActive()) {
+    if (inAttackRange || !startedPath || !nativeActive()) {
       stuckTicks = 0
       stuckRepathCount = 0
       lastMoveX = player.x
@@ -1924,7 +1932,7 @@ object CombatMacroModule : Module("Combat Macro") {
           level.entitiesForRendering().firstOrNull { it.uuid == id } as? LivingEntity
         }
       if (target != null && target.isAlive && target.health > 0f) {
-        DuskPathfinder.stop(mc, "Combat repath.")
+        nativeStop()
         val targetPos = target.blockPosition()
         val restarted = startCombatPathToTarget(level, targetPos)
         if (restarted) {
@@ -1939,7 +1947,7 @@ object CombatMacroModule : Module("Combat Macro") {
 
     stuckRepathCount = 0
     if (warpOnStuck.value) {
-      DuskPathfinder.stop(mc, null)
+      nativeStop()
       (player as? LocalPlayer)?.connection?.sendCommand("warp hub")
       if (cryptZombieSlayer.value && slayerLocation.value == 1) {
         // Crypt slayer: warp hub then walkback instead of stopping the macro
@@ -1958,21 +1966,8 @@ object CombatMacroModule : Module("Combat Macro") {
   private fun startCombatPathToTarget(level: ClientLevel, targetPos: BlockPos): Boolean {
     // Jitter the destination slightly so the path never goes perfectly straight to the mob.
     val dest = jitterTargetPos(targetPos)
-
-    if (DuskPathfinder.start(mc, dest, PathPlanProfiles.COMBAT_ID)) {
-      return true
-    }
-
-    val direct = MinecraftPathingRules.resolveTarget(level, dest)
-    if (direct != null && DuskPathfinder.start(mc, direct, PathPlanProfiles.COMBAT_ID)) {
-      return true
-    }
-
-    val fallback = findNearestWalkableAround(level, dest, CHASE_RESOLVE_RADIUS, CHASE_RESOLVE_VERTICAL)
-    if (fallback != null && DuskPathfinder.start(mc, fallback, PathPlanProfiles.COMBAT_ID)) {
-      return true
-    }
-    return false
+    NativePathfinder.setTarget(dest.x + 0.5, dest.y.toDouble(), dest.z + 0.5)
+    return true
   }
 
   /** Returns a copy of [pos] offset by a small random amount on X/Z so paths curve off-centre. */
@@ -2006,9 +2001,17 @@ object CombatMacroModule : Module("Combat Macro") {
     return best
   }
 
+  private fun nativeActive(): Boolean =
+    NativePathfinder.status.let { it != PathStatus.IDLE && it != PathStatus.ARRIVED && it != PathStatus.FAILED }
+
+  private fun nativeStop() {
+    NativePathfinder.stop()
+    MovementManager.setMovementLock(false)
+  }
+
   private fun stopMacro() {
-    if (startedPath && DuskPathfinder.isActive()) {
-      DuskPathfinder.stop(mc, "Combat macro stopped.")
+    if (startedPath && nativeActive()) {
+      nativeStop()
     }
     RotationExecutor.stopRotating()
     lastTargetPos = null

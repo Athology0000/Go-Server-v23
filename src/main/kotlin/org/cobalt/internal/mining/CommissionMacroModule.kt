@@ -21,7 +21,8 @@ import org.cobalt.api.util.ChatUtils
 import org.cobalt.api.util.InventoryUtils
 import org.cobalt.api.util.getLoreLines
 import org.cobalt.internal.combat.CombatMacroModule
-import org.cobalt.internal.pathfinding.DuskPathfinder
+import org.cobalt.api.pathfinder.jni.NativePathfinder
+import org.cobalt.api.util.player.MovementManager
 import org.cobalt.internal.pathfinding.PathPlanProfiles
 
 object CommissionMacroModule : Module("Commission Macro") {
@@ -668,7 +669,8 @@ object CommissionMacroModule : Module("Commission Macro") {
 
   private fun resetMacro() {
     stopWorkModule()
-    DuskPathfinder.stop(mc, "Commission macro reset.")
+    NativePathfinder.stop()
+    MovementManager.setMovementLock(false)
     RotationExecutor.stopRotating()
     if (pendingUseRelease) { mc.options.keyUse?.setDown(false); pendingUseRelease = false }
     state          = State.IDLE

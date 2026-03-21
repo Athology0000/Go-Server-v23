@@ -36,8 +36,11 @@ import org.cobalt.api.util.ChatUtils
 import org.cobalt.api.util.InventoryUtils
 import org.cobalt.api.util.render.Render3D
 import org.cobalt.api.pathfinder.minecraft.MinecraftPathingRules
+import org.cobalt.api.pathfinder.jni.MovementProfile
+import org.cobalt.api.pathfinder.jni.NativePathfinder
+import org.cobalt.api.pathfinder.jni.PathStatus
+import org.cobalt.api.util.player.MovementManager
 import org.cobalt.internal.etherwarp.EtherwarpLogic
-import org.cobalt.internal.pathfinding.DuskPathfinder
 import org.cobalt.internal.pathfinding.PathfindingModule
 import org.cobalt.internal.rotation.RotationsModule
 
@@ -258,7 +261,7 @@ object RoutesModule : Module("Routes") {
     routeIndex = 0
     routeRunning = false
     resetRuntimeState()
-    DuskPathfinder.stop(mc, "Route cleared.")
+    nativeStop("Route cleared.")
     updateStatus()
   }
 
@@ -379,7 +382,8 @@ object RoutesModule : Module("Routes") {
     }
 
     if (action == RouteAction.WALK) {
-      if (DuskPathfinder.isActive()) {
+      if (nativeActive()) {
+        NativePathfinder.tick()?.applyToPlayer()
         return
       }
       if (awaitingArrival) {
@@ -407,12 +411,10 @@ object RoutesModule : Module("Routes") {
             // Before giving up, retry with an A* repath from current position
             val retryDest = lastResolvedTarget ?: lastTarget?.let { resolveApproxTarget(it) }
             if (retryDest != null && walkRetryCount < MAX_WALK_RETRIES) {
-              val started = DuskPathfinder.start(mc, retryDest)
-              if (started) {
-                walkRetryCount++
-                lastResolvedTarget = retryDest
-                return
-              }
+              NativePathfinder.setTarget(retryDest.x + 0.5, retryDest.y.toDouble(), retryDest.z + 0.5)
+              walkRetryCount++
+              lastResolvedTarget = retryDest
+              return
             }
             walkRetryCount = 0
             stopRoute("Route failed: could not reach point ${routeIndex + 1}.")
@@ -626,19 +628,21 @@ object RoutesModule : Module("Routes") {
       // startFromBeginning=true: findNearestPointIndex() already identified the correct
       // starting waypoint via 3D distance — don't let startDirect re-search by XZ and
       // jump ahead to a later node that may be through a wall (e.g. the crypt exit).
-      val started = DuskPathfinder.startDirect(mc, waypoints, startFromBeginning = true)
-      if (started) {
-        action = RouteAction.WALK
-        awaitingArrival = true
-        walkCompletePointOnArrival = true
-        lastTarget = routePoints.last().pos
-        lastResolvedTarget = lastTarget
-        activePoint = null
-        routeIndex = routePoints.lastIndex  // completePoint will push past end → stopRoute
-        updateStatus()
-        ChatUtils.sendMessage("Walkback \"$trimmedName\" started (direct, ${waypoints.size} nodes).")
-        return true
+      val flat = DoubleArray(waypoints.size * 3) { i ->
+        val bp = waypoints[i / 3]
+        when (i % 3) { 0 -> bp.x + 0.5; 1 -> bp.y.toDouble(); else -> bp.z + 0.5 }
       }
+      NativePathfinder.setRoute(flat, loop = false, MovementProfile.DEFAULT)
+      action = RouteAction.WALK
+      awaitingArrival = true
+      walkCompletePointOnArrival = true
+      lastTarget = routePoints.last().pos
+      lastResolvedTarget = lastTarget
+      activePoint = null
+      routeIndex = routePoints.lastIndex  // completePoint will push past end → stopRoute
+      updateStatus()
+      ChatUtils.sendMessage("Walkback \"$trimmedName\" started (direct, ${waypoints.size} nodes).")
+      return true
     }
 
     updateStatus()
@@ -687,11 +691,7 @@ object RoutesModule : Module("Routes") {
 
     PathfindingModule.ensureEnabledForAutomation("routes")
 
-    val started = DuskPathfinder.start(mc, bestTarget)
-    if (!started) {
-      ChatUtils.sendMessage("Failed to path to closest vein.")
-      return
-    }
+    NativePathfinder.setTarget(bestTarget.x + 0.5, bestTarget.y.toDouble(), bestTarget.z + 0.5)
     lastPathStartTick = level.gameTime
 
     ChatUtils.sendMessage(
@@ -699,11 +699,20 @@ object RoutesModule : Module("Routes") {
     )
   }
 
+  private fun nativeActive(): Boolean =
+    NativePathfinder.status.let { it != PathStatus.IDLE && it != PathStatus.ARRIVED && it != PathStatus.FAILED }
+
+  private fun nativeStop(reason: String?) {
+    NativePathfinder.stop()
+    MovementManager.setMovementLock(false)
+    if (reason != null) ChatUtils.sendMessage(reason)
+  }
+
   private fun stopRoute(reason: String) {
     val wasRunning = routeRunning
     routeRunning = false
     resetRuntimeState()
-    DuskPathfinder.stop(mc, reason)
+    nativeStop(null)
     updateStatus()
     if (wasRunning && reason.isNotBlank()) {
       ChatUtils.sendMessage(reason)
@@ -1082,19 +1091,20 @@ object RoutesModule : Module("Routes") {
           batchEnd++
         }
         val waypoints = routePoints.subList(routeIndex, batchEnd + 1).map { it.pos }
-        val started = DuskPathfinder.startDirect(mc, waypoints, startFromBeginning = true)
-        if (started) {
-          action = RouteAction.WALK
-          awaitingArrival = true
-          walkCompletePointOnArrival = true
-          lastTarget = waypoints.last()
-          lastResolvedTarget = lastTarget
-          activePoint = null
-          routeIndex = batchEnd  // completePoint() → routeIndex++ → next non-NORMAL
-          updateStatus()
-          return
+        val flat = DoubleArray(waypoints.size * 3) { i ->
+          val bp = waypoints[i / 3]
+          when (i % 3) { 0 -> bp.x + 0.5; 1 -> bp.y.toDouble(); else -> bp.z + 0.5 }
         }
-        startWalk(point.pos)
+        NativePathfinder.setRoute(flat, loop = false, MovementProfile.DEFAULT)
+        action = RouteAction.WALK
+        awaitingArrival = true
+        walkCompletePointOnArrival = true
+        lastTarget = waypoints.last()
+        lastResolvedTarget = lastTarget
+        activePoint = null
+        routeIndex = batchEnd  // completePoint() → routeIndex++ → next non-NORMAL
+        updateStatus()
+        return
       }
     }
   }
@@ -1140,11 +1150,7 @@ object RoutesModule : Module("Routes") {
       stopRoute("Route failed: no walkable target near point ${routeIndex + 1}.")
       return
     }
-    val started = DuskPathfinder.start(mc, resolved)
-    if (!started) {
-      stopRoute("Route failed: no path to point ${routeIndex + 1}.")
-      return
-    }
+    NativePathfinder.setTarget(resolved.x + 0.5, resolved.y.toDouble(), resolved.z + 0.5)
     mc.level?.let { level -> lastPathStartTick = level.gameTime }
     action = RouteAction.WALK
     awaitingArrival = true
@@ -1566,18 +1572,15 @@ object RoutesModule : Module("Routes") {
     val approach = findApproach(level, player, target) ?: return
     PathfindingModule.ensureEnabledForAutomation("routes")
     val distSq = minePathTarget?.distSqr(approach)?.toDouble() ?: Double.POSITIVE_INFINITY
-    if (!DuskPathfinder.isActive() || distSq > 1.0) {
+    if (!nativeActive() || distSq > 1.0) {
       if (level.gameTime - lastPathStartTick < 8L) {
         return
       }
       lastPathStartTick = level.gameTime
-      val started = DuskPathfinder.start(mc, approach)
-      if (started) {
-        minePathTarget = approach
-      } else if (!DuskPathfinder.isActive()) {
-        minePathTarget = null
-      }
+      NativePathfinder.setTarget(approach.x + 0.5, approach.y.toDouble(), approach.z + 0.5)
+      minePathTarget = approach
     }
+    NativePathfinder.tick()?.applyToPlayer()
   }
 
   private fun findApproach(
@@ -1830,8 +1833,8 @@ object RoutesModule : Module("Routes") {
     if (!EtherwarpLogic.holdingEtherwarpItem()) return false
     if (!ensureEtherwarpHotbarSelected()) return false
 
-    if (DuskPathfinder.isActive()) {
-      DuskPathfinder.stop(mc, "Warping.")
+    if (nativeActive()) {
+      nativeStop(null)
     }
     RotationExecutor.stopRotating()
     mc.options.keyUse?.setDown(false)

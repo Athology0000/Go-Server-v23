@@ -8,6 +8,7 @@ import org.cobalt.api.hud.modules.WatermarkModule
 import org.cobalt.api.hud.modules.InventoryHudModule
 import org.cobalt.api.module.ModuleManager
 import org.cobalt.api.notification.NotificationManager
+import org.cobalt.api.pathfinder.jni.NativePathfinder
 import org.cobalt.api.rotation.RotationExecutor
 import org.cobalt.api.util.TickScheduler
 import org.cobalt.internal.combat.CombatHudModule
@@ -97,6 +98,7 @@ object Cobalt : ClientModInitializer {
       TickScheduler, MainCommand, NotificationManager,
       RotationExecutor, HudModuleManager, TitleScreenRenderer,
     ).forEach { EventBus.register(it) }
+    NativePathfinder.init()
     Config.loadModulesConfig()
     EventBus.register(this)
     println("Dutt Client Initialized")

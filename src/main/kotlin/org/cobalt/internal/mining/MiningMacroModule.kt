@@ -26,7 +26,9 @@ import org.cobalt.api.util.ChatUtils
 import org.cobalt.api.util.InventoryUtils
 import org.cobalt.api.pathfinder.minecraft.MinecraftPathingRules
 import org.cobalt.internal.etherwarp.EtherwarpLogic
-import org.cobalt.internal.pathfinding.DuskPathfinder
+import org.cobalt.api.pathfinder.jni.NativePathfinder
+import org.cobalt.api.pathfinder.jni.PathStatus
+import org.cobalt.api.util.player.MovementManager
 import org.cobalt.internal.pathfinding.PathfindingModule
 import org.cobalt.internal.rotation.RotationsModule
 
@@ -293,9 +295,12 @@ object MiningMacroModule : Module("Mining Macro") {
       PathfindingModule.ensureEnabledForAutomation("mining macro")
     }
 
-    if (startedPath && !DuskPathfinder.isActive()) {
+    if (startedPath && !nativeActive()) {
       startedPath = false
       lastPathTarget = null
+    }
+    if (startedPath && nativeActive()) {
+      NativePathfinder.tick()?.applyToPlayer()
     }
 
     if (mc.screen != null) {
@@ -363,8 +368,8 @@ object MiningMacroModule : Module("Mining Macro") {
       if (!lanternPlacedForVein) {
         lanternPlacedForVein = tryPlaceLantern(level, player)
       }
-      if (startedPath && DuskPathfinder.isActive()) {
-        DuskPathfinder.stop(mc, "Mining.")
+      if (startedPath && nativeActive()) {
+        nativeStop()
       }
       startedPath = false
       lastPathTarget = null
@@ -830,19 +835,14 @@ object MiningMacroModule : Module("Mining Macro") {
   ) {
     PathfindingModule.ensureEnabledForAutomation("mining macro")
     val approach = findApproach(level, player, target) ?: return
-    if (!DuskPathfinder.isActive() || lastPathTarget == null || lastPathTarget?.distSqr(approach) ?: 0.0 > 1.0) {
+    if (!nativeActive() || lastPathTarget == null || lastPathTarget?.distSqr(approach) ?: 0.0 > 1.0) {
       if (level.gameTime - lastPathStartTick < 8L) {
         return
       }
       lastPathStartTick = level.gameTime
-      val started = DuskPathfinder.start(mc, approach)
-      if (started) {
-        startedPath = true
-        lastPathTarget = approach
-      } else if (!DuskPathfinder.isActive()) {
-        startedPath = false
-        lastPathTarget = null
-      }
+      NativePathfinder.setTarget(approach.x + 0.5, approach.y.toDouble(), approach.z + 0.5)
+      startedPath = true
+      lastPathTarget = approach
     }
   }
 
@@ -999,8 +999,8 @@ object MiningMacroModule : Module("Mining Macro") {
     if (!hasLineOfSight(level, player, target)) return false
     if (!ensureEtherwarpHotbarSelected()) return false
 
-    if (startedPath && DuskPathfinder.isActive()) {
-      DuskPathfinder.stop(mc, "Warping.")
+    if (startedPath && nativeActive()) {
+      nativeStop()
     }
     startedPath = false
     lastPathTarget = null
@@ -1215,9 +1215,17 @@ object MiningMacroModule : Module("Mining Macro") {
     ChatUtils.sendMessage(message)
   }
 
+  private fun nativeActive(): Boolean =
+    NativePathfinder.status.let { it != PathStatus.IDLE && it != PathStatus.ARRIVED && it != PathStatus.FAILED }
+
+  private fun nativeStop() {
+    NativePathfinder.stop()
+    MovementManager.setMovementLock(false)
+  }
+
   private fun stopMacro(reason: String) {
-    if (startedPath && DuskPathfinder.isActive()) {
-      DuskPathfinder.stop(mc, reason)
+    if (startedPath && nativeActive()) {
+      nativeStop()
     }
     startedPath = false
     lastPathStartTick = 0L
