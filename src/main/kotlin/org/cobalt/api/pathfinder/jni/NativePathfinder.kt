@@ -19,6 +19,12 @@ object NativePathfinder {
 
     val isInitialized: Boolean get() = handle != 0L
 
+    /** Cached path nodes as Vec3 list; updated on EXECUTING transition. Call only from game tick thread. */
+    var cachedPathNodes: List<net.minecraft.world.phys.Vec3> = emptyList()
+        private set
+
+    private var lastTickStatus: PathStatus = PathStatus.IDLE
+
     fun init() {
         if (handle != 0L) return
         handle = NativePathfinderBridge.createEngine()
@@ -90,6 +96,17 @@ object NativePathfinder {
         val actionOrdinal = r[8]
         val parsedStatus = PathStatus.entries.getOrElse(statusOrdinal) { PathStatus.FAILED }
 
+        // Refresh node cache on EXECUTING transition; clear when path ends.
+        // REPLANNING: keep old cached nodes (engine continues on old path until new plan arrives).
+        // PLANNING: neither refresh nor clear (no path exists yet).
+        when {
+            parsedStatus == PathStatus.EXECUTING && lastTickStatus != PathStatus.EXECUTING -> refreshPathNodes()
+            parsedStatus == PathStatus.IDLE || parsedStatus == PathStatus.ARRIVED || parsedStatus == PathStatus.FAILED -> {
+                if (cachedPathNodes.isNotEmpty()) cachedPathNodes = emptyList()
+            }
+        }
+        lastTickStatus = parsedStatus
+
         // Don't lock movement/rotation when the engine isn't actively navigating
         if (parsedStatus == PathStatus.IDLE ||
             parsedStatus == PathStatus.PLANNING ||
@@ -110,5 +127,17 @@ object NativePathfinder {
             activeAction = ActionType.entries.getOrElse(actionOrdinal) { ActionType.WALK },
             distanceToTarget = java.lang.Float.intBitsToFloat(r[9])
         )
+    }
+
+    private fun refreshPathNodes() {
+        if (handle == 0L) { cachedPathNodes = emptyList(); return }
+        val raw = NativePathfinderBridge.getPathNodes(handle)
+        val result = ArrayList<net.minecraft.world.phys.Vec3>(raw.size / 3)
+        var i = 0
+        while (i + 2 < raw.size) {
+            result.add(net.minecraft.world.phys.Vec3(raw[i].toDouble(), raw[i + 1].toDouble(), raw[i + 2].toDouble()))
+            i += 3
+        }
+        cachedPathNodes = result
     }
 }
