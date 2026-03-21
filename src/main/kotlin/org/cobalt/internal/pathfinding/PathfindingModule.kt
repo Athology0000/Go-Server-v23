@@ -9,13 +9,18 @@ import org.cobalt.api.event.annotation.SubscribeEvent
 import org.cobalt.api.event.impl.client.MouseEvent
 import org.cobalt.api.event.impl.client.TickEvent
 import org.cobalt.api.event.impl.render.WorldRenderEvent
+import net.minecraft.world.InteractionHand
 import org.cobalt.api.module.setting.impl.SliderSetting
 import org.cobalt.api.module.Module
 import org.cobalt.api.module.setting.impl.ActionSetting
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.InfoSetting
 import org.cobalt.api.module.setting.impl.InfoType
+import org.cobalt.api.module.setting.impl.ModeSetting
 import org.cobalt.api.module.setting.impl.TextSetting
+import org.cobalt.api.pathfinder.jni.ActionType
+import org.cobalt.api.pathfinder.jni.NativePathfinder
+import org.cobalt.api.pathfinder.jni.PathStatus
 import org.cobalt.api.pathfinder.minecraft.MinecraftPathingRules
 import org.cobalt.api.ui.theme.ThemeManager
 import org.cobalt.api.util.ChatUtils
@@ -76,6 +81,13 @@ object PathfindingModule : Module("Pathfinding") {
     "Debug File Logs",
     "Write path/rotation debug logs to file.",
     false
+  )
+
+  private val aotvSlot = ModeSetting(
+    "AOTV Slot",
+    "Hotbar slot (1-9) holding your AOTV item.",
+    0,
+    arrayOf("1","2","3","4","5","6","7","8","9")
   )
 
   private val startAction = ActionSetting(
@@ -176,6 +188,7 @@ object PathfindingModule : Module("Pathfinding") {
       cacheHudCellSize,
       cacheHudShowGrid,
       debugFileLogging,
+      aotvSlot,
       startAction,
       stopAction,
     )
@@ -194,9 +207,18 @@ object PathfindingModule : Module("Pathfinding") {
     // PathfindingModule only drives NativePathfinder when the user explicitly
     // started a path via the UI (startFromSettings / startTo). Macros tick it themselves.
     if (!enabled.value || !moduleOwnsPath) return
-    val cmd = org.cobalt.api.pathfinder.jni.NativePathfinder.tick()
+    val cmd = NativePathfinder.tick()
     if (cmd != null) {
       cmd.applyToPlayer()
+      if (cmd.activeAction == ActionType.AOTV) {
+        val player = mc.player
+        if (player != null) {
+          val prevSlot = player.inventory.selectedSlot
+          player.inventory.selectedSlot = aotvSlot.value
+          mc.gameMode?.useItem(player, InteractionHand.MAIN_HAND)
+          player.inventory.selectedSlot = prevSlot
+        }
+      }
     } else {
       moduleOwnsPath = false
       MovementManager.setMovementLock(false)
@@ -223,7 +245,7 @@ object PathfindingModule : Module("Pathfinding") {
     val y = parseCoordinate(targetY.value) ?: return invalidTarget("Y", targetY.value)
     val z = parseCoordinate(targetZ.value) ?: return invalidTarget("Z", targetZ.value)
 
-    org.cobalt.api.pathfinder.jni.NativePathfinder.setTarget(x, y, z)
+    NativePathfinder.setTarget(x, y, z)
     moduleOwnsPath = true
   }
 
@@ -237,21 +259,21 @@ object PathfindingModule : Module("Pathfinding") {
     if (!enabled.value) {
       ensureEnabledForAutomation("pathfinding")
     }
-    org.cobalt.api.pathfinder.jni.NativePathfinder.setTarget(x, y, z)
+    NativePathfinder.setTarget(x, y, z)
     moduleOwnsPath = true
   }
 
   fun stopPath() {
-    org.cobalt.api.pathfinder.jni.NativePathfinder.stop()
+    NativePathfinder.stop()
     moduleOwnsPath = false
     MovementManager.setMovementLock(false)
   }
 
   private fun nativeActive(): Boolean {
-    val s = org.cobalt.api.pathfinder.jni.NativePathfinder.status
-    return s != org.cobalt.api.pathfinder.jni.PathStatus.IDLE &&
-           s != org.cobalt.api.pathfinder.jni.PathStatus.ARRIVED &&
-           s != org.cobalt.api.pathfinder.jni.PathStatus.FAILED
+    val s = NativePathfinder.status
+    return s != PathStatus.IDLE &&
+           s != PathStatus.ARRIVED &&
+           s != PathStatus.FAILED
   }
 
   fun setTargetAtPlayer() {
