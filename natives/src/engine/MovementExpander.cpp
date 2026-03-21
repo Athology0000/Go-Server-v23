@@ -16,6 +16,16 @@ float MovementExpander::adjacentCost(const Vec3i& pos) const {
     return c;
 }
 
+float MovementExpander::clearanceCost(int x, int y, int z) const {
+    int open = 0;
+    for (int i = 0; i < 4; i++) {
+        if (world_.isPassable(x + DX4[i], y, z + DZ4[i])) open++;
+    }
+    // open=4 free, open=3 -> +0.1, open=2 -> +0.3, open=1 -> +0.5
+    static const float penalty[5] = {0.5f, 0.5f, 0.3f, 0.1f, 0.0f};
+    return penalty[open];
+}
+
 bool MovementExpander::clearanceOk(int x, int y, int z) const {
     return world_.isPassable(x, y, z) && world_.isPassable(x, y+1, z);
 }
@@ -28,7 +38,7 @@ void MovementExpander::addWalkSprint(const Vec3i& from, std::vector<PathNode>& o
         bool lowCeiling = !world_.isPassable(nx, from.y + 2, nz);
         ActionType act = lowCeiling ? ActionType::WALK : ActionType::SPRINT;
         float base = lowCeiling ? costs_.walk : costs_.sprint;
-        out.push_back({{nx, from.y, nz}, act, base + adjacentCost({nx, from.y, nz})});
+        out.push_back({{nx, from.y, nz}, act, base + adjacentCost({nx, from.y, nz}) + clearanceCost(nx, from.y, nz)});
     }
 }
 
