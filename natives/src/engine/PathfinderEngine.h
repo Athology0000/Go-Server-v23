@@ -17,6 +17,7 @@ public:
     void setTarget(double x, double y, double z, double arrivalRadius = 1.8);
     void stop();
     PathStatus getStatus() const;
+    void getPathNodes(std::vector<Vec3i>& out) const;
 
 private:
     WorldAccessor world_;

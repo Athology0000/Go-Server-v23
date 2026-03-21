@@ -36,4 +36,7 @@ public class NativePathfinderBridge {
 
     public static native void    stop(long handle);
     public static native int     getStatus(long handle);
+
+    /** Returns float[] packed as [x0,y0,z0, x1,y1,z1, ...] with block-center X/Z (+0.5 offset). Y is feet level (no offset). */
+    public static native float[] getPathNodes(long handle);
 }

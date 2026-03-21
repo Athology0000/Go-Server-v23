@@ -20,6 +20,7 @@ public:
                      float yaw, float pitch, bool onGround);
 
     PathStatus getStatus() const { return status_; }
+    const std::vector<Vec3i>& getActivePath() const { return activePath_; }
 
 private:
     PathStatus status_ = PathStatus::IDLE;

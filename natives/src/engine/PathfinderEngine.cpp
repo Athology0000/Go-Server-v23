@@ -25,3 +25,7 @@ void PathfinderEngine::setTarget(double x, double y, double z, double arrivalRad
 
 void PathfinderEngine::stop() { executor_.stop(); }
 PathStatus PathfinderEngine::getStatus() const { return executor_.getStatus(); }
+
+void PathfinderEngine::getPathNodes(std::vector<Vec3i>& out) const {
+    out = executor_.getActivePath();
+}

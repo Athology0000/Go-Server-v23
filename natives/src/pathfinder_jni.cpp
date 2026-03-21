@@ -72,4 +72,21 @@ Java_org_cobalt_pathfinder_NativePathfinderBridge_getStatus(JNIEnv*, jclass, jlo
     return (jint)((PathfinderEngine*)handle)->getStatus();
 }
 
+JNIEXPORT jfloatArray JNICALL
+Java_org_cobalt_pathfinder_NativePathfinderBridge_getPathNodes(JNIEnv* env, jclass, jlong handle) {
+    std::vector<Vec3i> nodes;
+    ((PathfinderEngine*)handle)->getPathNodes(nodes);
+    jfloatArray arr = env->NewFloatArray((jsize)(nodes.size() * 3));
+    if (nodes.empty()) return arr;
+    std::vector<jfloat> data;
+    data.reserve(nodes.size() * 3);
+    for (const auto& n : nodes) {
+        data.push_back((jfloat)(n.x + 0.5));  // block-center X
+        data.push_back((jfloat)(n.y));          // feet Y (no offset)
+        data.push_back((jfloat)(n.z + 0.5));  // block-center Z
+    }
+    env->SetFloatArrayRegion(arr, 0, (jsize)data.size(), data.data());
+    return arr;
+}
+
 } // extern "C"
