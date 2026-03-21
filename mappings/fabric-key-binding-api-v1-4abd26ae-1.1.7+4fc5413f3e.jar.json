@@ -1,0 +1,403 @@
+{
+  "md5": "d89ed00bfd1a211e2268702ebf99e79b",
+  "sha2": "d657fc7a6385d662b8da522eec0641529962bb23",
+  "sha256": "35ea62a4da3b9979fa642d30ce61837089c989c450507672baf4f7f22ebab155",
+  "contents": {
+    "classes": {
+      "net/fabricmc/fabric/api/client/keybinding/v1/package-info.class": {
+        "ver": 65,
+        "acc": 5632,
+        "nme": "net/fabricmc/fabric/api/client/keybinding/v1/package-info",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lorg/jspecify/annotations/NullMarked;"
+          },
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/client/keybinding/package-info.class": {
+        "ver": 65,
+        "acc": 5632,
+        "nme": "net/fabricmc/fabric/mixin/client/keybinding/package-info",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lorg/jspecify/annotations/NullMarked;"
+          },
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/api/client/keybinding/v1/KeyBindingHelper.class": {
+        "ver": 65,
+        "acc": 49,
+        "nme": "net/fabricmc/fabric/api/client/keybinding/v1/KeyBindingHelper",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "()V"
+          },
+          {
+            "nme": "registerKeyBinding",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/client/KeyMapping;)Lnet/minecraft/client/KeyMapping;"
+          },
+          {
+            "nme": "getBoundKeyOf",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/client/KeyMapping;)Lcom/mojang/blaze3d/platform/InputConstants$Key;"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/client/keybinding/KeyMappingAccessor.class": {
+        "ver": 65,
+        "acc": 1537,
+        "nme": "net/fabricmc/fabric/mixin/client/keybinding/KeyMappingAccessor",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "fabric_getBoundKey",
+            "acc": 1025,
+            "dsc": "()Lcom/mojang/blaze3d/platform/InputConstants$Key;",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/gen/Accessor;",
+                "vals": [
+                  "value",
+                  "key"
+                ]
+              }
+            ]
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/client/KeyMapping"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/client/keybinding/KeyMappingCategoryMixin.class": {
+        "ver": 65,
+        "acc": 1056,
+        "nme": "net/fabricmc/fabric/mixin/client/keybinding/KeyMappingCategoryMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "()V"
+          },
+          {
+            "nme": "onReturnRegister",
+            "acc": 10,
+            "dsc": "(Lnet/minecraft/resources/Identifier;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable;)V",
+            "sig": "(Lnet/minecraft/resources/Identifier;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable<Lnet/minecraft/client/KeyMapping$Category;>;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Inject;",
+                "vals": [
+                  "method",
+                  [
+                    "register(Lnet/minecraft/resources/Identifier;)Lnet/minecraft/client/KeyMapping$Category;"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "RETURN"
+                      ],
+                      "api": 589824
+                    }
+                  ]
+                ]
+              }
+            ]
+          }
+        ],
+        "flds": [
+          {
+            "acc": 8,
+            "nme": "SORT_ORDER",
+            "dsc": "Ljava/util/List;",
+            "sig": "Ljava/util/List<Lnet/minecraft/client/KeyMapping$Category;>;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/client/KeyMapping$Category"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/keybinding/package-info.class": {
+        "ver": 65,
+        "acc": 5632,
+        "nme": "net/fabricmc/fabric/impl/client/keybinding/package-info",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lorg/jspecify/annotations/NullMarked;"
+          },
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/client/keybinding/OptionsMixin.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/mixin/client/keybinding/OptionsMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "loadHook",
+            "acc": 1,
+            "dsc": "(Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Inject;",
+                "vals": [
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "HEAD"
+                      ],
+                      "api": 589824
+                    }
+                  ],
+                  "method",
+                  [
+                    "load"
+                  ]
+                ]
+              }
+            ]
+          }
+        ],
+        "flds": [
+          {
+            "acc": 1,
+            "nme": "keyMappings",
+            "dsc": "[Lnet/minecraft/client/KeyMapping;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/client/Options"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/keybinding/CategoryComparator.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/impl/client/keybinding/CategoryComparator",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "compare",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/client/KeyMapping$Category;Lnet/minecraft/client/KeyMapping$Category;)I"
+          },
+          {
+            "nme": "compare",
+            "acc": 4161,
+            "dsc": "(Ljava/lang/Object;Ljava/lang/Object;)I"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "INSTANCE",
+            "dsc": "Lnet/fabricmc/fabric/impl/client/keybinding/CategoryComparator;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/keybinding/KeyBindingRegistryImpl.class": {
+        "ver": 65,
+        "acc": 49,
+        "nme": "net/fabricmc/fabric/impl/client/keybinding/KeyBindingRegistryImpl",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "()V"
+          },
+          {
+            "nme": "registerKeyBinding",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/client/KeyMapping;)Lnet/minecraft/client/KeyMapping;"
+          },
+          {
+            "nme": "process",
+            "acc": 9,
+            "dsc": "([Lnet/minecraft/client/KeyMapping;)[Lnet/minecraft/client/KeyMapping;"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 26,
+            "nme": "MODDED_KEY_BINDINGS",
+            "dsc": "Ljava/util/List;",
+            "sig": "Ljava/util/List<Lnet/minecraft/client/KeyMapping;>;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

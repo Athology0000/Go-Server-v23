@@ -1,0 +1,414 @@
+{
+  "md5": "7b75debb50b4f38be028e0a9c5d8ba27",
+  "sha2": "fc707b74b8539f248e059c838cb2b90073a6f068",
+  "sha256": "6c78f00fe01e2543a42a1e2936417618565811095a55c7f8c2019159ac2ad2c1",
+  "contents": {
+    "classes": {
+      "net/fabricmc/fabric/api/serialization/v1/package-info.class": {
+        "ver": 65,
+        "acc": 5632,
+        "nme": "net/fabricmc/fabric/api/serialization/v1/package-info",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lorg/jspecify/annotations/NullMarked;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/serialization/TagValueOutputMixin.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/mixin/serialization/TagValueOutputMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "putByteArray",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;[B)V"
+          },
+          {
+            "nme": "putLongArray",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;[J)V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 2,
+            "nme": "output",
+            "dsc": "Lnet/minecraft/nbt/CompoundTag;"
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/world/level/storage/TagValueOutput"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/serialization/ValueOutputMixin.class": {
+        "ver": 65,
+        "acc": 1537,
+        "nme": "net/fabricmc/fabric/mixin/serialization/ValueOutputMixin",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/world/level/storage/ValueOutput"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/serialization/ValueInputMixin.class": {
+        "ver": 65,
+        "acc": 1537,
+        "nme": "net/fabricmc/fabric/mixin/serialization/ValueInputMixin",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/world/level/storage/ValueInput"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/api/serialization/v1/view/package-info.class": {
+        "ver": 65,
+        "acc": 5632,
+        "nme": "net/fabricmc/fabric/api/serialization/v1/view/package-info",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lorg/jspecify/annotations/NullMarked;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/serialization/TagValueInputMixin.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/mixin/serialization/TagValueInputMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "keys",
+            "acc": 1,
+            "dsc": "()Ljava/util/Collection;",
+            "sig": "()Ljava/util/Collection<Ljava/lang/String;>;"
+          },
+          {
+            "nme": "contains",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;)Z"
+          },
+          {
+            "nme": "getOptionalByteArray",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;)Ljava/util/Optional;",
+            "sig": "(Ljava/lang/String;)Ljava/util/Optional<[B>;"
+          },
+          {
+            "nme": "getOptionalLongArray",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;)Ljava/util/Optional;",
+            "sig": "(Ljava/lang/String;)Ljava/util/Optional<[J>;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 2,
+            "nme": "input",
+            "dsc": "Lnet/minecraft/nbt/CompoundTag;"
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/world/level/storage/TagValueInput"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/serialization/SpecialCodecs$2.class": {
+        "ver": 65,
+        "acc": 32,
+        "nme": "net/fabricmc/fabric/impl/serialization/SpecialCodecs$2",
+        "super": "com/mojang/serialization/MapCodec",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Ljava/lang/String;)V"
+          },
+          {
+            "nme": "decode",
+            "acc": 1,
+            "dsc": "(Lcom/mojang/serialization/DynamicOps;Lcom/mojang/serialization/MapLike;)Lcom/mojang/serialization/DataResult;",
+            "sig": "<T:Ljava/lang/Object;>(Lcom/mojang/serialization/DynamicOps<TT;>;Lcom/mojang/serialization/MapLike<TT;>;)Lcom/mojang/serialization/DataResult<Ljava/lang/Boolean;>;"
+          },
+          {
+            "nme": "encode",
+            "acc": 1,
+            "dsc": "(Ljava/lang/Boolean;Lcom/mojang/serialization/DynamicOps;Lcom/mojang/serialization/RecordBuilder;)Lcom/mojang/serialization/RecordBuilder;",
+            "sig": "<T:Ljava/lang/Object;>(Ljava/lang/Boolean;Lcom/mojang/serialization/DynamicOps<TT;>;Lcom/mojang/serialization/RecordBuilder<TT;>;)Lcom/mojang/serialization/RecordBuilder<TT;>;"
+          },
+          {
+            "nme": "keys",
+            "acc": 1,
+            "dsc": "(Lcom/mojang/serialization/DynamicOps;)Ljava/util/stream/Stream;",
+            "sig": "<T:Ljava/lang/Object;>(Lcom/mojang/serialization/DynamicOps<TT;>;)Ljava/util/stream/Stream<TT;>;"
+          },
+          {
+            "nme": "encode",
+            "acc": 4161,
+            "dsc": "(Ljava/lang/Object;Lcom/mojang/serialization/DynamicOps;Lcom/mojang/serialization/RecordBuilder;)Lcom/mojang/serialization/RecordBuilder;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 4112,
+            "nme": "val$key",
+            "dsc": "Ljava/lang/String;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/api/serialization/v1/view/FabricReadView.class": {
+        "ver": 65,
+        "acc": 1537,
+        "nme": "net/fabricmc/fabric/api/serialization/v1/view/FabricReadView",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "keys",
+            "acc": 1,
+            "dsc": "()Ljava/util/Collection;",
+            "sig": "()Ljava/util/Collection<Ljava/lang/String;>;"
+          },
+          {
+            "nme": "contains",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;)Z"
+          },
+          {
+            "nme": "getOptionalLongArray",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;)Ljava/util/Optional;",
+            "sig": "(Ljava/lang/String;)Ljava/util/Optional<[J>;"
+          },
+          {
+            "nme": "getOptionalByteArray",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;)Ljava/util/Optional;",
+            "sig": "(Ljava/lang/String;)Ljava/util/Optional<[B>;"
+          }
+        ],
+        "flds": []
+      },
+      "net/fabricmc/fabric/impl/serialization/SpecialCodecs$1.class": {
+        "ver": 65,
+        "acc": 32,
+        "nme": "net/fabricmc/fabric/impl/serialization/SpecialCodecs$1",
+        "super": "com/mojang/serialization/MapCodec",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "()V"
+          },
+          {
+            "nme": "decode",
+            "acc": 1,
+            "dsc": "(Lcom/mojang/serialization/DynamicOps;Lcom/mojang/serialization/MapLike;)Lcom/mojang/serialization/DataResult;",
+            "sig": "<T:Ljava/lang/Object;>(Lcom/mojang/serialization/DynamicOps<TT;>;Lcom/mojang/serialization/MapLike<TT;>;)Lcom/mojang/serialization/DataResult<Ljava/util/Collection<Ljava/lang/String;>;>;"
+          },
+          {
+            "nme": "encode",
+            "acc": 1,
+            "dsc": "(Ljava/util/Collection;Lcom/mojang/serialization/DynamicOps;Lcom/mojang/serialization/RecordBuilder;)Lcom/mojang/serialization/RecordBuilder;",
+            "sig": "<T:Ljava/lang/Object;>(Ljava/util/Collection<Ljava/lang/String;>;Lcom/mojang/serialization/DynamicOps<TT;>;Lcom/mojang/serialization/RecordBuilder<TT;>;)Lcom/mojang/serialization/RecordBuilder<TT;>;"
+          },
+          {
+            "nme": "keys",
+            "acc": 1,
+            "dsc": "(Lcom/mojang/serialization/DynamicOps;)Ljava/util/stream/Stream;",
+            "sig": "<T:Ljava/lang/Object;>(Lcom/mojang/serialization/DynamicOps<TT;>;)Ljava/util/stream/Stream<TT;>;"
+          },
+          {
+            "nme": "encode",
+            "acc": 4161,
+            "dsc": "(Ljava/lang/Object;Lcom/mojang/serialization/DynamicOps;Lcom/mojang/serialization/RecordBuilder;)Lcom/mojang/serialization/RecordBuilder;"
+          },
+          {
+            "nme": "lambda$decode$0",
+            "acc": 4106,
+            "dsc": "(Lcom/mojang/serialization/DynamicOps;Lcom/mojang/datafixers/util/Pair;)Ljava/lang/String;"
+          }
+        ],
+        "flds": []
+      },
+      "net/fabricmc/fabric/impl/serialization/SpecialCodecs.class": {
+        "ver": 65,
+        "acc": 1537,
+        "nme": "net/fabricmc/fabric/impl/serialization/SpecialCodecs",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "contains",
+            "acc": 9,
+            "dsc": "(Ljava/lang/String;)Lcom/mojang/serialization/MapCodec;",
+            "sig": "(Ljava/lang/String;)Lcom/mojang/serialization/MapCodec<Ljava/lang/Boolean;>;"
+          },
+          {
+            "nme": "lambda$static$0",
+            "acc": 4106,
+            "dsc": "(Ljava/nio/ByteBuffer;)[B"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "LONG_ARRAY",
+            "dsc": "Lcom/mojang/serialization/Codec;",
+            "sig": "Lcom/mojang/serialization/Codec<[J>;"
+          },
+          {
+            "acc": 25,
+            "nme": "BYTE_ARRAY",
+            "dsc": "Lcom/mojang/serialization/Codec;",
+            "sig": "Lcom/mojang/serialization/Codec<[B>;"
+          },
+          {
+            "acc": 25,
+            "nme": "KEYS_EXTRACT",
+            "dsc": "Lcom/mojang/serialization/MapCodec;",
+            "sig": "Lcom/mojang/serialization/MapCodec<Ljava/util/Collection<Ljava/lang/String;>;>;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/serialization/package-info.class": {
+        "ver": 65,
+        "acc": 5632,
+        "nme": "net/fabricmc/fabric/impl/serialization/package-info",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lorg/jspecify/annotations/NullMarked;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/serialization/package-info.class": {
+        "ver": 65,
+        "acc": 5632,
+        "nme": "net/fabricmc/fabric/mixin/serialization/package-info",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lorg/jspecify/annotations/NullMarked;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/api/serialization/v1/view/FabricWriteView.class": {
+        "ver": 65,
+        "acc": 1537,
+        "nme": "net/fabricmc/fabric/api/serialization/v1/view/FabricWriteView",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "putLongArray",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;[J)V"
+          },
+          {
+            "nme": "putByteArray",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;[B)V"
+          }
+        ],
+        "flds": []
+      },
+      "net/fabricmc/fabric/api/serialization/v1/MoreCodecs.class": {
+        "ver": 65,
+        "acc": 1537,
+        "nme": "net/fabricmc/fabric/api/serialization/v1/MoreCodecs",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "LONG_ARRAY",
+            "dsc": "Lcom/mojang/serialization/Codec;",
+            "sig": "Lcom/mojang/serialization/Codec<[J>;"
+          },
+          {
+            "acc": 25,
+            "nme": "BYTE_ARRAY",
+            "dsc": "Lcom/mojang/serialization/Codec;",
+            "sig": "Lcom/mojang/serialization/Codec<[B>;"
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/jetbrains/annotations/ApiStatus$NonExtendable;"
+          }
+        ]
+      }
+    }
+  }
+}

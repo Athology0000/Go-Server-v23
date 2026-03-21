@@ -1,0 +1,4521 @@
+{
+  "md5": "339c6be50c89fcadaa92e4d98d7a4216",
+  "sha2": "a5b382b72c6f51ff6129080c49c4ae4c12ff57a6",
+  "sha256": "e45f32f0d80e1164593cfcf9f1907ae39871084c6aa08e49acc2e8e22e1d93ce",
+  "contents": {
+    "classes": {
+      "kotlinx/serialization/cbor/KeyTags$Impl.class": {
+        "ver": 52,
+        "acc": 4145,
+        "nme": "kotlinx/serialization/cbor/KeyTags$Impl",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "([J)V"
+          },
+          {
+            "nme": "tags",
+            "acc": 4113,
+            "dsc": "()[J"
+          },
+          {
+            "nme": "<init>",
+            "acc": 4097,
+            "dsc": "([JLkotlin/jvm/internal/DefaultConstructorMarker;)V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 4114,
+            "nme": "tags",
+            "dsc": "[J"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              3,
+              "xi",
+              48
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/internal/CborReader.class": {
+        "ver": 52,
+        "acc": 33,
+        "nme": "kotlinx/serialization/cbor/internal/CborReader",
+        "super": "kotlinx/serialization/encoding/AbstractDecoder",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Lkotlinx/serialization/cbor/Cbor;Lkotlinx/serialization/cbor/internal/CborParser;)V"
+          },
+          {
+            "nme": "getCbor",
+            "acc": 1,
+            "dsc": "()Lkotlinx/serialization/cbor/Cbor;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "getParser",
+            "acc": 20,
+            "dsc": "()Lkotlinx/serialization/cbor/internal/CborParser;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "getSize",
+            "acc": 20,
+            "dsc": "()I"
+          },
+          {
+            "nme": "getFiniteMode",
+            "acc": 20,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "getDecodeByteArrayAsByteString",
+            "acc": 20,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "setDecodeByteArrayAsByteString",
+            "acc": 20,
+            "dsc": "(Z)V"
+          },
+          {
+            "nme": "getTags-2g2roS4",
+            "acc": 20,
+            "dsc": "()[J",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/Nullable;"
+              }
+            ]
+          },
+          {
+            "nme": "setTags-uLth9ew",
+            "acc": 20,
+            "dsc": "([J)V"
+          },
+          {
+            "nme": "setSize",
+            "acc": 20,
+            "dsc": "(I)V"
+          },
+          {
+            "nme": "getSerializersModule",
+            "acc": 1,
+            "dsc": "()Lkotlinx/serialization/modules/SerializersModule;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "skipBeginToken-uLth9ew",
+            "acc": 4,
+            "dsc": "([J)V"
+          },
+          {
+            "nme": "beginStructure",
+            "acc": 1,
+            "dsc": "(Lkotlinx/serialization/descriptors/SerialDescriptor;)Lkotlinx/serialization/encoding/CompositeDecoder;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "endStructure",
+            "acc": 1,
+            "dsc": "(Lkotlinx/serialization/descriptors/SerialDescriptor;)V"
+          },
+          {
+            "nme": "decodeElementIndex",
+            "acc": 1,
+            "dsc": "(Lkotlinx/serialization/descriptors/SerialDescriptor;)I"
+          },
+          {
+            "nme": "decodeElementNameWithTags",
+            "acc": 18,
+            "dsc": "(Lkotlinx/serialization/descriptors/SerialDescriptor;)Lkotlin/Pair;",
+            "sig": "(Lkotlinx/serialization/descriptors/SerialDescriptor;)Lkotlin/Pair<Ljava/lang/String;Lkotlin/ULongArray;>;"
+          },
+          {
+            "nme": "decodeElementNameWithTagsLenient",
+            "acc": 18,
+            "dsc": "(Lkotlinx/serialization/descriptors/SerialDescriptor;)Lkotlin/Pair;",
+            "sig": "(Lkotlinx/serialization/descriptors/SerialDescriptor;)Lkotlin/Pair<Ljava/lang/String;Lkotlin/ULongArray;>;"
+          },
+          {
+            "nme": "decodeSerializableValue",
+            "acc": 1,
+            "dsc": "(Lkotlinx/serialization/DeserializationStrategy;)Ljava/lang/Object;",
+            "sig": "<T:Ljava/lang/Object;>(Lkotlinx/serialization/DeserializationStrategy<+TT;>;)TT;"
+          },
+          {
+            "nme": "decodeString",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "decodeNotNullMark",
+            "acc": 1,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "decodeDouble",
+            "acc": 1,
+            "dsc": "()D"
+          },
+          {
+            "nme": "decodeFloat",
+            "acc": 1,
+            "dsc": "()F"
+          },
+          {
+            "nme": "decodeBoolean",
+            "acc": 1,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "decodeByte",
+            "acc": 1,
+            "dsc": "()B"
+          },
+          {
+            "nme": "decodeShort",
+            "acc": 1,
+            "dsc": "()S"
+          },
+          {
+            "nme": "decodeChar",
+            "acc": 1,
+            "dsc": "()C"
+          },
+          {
+            "nme": "decodeInt",
+            "acc": 1,
+            "dsc": "()I"
+          },
+          {
+            "nme": "decodeLong",
+            "acc": 1,
+            "dsc": "()J"
+          },
+          {
+            "nme": "decodeNull",
+            "acc": 1,
+            "dsc": "()Ljava/lang/Void;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/Nullable;"
+              }
+            ]
+          },
+          {
+            "nme": "decodeEnum",
+            "acc": 1,
+            "dsc": "(Lkotlinx/serialization/descriptors/SerialDescriptor;)I"
+          },
+          {
+            "nme": "isDone",
+            "acc": 18,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "verifyKeyTags-rjbGhUI",
+            "acc": 18,
+            "dsc": "(Lkotlinx/serialization/descriptors/SerialDescriptor;I[J)V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "cbor",
+            "dsc": "Lkotlinx/serialization/cbor/Cbor;"
+          },
+          {
+            "acc": 18,
+            "nme": "parser",
+            "dsc": "Lkotlinx/serialization/cbor/internal/CborParser;"
+          },
+          {
+            "acc": 2,
+            "nme": "size",
+            "dsc": "I"
+          },
+          {
+            "acc": 2,
+            "nme": "finiteMode",
+            "dsc": "Z"
+          },
+          {
+            "acc": 2,
+            "nme": "readProperties",
+            "dsc": "I"
+          },
+          {
+            "acc": 2,
+            "nme": "decodeByteArrayAsByteString",
+            "dsc": "Z"
+          },
+          {
+            "acc": 2,
+            "nme": "tags",
+            "dsc": "[J"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\u0001\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0007\n\u0002\u0010\b\n\u0002\b\u0003\n\u0002\u0010\u000b\n\u0002\b\t\n\u0002\u0018\u0002\n\u0002\b\u0006\n\u0002\u0010\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0006\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0003\n\u0002\u0018\u0002\n\u0002\u0010\u000e\n\u0002\b\u0004\n\u0002\u0018\u0002\n\u0002\b\u0004\n\u0002\u0010\u0006\n\u0000\n\u0002\u0010\u0007\n\u0002\b\u0002\n\u0002\u0010\u0005\n\u0000\n\u0002\u0010\n\n\u0000\n\u0002\u0010\f\n\u0002\b\u0002\n\u0002\u0010\t\n\u0000\n\u0002\u0010\u0001\n\u0002\b\b\b\u0010\u0018\u00002\u00020\u00012\u00020\u0002B\u0017\u0012\u0006\u0010\u0003\u001a\u00020\u0004\u0012\u0006\u0010\u0005\u001a\u00020\u0006¢\u0006\u0004\b\u0007\u0010\bJ\u0010\u0010\"\u001a\u00020#2\u0006\u0010\u000f\u001a\u00020\u000eH\u0004J\u0019\u0010(\u001a\u00020#2\b\u0010)\u001a\u0004\u0018\u00010\u001cH\u0014¢\u0006\u0004\b*\u0010 J\u0010\u0010+\u001a\u00020,2\u0006\u0010-\u001a\u00020.H\u0016J\u0010\u0010/\u001a\u00020#2\u0006\u0010-\u001a\u00020.H\u0016J\u0010\u00100\u001a\u00020\u000e2\u0006\u0010-\u001a\u00020.H\u0016J\u001e\u00101\u001a\u0010\u0012\u0004\u0012\u000203\u0012\u0006\u0012\u0004\u0018\u00010\u001c022\u0006\u0010-\u001a\u00020.H\u0002J \u00104\u001a\u0012\u0012\u0006\u0012\u0004\u0018\u000103\u0012\u0006\u0012\u0004\u0018\u00010\u001c022\u0006\u0010-\u001a\u00020.H\u0002J!\u00105\u001a\u0002H6\"\u0004\b\u0000\u001062\f\u00107\u001a\b\u0012\u0004\u0012\u0002H608H\u0016¢\u0006\u0002\u00109J\b\u0010:\u001a\u000203H\u0016J\b\u0010;\u001a\u00020\u0012H\u0016J\b\u0010<\u001a\u00020=H\u0016J\b\u0010>\u001a\u00020?H\u0016J\b\u0010@\u001a\u00020\u0012H\u0016J\b\u0010A\u001a\u00020BH\u0016J\b\u0010C\u001a\u00020DH\u0016J\b\u0010E\u001a\u00020FH\u0016J\b\u0010G\u001a\u00020\u000eH\u0016J\b\u0010H\u001a\u00020IH\u0016J\n\u0010J\u001a\u0004\u0018\u00010KH\u0016J\u0010\u0010L\u001a\u00020\u000e2\u0006\u0010M\u001a\u00020.H\u0016J\b\u0010N\u001a\u00020\u0012H\u0002J)\u0010O\u001a\u00020#2\u0006\u0010-\u001a\u00020.2\u0006\u0010P\u001a\u00020\u000e2\b\u0010\u001b\u001a\u0004\u0018\u00010\u001cH\u0002¢\u0006\u0004\bQ\u0010RR\u0014\u0010\u0003\u001a\u00020\u0004X\u0004¢\u0006\b\n\u0000\u001a\u0004\b\t\u0010\nR\u0014\u0010\u0005\u001a\u00020\u0006X\u0004¢\u0006\b\n\u0000\u001a\u0004\b\u000b\u0010\fR\u001e\u0010\u000f\u001a\u00020\u000e2\u0006\u0010\r\u001a\u00020\u000e@BX\u000e¢\u0006\b\n\u0000\u001a\u0004\b\u0010\u0010\u0011R\u001e\u0010\u0013\u001a\u00020\u00122\u0006\u0010\r\u001a\u00020\u0012@BX\u000e¢\u0006\b\n\u0000\u001a\u0004\b\u0014\u0010\u0015R\u000e\u0010\u0016\u001a\u00020\u000eX\u000e¢\u0006\u0002\n\u0000R\u001a\u0010\u0017\u001a\u00020\u0012X\u000e¢\u0006\u000e\n\u0000\u001a\u0004\b\u0018\u0010\u0015\"\u0004\b\u0019\u0010\u001aR\u001e\u0010\u001b\u001a\u0004\u0018\u00010\u001cX\u000e¢\u0006\u0010\n\u0002\u0010!\u001a\u0004\b\u001d\u0010\u001e\"\u0004\b\u001f\u0010 R\u0014\u0010$\u001a\u00020%8VX\u0004¢\u0006\u0006\u001a\u0004\b&\u0010'¨\u0006S"
+              ],
+              "d2",
+              [
+                "Lkotlinx/serialization/cbor/internal/CborReader;",
+                "Lkotlinx/serialization/encoding/AbstractDecoder;",
+                "Lkotlinx/serialization/cbor/CborDecoder;",
+                "cbor",
+                "Lkotlinx/serialization/cbor/Cbor;",
+                "parser",
+                "Lkotlinx/serialization/cbor/internal/CborParser;",
+                "<init>",
+                "(Lkotlinx/serialization/cbor/Cbor;Lkotlinx/serialization/cbor/internal/CborParser;)V",
+                "getCbor",
+                "()Lkotlinx/serialization/cbor/Cbor;",
+                "getParser",
+                "()Lkotlinx/serialization/cbor/internal/CborParser;",
+                "value",
+                "",
+                "size",
+                "getSize",
+                "()I",
+                "",
+                "finiteMode",
+                "getFiniteMode",
+                "()Z",
+                "readProperties",
+                "decodeByteArrayAsByteString",
+                "getDecodeByteArrayAsByteString",
+                "setDecodeByteArrayAsByteString",
+                "(Z)V",
+                "tags",
+                "Lkotlin/ULongArray;",
+                "getTags-2g2roS4",
+                "()[J",
+                "setTags-uLth9ew",
+                "([J)V",
+                "[J",
+                "setSize",
+                "",
+                "serializersModule",
+                "Lkotlinx/serialization/modules/SerializersModule;",
+                "getSerializersModule",
+                "()Lkotlinx/serialization/modules/SerializersModule;",
+                "skipBeginToken",
+                "objectTags",
+                "skipBeginToken-uLth9ew",
+                "beginStructure",
+                "Lkotlinx/serialization/encoding/CompositeDecoder;",
+                "descriptor",
+                "Lkotlinx/serialization/descriptors/SerialDescriptor;",
+                "endStructure",
+                "decodeElementIndex",
+                "decodeElementNameWithTags",
+                "Lkotlin/Pair;",
+                "",
+                "decodeElementNameWithTagsLenient",
+                "decodeSerializableValue",
+                "T",
+                "deserializer",
+                "Lkotlinx/serialization/DeserializationStrategy;",
+                "(Lkotlinx/serialization/DeserializationStrategy;)Ljava/lang/Object;",
+                "decodeString",
+                "decodeNotNullMark",
+                "decodeDouble",
+                "",
+                "decodeFloat",
+                "",
+                "decodeBoolean",
+                "decodeByte",
+                "",
+                "decodeShort",
+                "",
+                "decodeChar",
+                "",
+                "decodeInt",
+                "decodeLong",
+                "",
+                "decodeNull",
+                "",
+                "decodeEnum",
+                "enumDescriptor",
+                "isDone",
+                "verifyKeyTags",
+                "index",
+                "verifyKeyTags-rjbGhUI",
+                "(Lkotlinx/serialization/descriptors/SerialDescriptor;I[J)V",
+                "kotlinx-serialization-cbor"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lkotlin/jvm/internal/SourceDebugExtension;",
+            "vals": [
+              "value",
+              [
+                "SMAP\nDecoder.kt\nKotlin\n*S Kotlin\n*F\n+ 1 Decoder.kt\nkotlinx/serialization/cbor/internal/CborReader\n+ 2 fake.kt\nkotlin/jvm/internal/FakeKt\n*L\n1#1,621:1\n1#2:622\n*E\n"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/internal/ByteArrayInput.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/serialization/cbor/internal/ByteArrayInput",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "([B)V"
+          },
+          {
+            "nme": "getAvailableBytes",
+            "acc": 17,
+            "dsc": "()I"
+          },
+          {
+            "nme": "read",
+            "acc": 17,
+            "dsc": "()I"
+          },
+          {
+            "nme": "read",
+            "acc": 17,
+            "dsc": "([BII)I"
+          },
+          {
+            "nme": "skip",
+            "acc": 17,
+            "dsc": "(I)V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 2,
+            "nme": "array",
+            "dsc": "[B"
+          },
+          {
+            "acc": 2,
+            "nme": "position",
+            "dsc": "I"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000 \n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0000\n\u0002\u0010\u0012\n\u0002\b\u0003\n\u0002\u0010\b\n\u0002\b\b\n\u0002\u0010\u0002\n\u0000\b\u0000\u0018\u00002\u00020\u0001B\u000f\u0012\u0006\u0010\u0002\u001a\u00020\u0003¢\u0006\u0004\b\u0004\u0010\u0005J\u0006\u0010\u000b\u001a\u00020\u0007J\u001e\u0010\u000b\u001a\u00020\u00072\u0006\u0010\f\u001a\u00020\u00032\u0006\u0010\r\u001a\u00020\u00072\u0006\u0010\u000e\u001a\u00020\u0007J\u000e\u0010\u000f\u001a\u00020\u00102\u0006\u0010\u000e\u001a\u00020\u0007R\u000e\u0010\u0002\u001a\u00020\u0003X\u000e¢\u0006\u0002\n\u0000R\u000e\u0010\u0006\u001a\u00020\u0007X\u000e¢\u0006\u0002\n\u0000R\u0011\u0010\b\u001a\u00020\u00078F¢\u0006\u0006\u001a\u0004\b\t\u0010\n¨\u0006\u0011"
+              ],
+              "d2",
+              [
+                "Lkotlinx/serialization/cbor/internal/ByteArrayInput;",
+                "",
+                "array",
+                "",
+                "<init>",
+                "([B)V",
+                "position",
+                "",
+                "availableBytes",
+                "getAvailableBytes",
+                "()I",
+                "read",
+                "b",
+                "offset",
+                "length",
+                "skip",
+                "",
+                "kotlinx-serialization-cbor"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/internal/CborDecodingException.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/serialization/cbor/internal/CborDecodingException",
+        "super": "kotlinx/serialization/SerializationException",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;)V"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\u0012\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0000\n\u0002\u0010\u000e\n\u0002\b\u0003\b\u0000\u0018\u00002\u00020\u0001B\u000f\u0012\u0006\u0010\u0002\u001a\u00020\u0003¢\u0006\u0004\b\u0004\u0010\u0005¨\u0006\u0006"
+              ],
+              "d2",
+              [
+                "Lkotlinx/serialization/cbor/internal/CborDecodingException;",
+                "Lkotlinx/serialization/SerializationException;",
+                "message",
+                "",
+                "<init>",
+                "(Ljava/lang/String;)V",
+                "kotlinx-serialization-cbor"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/CborEncoder.class": {
+        "ver": 52,
+        "acc": 1537,
+        "nme": "kotlinx/serialization/cbor/CborEncoder",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "getCbor",
+            "acc": 1025,
+            "dsc": "()Lkotlinx/serialization/cbor/Cbor;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "access$encodeNotNullMark$jd",
+            "acc": 4105,
+            "dsc": "(Lkotlinx/serialization/cbor/CborEncoder;)V"
+          },
+          {
+            "nme": "access$beginCollection$jd",
+            "acc": 4105,
+            "dsc": "(Lkotlinx/serialization/cbor/CborEncoder;Lkotlinx/serialization/descriptors/SerialDescriptor;I)Lkotlinx/serialization/encoding/CompositeEncoder;"
+          },
+          {
+            "nme": "access$encodeSerializableValue$jd",
+            "acc": 4105,
+            "dsc": "(Lkotlinx/serialization/cbor/CborEncoder;Lkotlinx/serialization/SerializationStrategy;Ljava/lang/Object;)V"
+          },
+          {
+            "nme": "access$encodeNullableSerializableValue$jd",
+            "acc": 4105,
+            "dsc": "(Lkotlinx/serialization/cbor/CborEncoder;Lkotlinx/serialization/SerializationStrategy;Ljava/lang/Object;)V"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlinx/serialization/ExperimentalSerializationApi;"
+          },
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\u0012\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0003\bg\u0018\u00002\u00020\u0001R\u0012\u0010\u0002\u001a\u00020\u0003X¦\u0004¢\u0006\u0006\u001a\u0004\b\u0004\u0010\u0005¨\u0006\u0006À\u0006\u0003"
+              ],
+              "d2",
+              [
+                "Lkotlinx/serialization/cbor/CborEncoder;",
+                "Lkotlinx/serialization/encoding/Encoder;",
+                "cbor",
+                "Lkotlinx/serialization/cbor/Cbor;",
+                "getCbor",
+                "()Lkotlinx/serialization/cbor/Cbor;",
+                "kotlinx-serialization-cbor"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lkotlin/SubclassOptInRequired;",
+            "vals": [
+              "markerClass",
+              [
+                {
+                  "itrlNme": "kotlinx/serialization/SealedSerializationApi"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/CborLabel.class": {
+        "ver": 52,
+        "acc": 9729,
+        "nme": "kotlinx/serialization/cbor/CborLabel",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "label",
+            "acc": 1025,
+            "dsc": "()J"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/annotation/Target;",
+            "vals": [
+              "allowedTargets",
+              [
+                [
+                  "Lkotlin/annotation/AnnotationTarget;",
+                  "PROPERTY"
+                ]
+              ]
+            ]
+          },
+          {
+            "dsc": "Lkotlinx/serialization/ExperimentalSerializationApi;"
+          },
+          {
+            "dsc": "Ljava/lang/annotation/Retention;",
+            "vals": [
+              "value",
+              [
+                "Ljava/lang/annotation/RetentionPolicy;",
+                "RUNTIME"
+              ]
+            ]
+          },
+          {
+            "dsc": "Ljava/lang/annotation/Target;",
+            "vals": [
+              "value",
+              []
+            ]
+          },
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\u0012\n\u0002\u0018\u0002\n\u0002\u0010\u001b\n\u0000\n\u0002\u0010\t\n\u0002\b\u0002\b\u0002\u0018\u00002\u00020\u0001B\b\u0012\u0006\u0010\u0002\u001a\u00020\u0003R\u000f\u0010\u0002\u001a\u00020\u0003¢\u0006\u0006\u001a\u0004\b\u0002\u0010\u0004¨\u0006\u0005"
+              ],
+              "d2",
+              [
+                "Lkotlinx/serialization/cbor/CborLabel;",
+                "",
+                "label",
+                "",
+                "()J",
+                "kotlinx-serialization-cbor"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lkotlinx/serialization/SerialInfo;"
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/CborKt.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/serialization/cbor/CborKt",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "Cbor",
+            "acc": 25,
+            "dsc": "(Lkotlinx/serialization/cbor/Cbor;Lkotlin/jvm/functions/Function1;)Lkotlinx/serialization/cbor/Cbor;",
+            "sig": "(Lkotlinx/serialization/cbor/Cbor;Lkotlin/jvm/functions/Function1<-Lkotlinx/serialization/cbor/CborBuilder;Lkotlin/Unit;>;)Lkotlinx/serialization/cbor/Cbor;",
+            "vanns": [
+              {
+                "dsc": "Lkotlinx/serialization/ExperimentalSerializationApi;"
+              }
+            ],
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "Cbor$default",
+            "acc": 4105,
+            "dsc": "(Lkotlinx/serialization/cbor/Cbor;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lkotlinx/serialization/cbor/Cbor;"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              2,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\u001c\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0002\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\u0010\u0002\n\u0002\u0018\u0002\n\u0000\u001a+\u0010\u0000\u001a\u00020\u00012\b\b\u0002\u0010\u0002\u001a\u00020\u00012\u0017\u0010\u0003\u001a\u0013\u0012\u0004\u0012\u00020\u0005\u0012\u0004\u0012\u00020\u00060\u0004¢\u0006\u0002\b\u0007H\u0007¨\u0006\b"
+              ],
+              "d2",
+              [
+                "Cbor",
+                "Lkotlinx/serialization/cbor/Cbor;",
+                "from",
+                "builderAction",
+                "Lkotlin/Function1;",
+                "Lkotlinx/serialization/cbor/CborBuilder;",
+                "",
+                "Lkotlin/ExtensionFunctionType;",
+                "kotlinx-serialization-cbor"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/KeyTags.class": {
+        "ver": 52,
+        "acc": 9729,
+        "nme": "kotlinx/serialization/cbor/KeyTags",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "tags",
+            "acc": 1025,
+            "dsc": "()[J"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/annotation/Target;",
+            "vals": [
+              "allowedTargets",
+              [
+                [
+                  "Lkotlin/annotation/AnnotationTarget;",
+                  "PROPERTY"
+                ]
+              ]
+            ]
+          },
+          {
+            "dsc": "Lkotlinx/serialization/ExperimentalSerializationApi;"
+          },
+          {
+            "dsc": "Ljava/lang/annotation/Retention;",
+            "vals": [
+              "value",
+              [
+                "Ljava/lang/annotation/RetentionPolicy;",
+                "RUNTIME"
+              ]
+            ]
+          },
+          {
+            "dsc": "Ljava/lang/annotation/Target;",
+            "vals": [
+              "value",
+              []
+            ]
+          },
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\u0016\n\u0002\u0018\u0002\n\u0002\u0010\u001b\n\u0000\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\b\u0002\b\u0002\u0018\u00002\u00020\u0001B\f\u0012\n\u0010\u0002\u001a\u00020\u0003\"\u00020\u0004R\u000f\u0010\u0002\u001a\u00020\u0003¢\u0006\u0006\u001a\u0004\b\u0002\u0010\u0005¨\u0006\u0006"
+              ],
+              "d2",
+              [
+                "Lkotlinx/serialization/cbor/KeyTags;",
+                "",
+                "tags",
+                "Lkotlin/ULongArray;",
+                "Lkotlin/ULong;",
+                "()[J",
+                "kotlinx-serialization-cbor"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lkotlinx/serialization/SerialInfo;"
+          },
+          {
+            "dsc": "Lkotlinx/serialization/cbor/internal/SuppressAnimalSniffer;"
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/Cbor$Default.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/serialization/cbor/Cbor$Default",
+        "super": "kotlinx/serialization/cbor/Cbor",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "()V"
+          },
+          {
+            "nme": "getCoseCompliant",
+            "acc": 17,
+            "dsc": "()Lkotlinx/serialization/cbor/Cbor;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "<init>",
+            "acc": 4097,
+            "dsc": "(Lkotlin/jvm/internal/DefaultConstructorMarker;)V"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\f\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\b\u0006\b\u0003\u0018\u00002\u00020\u0001B\t\b\u0002¢\u0006\u0004\b\u0002\u0010\u0003R\u0011\u0010\u0004\u001a\u00020\u0001¢\u0006\b\n\u0000\u001a\u0004\b\u0005\u0010\u0006¨\u0006\u0007"
+              ],
+              "d2",
+              [
+                "Lkotlinx/serialization/cbor/Cbor$Default;",
+                "Lkotlinx/serialization/cbor/Cbor;",
+                "<init>",
+                "()V",
+                "CoseCompliant",
+                "getCoseCompliant",
+                "()Lkotlinx/serialization/cbor/Cbor;",
+                "kotlinx-serialization-cbor"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/CborDecoder$DefaultImpls.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/serialization/cbor/CborDecoder$DefaultImpls",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "decodeSerializableValue",
+            "acc": 131081,
+            "dsc": "(Lkotlinx/serialization/cbor/CborDecoder;Lkotlinx/serialization/DeserializationStrategy;)Ljava/lang/Object;",
+            "sig": "<T:Ljava/lang/Object;>(Lkotlinx/serialization/cbor/CborDecoder;Lkotlinx/serialization/DeserializationStrategy<+TT;>;)TT;",
+            "vanns": [
+              {
+                "dsc": "Ljava/lang/Deprecated;"
+              }
+            ]
+          },
+          {
+            "nme": "decodeNullableSerializableValue",
+            "acc": 131081,
+            "dsc": "(Lkotlinx/serialization/cbor/CborDecoder;Lkotlinx/serialization/DeserializationStrategy;)Ljava/lang/Object;",
+            "sig": "<T:Ljava/lang/Object;>(Lkotlinx/serialization/cbor/CborDecoder;Lkotlinx/serialization/DeserializationStrategy<+TT;>;)TT;",
+            "vanns": [
+              {
+                "dsc": "Lkotlinx/serialization/ExperimentalSerializationApi;"
+              },
+              {
+                "dsc": "Ljava/lang/Deprecated;"
+              }
+            ],
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/Nullable;"
+              }
+            ]
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              3,
+              "xi",
+              48
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/internal/CborWriter.class": {
+        "ver": 52,
+        "acc": 1057,
+        "nme": "kotlinx/serialization/cbor/internal/CborWriter",
+        "super": "kotlinx/serialization/encoding/AbstractEncoder",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "(Lkotlinx/serialization/cbor/Cbor;Lkotlinx/serialization/cbor/internal/ByteArrayOutput;)V"
+          },
+          {
+            "nme": "getCbor",
+            "acc": 1,
+            "dsc": "()Lkotlinx/serialization/cbor/Cbor;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "getOutput",
+            "acc": 20,
+            "dsc": "()Lkotlinx/serialization/cbor/internal/ByteArrayOutput;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "isClass",
+            "acc": 20,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "setClass",
+            "acc": 20,
+            "dsc": "(Z)V"
+          },
+          {
+            "nme": "getEncodeByteArrayAsByteString",
+            "acc": 20,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "setEncodeByteArrayAsByteString",
+            "acc": 20,
+            "dsc": "(Z)V"
+          },
+          {
+            "nme": "getDestination",
+            "acc": 1028,
+            "dsc": "()Lkotlinx/serialization/cbor/internal/ByteArrayOutput;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "getSerializersModule",
+            "acc": 1,
+            "dsc": "()Lkotlinx/serialization/modules/SerializersModule;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "encodeSerializableValue",
+            "acc": 1,
+            "dsc": "(Lkotlinx/serialization/SerializationStrategy;Ljava/lang/Object;)V",
+            "sig": "<T:Ljava/lang/Object;>(Lkotlinx/serialization/SerializationStrategy<-TT;>;TT;)V"
+          },
+          {
+            "nme": "shouldEncodeElementDefault",
+            "acc": 1,
+            "dsc": "(Lkotlinx/serialization/descriptors/SerialDescriptor;I)Z"
+          },
+          {
+            "nme": "incrementChildren",
+            "acc": 1028,
+            "dsc": "()V"
+          },
+          {
+            "nme": "encodeString",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;)V"
+          },
+          {
+            "nme": "encodeFloat",
+            "acc": 1,
+            "dsc": "(F)V"
+          },
+          {
+            "nme": "encodeDouble",
+            "acc": 1,
+            "dsc": "(D)V"
+          },
+          {
+            "nme": "encodeChar",
+            "acc": 1,
+            "dsc": "(C)V"
+          },
+          {
+            "nme": "encodeByte",
+            "acc": 1,
+            "dsc": "(B)V"
+          },
+          {
+            "nme": "encodeShort",
+            "acc": 1,
+            "dsc": "(S)V"
+          },
+          {
+            "nme": "encodeInt",
+            "acc": 1,
+            "dsc": "(I)V"
+          },
+          {
+            "nme": "encodeLong",
+            "acc": 1,
+            "dsc": "(J)V"
+          },
+          {
+            "nme": "encodeBoolean",
+            "acc": 1,
+            "dsc": "(Z)V"
+          },
+          {
+            "nme": "encodeNull",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "encodeEnum",
+            "acc": 1,
+            "dsc": "(Lkotlinx/serialization/descriptors/SerialDescriptor;I)V"
+          },
+          {
+            "nme": "encodeElement",
+            "acc": 1,
+            "dsc": "(Lkotlinx/serialization/descriptors/SerialDescriptor;I)Z"
+          },
+          {
+            "nme": "<init>",
+            "acc": 4097,
+            "dsc": "(Lkotlinx/serialization/cbor/Cbor;Lkotlinx/serialization/cbor/internal/ByteArrayOutput;Lkotlin/jvm/internal/DefaultConstructorMarker;)V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "cbor",
+            "dsc": "Lkotlinx/serialization/cbor/Cbor;"
+          },
+          {
+            "acc": 18,
+            "nme": "output",
+            "dsc": "Lkotlinx/serialization/cbor/internal/ByteArrayOutput;"
+          },
+          {
+            "acc": 2,
+            "nme": "isClass",
+            "dsc": "Z"
+          },
+          {
+            "acc": 2,
+            "nme": "encodeByteArrayAsByteString",
+            "dsc": "Z"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\u0001\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0007\n\u0002\u0010\u000b\n\u0002\b\b\n\u0002\u0018\u0002\n\u0002\b\u0003\n\u0002\u0010\u0002\n\u0002\b\u0002\n\u0002\u0018\u0002\n\u0002\b\u0004\n\u0002\u0018\u0002\n\u0000\n\u0002\u0010\b\n\u0002\b\u0002\n\u0002\u0010\u000e\n\u0000\n\u0002\u0010\u0007\n\u0000\n\u0002\u0010\u0006\n\u0000\n\u0002\u0010\f\n\u0000\n\u0002\u0010\u0005\n\u0000\n\u0002\u0010\n\n\u0002\b\u0002\n\u0002\u0010\t\n\u0002\b\u0006\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0000\b0\u0018\u00002\u00020\u00012\u00020\u0002:\u0001;B\u0019\b\u0004\u0012\u0006\u0010\u0003\u001a\u00020\u0004\u0012\u0006\u0010\u0005\u001a\u00020\u0006¢\u0006\u0004\b\u0007\u0010\bJ\b\u0010\u0015\u001a\u00020\u0006H$J)\u0010\u001a\u001a\u00020\u001b\"\u0004\b\u0000\u0010\u001c2\f\u0010\u001d\u001a\b\u0012\u0004\u0012\u0002H\u001c0\u001e2\u0006\u0010\u001f\u001a\u0002H\u001cH\u0016¢\u0006\u0002\u0010 J\u0018\u0010!\u001a\u00020\u000e2\u0006\u0010\"\u001a\u00020#2\u0006\u0010$\u001a\u00020%H\u0016J\b\u0010&\u001a\u00020\u001bH$J\u0010\u0010'\u001a\u00020\u001b2\u0006\u0010\u001f\u001a\u00020(H\u0016J\u0010\u0010)\u001a\u00020\u001b2\u0006\u0010\u001f\u001a\u00020*H\u0016J\u0010\u0010+\u001a\u00020\u001b2\u0006\u0010\u001f\u001a\u00020,H\u0016J\u0010\u0010-\u001a\u00020\u001b2\u0006\u0010\u001f\u001a\u00020.H\u0016J\u0010\u0010/\u001a\u00020\u001b2\u0006\u0010\u001f\u001a\u000200H\u0016J\u0010\u00101\u001a\u00020\u001b2\u0006\u0010\u001f\u001a\u000202H\u0016J\u0010\u00103\u001a\u00020\u001b2\u0006\u0010\u001f\u001a\u00020%H\u0016J\u0010\u00104\u001a\u00020\u001b2\u0006\u0010\u001f\u001a\u000205H\u0016J\u0010\u00106\u001a\u00020\u001b2\u0006\u0010\u001f\u001a\u00020\u000eH\u0016J\b\u00107\u001a\u00020\u001bH\u0016J\u0018\u00108\u001a\u00020\u001b2\u0006\u00109\u001a\u00020#2\u0006\u0010$\u001a\u00020%H\u0016J\u0018\u0010:\u001a\u00020\u000e2\u0006\u0010\"\u001a\u00020#2\u0006\u0010$\u001a\u00020%H\u0016R\u0014\u0010\u0003\u001a\u00020\u0004X\u0004¢\u0006\b\n\u0000\u001a\u0004\b\t\u0010\nR\u0014\u0010\u0005\u001a\u00020\u0006X\u0004¢\u0006\b\n\u0000\u001a\u0004\b\u000b\u0010\fR\u001a\u0010\r\u001a\u00020\u000eX\u000e¢\u0006\u000e\n\u0000\u001a\u0004\b\r\u0010\u000f\"\u0004\b\u0010\u0010\u0011R\u001a\u0010\u0012\u001a\u00020\u000eX\u000e¢\u0006\u000e\n\u0000\u001a\u0004\b\u0013\u0010\u000f\"\u0004\b\u0014\u0010\u0011R\u0014\u0010\u0016\u001a\u00020\u00178VX\u0004¢\u0006\u0006\u001a\u0004\b\u0018\u0010\u0019\u0001\u0002<=¨\u0006>"
+              ],
+              "d2",
+              [
+                "Lkotlinx/serialization/cbor/internal/CborWriter;",
+                "Lkotlinx/serialization/encoding/AbstractEncoder;",
+                "Lkotlinx/serialization/cbor/CborEncoder;",
+                "cbor",
+                "Lkotlinx/serialization/cbor/Cbor;",
+                "output",
+                "Lkotlinx/serialization/cbor/internal/ByteArrayOutput;",
+                "<init>",
+                "(Lkotlinx/serialization/cbor/Cbor;Lkotlinx/serialization/cbor/internal/ByteArrayOutput;)V",
+                "getCbor",
+                "()Lkotlinx/serialization/cbor/Cbor;",
+                "getOutput",
+                "()Lkotlinx/serialization/cbor/internal/ByteArrayOutput;",
+                "isClass",
+                "",
+                "()Z",
+                "setClass",
+                "(Z)V",
+                "encodeByteArrayAsByteString",
+                "getEncodeByteArrayAsByteString",
+                "setEncodeByteArrayAsByteString",
+                "getDestination",
+                "serializersModule",
+                "Lkotlinx/serialization/modules/SerializersModule;",
+                "getSerializersModule",
+                "()Lkotlinx/serialization/modules/SerializersModule;",
+                "encodeSerializableValue",
+                "",
+                "T",
+                "serializer",
+                "Lkotlinx/serialization/SerializationStrategy;",
+                "value",
+                "(Lkotlinx/serialization/SerializationStrategy;Ljava/lang/Object;)V",
+                "shouldEncodeElementDefault",
+                "descriptor",
+                "Lkotlinx/serialization/descriptors/SerialDescriptor;",
+                "index",
+                "",
+                "incrementChildren",
+                "encodeString",
+                "",
+                "encodeFloat",
+                "",
+                "encodeDouble",
+                "",
+                "encodeChar",
+                "",
+                "encodeByte",
+                "",
+                "encodeShort",
+                "",
+                "encodeInt",
+                "encodeLong",
+                "",
+                "encodeBoolean",
+                "encodeNull",
+                "encodeEnum",
+                "enumDescriptor",
+                "encodeElement",
+                "Data",
+                "Lkotlinx/serialization/cbor/internal/DefiniteLengthCborWriter;",
+                "Lkotlinx/serialization/cbor/internal/IndefiniteLengthCborWriter;",
+                "kotlinx-serialization-cbor"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lkotlin/jvm/internal/SourceDebugExtension;",
+            "vals": [
+              "value",
+              [
+                "SMAP\nEncoder.kt\nKotlin\n*S Kotlin\n*F\n+ 1 Encoder.kt\nkotlinx/serialization/cbor/internal/CborWriter\n+ 2 _Collections.kt\nkotlin/collections/CollectionsKt___CollectionsKt\n*L\n1#1,333:1\n1869#2,2:334\n1869#2,2:336\n*S KotlinDebug\n*F\n+ 1 Encoder.kt\nkotlinx/serialization/cbor/internal/CborWriter\n*L\n127#1:334,2\n141#1:336,2\n*E\n"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/internal/IndefiniteLengthCborWriter.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/serialization/cbor/internal/IndefiniteLengthCborWriter",
+        "super": "kotlinx/serialization/cbor/internal/CborWriter",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Lkotlinx/serialization/cbor/Cbor;Lkotlinx/serialization/cbor/internal/ByteArrayOutput;)V"
+          },
+          {
+            "nme": "beginStructure",
+            "acc": 1,
+            "dsc": "(Lkotlinx/serialization/descriptors/SerialDescriptor;)Lkotlinx/serialization/encoding/CompositeEncoder;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "endStructure",
+            "acc": 1,
+            "dsc": "(Lkotlinx/serialization/descriptors/SerialDescriptor;)V"
+          },
+          {
+            "nme": "getDestination",
+            "acc": 4,
+            "dsc": "()Lkotlinx/serialization/cbor/internal/ByteArrayOutput;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "incrementChildren",
+            "acc": 4,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000,\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0003\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0000\n\u0002\u0010\u0002\n\u0002\b\u0003\b\u0000\u0018\u00002\u00020\u0001B\u0017\u0012\u0006\u0010\u0002\u001a\u00020\u0003\u0012\u0006\u0010\u0004\u001a\u00020\u0005¢\u0006\u0004\b\u0006\u0010\u0007J\u0010\u0010\b\u001a\u00020\t2\u0006\u0010\n\u001a\u00020\u000bH\u0016J\u0010\u0010\f\u001a\u00020\r2\u0006\u0010\n\u001a\u00020\u000bH\u0016J\b\u0010\u000e\u001a\u00020\u0005H\u0014J\b\u0010\u000f\u001a\u00020\rH\u0014¨\u0006\u0010"
+              ],
+              "d2",
+              [
+                "Lkotlinx/serialization/cbor/internal/IndefiniteLengthCborWriter;",
+                "Lkotlinx/serialization/cbor/internal/CborWriter;",
+                "cbor",
+                "Lkotlinx/serialization/cbor/Cbor;",
+                "output",
+                "Lkotlinx/serialization/cbor/internal/ByteArrayOutput;",
+                "<init>",
+                "(Lkotlinx/serialization/cbor/Cbor;Lkotlinx/serialization/cbor/internal/ByteArrayOutput;)V",
+                "beginStructure",
+                "Lkotlinx/serialization/encoding/CompositeEncoder;",
+                "descriptor",
+                "Lkotlinx/serialization/descriptors/SerialDescriptor;",
+                "endStructure",
+                "",
+                "getDestination",
+                "incrementChildren",
+                "kotlinx-serialization-cbor"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lkotlin/jvm/internal/SourceDebugExtension;",
+            "vals": [
+              "value",
+              [
+                "SMAP\nEncoder.kt\nKotlin\n*S Kotlin\n*F\n+ 1 Encoder.kt\nkotlinx/serialization/cbor/internal/IndefiniteLengthCborWriter\n+ 2 _Collections.kt\nkotlin/collections/CollectionsKt___CollectionsKt\n*L\n1#1,333:1\n1869#2,2:334\n*S KotlinDebug\n*F\n+ 1 Encoder.kt\nkotlinx/serialization/cbor/internal/IndefiniteLengthCborWriter\n*L\n155#1:334,2\n*E\n"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/internal/CborListReader.class": {
+        "ver": 52,
+        "acc": 32,
+        "nme": "kotlinx/serialization/cbor/internal/CborListReader",
+        "super": "kotlinx/serialization/cbor/internal/CborReader",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Lkotlinx/serialization/cbor/Cbor;Lkotlinx/serialization/cbor/internal/CborParser;)V"
+          },
+          {
+            "nme": "skipBeginToken-uLth9ew",
+            "acc": 4,
+            "dsc": "([J)V"
+          },
+          {
+            "nme": "decodeElementIndex",
+            "acc": 1,
+            "dsc": "(Lkotlinx/serialization/descriptors/SerialDescriptor;)I"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 2,
+            "nme": "ind",
+            "dsc": "I"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u00002\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0003\n\u0002\u0010\b\n\u0000\n\u0002\u0010\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0004\n\u0002\u0018\u0002\n\u0000\b\u0012\u0018\u00002\u00020\u0001B\u0017\u0012\u0006\u0010\u0002\u001a\u00020\u0003\u0012\u0006\u0010\u0004\u001a\u00020\u0005¢\u0006\u0004\b\u0006\u0010\u0007J\u0019\u0010\n\u001a\u00020\u000b2\b\u0010\f\u001a\u0004\u0018\u00010\rH\u0014¢\u0006\u0004\b\u000e\u0010\u000fJ\u0010\u0010\u0010\u001a\u00020\t2\u0006\u0010\u0011\u001a\u00020\u0012H\u0016R\u000e\u0010\b\u001a\u00020\tX\u000e¢\u0006\u0002\n\u0000¨\u0006\u0013"
+              ],
+              "d2",
+              [
+                "Lkotlinx/serialization/cbor/internal/CborListReader;",
+                "Lkotlinx/serialization/cbor/internal/CborReader;",
+                "cbor",
+                "Lkotlinx/serialization/cbor/Cbor;",
+                "decoder",
+                "Lkotlinx/serialization/cbor/internal/CborParser;",
+                "<init>",
+                "(Lkotlinx/serialization/cbor/Cbor;Lkotlinx/serialization/cbor/internal/CborParser;)V",
+                "ind",
+                "",
+                "skipBeginToken",
+                "",
+                "objectTags",
+                "Lkotlin/ULongArray;",
+                "skipBeginToken-uLth9ew",
+                "([J)V",
+                "decodeElementIndex",
+                "descriptor",
+                "Lkotlinx/serialization/descriptors/SerialDescriptor;",
+                "kotlinx-serialization-cbor"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lkotlin/jvm/internal/SourceDebugExtension;",
+            "vals": [
+              "value",
+              [
+                "SMAP\nDecoder.kt\nKotlin\n*S Kotlin\n*F\n+ 1 Decoder.kt\nkotlinx/serialization/cbor/internal/CborListReader\n+ 2 fake.kt\nkotlin/jvm/internal/FakeKt\n*L\n1#1,621:1\n1#2:622\n*E\n"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/internal/CborMapReader.class": {
+        "ver": 52,
+        "acc": 48,
+        "nme": "kotlinx/serialization/cbor/internal/CborMapReader",
+        "super": "kotlinx/serialization/cbor/internal/CborListReader",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Lkotlinx/serialization/cbor/Cbor;Lkotlinx/serialization/cbor/internal/CborParser;)V"
+          },
+          {
+            "nme": "skipBeginToken-uLth9ew",
+            "acc": 4,
+            "dsc": "([J)V"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000&\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0003\n\u0002\u0010\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0003\b\u0002\u0018\u00002\u00020\u0001B\u0017\u0012\u0006\u0010\u0002\u001a\u00020\u0003\u0012\u0006\u0010\u0004\u001a\u00020\u0005¢\u0006\u0004\b\u0006\u0010\u0007J\u0019\u0010\b\u001a\u00020\t2\b\u0010\n\u001a\u0004\u0018\u00010\u000bH\u0014¢\u0006\u0004\b\f\u0010\r¨\u0006\u000e"
+              ],
+              "d2",
+              [
+                "Lkotlinx/serialization/cbor/internal/CborMapReader;",
+                "Lkotlinx/serialization/cbor/internal/CborListReader;",
+                "cbor",
+                "Lkotlinx/serialization/cbor/Cbor;",
+                "decoder",
+                "Lkotlinx/serialization/cbor/internal/CborParser;",
+                "<init>",
+                "(Lkotlinx/serialization/cbor/Cbor;Lkotlinx/serialization/cbor/internal/CborParser;)V",
+                "skipBeginToken",
+                "",
+                "objectTags",
+                "Lkotlin/ULongArray;",
+                "skipBeginToken-uLth9ew",
+                "([J)V",
+                "kotlinx-serialization-cbor"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lkotlin/jvm/internal/SourceDebugExtension;",
+            "vals": [
+              "value",
+              [
+                "SMAP\nDecoder.kt\nKotlin\n*S Kotlin\n*F\n+ 1 Decoder.kt\nkotlinx/serialization/cbor/internal/CborMapReader\n+ 2 fake.kt\nkotlin/jvm/internal/FakeKt\n*L\n1#1,621:1\n1#2:622\n*E\n"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/CborTag.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/serialization/cbor/CborTag",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "()V"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "INSTANCE",
+            "dsc": "Lkotlinx/serialization/cbor/CborTag;"
+          },
+          {
+            "acc": 25,
+            "nme": "DATE_TIME_STANDARD",
+            "dsc": "J",
+            "val": 0
+          },
+          {
+            "acc": 25,
+            "nme": "DATE_TIME_EPOCH",
+            "dsc": "J",
+            "val": 1
+          },
+          {
+            "acc": 25,
+            "nme": "BIGNUM_POSITIVE",
+            "dsc": "J",
+            "val": 2
+          },
+          {
+            "acc": 25,
+            "nme": "BIGNUM_NEGAIVE",
+            "dsc": "J",
+            "val": 3
+          },
+          {
+            "acc": 25,
+            "nme": "DECIMAL_FRACTION",
+            "dsc": "J",
+            "val": 4
+          },
+          {
+            "acc": 25,
+            "nme": "BIGFLOAT",
+            "dsc": "J",
+            "val": 5
+          },
+          {
+            "acc": 25,
+            "nme": "BASE64_URL",
+            "dsc": "J",
+            "val": 21
+          },
+          {
+            "acc": 25,
+            "nme": "BASE64",
+            "dsc": "J",
+            "val": 22
+          },
+          {
+            "acc": 25,
+            "nme": "BASE16",
+            "dsc": "J",
+            "val": 23
+          },
+          {
+            "acc": 25,
+            "nme": "CBOR_ENCODED_DATA",
+            "dsc": "J",
+            "val": 24
+          },
+          {
+            "acc": 25,
+            "nme": "URI",
+            "dsc": "J",
+            "val": 32
+          },
+          {
+            "acc": 25,
+            "nme": "STRING_BASE64_URL",
+            "dsc": "J",
+            "val": 33
+          },
+          {
+            "acc": 25,
+            "nme": "STRING_BASE64",
+            "dsc": "J",
+            "val": 34
+          },
+          {
+            "acc": 25,
+            "nme": "REGEX",
+            "dsc": "J",
+            "val": 35
+          },
+          {
+            "acc": 25,
+            "nme": "MIME_MESSAGE",
+            "dsc": "J",
+            "val": 36
+          },
+          {
+            "acc": 25,
+            "nme": "CBOR_SELF_DESCRIBE",
+            "dsc": "J",
+            "val": 55799
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\u0014\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0002\b\u0003\n\u0002\u0018\u0002\n\u0002\b\u0011\bÆ\u0002\u0018\u00002\u00020\u0001B\t\b\u0002¢\u0006\u0004\b\u0002\u0010\u0003R\u0010\u0010\u0004\u001a\u00020\u0005XT¢\u0006\u0004\n\u0002\u0010\u0006R\u0010\u0010\u0007\u001a\u00020\u0005XT¢\u0006\u0004\n\u0002\u0010\u0006R\u0010\u0010\b\u001a\u00020\u0005XT¢\u0006\u0004\n\u0002\u0010\u0006R\u0010\u0010\t\u001a\u00020\u0005XT¢\u0006\u0004\n\u0002\u0010\u0006R\u0010\u0010\n\u001a\u00020\u0005XT¢\u0006\u0004\n\u0002\u0010\u0006R\u0010\u0010\u000b\u001a\u00020\u0005XT¢\u0006\u0004\n\u0002\u0010\u0006R\u0010\u0010\f\u001a\u00020\u0005XT¢\u0006\u0004\n\u0002\u0010\u0006R\u0010\u0010\r\u001a\u00020\u0005XT¢\u0006\u0004\n\u0002\u0010\u0006R\u0010\u0010\u000e\u001a\u00020\u0005XT¢\u0006\u0004\n\u0002\u0010\u0006R\u0010\u0010\u000f\u001a\u00020\u0005XT¢\u0006\u0004\n\u0002\u0010\u0006R\u0010\u0010\u0010\u001a\u00020\u0005XT¢\u0006\u0004\n\u0002\u0010\u0006R\u0010\u0010\u0011\u001a\u00020\u0005XT¢\u0006\u0004\n\u0002\u0010\u0006R\u0010\u0010\u0012\u001a\u00020\u0005XT¢\u0006\u0004\n\u0002\u0010\u0006R\u0010\u0010\u0013\u001a\u00020\u0005XT¢\u0006\u0004\n\u0002\u0010\u0006R\u0010\u0010\u0014\u001a\u00020\u0005XT¢\u0006\u0004\n\u0002\u0010\u0006R\u0010\u0010\u0015\u001a\u00020\u0005XT¢\u0006\u0004\n\u0002\u0010\u0006¨\u0006\u0016"
+              ],
+              "d2",
+              [
+                "Lkotlinx/serialization/cbor/CborTag;",
+                "",
+                "<init>",
+                "()V",
+                "DATE_TIME_STANDARD",
+                "Lkotlin/ULong;",
+                "J",
+                "DATE_TIME_EPOCH",
+                "BIGNUM_POSITIVE",
+                "BIGNUM_NEGAIVE",
+                "DECIMAL_FRACTION",
+                "BIGFLOAT",
+                "BASE64_URL",
+                "BASE64",
+                "BASE16",
+                "CBOR_ENCODED_DATA",
+                "URI",
+                "STRING_BASE64_URL",
+                "STRING_BASE64",
+                "REGEX",
+                "MIME_MESSAGE",
+                "CBOR_SELF_DESCRIBE",
+                "kotlinx-serialization-cbor"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/internal/EncodingKt.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/serialization/cbor/internal/EncodingKt",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "isByteString",
+            "acc": 25,
+            "dsc": "(Lkotlinx/serialization/descriptors/SerialDescriptor;I)Z"
+          },
+          {
+            "nme": "isInlineByteString",
+            "acc": 25,
+            "dsc": "(Lkotlinx/serialization/descriptors/SerialDescriptor;)Z"
+          },
+          {
+            "nme": "getValueTags",
+            "acc": 25,
+            "dsc": "(Lkotlinx/serialization/descriptors/SerialDescriptor;I)[J",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/Nullable;"
+              }
+            ]
+          },
+          {
+            "nme": "getKeyTags",
+            "acc": 25,
+            "dsc": "(Lkotlinx/serialization/descriptors/SerialDescriptor;I)[J",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/Nullable;"
+              }
+            ]
+          },
+          {
+            "nme": "getCborLabel",
+            "acc": 25,
+            "dsc": "(Lkotlinx/serialization/descriptors/SerialDescriptor;I)Ljava/lang/Long;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/Nullable;"
+              }
+            ]
+          },
+          {
+            "nme": "hasArrayTag",
+            "acc": 25,
+            "dsc": "(Lkotlinx/serialization/descriptors/SerialDescriptor;)Z"
+          },
+          {
+            "nme": "findAnnotation",
+            "acc": 4121,
+            "dsc": "(Lkotlinx/serialization/descriptors/SerialDescriptor;I)Ljava/lang/annotation/Annotation;",
+            "sig": "<A::Ljava/lang/annotation/Annotation;>(Lkotlinx/serialization/descriptors/SerialDescriptor;I)TA;"
+          },
+          {
+            "nme": "getObjectTags",
+            "acc": 25,
+            "dsc": "(Lkotlinx/serialization/descriptors/SerialDescriptor;)[J",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/Nullable;"
+              }
+            ]
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "FALSE",
+            "dsc": "I",
+            "val": 244
+          },
+          {
+            "acc": 25,
+            "nme": "TRUE",
+            "dsc": "I",
+            "val": 245
+          },
+          {
+            "acc": 25,
+            "nme": "NULL",
+            "dsc": "I",
+            "val": 246
+          },
+          {
+            "acc": 25,
+            "nme": "EMPTY_MAP",
+            "dsc": "I",
+            "val": 160
+          },
+          {
+            "acc": 25,
+            "nme": "NEXT_HALF",
+            "dsc": "I",
+            "val": 249
+          },
+          {
+            "acc": 25,
+            "nme": "NEXT_FLOAT",
+            "dsc": "I",
+            "val": 250
+          },
+          {
+            "acc": 25,
+            "nme": "NEXT_DOUBLE",
+            "dsc": "I",
+            "val": 251
+          },
+          {
+            "acc": 25,
+            "nme": "BEGIN_ARRAY",
+            "dsc": "I",
+            "val": 159
+          },
+          {
+            "acc": 25,
+            "nme": "BEGIN_MAP",
+            "dsc": "I",
+            "val": 191
+          },
+          {
+            "acc": 25,
+            "nme": "BREAK",
+            "dsc": "I",
+            "val": 255
+          },
+          {
+            "acc": 25,
+            "nme": "ADDITIONAL_INFORMATION_INDEFINITE_LENGTH",
+            "dsc": "I",
+            "val": 31
+          },
+          {
+            "acc": 25,
+            "nme": "HEADER_BYTE_STRING",
+            "dsc": "I",
+            "val": 64
+          },
+          {
+            "acc": 25,
+            "nme": "HEADER_STRING",
+            "dsc": "I",
+            "val": 96
+          },
+          {
+            "acc": 25,
+            "nme": "HEADER_NEGATIVE",
+            "dsc": "B",
+            "val": 32
+          },
+          {
+            "acc": 25,
+            "nme": "HEADER_ARRAY",
+            "dsc": "I",
+            "val": 128
+          },
+          {
+            "acc": 25,
+            "nme": "HEADER_MAP",
+            "dsc": "I",
+            "val": 160
+          },
+          {
+            "acc": 25,
+            "nme": "HEADER_TAG",
+            "dsc": "I",
+            "val": 192
+          },
+          {
+            "acc": 25,
+            "nme": "LENGTH_STACK_INDEFINITE",
+            "dsc": "I",
+            "val": -1
+          },
+          {
+            "acc": 25,
+            "nme": "HALF_PRECISION_EXPONENT_BIAS",
+            "dsc": "I",
+            "val": 15
+          },
+          {
+            "acc": 25,
+            "nme": "HALF_PRECISION_MAX_EXPONENT",
+            "dsc": "I",
+            "val": 31
+          },
+          {
+            "acc": 25,
+            "nme": "HALF_PRECISION_MAX_MANTISSA",
+            "dsc": "I",
+            "val": 1023
+          },
+          {
+            "acc": 25,
+            "nme": "SINGLE_PRECISION_EXPONENT_BIAS",
+            "dsc": "I",
+            "val": 127
+          },
+          {
+            "acc": 25,
+            "nme": "SINGLE_PRECISION_MAX_EXPONENT",
+            "dsc": "I",
+            "val": 255
+          },
+          {
+            "acc": 25,
+            "nme": "SINGLE_PRECISION_NORMALIZE_BASE",
+            "dsc": "F",
+            "val": 0.5
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              2,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000<\n\u0000\n\u0002\u0010\b\n\u0002\b\r\n\u0002\u0010\u0005\n\u0002\b\n\n\u0002\u0010\u0007\n\u0000\n\u0002\u0010\u000b\n\u0002\u0018\u0002\n\u0002\b\u0003\n\u0002\u0018\u0002\n\u0002\b\u0003\n\u0002\u0010\t\n\u0002\b\u0004\n\u0002\u0010\u001b\n\u0002\b\u0005\u001a\u0014\u0010\u001b\u001a\u00020\u001c*\u00020\u001d2\u0006\u0010\u001e\u001a\u00020\u0001H\u0000\u001a\f\u0010\u001f\u001a\u00020\u001c*\u00020\u001dH\u0000\u001a\u001b\u0010 \u001a\u0004\u0018\u00010!*\u00020\u001d2\u0006\u0010\u001e\u001a\u00020\u0001H\u0000¢\u0006\u0002\u0010\"\u001a\u001b\u0010#\u001a\u0004\u0018\u00010!*\u00020\u001d2\u0006\u0010\u001e\u001a\u00020\u0001H\u0000¢\u0006\u0002\u0010\"\u001a\u001b\u0010$\u001a\u0004\u0018\u00010%*\u00020\u001d2\u0006\u0010\u001e\u001a\u00020\u0001H\u0000¢\u0006\u0002\u0010&\u001a\f\u0010'\u001a\u00020\u001c*\u00020\u001dH\u0000\u001a(\u0010(\u001a\u0004\u0018\u0001H)\"\n\b\u0000\u0010)\u0018\u0001*\u00020**\u00020\u001d2\u0006\u0010+\u001a\u00020\u0001H\b¢\u0006\u0002\u0010,\u001a\u0013\u0010-\u001a\u0004\u0018\u00010!*\u00020\u001dH\u0000¢\u0006\u0002\u0010.\"\u000e\u0010\u0000\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0002\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0003\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0004\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0005\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0006\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0007\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\b\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\t\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\n\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u000b\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\f\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\r\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u000e\u001a\u00020\u000fXT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0010\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0011\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0012\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0013\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0014\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0015\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0016\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0017\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0018\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0019\u001a\u00020\u001aXT¢\u0006\u0002\n\u0000¨\u0006/"
+              ],
+              "d2",
+              [
+                "FALSE",
+                "",
+                "TRUE",
+                "NULL",
+                "EMPTY_MAP",
+                "NEXT_HALF",
+                "NEXT_FLOAT",
+                "NEXT_DOUBLE",
+                "BEGIN_ARRAY",
+                "BEGIN_MAP",
+                "BREAK",
+                "ADDITIONAL_INFORMATION_INDEFINITE_LENGTH",
+                "HEADER_BYTE_STRING",
+                "HEADER_STRING",
+                "HEADER_NEGATIVE",
+                "",
+                "HEADER_ARRAY",
+                "HEADER_MAP",
+                "HEADER_TAG",
+                "LENGTH_STACK_INDEFINITE",
+                "HALF_PRECISION_EXPONENT_BIAS",
+                "HALF_PRECISION_MAX_EXPONENT",
+                "HALF_PRECISION_MAX_MANTISSA",
+                "SINGLE_PRECISION_EXPONENT_BIAS",
+                "SINGLE_PRECISION_MAX_EXPONENT",
+                "SINGLE_PRECISION_NORMALIZE_BASE",
+                "",
+                "isByteString",
+                "",
+                "Lkotlinx/serialization/descriptors/SerialDescriptor;",
+                "index",
+                "isInlineByteString",
+                "getValueTags",
+                "Lkotlin/ULongArray;",
+                "(Lkotlinx/serialization/descriptors/SerialDescriptor;I)[J",
+                "getKeyTags",
+                "getCborLabel",
+                "",
+                "(Lkotlinx/serialization/descriptors/SerialDescriptor;I)Ljava/lang/Long;",
+                "hasArrayTag",
+                "findAnnotation",
+                "A",
+                "",
+                "elementIndex",
+                "(Lkotlinx/serialization/descriptors/SerialDescriptor;I)Ljava/lang/annotation/Annotation;",
+                "getObjectTags",
+                "(Lkotlinx/serialization/descriptors/SerialDescriptor;)[J",
+                "kotlinx-serialization-cbor"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lkotlin/jvm/internal/SourceDebugExtension;",
+            "vals": [
+              "value",
+              [
+                "SMAP\nEncoding.kt\nKotlin\n*S Kotlin\n*F\n+ 1 Encoding.kt\nkotlinx/serialization/cbor/internal/EncodingKt\n+ 2 fake.kt\nkotlin/jvm/internal/FakeKt\n+ 3 _Collections.kt\nkotlin/collections/CollectionsKt___CollectionsKt\n*L\n1#1,80:1\n74#1:82\n74#1:85\n74#1:88\n1#2:81\n295#3,2:83\n295#3,2:86\n295#3,2:89\n1761#3,3:91\n295#3,2:94\n808#3,11:96\n*S KotlinDebug\n*F\n+ 1 Encoding.kt\nkotlinx/serialization/cbor/internal/EncodingKt\n*L\n59#1:82\n62#1:85\n65#1:88\n59#1:83,2\n62#1:86,2\n65#1:89,2\n69#1:91,3\n74#1:94,2\n79#1:96,11\n*E\n"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/CborBuilder.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/serialization/cbor/CborBuilder",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Lkotlinx/serialization/cbor/Cbor;)V"
+          },
+          {
+            "nme": "getEncodeDefaults",
+            "acc": 17,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "setEncodeDefaults",
+            "acc": 17,
+            "dsc": "(Z)V"
+          },
+          {
+            "nme": "getIgnoreUnknownKeys",
+            "acc": 17,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "setIgnoreUnknownKeys",
+            "acc": 17,
+            "dsc": "(Z)V"
+          },
+          {
+            "nme": "getEncodeKeyTags",
+            "acc": 17,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "setEncodeKeyTags",
+            "acc": 17,
+            "dsc": "(Z)V"
+          },
+          {
+            "nme": "getEncodeValueTags",
+            "acc": 17,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "setEncodeValueTags",
+            "acc": 17,
+            "dsc": "(Z)V"
+          },
+          {
+            "nme": "getEncodeObjectTags",
+            "acc": 17,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "setEncodeObjectTags",
+            "acc": 17,
+            "dsc": "(Z)V"
+          },
+          {
+            "nme": "getVerifyKeyTags",
+            "acc": 17,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "setVerifyKeyTags",
+            "acc": 17,
+            "dsc": "(Z)V"
+          },
+          {
+            "nme": "getVerifyValueTags",
+            "acc": 17,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "setVerifyValueTags",
+            "acc": 17,
+            "dsc": "(Z)V"
+          },
+          {
+            "nme": "getVerifyObjectTags",
+            "acc": 17,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "setVerifyObjectTags",
+            "acc": 17,
+            "dsc": "(Z)V"
+          },
+          {
+            "nme": "getUseDefiniteLengthEncoding",
+            "acc": 17,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "setUseDefiniteLengthEncoding",
+            "acc": 17,
+            "dsc": "(Z)V"
+          },
+          {
+            "nme": "getPreferCborLabelsOverNames",
+            "acc": 17,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "setPreferCborLabelsOverNames",
+            "acc": 17,
+            "dsc": "(Z)V"
+          },
+          {
+            "nme": "getAlwaysUseByteString",
+            "acc": 17,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "setAlwaysUseByteString",
+            "acc": 17,
+            "dsc": "(Z)V"
+          },
+          {
+            "nme": "getSerializersModule",
+            "acc": 17,
+            "dsc": "()Lkotlinx/serialization/modules/SerializersModule;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "setSerializersModule",
+            "acc": 17,
+            "dsc": "(Lkotlinx/serialization/modules/SerializersModule;)V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 2,
+            "nme": "encodeDefaults",
+            "dsc": "Z"
+          },
+          {
+            "acc": 2,
+            "nme": "ignoreUnknownKeys",
+            "dsc": "Z"
+          },
+          {
+            "acc": 2,
+            "nme": "encodeKeyTags",
+            "dsc": "Z"
+          },
+          {
+            "acc": 2,
+            "nme": "encodeValueTags",
+            "dsc": "Z"
+          },
+          {
+            "acc": 2,
+            "nme": "encodeObjectTags",
+            "dsc": "Z"
+          },
+          {
+            "acc": 2,
+            "nme": "verifyKeyTags",
+            "dsc": "Z"
+          },
+          {
+            "acc": 2,
+            "nme": "verifyValueTags",
+            "dsc": "Z"
+          },
+          {
+            "acc": 2,
+            "nme": "verifyObjectTags",
+            "dsc": "Z"
+          },
+          {
+            "acc": 2,
+            "nme": "useDefiniteLengthEncoding",
+            "dsc": "Z"
+          },
+          {
+            "acc": 2,
+            "nme": "preferCborLabelsOverNames",
+            "dsc": "Z"
+          },
+          {
+            "acc": 2,
+            "nme": "alwaysUseByteString",
+            "dsc": "Z"
+          },
+          {
+            "acc": 2,
+            "nme": "serializersModule",
+            "dsc": "Lkotlinx/serialization/modules/SerializersModule;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlinx/serialization/ExperimentalSerializationApi;"
+          },
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\"\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0003\n\u0002\u0010\u000b\n\u0002\b#\n\u0002\u0018\u0002\n\u0002\b\u0005\b\u0007\u0018\u00002\u00020\u0001B\u0011\b\u0000\u0012\u0006\u0010\u0002\u001a\u00020\u0003¢\u0006\u0004\b\u0004\u0010\u0005R\u001a\u0010\u0006\u001a\u00020\u0007X\u000e¢\u0006\u000e\n\u0000\u001a\u0004\b\b\u0010\t\"\u0004\b\n\u0010\u000bR\u001a\u0010\f\u001a\u00020\u0007X\u000e¢\u0006\u000e\n\u0000\u001a\u0004\b\r\u0010\t\"\u0004\b\u000e\u0010\u000bR\u001a\u0010\u000f\u001a\u00020\u0007X\u000e¢\u0006\u000e\n\u0000\u001a\u0004\b\u0010\u0010\t\"\u0004\b\u0011\u0010\u000bR\u001a\u0010\u0012\u001a\u00020\u0007X\u000e¢\u0006\u000e\n\u0000\u001a\u0004\b\u0013\u0010\t\"\u0004\b\u0014\u0010\u000bR\u001a\u0010\u0015\u001a\u00020\u0007X\u000e¢\u0006\u000e\n\u0000\u001a\u0004\b\u0016\u0010\t\"\u0004\b\u0017\u0010\u000bR\u001a\u0010\u0018\u001a\u00020\u0007X\u000e¢\u0006\u000e\n\u0000\u001a\u0004\b\u0019\u0010\t\"\u0004\b\u001a\u0010\u000bR\u001a\u0010\u001b\u001a\u00020\u0007X\u000e¢\u0006\u000e\n\u0000\u001a\u0004\b\u001c\u0010\t\"\u0004\b\u001d\u0010\u000bR\u001a\u0010\u001e\u001a\u00020\u0007X\u000e¢\u0006\u000e\n\u0000\u001a\u0004\b\u001f\u0010\t\"\u0004\b \u0010\u000bR\u001a\u0010!\u001a\u00020\u0007X\u000e¢\u0006\u000e\n\u0000\u001a\u0004\b\"\u0010\t\"\u0004\b#\u0010\u000bR\u001a\u0010$\u001a\u00020\u0007X\u000e¢\u0006\u000e\n\u0000\u001a\u0004\b%\u0010\t\"\u0004\b&\u0010\u000bR\u001a\u0010'\u001a\u00020\u0007X\u000e¢\u0006\u000e\n\u0000\u001a\u0004\b(\u0010\t\"\u0004\b)\u0010\u000bR\u001a\u0010*\u001a\u00020+X\u000e¢\u0006\u000e\n\u0000\u001a\u0004\b,\u0010-\"\u0004\b.\u0010/¨\u00060"
+              ],
+              "d2",
+              [
+                "Lkotlinx/serialization/cbor/CborBuilder;",
+                "",
+                "cbor",
+                "Lkotlinx/serialization/cbor/Cbor;",
+                "<init>",
+                "(Lkotlinx/serialization/cbor/Cbor;)V",
+                "encodeDefaults",
+                "",
+                "getEncodeDefaults",
+                "()Z",
+                "setEncodeDefaults",
+                "(Z)V",
+                "ignoreUnknownKeys",
+                "getIgnoreUnknownKeys",
+                "setIgnoreUnknownKeys",
+                "encodeKeyTags",
+                "getEncodeKeyTags",
+                "setEncodeKeyTags",
+                "encodeValueTags",
+                "getEncodeValueTags",
+                "setEncodeValueTags",
+                "encodeObjectTags",
+                "getEncodeObjectTags",
+                "setEncodeObjectTags",
+                "verifyKeyTags",
+                "getVerifyKeyTags",
+                "setVerifyKeyTags",
+                "verifyValueTags",
+                "getVerifyValueTags",
+                "setVerifyValueTags",
+                "verifyObjectTags",
+                "getVerifyObjectTags",
+                "setVerifyObjectTags",
+                "useDefiniteLengthEncoding",
+                "getUseDefiniteLengthEncoding",
+                "setUseDefiniteLengthEncoding",
+                "preferCborLabelsOverNames",
+                "getPreferCborLabelsOverNames",
+                "setPreferCborLabelsOverNames",
+                "alwaysUseByteString",
+                "getAlwaysUseByteString",
+                "setAlwaysUseByteString",
+                "serializersModule",
+                "Lkotlinx/serialization/modules/SerializersModule;",
+                "getSerializersModule",
+                "()Lkotlinx/serialization/modules/SerializersModule;",
+                "setSerializersModule",
+                "(Lkotlinx/serialization/modules/SerializersModule;)V",
+                "kotlinx-serialization-cbor"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/CborEncoder$DefaultImpls.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/serialization/cbor/CborEncoder$DefaultImpls",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "encodeNotNullMark",
+            "acc": 131081,
+            "dsc": "(Lkotlinx/serialization/cbor/CborEncoder;)V",
+            "vanns": [
+              {
+                "dsc": "Lkotlinx/serialization/ExperimentalSerializationApi;"
+              },
+              {
+                "dsc": "Ljava/lang/Deprecated;"
+              }
+            ]
+          },
+          {
+            "nme": "beginCollection",
+            "acc": 131081,
+            "dsc": "(Lkotlinx/serialization/cbor/CborEncoder;Lkotlinx/serialization/descriptors/SerialDescriptor;I)Lkotlinx/serialization/encoding/CompositeEncoder;",
+            "vanns": [
+              {
+                "dsc": "Ljava/lang/Deprecated;"
+              }
+            ],
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "encodeSerializableValue",
+            "acc": 131081,
+            "dsc": "(Lkotlinx/serialization/cbor/CborEncoder;Lkotlinx/serialization/SerializationStrategy;Ljava/lang/Object;)V",
+            "sig": "<T:Ljava/lang/Object;>(Lkotlinx/serialization/cbor/CborEncoder;Lkotlinx/serialization/SerializationStrategy<-TT;>;TT;)V",
+            "vanns": [
+              {
+                "dsc": "Ljava/lang/Deprecated;"
+              }
+            ]
+          },
+          {
+            "nme": "encodeNullableSerializableValue",
+            "acc": 131081,
+            "dsc": "(Lkotlinx/serialization/cbor/CborEncoder;Lkotlinx/serialization/SerializationStrategy;Ljava/lang/Object;)V",
+            "sig": "<T:Ljava/lang/Object;>(Lkotlinx/serialization/cbor/CborEncoder;Lkotlinx/serialization/SerializationStrategy<-TT;>;TT;)V",
+            "vanns": [
+              {
+                "dsc": "Lkotlinx/serialization/ExperimentalSerializationApi;"
+              },
+              {
+                "dsc": "Ljava/lang/Deprecated;"
+              }
+            ]
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              3,
+              "xi",
+              48
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/internal/SuppressAnimalSniffer.class": {
+        "ver": 52,
+        "acc": 9729,
+        "nme": "kotlinx/serialization/cbor/internal/SuppressAnimalSniffer",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/annotation/Retention;",
+            "vals": [
+              "value",
+              [
+                "Lkotlin/annotation/AnnotationRetention;",
+                "BINARY"
+              ]
+            ]
+          },
+          {
+            "dsc": "Lkotlin/annotation/Target;",
+            "vals": [
+              "allowedTargets",
+              [
+                [
+                  "Lkotlin/annotation/AnnotationTarget;",
+                  "CLASS"
+                ],
+                [
+                  "Lkotlin/annotation/AnnotationTarget;",
+                  "FUNCTION"
+                ]
+              ]
+            ]
+          },
+          {
+            "dsc": "Ljava/lang/annotation/Retention;",
+            "vals": [
+              "value",
+              [
+                "Ljava/lang/annotation/RetentionPolicy;",
+                "CLASS"
+              ]
+            ]
+          },
+          {
+            "dsc": "Ljava/lang/annotation/Target;",
+            "vals": [
+              "value",
+              [
+                [
+                  "Ljava/lang/annotation/ElementType;",
+                  "TYPE"
+                ],
+                [
+                  "Ljava/lang/annotation/ElementType;",
+                  "METHOD"
+                ]
+              ]
+            ]
+          },
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\n\n\u0002\u0018\u0002\n\u0002\u0010\u001b\n\u0000\b\u0002\u0018\u00002\u00020\u0001B\u0000¨\u0006\u0002"
+              ],
+              "d2",
+              [
+                "Lkotlinx/serialization/cbor/internal/SuppressAnimalSniffer;",
+                "",
+                "kotlinx-serialization-cbor"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/internal/CborParser.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/serialization/cbor/internal/CborParser",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/ByteArrayInput;Z)V"
+          },
+          {
+            "nme": "readByte",
+            "acc": 18,
+            "dsc": "()I"
+          },
+          {
+            "nme": "isEof",
+            "acc": 17,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "skipByte",
+            "acc": 18,
+            "dsc": "(I)V"
+          },
+          {
+            "nme": "isNull",
+            "acc": 17,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "nextNull-uLth9ew",
+            "acc": 17,
+            "dsc": "([J)Ljava/lang/Void;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/Nullable;"
+              }
+            ]
+          },
+          {
+            "nme": "nextNull-uLth9ew$default",
+            "acc": 4105,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/CborParser;[JILjava/lang/Object;)Ljava/lang/Void;"
+          },
+          {
+            "nme": "nextBoolean-uLth9ew",
+            "acc": 17,
+            "dsc": "([J)Z"
+          },
+          {
+            "nme": "nextBoolean-uLth9ew$default",
+            "acc": 4105,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/CborParser;[JILjava/lang/Object;)Z"
+          },
+          {
+            "nme": "startArray-uLth9ew",
+            "acc": 17,
+            "dsc": "([J)I"
+          },
+          {
+            "nme": "startArray-uLth9ew$default",
+            "acc": 4105,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/CborParser;[JILjava/lang/Object;)I"
+          },
+          {
+            "nme": "startMap-uLth9ew",
+            "acc": 17,
+            "dsc": "([J)I"
+          },
+          {
+            "nme": "startMap-uLth9ew$default",
+            "acc": 4105,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/CborParser;[JILjava/lang/Object;)I"
+          },
+          {
+            "nme": "startSized-kvxxsfM",
+            "acc": 18,
+            "dsc": "([JIILjava/lang/String;)I"
+          },
+          {
+            "nme": "isEnd",
+            "acc": 17,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "end",
+            "acc": 17,
+            "dsc": "()V"
+          },
+          {
+            "nme": "nextByteString-uLth9ew",
+            "acc": 17,
+            "dsc": "([J)[B",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "nextByteString-uLth9ew$default",
+            "acc": 4105,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/CborParser;[JILjava/lang/Object;)[B"
+          },
+          {
+            "nme": "nextString-uLth9ew",
+            "acc": 17,
+            "dsc": "([J)Ljava/lang/String;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "nextString-uLth9ew$default",
+            "acc": 4105,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/CborParser;[JILjava/lang/Object;)Ljava/lang/String;"
+          },
+          {
+            "nme": "nextTaggedString-uLth9ew",
+            "acc": 18,
+            "dsc": "([J)Lkotlin/Pair;",
+            "sig": "([J)Lkotlin/Pair<Ljava/lang/String;Lkotlin/ULongArray;>;"
+          },
+          {
+            "nme": "readBytes",
+            "acc": 18,
+            "dsc": "()[B"
+          },
+          {
+            "nme": "processTags-_7fx0C0",
+            "acc": 18,
+            "dsc": "([J)[J"
+          },
+          {
+            "nme": "verifyTagsAndThrow-EOCRwWE$kotlinx_serialization_cbor",
+            "acc": 17,
+            "dsc": "([J[J)V"
+          },
+          {
+            "nme": "nextTaggedStringOrNumber",
+            "acc": 17,
+            "dsc": "()Lkotlin/Triple;",
+            "sig": "()Lkotlin/Triple<Ljava/lang/String;Ljava/lang/Long;Lkotlin/ULongArray;>;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "nextNumber-uLth9ew",
+            "acc": 17,
+            "dsc": "([J)J"
+          },
+          {
+            "nme": "nextNumber-uLth9ew$default",
+            "acc": 4105,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/CborParser;[JILjava/lang/Object;)J"
+          },
+          {
+            "nme": "readNumber",
+            "acc": 18,
+            "dsc": "()J"
+          },
+          {
+            "nme": "readExact",
+            "acc": 18,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/ByteArrayInput;I)J"
+          },
+          {
+            "nme": "readExactNBytes",
+            "acc": 18,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/ByteArrayInput;I)[B"
+          },
+          {
+            "nme": "nextFloat-uLth9ew",
+            "acc": 17,
+            "dsc": "([J)F"
+          },
+          {
+            "nme": "nextFloat-uLth9ew$default",
+            "acc": 4105,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/CborParser;[JILjava/lang/Object;)F"
+          },
+          {
+            "nme": "nextDouble-uLth9ew",
+            "acc": 17,
+            "dsc": "([J)D"
+          },
+          {
+            "nme": "nextDouble-uLth9ew$default",
+            "acc": 4105,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/CborParser;[JILjava/lang/Object;)D"
+          },
+          {
+            "nme": "readLong",
+            "acc": 18,
+            "dsc": "()J"
+          },
+          {
+            "nme": "readShort",
+            "acc": 18,
+            "dsc": "()S"
+          },
+          {
+            "nme": "readInt",
+            "acc": 18,
+            "dsc": "()I"
+          },
+          {
+            "nme": "skipElement-uLth9ew",
+            "acc": 17,
+            "dsc": "([J)V"
+          },
+          {
+            "nme": "prune",
+            "acc": 18,
+            "dsc": "(Ljava/util/List;)V",
+            "sig": "(Ljava/util/List<Ljava/lang/Integer;>;)V"
+          },
+          {
+            "nme": "isIndefinite",
+            "acc": 18,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "elementLength",
+            "acc": 18,
+            "dsc": "()I"
+          },
+          {
+            "nme": "readIndefiniteLengthBytes",
+            "acc": 18,
+            "dsc": "()[B"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "input",
+            "dsc": "Lkotlinx/serialization/cbor/internal/ByteArrayInput;"
+          },
+          {
+            "acc": 18,
+            "nme": "verifyObjectTags",
+            "dsc": "Z"
+          },
+          {
+            "acc": 2,
+            "nme": "curByte",
+            "dsc": "I"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000z\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0000\n\u0002\u0018\u0002\n\u0000\n\u0002\u0010\u000b\n\u0002\b\u0003\n\u0002\u0010\b\n\u0002\b\u0003\n\u0002\u0010\u0002\n\u0002\b\u0003\n\u0002\u0010\u0001\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u000e\n\u0002\u0010\u000e\n\u0002\b\u0005\n\u0002\u0010\u0012\n\u0002\b\u0006\n\u0002\u0018\u0002\n\u0002\b\u000b\n\u0002\u0018\u0002\n\u0002\u0010\t\n\u0002\b\t\n\u0002\u0010\u0007\n\u0002\b\u0003\n\u0002\u0010\u0006\n\u0002\b\u0004\n\u0002\u0010\n\n\u0002\b\u0006\n\u0002\u0010!\n\u0002\b\u0004\b\u0000\u0018\u00002\u00020\u0001B\u0017\u0012\u0006\u0010\u0002\u001a\u00020\u0003\u0012\u0006\u0010\u0004\u001a\u00020\u0005¢\u0006\u0004\b\u0006\u0010\u0007J\b\u0010\n\u001a\u00020\tH\u0002J\u0006\u0010\u000b\u001a\u00020\u0005J\u0010\u0010\f\u001a\u00020\r2\u0006\u0010\u000e\u001a\u00020\tH\u0002J\u0006\u0010\u000f\u001a\u00020\u0005J\u001b\u0010\u0010\u001a\u0004\u0018\u00010\u00112\n\b\u0002\u0010\u0012\u001a\u0004\u0018\u00010\u0013¢\u0006\u0004\b\u0014\u0010\u0015J\u0019\u0010\u0016\u001a\u00020\u00052\n\b\u0002\u0010\u0012\u001a\u0004\u0018\u00010\u0013¢\u0006\u0004\b\u0017\u0010\u0018J\u0019\u0010\u0019\u001a\u00020\t2\n\b\u0002\u0010\u0012\u001a\u0004\u0018\u00010\u0013¢\u0006\u0004\b\u001a\u0010\u001bJ\u0019\u0010\u001c\u001a\u00020\t2\n\b\u0002\u0010\u0012\u001a\u0004\u0018\u00010\u0013¢\u0006\u0004\b\u001d\u0010\u001bJ1\u0010\u001e\u001a\u00020\t2\b\u0010\u0012\u001a\u0004\u0018\u00010\u00132\u0006\u0010\u001f\u001a\u00020\t2\u0006\u0010 \u001a\u00020\t2\u0006\u0010!\u001a\u00020\"H\u0002¢\u0006\u0004\b#\u0010$J\u0006\u0010%\u001a\u00020\u0005J\u0006\u0010&\u001a\u00020\rJ\u0019\u0010'\u001a\u00020(2\n\b\u0002\u0010\u0012\u001a\u0004\u0018\u00010\u0013¢\u0006\u0004\b)\u0010*J\u0019\u0010+\u001a\u00020\"2\n\b\u0002\u0010\u0012\u001a\u0004\u0018\u00010\u0013¢\u0006\u0004\b,\u0010-J'\u0010.\u001a\u0010\u0012\u0004\u0012\u00020\"\u0012\u0006\u0012\u0004\u0018\u00010\u00130/2\b\u0010\u0012\u001a\u0004\u0018\u00010\u0013H\u0002¢\u0006\u0004\b0\u00101J\b\u00102\u001a\u00020(H\u0002J\u001b\u00103\u001a\u0004\u0018\u00010\u00132\b\u0010\u0012\u001a\u0004\u0018\u00010\u0013H\u0002¢\u0006\u0004\b4\u00105J!\u00106\u001a\u00020\r2\u0006\u0010\u000e\u001a\u00020\u00132\b\u00107\u001a\u0004\u0018\u00010\u0013H\u0000¢\u0006\u0004\b8\u00109J\u001e\u0010:\u001a\u001a\u0012\u0006\u0012\u0004\u0018\u00010\"\u0012\u0006\u0012\u0004\u0018\u00010<\u0012\u0006\u0012\u0004\u0018\u00010\u00130;J\u0019\u0010=\u001a\u00020<2\n\b\u0002\u0010\u0012\u001a\u0004\u0018\u00010\u0013¢\u0006\u0004\b>\u0010?J\b\u0010@\u001a\u00020<H\u0002J\u0014\u0010A\u001a\u00020<*\u00020\u00032\u0006\u0010B\u001a\u00020\tH\u0002J\u0014\u0010C\u001a\u00020(*\u00020\u00032\u0006\u0010D\u001a\u00020\tH\u0002J\u0019\u0010E\u001a\u00020F2\n\b\u0002\u0010\u0012\u001a\u0004\u0018\u00010\u0013¢\u0006\u0004\bG\u0010HJ\u0019\u0010I\u001a\u00020J2\n\b\u0002\u0010\u0012\u001a\u0004\u0018\u00010\u0013¢\u0006\u0004\bK\u0010LJ\b\u0010M\u001a\u00020<H\u0002J\b\u0010N\u001a\u00020OH\u0002J\b\u0010P\u001a\u00020\tH\u0002J\u0017\u0010Q\u001a\u00020\r2\b\u0010\u0012\u001a\u0004\u0018\u00010\u0013¢\u0006\u0004\bR\u0010SJ\u0016\u0010T\u001a\u00020\r2\f\u0010U\u001a\b\u0012\u0004\u0012\u00020\t0VH\u0002J\b\u0010W\u001a\u00020\u0005H\u0002J\b\u0010X\u001a\u00020\tH\u0002J\b\u0010Y\u001a\u00020(H\u0002R\u000e\u0010\u0002\u001a\u00020\u0003X\u0004¢\u0006\u0002\n\u0000R\u000e\u0010\u0004\u001a\u00020\u0005X\u0004¢\u0006\u0002\n\u0000R\u000e\u0010\b\u001a\u00020\tX\u000e¢\u0006\u0002\n\u0000¨\u0006Z"
+              ],
+              "d2",
+              [
+                "Lkotlinx/serialization/cbor/internal/CborParser;",
+                "",
+                "input",
+                "Lkotlinx/serialization/cbor/internal/ByteArrayInput;",
+                "verifyObjectTags",
+                "",
+                "<init>",
+                "(Lkotlinx/serialization/cbor/internal/ByteArrayInput;Z)V",
+                "curByte",
+                "",
+                "readByte",
+                "isEof",
+                "skipByte",
+                "",
+                "expected",
+                "isNull",
+                "nextNull",
+                "",
+                "tags",
+                "Lkotlin/ULongArray;",
+                "nextNull-uLth9ew",
+                "([J)Ljava/lang/Void;",
+                "nextBoolean",
+                "nextBoolean-uLth9ew",
+                "([J)Z",
+                "startArray",
+                "startArray-uLth9ew",
+                "([J)I",
+                "startMap",
+                "startMap-uLth9ew",
+                "startSized",
+                "unboundedHeader",
+                "boundedHeaderMask",
+                "collectionType",
+                "",
+                "startSized-kvxxsfM",
+                "([JIILjava/lang/String;)I",
+                "isEnd",
+                "end",
+                "nextByteString",
+                "",
+                "nextByteString-uLth9ew",
+                "([J)[B",
+                "nextString",
+                "nextString-uLth9ew",
+                "([J)Ljava/lang/String;",
+                "nextTaggedString",
+                "Lkotlin/Pair;",
+                "nextTaggedString-uLth9ew",
+                "([J)Lkotlin/Pair;",
+                "readBytes",
+                "processTags",
+                "processTags-_7fx0C0",
+                "([J)[J",
+                "verifyTagsAndThrow",
+                "actual",
+                "verifyTagsAndThrow-EOCRwWE$kotlinx_serialization_cbor",
+                "([J[J)V",
+                "nextTaggedStringOrNumber",
+                "Lkotlin/Triple;",
+                "",
+                "nextNumber",
+                "nextNumber-uLth9ew",
+                "([J)J",
+                "readNumber",
+                "readExact",
+                "bytes",
+                "readExactNBytes",
+                "bytesCount",
+                "nextFloat",
+                "",
+                "nextFloat-uLth9ew",
+                "([J)F",
+                "nextDouble",
+                "",
+                "nextDouble-uLth9ew",
+                "([J)D",
+                "readLong",
+                "readShort",
+                "",
+                "readInt",
+                "skipElement",
+                "skipElement-uLth9ew",
+                "([J)V",
+                "prune",
+                "lengthStack",
+                "",
+                "isIndefinite",
+                "elementLength",
+                "readIndefiniteLengthBytes",
+                "kotlinx-serialization-cbor"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/internal/DefiniteLengthCborWriter.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/serialization/cbor/internal/DefiniteLengthCborWriter",
+        "super": "kotlinx/serialization/cbor/internal/CborWriter",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Lkotlinx/serialization/cbor/Cbor;Lkotlinx/serialization/cbor/internal/ByteArrayOutput;)V"
+          },
+          {
+            "nme": "getDestination",
+            "acc": 4,
+            "dsc": "()Lkotlinx/serialization/cbor/internal/ByteArrayOutput;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "incrementChildren",
+            "acc": 4,
+            "dsc": "()V"
+          },
+          {
+            "nme": "beginStructure",
+            "acc": 1,
+            "dsc": "(Lkotlinx/serialization/descriptors/SerialDescriptor;)Lkotlinx/serialization/encoding/CompositeEncoder;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "endStructure",
+            "acc": 1,
+            "dsc": "(Lkotlinx/serialization/descriptors/SerialDescriptor;)V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "structureStack",
+            "dsc": "Ljava/util/List;",
+            "sig": "Ljava/util/List<Lkotlinx/serialization/cbor/internal/CborWriter$Data;>;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000<\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0003\n\u0002\u0010!\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\b\u0002\n\u0002\u0010\u0002\n\u0000\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0002\b\u0000\u0018\u00002\u00020\u0001B\u0017\u0012\u0006\u0010\u0002\u001a\u00020\u0003\u0012\u0006\u0010\u0004\u001a\u00020\u0005¢\u0006\u0004\b\u0006\u0010\u0007J\b\u0010\f\u001a\u00020\u0005H\u0014J\b\u0010\r\u001a\u00020\u000eH\u0014J\u0010\u0010\u000f\u001a\u00020\u00102\u0006\u0010\u0011\u001a\u00020\u0012H\u0016J\u0010\u0010\u0013\u001a\u00020\u000e2\u0006\u0010\u0011\u001a\u00020\u0012H\u0016R\u0018\u0010\b\u001a\f\u0012\u0004\u0012\u00020\n0\tj\u0002`\u000bX\u0004¢\u0006\u0002\n\u0000¨\u0006\u0014"
+              ],
+              "d2",
+              [
+                "Lkotlinx/serialization/cbor/internal/DefiniteLengthCborWriter;",
+                "Lkotlinx/serialization/cbor/internal/CborWriter;",
+                "cbor",
+                "Lkotlinx/serialization/cbor/Cbor;",
+                "output",
+                "Lkotlinx/serialization/cbor/internal/ByteArrayOutput;",
+                "<init>",
+                "(Lkotlinx/serialization/cbor/Cbor;Lkotlinx/serialization/cbor/internal/ByteArrayOutput;)V",
+                "structureStack",
+                "",
+                "Lkotlinx/serialization/cbor/internal/CborWriter$Data;",
+                "Lkotlinx/serialization/cbor/internal/Stack;",
+                "getDestination",
+                "incrementChildren",
+                "",
+                "beginStructure",
+                "Lkotlinx/serialization/encoding/CompositeEncoder;",
+                "descriptor",
+                "Lkotlinx/serialization/descriptors/SerialDescriptor;",
+                "endStructure",
+                "kotlinx-serialization-cbor"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lkotlin/jvm/internal/SourceDebugExtension;",
+            "vals": [
+              "value",
+              [
+                "SMAP\nEncoder.kt\nKotlin\n*S Kotlin\n*F\n+ 1 Encoder.kt\nkotlinx/serialization/cbor/internal/DefiniteLengthCborWriter\n+ 2 _Collections.kt\nkotlin/collections/CollectionsKt___CollectionsKt\n*L\n1#1,333:1\n1869#2,2:334\n*S KotlinDebug\n*F\n+ 1 Encoder.kt\nkotlinx/serialization/cbor/internal/DefiniteLengthCborWriter\n*L\n207#1:334,2\n*E\n"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/CborLabel$Impl.class": {
+        "ver": 52,
+        "acc": 4145,
+        "nme": "kotlinx/serialization/cbor/CborLabel$Impl",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(J)V"
+          },
+          {
+            "nme": "label",
+            "acc": 4113,
+            "dsc": "()J"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 4114,
+            "nme": "label",
+            "dsc": "J"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              3,
+              "xi",
+              48
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/CborConfiguration.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/serialization/cbor/CborConfiguration",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(ZZZZZZZZZZZ)V"
+          },
+          {
+            "nme": "getEncodeDefaults",
+            "acc": 17,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "getIgnoreUnknownKeys",
+            "acc": 17,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "getEncodeKeyTags",
+            "acc": 17,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "getEncodeValueTags",
+            "acc": 17,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "getEncodeObjectTags",
+            "acc": 17,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "getVerifyKeyTags",
+            "acc": 17,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "getVerifyValueTags",
+            "acc": 17,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "getVerifyObjectTags",
+            "acc": 17,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "getUseDefiniteLengthEncoding",
+            "acc": 17,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "getPreferCborLabelsOverNames",
+            "acc": 17,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "getAlwaysUseByteString",
+            "acc": 17,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "toString",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "encodeDefaults",
+            "dsc": "Z"
+          },
+          {
+            "acc": 18,
+            "nme": "ignoreUnknownKeys",
+            "dsc": "Z"
+          },
+          {
+            "acc": 18,
+            "nme": "encodeKeyTags",
+            "dsc": "Z"
+          },
+          {
+            "acc": 18,
+            "nme": "encodeValueTags",
+            "dsc": "Z"
+          },
+          {
+            "acc": 18,
+            "nme": "encodeObjectTags",
+            "dsc": "Z"
+          },
+          {
+            "acc": 18,
+            "nme": "verifyKeyTags",
+            "dsc": "Z"
+          },
+          {
+            "acc": 18,
+            "nme": "verifyValueTags",
+            "dsc": "Z"
+          },
+          {
+            "acc": 18,
+            "nme": "verifyObjectTags",
+            "dsc": "Z"
+          },
+          {
+            "acc": 18,
+            "nme": "useDefiniteLengthEncoding",
+            "dsc": "Z"
+          },
+          {
+            "acc": 18,
+            "nme": "preferCborLabelsOverNames",
+            "dsc": "Z"
+          },
+          {
+            "acc": 18,
+            "nme": "alwaysUseByteString",
+            "dsc": "Z"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlinx/serialization/ExperimentalSerializationApi;"
+          },
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\u0018\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0000\n\u0002\u0010\u000b\n\u0002\b\u0019\n\u0002\u0010\u000e\n\u0000\b\u0007\u0018\u00002\u00020\u0001Ba\b\u0000\u0012\u0006\u0010\u0002\u001a\u00020\u0003\u0012\u0006\u0010\u0004\u001a\u00020\u0003\u0012\u0006\u0010\u0005\u001a\u00020\u0003\u0012\u0006\u0010\u0006\u001a\u00020\u0003\u0012\u0006\u0010\u0007\u001a\u00020\u0003\u0012\u0006\u0010\b\u001a\u00020\u0003\u0012\u0006\u0010\t\u001a\u00020\u0003\u0012\u0006\u0010\n\u001a\u00020\u0003\u0012\u0006\u0010\u000b\u001a\u00020\u0003\u0012\u0006\u0010\f\u001a\u00020\u0003\u0012\u0006\u0010\r\u001a\u00020\u0003¢\u0006\u0004\b\u000e\u0010\u000fJ\b\u0010\u001c\u001a\u00020\u001dH\u0016R\u0011\u0010\u0002\u001a\u00020\u0003¢\u0006\b\n\u0000\u001a\u0004\b\u0010\u0010\u0011R\u0011\u0010\u0004\u001a\u00020\u0003¢\u0006\b\n\u0000\u001a\u0004\b\u0012\u0010\u0011R\u0011\u0010\u0005\u001a\u00020\u0003¢\u0006\b\n\u0000\u001a\u0004\b\u0013\u0010\u0011R\u0011\u0010\u0006\u001a\u00020\u0003¢\u0006\b\n\u0000\u001a\u0004\b\u0014\u0010\u0011R\u0011\u0010\u0007\u001a\u00020\u0003¢\u0006\b\n\u0000\u001a\u0004\b\u0015\u0010\u0011R\u0011\u0010\b\u001a\u00020\u0003¢\u0006\b\n\u0000\u001a\u0004\b\u0016\u0010\u0011R\u0011\u0010\t\u001a\u00020\u0003¢\u0006\b\n\u0000\u001a\u0004\b\u0017\u0010\u0011R\u0011\u0010\n\u001a\u00020\u0003¢\u0006\b\n\u0000\u001a\u0004\b\u0018\u0010\u0011R\u0011\u0010\u000b\u001a\u00020\u0003¢\u0006\b\n\u0000\u001a\u0004\b\u0019\u0010\u0011R\u0011\u0010\f\u001a\u00020\u0003¢\u0006\b\n\u0000\u001a\u0004\b\u001a\u0010\u0011R\u0011\u0010\r\u001a\u00020\u0003¢\u0006\b\n\u0000\u001a\u0004\b\u001b\u0010\u0011¨\u0006\u001e"
+              ],
+              "d2",
+              [
+                "Lkotlinx/serialization/cbor/CborConfiguration;",
+                "",
+                "encodeDefaults",
+                "",
+                "ignoreUnknownKeys",
+                "encodeKeyTags",
+                "encodeValueTags",
+                "encodeObjectTags",
+                "verifyKeyTags",
+                "verifyValueTags",
+                "verifyObjectTags",
+                "useDefiniteLengthEncoding",
+                "preferCborLabelsOverNames",
+                "alwaysUseByteString",
+                "<init>",
+                "(ZZZZZZZZZZZ)V",
+                "getEncodeDefaults",
+                "()Z",
+                "getIgnoreUnknownKeys",
+                "getEncodeKeyTags",
+                "getEncodeValueTags",
+                "getEncodeObjectTags",
+                "getVerifyKeyTags",
+                "getVerifyValueTags",
+                "getVerifyObjectTags",
+                "getUseDefiniteLengthEncoding",
+                "getPreferCborLabelsOverNames",
+                "getAlwaysUseByteString",
+                "toString",
+                "",
+                "kotlinx-serialization-cbor"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/CborArray.class": {
+        "ver": 52,
+        "acc": 9729,
+        "nme": "kotlinx/serialization/cbor/CborArray",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/annotation/Target;",
+            "vals": [
+              "allowedTargets",
+              [
+                [
+                  "Lkotlin/annotation/AnnotationTarget;",
+                  "CLASS"
+                ]
+              ]
+            ]
+          },
+          {
+            "dsc": "Lkotlinx/serialization/ExperimentalSerializationApi;"
+          },
+          {
+            "dsc": "Ljava/lang/annotation/Retention;",
+            "vals": [
+              "value",
+              [
+                "Ljava/lang/annotation/RetentionPolicy;",
+                "RUNTIME"
+              ]
+            ]
+          },
+          {
+            "dsc": "Ljava/lang/annotation/Target;",
+            "vals": [
+              "value",
+              [
+                [
+                  "Ljava/lang/annotation/ElementType;",
+                  "TYPE"
+                ]
+              ]
+            ]
+          },
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\n\n\u0002\u0018\u0002\n\u0002\u0010\u001b\n\u0000\b\u0002\u0018\u00002\u00020\u0001B\u0000¨\u0006\u0002"
+              ],
+              "d2",
+              [
+                "Lkotlinx/serialization/cbor/CborArray;",
+                "",
+                "kotlinx-serialization-cbor"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lkotlinx/serialization/SerialInfo;"
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/Cbor.class": {
+        "ver": 52,
+        "acc": 1057,
+        "nme": "kotlinx/serialization/cbor/Cbor",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "(Lkotlinx/serialization/cbor/CborConfiguration;Lkotlinx/serialization/modules/SerializersModule;)V"
+          },
+          {
+            "nme": "getConfiguration",
+            "acc": 17,
+            "dsc": "()Lkotlinx/serialization/cbor/CborConfiguration;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "getSerializersModule",
+            "acc": 1,
+            "dsc": "()Lkotlinx/serialization/modules/SerializersModule;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "encodeToByteArray",
+            "acc": 1,
+            "dsc": "(Lkotlinx/serialization/SerializationStrategy;Ljava/lang/Object;)[B",
+            "sig": "<T:Ljava/lang/Object;>(Lkotlinx/serialization/SerializationStrategy<-TT;>;TT;)[B",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "decodeFromByteArray",
+            "acc": 1,
+            "dsc": "(Lkotlinx/serialization/DeserializationStrategy;[B)Ljava/lang/Object;",
+            "sig": "<T:Ljava/lang/Object;>(Lkotlinx/serialization/DeserializationStrategy<+TT;>;[B)TT;"
+          },
+          {
+            "nme": "CoseCompliant$lambda$0",
+            "acc": 26,
+            "dsc": "(Lkotlinx/serialization/cbor/CborBuilder;)Lkotlin/Unit;"
+          },
+          {
+            "nme": "<init>",
+            "acc": 4097,
+            "dsc": "(Lkotlinx/serialization/cbor/CborConfiguration;Lkotlinx/serialization/modules/SerializersModule;Lkotlin/jvm/internal/DefaultConstructorMarker;)V"
+          },
+          {
+            "nme": "access$getCoseCompliant$cp",
+            "acc": 4121,
+            "dsc": "()Lkotlinx/serialization/cbor/Cbor;"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "Default",
+            "dsc": "Lkotlinx/serialization/cbor/Cbor$Default;"
+          },
+          {
+            "acc": 18,
+            "nme": "configuration",
+            "dsc": "Lkotlinx/serialization/cbor/CborConfiguration;"
+          },
+          {
+            "acc": 18,
+            "nme": "serializersModule",
+            "dsc": "Lkotlinx/serialization/modules/SerializersModule;"
+          },
+          {
+            "acc": 26,
+            "nme": "CoseCompliant",
+            "dsc": "Lkotlinx/serialization/cbor/Cbor;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlinx/serialization/ExperimentalSerializationApi;"
+          },
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000:\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0007\n\u0002\u0010\u0012\n\u0002\b\u0002\n\u0002\u0018\u0002\n\u0002\b\u0004\n\u0002\u0018\u0002\n\u0002\b\u0003\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0000\b7\u0018\u0000 \u00182\u00020\u0001:\u0001\u0018B\u0019\b\u0004\u0012\u0006\u0010\u0002\u001a\u00020\u0003\u0012\u0006\u0010\u0004\u001a\u00020\u0005¢\u0006\u0004\b\u0006\u0010\u0007J)\u0010\f\u001a\u00020\r\"\u0004\b\u0000\u0010\u000e2\f\u0010\u000f\u001a\b\u0012\u0004\u0012\u0002H\u000e0\u00102\u0006\u0010\u0011\u001a\u0002H\u000eH\u0016¢\u0006\u0002\u0010\u0012J)\u0010\u0013\u001a\u0002H\u000e\"\u0004\b\u0000\u0010\u000e2\f\u0010\u0014\u001a\b\u0012\u0004\u0012\u0002H\u000e0\u00152\u0006\u0010\u0016\u001a\u00020\rH\u0016¢\u0006\u0002\u0010\u0017R\u0011\u0010\u0002\u001a\u00020\u0003¢\u0006\b\n\u0000\u001a\u0004\b\b\u0010\tR\u0014\u0010\u0004\u001a\u00020\u0005X\u0004¢\u0006\b\n\u0000\u001a\u0004\b\n\u0010\u000b\u0001\u0002\u0019\u001a¨\u0006\u001b"
+              ],
+              "d2",
+              [
+                "Lkotlinx/serialization/cbor/Cbor;",
+                "Lkotlinx/serialization/BinaryFormat;",
+                "configuration",
+                "Lkotlinx/serialization/cbor/CborConfiguration;",
+                "serializersModule",
+                "Lkotlinx/serialization/modules/SerializersModule;",
+                "<init>",
+                "(Lkotlinx/serialization/cbor/CborConfiguration;Lkotlinx/serialization/modules/SerializersModule;)V",
+                "getConfiguration",
+                "()Lkotlinx/serialization/cbor/CborConfiguration;",
+                "getSerializersModule",
+                "()Lkotlinx/serialization/modules/SerializersModule;",
+                "encodeToByteArray",
+                "",
+                "T",
+                "serializer",
+                "Lkotlinx/serialization/SerializationStrategy;",
+                "value",
+                "(Lkotlinx/serialization/SerializationStrategy;Ljava/lang/Object;)[B",
+                "decodeFromByteArray",
+                "deserializer",
+                "Lkotlinx/serialization/DeserializationStrategy;",
+                "bytes",
+                "(Lkotlinx/serialization/DeserializationStrategy;[B)Ljava/lang/Object;",
+                "Default",
+                "Lkotlinx/serialization/cbor/Cbor$Default;",
+                "Lkotlinx/serialization/cbor/CborImpl;",
+                "kotlinx-serialization-cbor"
+              ]
+            ]
+          }
+        ]
+      },
+      "META-INF/versions/9/module-info.class": {
+        "ver": 53,
+        "acc": 32768,
+        "nme": "module-info",
+        "mthds": [],
+        "flds": []
+      },
+      "kotlinx/serialization/cbor/ObjectTags$Impl.class": {
+        "ver": 52,
+        "acc": 4145,
+        "nme": "kotlinx/serialization/cbor/ObjectTags$Impl",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "([J)V"
+          },
+          {
+            "nme": "tags",
+            "acc": 4113,
+            "dsc": "()[J"
+          },
+          {
+            "nme": "<init>",
+            "acc": 4097,
+            "dsc": "([JLkotlin/jvm/internal/DefaultConstructorMarker;)V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 4114,
+            "nme": "tags",
+            "dsc": "[J"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              3,
+              "xi",
+              48
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/internal/ByteArrayOutput.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/serialization/cbor/internal/ByteArrayOutput",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "ensureCapacity",
+            "acc": 18,
+            "dsc": "(I)V"
+          },
+          {
+            "nme": "toByteArray",
+            "acc": 17,
+            "dsc": "()[B",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "copyFrom",
+            "acc": 17,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/ByteArrayOutput;)V"
+          },
+          {
+            "nme": "write",
+            "acc": 17,
+            "dsc": "([BII)V"
+          },
+          {
+            "nme": "write$default",
+            "acc": 4105,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/ByteArrayOutput;[BIIILjava/lang/Object;)V"
+          },
+          {
+            "nme": "write",
+            "acc": 17,
+            "dsc": "(I)V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 2,
+            "nme": "array",
+            "dsc": "[B"
+          },
+          {
+            "acc": 2,
+            "nme": "position",
+            "dsc": "I"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000 \n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0002\b\u0003\n\u0002\u0010\u0012\n\u0000\n\u0002\u0010\b\n\u0000\n\u0002\u0010\u0002\n\u0002\b\n\b\u0000\u0018\u00002\u00020\u0001B\u0007¢\u0006\u0004\b\u0002\u0010\u0003J\u0010\u0010\b\u001a\u00020\t2\u0006\u0010\n\u001a\u00020\u0007H\u0002J\u0006\u0010\u000b\u001a\u00020\u0005J\u000e\u0010\f\u001a\u00020\t2\u0006\u0010\r\u001a\u00020\u0000J\"\u0010\u000e\u001a\u00020\t2\u0006\u0010\u000f\u001a\u00020\u00052\b\b\u0002\u0010\u0010\u001a\u00020\u00072\b\b\u0002\u0010\u0011\u001a\u00020\u0007J\u000e\u0010\u000e\u001a\u00020\t2\u0006\u0010\u0012\u001a\u00020\u0007R\u000e\u0010\u0004\u001a\u00020\u0005X\u000e¢\u0006\u0002\n\u0000R\u000e\u0010\u0006\u001a\u00020\u0007X\u000e¢\u0006\u0002\n\u0000¨\u0006\u0013"
+              ],
+              "d2",
+              [
+                "Lkotlinx/serialization/cbor/internal/ByteArrayOutput;",
+                "",
+                "<init>",
+                "()V",
+                "array",
+                "",
+                "position",
+                "",
+                "ensureCapacity",
+                "",
+                "elementsToAppend",
+                "toByteArray",
+                "copyFrom",
+                "src",
+                "write",
+                "buffer",
+                "offset",
+                "count",
+                "byteValue",
+                "kotlinx-serialization-cbor"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/internal/DecoderKt.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/serialization/cbor/internal/DecoderKt",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "flatten",
+            "acc": 26,
+            "dsc": "(Ljava/lang/Iterable;)[B",
+            "sig": "(Ljava/lang/Iterable<[B>;)[B"
+          },
+          {
+            "nme": "floatFromHalfBits",
+            "acc": 26,
+            "dsc": "(S)F"
+          },
+          {
+            "nme": "getElementNameForCborLabel",
+            "acc": 26,
+            "dsc": "(Lkotlinx/serialization/descriptors/SerialDescriptor;J)Ljava/lang/String;"
+          },
+          {
+            "nme": "getElementIndexOrThrow",
+            "acc": 26,
+            "dsc": "(Lkotlinx/serialization/descriptors/SerialDescriptor;Ljava/lang/String;)I"
+          },
+          {
+            "nme": "access$getElementIndexOrThrow",
+            "acc": 4121,
+            "dsc": "(Lkotlinx/serialization/descriptors/SerialDescriptor;Ljava/lang/String;)I"
+          },
+          {
+            "nme": "access$getElementNameForCborLabel",
+            "acc": 4121,
+            "dsc": "(Lkotlinx/serialization/descriptors/SerialDescriptor;J)Ljava/lang/String;"
+          },
+          {
+            "nme": "access$floatFromHalfBits",
+            "acc": 4121,
+            "dsc": "(S)F"
+          },
+          {
+            "nme": "access$flatten",
+            "acc": 4121,
+            "dsc": "(Ljava/lang/Iterable;)[B"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 26,
+            "nme": "normalizeBaseBits",
+            "dsc": "I"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              2,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u00000\n\u0000\n\u0002\u0010\u0012\n\u0002\u0010\u001c\n\u0000\n\u0002\u0010\b\n\u0000\n\u0002\u0010\u0007\n\u0000\n\u0002\u0010\n\n\u0000\n\u0002\u0010\u000e\n\u0002\u0018\u0002\n\u0000\n\u0002\u0010\t\n\u0002\b\u0003\u001a\u0012\u0010\u0000\u001a\u00020\u0001*\b\u0012\u0004\u0012\u00020\u00010\u0002H\u0002\u001a\u0010\u0010\u0005\u001a\u00020\u00062\u0006\u0010\u0007\u001a\u00020\bH\u0002\u001a\u0016\u0010\t\u001a\u0004\u0018\u00010\n*\u00020\u000b2\u0006\u0010\f\u001a\u00020\rH\u0002\u001a\u0014\u0010\u000e\u001a\u00020\u0004*\u00020\u000b2\u0006\u0010\u000f\u001a\u00020\nH\u0002\"\u000e\u0010\u0003\u001a\u00020\u0004X\u0004¢\u0006\u0002\n\u0000¨\u0006\u0010"
+              ],
+              "d2",
+              [
+                "flatten",
+                "",
+                "",
+                "normalizeBaseBits",
+                "",
+                "floatFromHalfBits",
+                "",
+                "bits",
+                "",
+                "getElementNameForCborLabel",
+                "",
+                "Lkotlinx/serialization/descriptors/SerialDescriptor;",
+                "label",
+                "",
+                "getElementIndexOrThrow",
+                "name",
+                "kotlinx-serialization-cbor"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lkotlin/jvm/internal/SourceDebugExtension;",
+            "vals": [
+              "value",
+              [
+                "SMAP\nDecoder.kt\nKotlin\n*S Kotlin\n*F\n+ 1 Decoder.kt\nkotlinx/serialization/cbor/internal/DecoderKt\n+ 2 fake.kt\nkotlin/jvm/internal/FakeKt\n+ 3 _Collections.kt\nkotlin/collections/CollectionsKt___CollectionsKt\n*L\n1#1,621:1\n1#2:622\n295#3,2:623\n*S KotlinDebug\n*F\n+ 1 Decoder.kt\nkotlinx/serialization/cbor/internal/DecoderKt\n*L\n607#1:623,2\n*E\n"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/internal/EncoderKt.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/serialization/cbor/internal/EncoderKt",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "Stack",
+            "acc": 26,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/CborWriter$Data;)Ljava/util/List;",
+            "sig": "(Lkotlinx/serialization/cbor/internal/CborWriter$Data;)Ljava/util/List<Lkotlinx/serialization/cbor/internal/CborWriter$Data;>;"
+          },
+          {
+            "nme": "push",
+            "acc": 26,
+            "dsc": "(Ljava/util/List;Lkotlinx/serialization/cbor/internal/CborWriter$Data;)Z",
+            "sig": "(Ljava/util/List<Lkotlinx/serialization/cbor/internal/CborWriter$Data;>;Lkotlinx/serialization/cbor/internal/CborWriter$Data;)Z"
+          },
+          {
+            "nme": "pop",
+            "acc": 26,
+            "dsc": "(Ljava/util/List;)Lkotlinx/serialization/cbor/internal/CborWriter$Data;",
+            "sig": "(Ljava/util/List<Lkotlinx/serialization/cbor/internal/CborWriter$Data;>;)Lkotlinx/serialization/cbor/internal/CborWriter$Data;"
+          },
+          {
+            "nme": "peek",
+            "acc": 26,
+            "dsc": "(Ljava/util/List;)Lkotlinx/serialization/cbor/internal/CborWriter$Data;",
+            "sig": "(Ljava/util/List<Lkotlinx/serialization/cbor/internal/CborWriter$Data;>;)Lkotlinx/serialization/cbor/internal/CborWriter$Data;"
+          },
+          {
+            "nme": "startArray",
+            "acc": 26,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/ByteArrayOutput;)V"
+          },
+          {
+            "nme": "startArray-2TYgG_w",
+            "acc": 26,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/ByteArrayOutput;J)V"
+          },
+          {
+            "nme": "startMap",
+            "acc": 26,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/ByteArrayOutput;)V"
+          },
+          {
+            "nme": "startMap-2TYgG_w",
+            "acc": 26,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/ByteArrayOutput;J)V"
+          },
+          {
+            "nme": "encodeTag-2TYgG_w",
+            "acc": 26,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/ByteArrayOutput;J)V"
+          },
+          {
+            "nme": "end",
+            "acc": 25,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/ByteArrayOutput;)V"
+          },
+          {
+            "nme": "encodeNull",
+            "acc": 25,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/ByteArrayOutput;)V"
+          },
+          {
+            "nme": "encodeEmptyMap",
+            "acc": 25,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/ByteArrayOutput;)V"
+          },
+          {
+            "nme": "writeByte",
+            "acc": 25,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/ByteArrayOutput;I)V"
+          },
+          {
+            "nme": "encodeBoolean",
+            "acc": 25,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/ByteArrayOutput;Z)V"
+          },
+          {
+            "nme": "encodeNumber",
+            "acc": 25,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/ByteArrayOutput;J)V"
+          },
+          {
+            "nme": "encodeByteString",
+            "acc": 25,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/ByteArrayOutput;[B)V"
+          },
+          {
+            "nme": "encodeString",
+            "acc": 25,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/ByteArrayOutput;Ljava/lang/String;)V"
+          },
+          {
+            "nme": "encodeByteArray",
+            "acc": 25,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/ByteArrayOutput;[BI)V"
+          },
+          {
+            "nme": "encodeFloat",
+            "acc": 25,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/ByteArrayOutput;F)V"
+          },
+          {
+            "nme": "encodeDouble",
+            "acc": 25,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/ByteArrayOutput;D)V"
+          },
+          {
+            "nme": "composeNumber",
+            "acc": 26,
+            "dsc": "(J)[B"
+          },
+          {
+            "nme": "composePositiveInline-z13BHRw",
+            "acc": 26,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/ByteArrayOutput;JI)V"
+          },
+          {
+            "nme": "composePositive-VKZWuLQ",
+            "acc": 26,
+            "dsc": "(J)[B"
+          },
+          {
+            "nme": "encodeToInline-32etgaw",
+            "acc": 26,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/ByteArrayOutput;JII)V"
+          },
+          {
+            "nme": "encodeToByteArray-E0BElUM",
+            "acc": 26,
+            "dsc": "(JIB)[B"
+          },
+          {
+            "nme": "composeNegative",
+            "acc": 26,
+            "dsc": "(J)[B"
+          },
+          {
+            "nme": "access$encodeTag-2TYgG_w",
+            "acc": 4121,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/ByteArrayOutput;J)V"
+          },
+          {
+            "nme": "access$startArray",
+            "acc": 4121,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/ByteArrayOutput;)V"
+          },
+          {
+            "nme": "access$startMap",
+            "acc": 4121,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/ByteArrayOutput;)V"
+          },
+          {
+            "nme": "access$Stack",
+            "acc": 4121,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/CborWriter$Data;)Ljava/util/List;"
+          },
+          {
+            "nme": "access$peek",
+            "acc": 4121,
+            "dsc": "(Ljava/util/List;)Lkotlinx/serialization/cbor/internal/CborWriter$Data;"
+          },
+          {
+            "nme": "access$push",
+            "acc": 4121,
+            "dsc": "(Ljava/util/List;Lkotlinx/serialization/cbor/internal/CborWriter$Data;)Z"
+          },
+          {
+            "nme": "access$pop",
+            "acc": 4121,
+            "dsc": "(Ljava/util/List;)Lkotlinx/serialization/cbor/internal/CborWriter$Data;"
+          },
+          {
+            "nme": "access$startArray-2TYgG_w",
+            "acc": 4121,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/ByteArrayOutput;J)V"
+          },
+          {
+            "nme": "access$startMap-2TYgG_w",
+            "acc": 4121,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/ByteArrayOutput;J)V"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              2,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000`\n\u0000\n\u0002\u0010!\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\b\u0002\n\u0002\u0010\u000b\n\u0002\b\u0004\n\u0002\u0010\u0002\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\b\f\n\u0002\u0010\b\n\u0002\b\u0002\n\u0002\u0010\t\n\u0002\b\u0002\n\u0002\u0010\u0012\n\u0000\n\u0002\u0010\u000e\n\u0002\b\u0003\n\u0002\u0010\u0007\n\u0000\n\u0002\u0010\u0006\n\u0002\b\r\n\u0002\u0010\u0005\n\u0002\b\u0004\u001a\u001a\u0010\u0000\u001a\f\u0012\u0004\u0012\u00020\u00020\u0001j\u0002`\u00032\u0006\u0010\u0004\u001a\u00020\u0002H\u0002\u001a\u001e\u0010\u0005\u001a\u00020\u0006*\f\u0012\u0004\u0012\u00020\u00020\u0001j\u0002`\u00032\u0006\u0010\u0007\u001a\u00020\u0002H\u0002\u001a\u0016\u0010\b\u001a\u00020\u0002*\f\u0012\u0004\u0012\u00020\u00020\u0001j\u0002`\u0003H\u0002\u001a\u0016\u0010\t\u001a\u00020\u0002*\f\u0012\u0004\u0012\u00020\u00020\u0001j\u0002`\u0003H\u0002\u001a\f\u0010\n\u001a\u00020\u000b*\u00020\fH\u0002\u001a\u001b\u0010\n\u001a\u00020\u000b*\u00020\f2\u0006\u0010\r\u001a\u00020\u000eH\u0002¢\u0006\u0004\b\u000f\u0010\u0010\u001a\f\u0010\u0011\u001a\u00020\u000b*\u00020\fH\u0002\u001a\u001b\u0010\u0011\u001a\u00020\u000b*\u00020\f2\u0006\u0010\r\u001a\u00020\u000eH\u0002¢\u0006\u0004\b\u0012\u0010\u0010\u001a\u001b\u0010\u0013\u001a\u00020\u000b*\u00020\f2\u0006\u0010\u0014\u001a\u00020\u000eH\u0002¢\u0006\u0004\b\u0015\u0010\u0010\u001a\f\u0010\u0016\u001a\u00020\u000b*\u00020\fH\u0000\u001a\f\u0010\u0017\u001a\u00020\u000b*\u00020\fH\u0000\u001a\f\u0010\u0018\u001a\u00020\u000b*\u00020\fH\u0000\u001a\u0014\u0010\u0019\u001a\u00020\u000b*\u00020\f2\u0006\u0010\u001a\u001a\u00020\u001bH\u0000\u001a\u0014\u0010\u001c\u001a\u00020\u000b*\u00020\f2\u0006\u0010\u0007\u001a\u00020\u0006H\u0000\u001a\u0014\u0010\u001d\u001a\u00020\u000b*\u00020\f2\u0006\u0010\u0007\u001a\u00020\u001eH\u0000\u001a\u0014\u0010\u001f\u001a\u00020\u000b*\u00020\f2\u0006\u0010 \u001a\u00020!H\u0000\u001a\u0014\u0010\"\u001a\u00020\u000b*\u00020\f2\u0006\u0010\u0007\u001a\u00020#H\u0000\u001a\u001c\u0010$\u001a\u00020\u000b*\u00020\f2\u0006\u0010 \u001a\u00020!2\u0006\u0010%\u001a\u00020\u001bH\u0000\u001a\u0014\u0010&\u001a\u00020\u000b*\u00020\f2\u0006\u0010\u0007\u001a\u00020'H\u0000\u001a\u0014\u0010(\u001a\u00020\u000b*\u00020\f2\u0006\u0010\u0007\u001a\u00020)H\u0000\u001a\u0010\u0010*\u001a\u00020!2\u0006\u0010\u0007\u001a\u00020\u001eH\u0002\u001a#\u0010+\u001a\u00020\u000b*\u00020\f2\u0006\u0010\u0007\u001a\u00020\u000e2\u0006\u0010,\u001a\u00020\u001bH\u0002¢\u0006\u0004\b-\u0010.\u001a\u0017\u0010/\u001a\u00020!2\u0006\u0010\u0007\u001a\u00020\u000eH\u0002¢\u0006\u0004\b0\u00101\u001a+\u00102\u001a\u00020\u000b*\u00020\f2\u0006\u0010\u0007\u001a\u00020\u000e2\u0006\u00103\u001a\u00020\u001b2\u0006\u0010\u0014\u001a\u00020\u001bH\u0002¢\u0006\u0004\b4\u00105\u001a'\u00106\u001a\u00020!2\u0006\u0010\u0007\u001a\u00020\u000e2\u0006\u00103\u001a\u00020\u001b2\u0006\u0010\u0014\u001a\u000207H\u0002¢\u0006\u0004\b8\u00109\u001a\u0010\u0010:\u001a\u00020!2\u0006\u0010\u0007\u001a\u00020\u001eH\u0002*\u0018\b\u0002\u0010\u0000\"\b\u0012\u0004\u0012\u00020\u00020\u00012\b\u0012\u0004\u0012\u00020\u00020\u0001¨\u0006;"
+              ],
+              "d2",
+              [
+                "Stack",
+                "",
+                "Lkotlinx/serialization/cbor/internal/CborWriter$Data;",
+                "Lkotlinx/serialization/cbor/internal/Stack;",
+                "initial",
+                "push",
+                "",
+                "value",
+                "pop",
+                "peek",
+                "startArray",
+                "",
+                "Lkotlinx/serialization/cbor/internal/ByteArrayOutput;",
+                "size",
+                "Lkotlin/ULong;",
+                "startArray-2TYgG_w",
+                "(Lkotlinx/serialization/cbor/internal/ByteArrayOutput;J)V",
+                "startMap",
+                "startMap-2TYgG_w",
+                "encodeTag",
+                "tag",
+                "encodeTag-2TYgG_w",
+                "end",
+                "encodeNull",
+                "encodeEmptyMap",
+                "writeByte",
+                "byteValue",
+                "",
+                "encodeBoolean",
+                "encodeNumber",
+                "",
+                "encodeByteString",
+                "data",
+                "",
+                "encodeString",
+                "",
+                "encodeByteArray",
+                "type",
+                "encodeFloat",
+                "",
+                "encodeDouble",
+                "",
+                "composeNumber",
+                "composePositiveInline",
+                "mod",
+                "composePositiveInline-z13BHRw",
+                "(Lkotlinx/serialization/cbor/internal/ByteArrayOutput;JI)V",
+                "composePositive",
+                "composePositive-VKZWuLQ",
+                "(J)[B",
+                "encodeToInline",
+                "bytes",
+                "encodeToInline-32etgaw",
+                "(Lkotlinx/serialization/cbor/internal/ByteArrayOutput;JII)V",
+                "encodeToByteArray",
+                "",
+                "encodeToByteArray-E0BElUM",
+                "(JIB)[B",
+                "composeNegative",
+                "kotlinx-serialization-cbor"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/CborDecoder.class": {
+        "ver": 52,
+        "acc": 1537,
+        "nme": "kotlinx/serialization/cbor/CborDecoder",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "getCbor",
+            "acc": 1025,
+            "dsc": "()Lkotlinx/serialization/cbor/Cbor;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "access$decodeSerializableValue$jd",
+            "acc": 4105,
+            "dsc": "(Lkotlinx/serialization/cbor/CborDecoder;Lkotlinx/serialization/DeserializationStrategy;)Ljava/lang/Object;"
+          },
+          {
+            "nme": "access$decodeNullableSerializableValue$jd",
+            "acc": 4105,
+            "dsc": "(Lkotlinx/serialization/cbor/CborDecoder;Lkotlinx/serialization/DeserializationStrategy;)Ljava/lang/Object;"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlinx/serialization/ExperimentalSerializationApi;"
+          },
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\u0012\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0003\bg\u0018\u00002\u00020\u0001R\u0012\u0010\u0002\u001a\u00020\u0003X¦\u0004¢\u0006\u0006\u001a\u0004\b\u0004\u0010\u0005¨\u0006\u0006À\u0006\u0003"
+              ],
+              "d2",
+              [
+                "Lkotlinx/serialization/cbor/CborDecoder;",
+                "Lkotlinx/serialization/encoding/Decoder;",
+                "cbor",
+                "Lkotlinx/serialization/cbor/Cbor;",
+                "getCbor",
+                "()Lkotlinx/serialization/cbor/Cbor;",
+                "kotlinx-serialization-cbor"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lkotlin/SubclassOptInRequired;",
+            "vals": [
+              "markerClass",
+              [
+                {
+                  "itrlNme": "kotlinx/serialization/SealedSerializationApi"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/CborImpl.class": {
+        "ver": 52,
+        "acc": 48,
+        "nme": "kotlinx/serialization/cbor/CborImpl",
+        "super": "kotlinx/serialization/cbor/Cbor",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Lkotlinx/serialization/cbor/CborConfiguration;Lkotlinx/serialization/modules/SerializersModule;)V"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\u0018\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0003\b\u0002\u0018\u00002\u00020\u0001B\u0017\u0012\u0006\u0010\u0002\u001a\u00020\u0003\u0012\u0006\u0010\u0004\u001a\u00020\u0005¢\u0006\u0004\b\u0006\u0010\u0007¨\u0006\b"
+              ],
+              "d2",
+              [
+                "Lkotlinx/serialization/cbor/CborImpl;",
+                "Lkotlinx/serialization/cbor/Cbor;",
+                "configuration",
+                "Lkotlinx/serialization/cbor/CborConfiguration;",
+                "serializersModule",
+                "Lkotlinx/serialization/modules/SerializersModule;",
+                "<init>",
+                "(Lkotlinx/serialization/cbor/CborConfiguration;Lkotlinx/serialization/modules/SerializersModule;)V",
+                "kotlinx-serialization-cbor"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/ValueTags$Impl.class": {
+        "ver": 52,
+        "acc": 4145,
+        "nme": "kotlinx/serialization/cbor/ValueTags$Impl",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "([J)V"
+          },
+          {
+            "nme": "tags",
+            "acc": 4113,
+            "dsc": "()[J"
+          },
+          {
+            "nme": "<init>",
+            "acc": 4097,
+            "dsc": "([JLkotlin/jvm/internal/DefaultConstructorMarker;)V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 4114,
+            "nme": "tags",
+            "dsc": "[J"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              3,
+              "xi",
+              48
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/ValueTags.class": {
+        "ver": 52,
+        "acc": 9729,
+        "nme": "kotlinx/serialization/cbor/ValueTags",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "tags",
+            "acc": 1025,
+            "dsc": "()[J"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/annotation/Target;",
+            "vals": [
+              "allowedTargets",
+              [
+                [
+                  "Lkotlin/annotation/AnnotationTarget;",
+                  "PROPERTY"
+                ]
+              ]
+            ]
+          },
+          {
+            "dsc": "Lkotlinx/serialization/ExperimentalSerializationApi;"
+          },
+          {
+            "dsc": "Ljava/lang/annotation/Retention;",
+            "vals": [
+              "value",
+              [
+                "Ljava/lang/annotation/RetentionPolicy;",
+                "RUNTIME"
+              ]
+            ]
+          },
+          {
+            "dsc": "Ljava/lang/annotation/Target;",
+            "vals": [
+              "value",
+              []
+            ]
+          },
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\u0016\n\u0002\u0018\u0002\n\u0002\u0010\u001b\n\u0000\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\b\u0002\b\u0002\u0018\u00002\u00020\u0001B\f\u0012\n\u0010\u0002\u001a\u00020\u0003\"\u00020\u0004R\u000f\u0010\u0002\u001a\u00020\u0003¢\u0006\u0006\u001a\u0004\b\u0002\u0010\u0005¨\u0006\u0006"
+              ],
+              "d2",
+              [
+                "Lkotlinx/serialization/cbor/ValueTags;",
+                "",
+                "tags",
+                "Lkotlin/ULongArray;",
+                "Lkotlin/ULong;",
+                "()[J",
+                "kotlinx-serialization-cbor"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lkotlinx/serialization/SerialInfo;"
+          },
+          {
+            "dsc": "Lkotlinx/serialization/cbor/internal/SuppressAnimalSniffer;"
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/ByteString.class": {
+        "ver": 52,
+        "acc": 9729,
+        "nme": "kotlinx/serialization/cbor/ByteString",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/annotation/Target;",
+            "vals": [
+              "allowedTargets",
+              [
+                [
+                  "Lkotlin/annotation/AnnotationTarget;",
+                  "PROPERTY"
+                ]
+              ]
+            ]
+          },
+          {
+            "dsc": "Lkotlinx/serialization/ExperimentalSerializationApi;"
+          },
+          {
+            "dsc": "Ljava/lang/annotation/Retention;",
+            "vals": [
+              "value",
+              [
+                "Ljava/lang/annotation/RetentionPolicy;",
+                "RUNTIME"
+              ]
+            ]
+          },
+          {
+            "dsc": "Ljava/lang/annotation/Target;",
+            "vals": [
+              "value",
+              []
+            ]
+          },
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\n\n\u0002\u0018\u0002\n\u0002\u0010\u001b\n\u0000\b\u0002\u0018\u00002\u00020\u0001B\u0000¨\u0006\u0002"
+              ],
+              "d2",
+              [
+                "Lkotlinx/serialization/cbor/ByteString;",
+                "",
+                "kotlinx-serialization-cbor"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lkotlinx/serialization/SerialInfo;"
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/CborArray$Impl.class": {
+        "ver": 52,
+        "acc": 4145,
+        "nme": "kotlinx/serialization/cbor/CborArray$Impl",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              3,
+              "xi",
+              48
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/internal/CborDecodingExceptionKt.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/serialization/cbor/internal/CborDecodingExceptionKt",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "CborDecodingException",
+            "acc": 25,
+            "dsc": "(Ljava/lang/String;I)Lkotlinx/serialization/cbor/internal/CborDecodingException;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "printByte",
+            "acc": 25,
+            "dsc": "(I)Ljava/lang/String;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              2,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\u0016\n\u0000\n\u0002\u0018\u0002\n\u0000\n\u0002\u0010\u000e\n\u0000\n\u0002\u0010\b\n\u0002\b\u0003\u001a\u0018\u0010\u0000\u001a\u00020\u00012\u0006\u0010\u0002\u001a\u00020\u00032\u0006\u0010\u0004\u001a\u00020\u0005H\u0000\u001a\u0010\u0010\u0006\u001a\u00020\u00032\u0006\u0010\u0007\u001a\u00020\u0005H\u0000¨\u0006\b"
+              ],
+              "d2",
+              [
+                "CborDecodingException",
+                "Lkotlinx/serialization/cbor/internal/CborDecodingException;",
+                "expected",
+                "",
+                "foundByte",
+                "",
+                "printByte",
+                "b",
+                "kotlinx-serialization-cbor"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/internal/CborWriter$Data.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/serialization/cbor/internal/CborWriter$Data",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Lkotlinx/serialization/cbor/internal/ByteArrayOutput;I)V"
+          },
+          {
+            "nme": "getBytes",
+            "acc": 17,
+            "dsc": "()Lkotlinx/serialization/cbor/internal/ByteArrayOutput;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "getElementCount",
+            "acc": 17,
+            "dsc": "()I"
+          },
+          {
+            "nme": "setElementCount",
+            "acc": 17,
+            "dsc": "(I)V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "bytes",
+            "dsc": "Lkotlinx/serialization/cbor/internal/ByteArrayOutput;"
+          },
+          {
+            "acc": 2,
+            "nme": "elementCount",
+            "dsc": "I"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\u0018\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0000\n\u0002\u0018\u0002\n\u0000\n\u0002\u0010\b\n\u0002\b\t\u0018\u00002\u00020\u0001B\u0017\u0012\u0006\u0010\u0002\u001a\u00020\u0003\u0012\u0006\u0010\u0004\u001a\u00020\u0005¢\u0006\u0004\b\u0006\u0010\u0007R\u0011\u0010\u0002\u001a\u00020\u0003¢\u0006\b\n\u0000\u001a\u0004\b\b\u0010\tR\u001a\u0010\u0004\u001a\u00020\u0005X\u000e¢\u0006\u000e\n\u0000\u001a\u0004\b\n\u0010\u000b\"\u0004\b\f\u0010\r¨\u0006\u000e"
+              ],
+              "d2",
+              [
+                "Lkotlinx/serialization/cbor/internal/CborWriter$Data;",
+                "",
+                "bytes",
+                "Lkotlinx/serialization/cbor/internal/ByteArrayOutput;",
+                "elementCount",
+                "",
+                "<init>",
+                "(Lkotlinx/serialization/cbor/internal/ByteArrayOutput;I)V",
+                "getBytes",
+                "()Lkotlinx/serialization/cbor/internal/ByteArrayOutput;",
+                "getElementCount",
+                "()I",
+                "setElementCount",
+                "(I)V",
+                "kotlinx-serialization-cbor"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/ByteString$Impl.class": {
+        "ver": 52,
+        "acc": 4145,
+        "nme": "kotlinx/serialization/cbor/ByteString$Impl",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              3,
+              "xi",
+              48
+            ]
+          }
+        ]
+      },
+      "kotlinx/serialization/cbor/ObjectTags.class": {
+        "ver": 52,
+        "acc": 9729,
+        "nme": "kotlinx/serialization/cbor/ObjectTags",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "tags",
+            "acc": 1025,
+            "dsc": "()[J"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/annotation/Target;",
+            "vals": [
+              "allowedTargets",
+              [
+                [
+                  "Lkotlin/annotation/AnnotationTarget;",
+                  "CLASS"
+                ]
+              ]
+            ]
+          },
+          {
+            "dsc": "Lkotlinx/serialization/ExperimentalSerializationApi;"
+          },
+          {
+            "dsc": "Ljava/lang/annotation/Retention;",
+            "vals": [
+              "value",
+              [
+                "Ljava/lang/annotation/RetentionPolicy;",
+                "RUNTIME"
+              ]
+            ]
+          },
+          {
+            "dsc": "Ljava/lang/annotation/Target;",
+            "vals": [
+              "value",
+              [
+                [
+                  "Ljava/lang/annotation/ElementType;",
+                  "TYPE"
+                ]
+              ]
+            ]
+          },
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\u0016\n\u0002\u0018\u0002\n\u0002\u0010\u001b\n\u0000\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\b\u0002\b\u0002\u0018\u00002\u00020\u0001B\f\u0012\n\u0010\u0002\u001a\u00020\u0003\"\u00020\u0004R\u000f\u0010\u0002\u001a\u00020\u0003¢\u0006\u0006\u001a\u0004\b\u0002\u0010\u0005¨\u0006\u0006"
+              ],
+              "d2",
+              [
+                "Lkotlinx/serialization/cbor/ObjectTags;",
+                "",
+                "tags",
+                "Lkotlin/ULongArray;",
+                "Lkotlin/ULong;",
+                "()[J",
+                "kotlinx-serialization-cbor"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lkotlinx/serialization/SerialInfo;"
+          },
+          {
+            "dsc": "Lkotlinx/serialization/cbor/internal/SuppressAnimalSniffer;"
+          }
+        ]
+      }
+    }
+  }
+}

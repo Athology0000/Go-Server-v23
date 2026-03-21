@@ -1,0 +1,5236 @@
+{
+  "md5": "84b0478f5024db116ba89e2a254f67aa",
+  "sha2": "fef3e94968053bb42c9914495123f3f5c093ed73",
+  "sha256": "bb744759a077d6621d51a3b755f8e7badcb931305ec4f406d79d614449b34305",
+  "contents": {
+    "classes": {
+      "net/fabricmc/fabric/impl/client/indigo/renderer/render/SimpleBlockRenderContext.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/render/SimpleBlockRenderContext",
+        "super": "net/fabricmc/fabric/impl/client/indigo/renderer/render/AbstractRenderContext",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "bufferQuad",
+            "acc": 4,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;)V"
+          },
+          {
+            "nme": "tintQuad",
+            "acc": 2,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;)V"
+          },
+          {
+            "nme": "shadeQuad",
+            "acc": 2,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;Z)V"
+          },
+          {
+            "nme": "bufferModel",
+            "acc": 1,
+            "dsc": "(Lcom/mojang/blaze3d/vertex/PoseStack$Pose;Lnet/fabricmc/fabric/api/renderer/v1/render/BlockVertexConsumerProvider;Lnet/minecraft/client/renderer/block/model/BlockStateModel;FFFIILnet/minecraft/world/level/BlockAndTintGetter;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;)V"
+          },
+          {
+            "nme": "lambda$bufferModel$0",
+            "acc": 4106,
+            "dsc": "(Lnet/minecraft/core/Direction;)Z"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "POOL",
+            "dsc": "Ljava/lang/ThreadLocal;",
+            "sig": "Ljava/lang/ThreadLocal<Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/SimpleBlockRenderContext;>;"
+          },
+          {
+            "acc": 18,
+            "nme": "random",
+            "dsc": "Lnet/minecraft/util/RandomSource;"
+          },
+          {
+            "acc": 2,
+            "nme": "vertexConsumers",
+            "dsc": "Lnet/fabricmc/fabric/api/renderer/v1/render/BlockVertexConsumerProvider;"
+          },
+          {
+            "acc": 2,
+            "nme": "defaultRenderLayer",
+            "dsc": "Lnet/minecraft/client/renderer/chunk/ChunkSectionLayer;"
+          },
+          {
+            "acc": 2,
+            "nme": "red",
+            "dsc": "F"
+          },
+          {
+            "acc": 2,
+            "nme": "green",
+            "dsc": "F"
+          },
+          {
+            "acc": 2,
+            "nme": "blue",
+            "dsc": "F"
+          },
+          {
+            "acc": 2,
+            "nme": "light",
+            "dsc": "I"
+          },
+          {
+            "acc": 2,
+            "nme": "lastRenderLayer",
+            "dsc": "Lnet/minecraft/client/renderer/chunk/ChunkSectionLayer;"
+          },
+          {
+            "acc": 2,
+            "nme": "lastVertexConsumer",
+            "dsc": "Lcom/mojang/blaze3d/vertex/VertexConsumer;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/client/indigo/renderer/SubmitNodeCollectionMixin.class": {
+        "ver": 65,
+        "acc": 1056,
+        "nme": "net/fabricmc/fabric/mixin/client/indigo/renderer/SubmitNodeCollectionMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "()V"
+          },
+          {
+            "nme": "clear",
+            "acc": 1,
+            "dsc": "(Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Inject;",
+                "vals": [
+                  "method",
+                  [
+                    "clear"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "RETURN"
+                      ],
+                      "api": 589824
+                    }
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "fabric_submitItem",
+            "acc": 1,
+            "dsc": "(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/world/item/ItemDisplayContext;III[ILjava/util/List;Lnet/minecraft/client/renderer/rendertype/RenderType;Lnet/minecraft/client/renderer/item/ItemStackRenderState$FoilType;Lnet/fabricmc/fabric/api/renderer/v1/mesh/MeshView;Lnet/fabricmc/fabric/api/renderer/v1/render/ItemRenderTypeGetter;)V",
+            "sig": "(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/world/item/ItemDisplayContext;III[ILjava/util/List<Lnet/minecraft/client/renderer/block/model/BakedQuad;>;Lnet/minecraft/client/renderer/rendertype/RenderType;Lnet/minecraft/client/renderer/item/ItemStackRenderState$FoilType;Lnet/fabricmc/fabric/api/renderer/v1/mesh/MeshView;Lnet/fabricmc/fabric/api/renderer/v1/render/ItemRenderTypeGetter;)V"
+          },
+          {
+            "nme": "fabric_getMeshItemCommands",
+            "acc": 1,
+            "dsc": "()Ljava/util/List;",
+            "sig": "()Ljava/util/List<Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/MeshItemCommand;>;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 2,
+            "nme": "wasUsed",
+            "dsc": "Z"
+          },
+          {
+            "acc": 18,
+            "nme": "meshItemCommands",
+            "dsc": "Ljava/util/List;",
+            "sig": "Ljava/util/List<Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/MeshItemCommand;>;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/client/renderer/SubmitNodeCollection"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/render/TerrainRenderContext.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/render/TerrainRenderContext",
+        "super": "net/fabricmc/fabric/impl/client/indigo/renderer/render/AbstractTerrainRenderContext",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "createLightDataProvider",
+            "acc": 4,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/BlockRenderInfo;)Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/LightDataProvider;"
+          },
+          {
+            "nme": "getVertexConsumer",
+            "acc": 4,
+            "dsc": "(Lnet/minecraft/client/renderer/chunk/ChunkSectionLayer;)Lcom/mojang/blaze3d/vertex/VertexConsumer;"
+          },
+          {
+            "nme": "prepare",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/world/level/BlockAndTintGetter;Lnet/minecraft/core/BlockPos;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/util/RandomSource;Ljava/util/function/Function;)V",
+            "sig": "(Lnet/minecraft/world/level/BlockAndTintGetter;Lnet/minecraft/core/BlockPos;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/util/RandomSource;Ljava/util/function/Function<Lnet/minecraft/client/renderer/chunk/ChunkSectionLayer;Lcom/mojang/blaze3d/vertex/BufferBuilder;>;)V"
+          },
+          {
+            "nme": "release",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "bufferModel",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/client/renderer/block/model/BlockStateModel;Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/core/BlockPos;)V"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "POOL",
+            "dsc": "Ljava/lang/ThreadLocal;",
+            "sig": "Ljava/lang/ThreadLocal<Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/TerrainRenderContext;>;"
+          },
+          {
+            "acc": 2,
+            "nme": "matrixStack",
+            "dsc": "Lcom/mojang/blaze3d/vertex/PoseStack;"
+          },
+          {
+            "acc": 2,
+            "nme": "random",
+            "dsc": "Lnet/minecraft/util/RandomSource;"
+          },
+          {
+            "acc": 2,
+            "nme": "bufferFunc",
+            "dsc": "Ljava/util/function/Function;",
+            "sig": "Ljava/util/function/Function<Lnet/minecraft/client/renderer/chunk/ChunkSectionLayer;Lcom/mojang/blaze3d/vertex/BufferBuilder;>;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace$4.class": {
+        "ver": 65,
+        "acc": 16432,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace$4",
+        "super": "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "(Ljava/lang/String;I[Lnet/minecraft/core/Direction;[I)V"
+          },
+          {
+            "nme": "computeCornerWeights",
+            "acc": 0,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl;I[F)V"
+          },
+          {
+            "nme": "computeDepth",
+            "acc": 0,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl;I)F"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/helper/ColorHelper.class": {
+        "ver": 65,
+        "acc": 49,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/helper/ColorHelper",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "()V"
+          },
+          {
+            "nme": "maxLight",
+            "acc": 9,
+            "dsc": "(II)I"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/render/MeshItemCommand.class": {
+        "ver": 65,
+        "acc": 65585,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/render/MeshItemCommand",
+        "super": "java/lang/Record",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Lcom/mojang/blaze3d/vertex/PoseStack$Pose;Lnet/minecraft/world/item/ItemDisplayContext;III[ILjava/util/List;Lnet/minecraft/client/renderer/rendertype/RenderType;Lnet/minecraft/client/renderer/item/ItemStackRenderState$FoilType;Lnet/fabricmc/fabric/api/renderer/v1/mesh/MeshView;Lnet/fabricmc/fabric/api/renderer/v1/render/ItemRenderTypeGetter;)V",
+            "sig": "(Lcom/mojang/blaze3d/vertex/PoseStack$Pose;Lnet/minecraft/world/item/ItemDisplayContext;III[ILjava/util/List<Lnet/minecraft/client/renderer/block/model/BakedQuad;>;Lnet/minecraft/client/renderer/rendertype/RenderType;Lnet/minecraft/client/renderer/item/ItemStackRenderState$FoilType;Lnet/fabricmc/fabric/api/renderer/v1/mesh/MeshView;Lnet/fabricmc/fabric/api/renderer/v1/render/ItemRenderTypeGetter;)V"
+          },
+          {
+            "nme": "toString",
+            "acc": 17,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "hashCode",
+            "acc": 17,
+            "dsc": "()I"
+          },
+          {
+            "nme": "equals",
+            "acc": 17,
+            "dsc": "(Ljava/lang/Object;)Z"
+          },
+          {
+            "nme": "positionMatrix",
+            "acc": 1,
+            "dsc": "()Lcom/mojang/blaze3d/vertex/PoseStack$Pose;"
+          },
+          {
+            "nme": "displayContext",
+            "acc": 1,
+            "dsc": "()Lnet/minecraft/world/item/ItemDisplayContext;"
+          },
+          {
+            "nme": "lightCoords",
+            "acc": 1,
+            "dsc": "()I"
+          },
+          {
+            "nme": "overlayCoords",
+            "acc": 1,
+            "dsc": "()I"
+          },
+          {
+            "nme": "outlineColor",
+            "acc": 1,
+            "dsc": "()I"
+          },
+          {
+            "nme": "tintLayers",
+            "acc": 1,
+            "dsc": "()[I"
+          },
+          {
+            "nme": "quads",
+            "acc": 1,
+            "dsc": "()Ljava/util/List;",
+            "sig": "()Ljava/util/List<Lnet/minecraft/client/renderer/block/model/BakedQuad;>;"
+          },
+          {
+            "nme": "renderLayer",
+            "acc": 1,
+            "dsc": "()Lnet/minecraft/client/renderer/rendertype/RenderType;"
+          },
+          {
+            "nme": "glintType",
+            "acc": 1,
+            "dsc": "()Lnet/minecraft/client/renderer/item/ItemStackRenderState$FoilType;"
+          },
+          {
+            "nme": "mesh",
+            "acc": 1,
+            "dsc": "()Lnet/fabricmc/fabric/api/renderer/v1/mesh/MeshView;"
+          },
+          {
+            "nme": "renderTypeGetter",
+            "acc": 1,
+            "dsc": "()Lnet/fabricmc/fabric/api/renderer/v1/render/ItemRenderTypeGetter;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "positionMatrix",
+            "dsc": "Lcom/mojang/blaze3d/vertex/PoseStack$Pose;"
+          },
+          {
+            "acc": 18,
+            "nme": "displayContext",
+            "dsc": "Lnet/minecraft/world/item/ItemDisplayContext;"
+          },
+          {
+            "acc": 18,
+            "nme": "lightCoords",
+            "dsc": "I"
+          },
+          {
+            "acc": 18,
+            "nme": "overlayCoords",
+            "dsc": "I"
+          },
+          {
+            "acc": 18,
+            "nme": "outlineColor",
+            "dsc": "I"
+          },
+          {
+            "acc": 18,
+            "nme": "tintLayers",
+            "dsc": "[I"
+          },
+          {
+            "acc": 18,
+            "nme": "quads",
+            "dsc": "Ljava/util/List;",
+            "sig": "Ljava/util/List<Lnet/minecraft/client/renderer/block/model/BakedQuad;>;"
+          },
+          {
+            "acc": 18,
+            "nme": "renderLayer",
+            "dsc": "Lnet/minecraft/client/renderer/rendertype/RenderType;"
+          },
+          {
+            "acc": 18,
+            "nme": "glintType",
+            "dsc": "Lnet/minecraft/client/renderer/item/ItemStackRenderState$FoilType;"
+          },
+          {
+            "acc": 18,
+            "nme": "mesh",
+            "dsc": "Lnet/fabricmc/fabric/api/renderer/v1/mesh/MeshView;"
+          },
+          {
+            "acc": 18,
+            "nme": "renderTypeGetter",
+            "dsc": "Lnet/fabricmc/fabric/api/renderer/v1/render/ItemRenderTypeGetter;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/IndigoMixinConfigPlugin.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/IndigoMixinConfigPlugin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "loadIfNeeded",
+            "acc": 10,
+            "dsc": "()V"
+          },
+          {
+            "nme": "shouldApplyIndigo",
+            "acc": 8,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "onLoad",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;)V"
+          },
+          {
+            "nme": "getRefMapperConfig",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "shouldApplyMixin",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;Ljava/lang/String;)Z"
+          },
+          {
+            "nme": "acceptTargets",
+            "acc": 1,
+            "dsc": "(Ljava/util/Set;Ljava/util/Set;)V",
+            "sig": "(Ljava/util/Set<Ljava/lang/String;>;Ljava/util/Set<Ljava/lang/String;>;)V"
+          },
+          {
+            "nme": "getMixins",
+            "acc": 1,
+            "dsc": "()Ljava/util/List;",
+            "sig": "()Ljava/util/List<Ljava/lang/String;>;"
+          },
+          {
+            "nme": "preApply",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;Lorg/objectweb/asm/tree/ClassNode;Ljava/lang/String;Lorg/spongepowered/asm/mixin/extensibility/IMixinInfo;)V"
+          },
+          {
+            "nme": "postApply",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;Lorg/objectweb/asm/tree/ClassNode;Ljava/lang/String;Lorg/spongepowered/asm/mixin/extensibility/IMixinInfo;)V"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 26,
+            "nme": "JSON_KEY_DISABLE_INDIGO",
+            "dsc": "Ljava/lang/String;",
+            "val": "fabric-renderer-api-v1:contains_renderer"
+          },
+          {
+            "acc": 10,
+            "nme": "needsLoad",
+            "dsc": "Z"
+          },
+          {
+            "acc": 10,
+            "nme": "indigoApplicable",
+            "dsc": "Z"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/accessor/AccessRenderCommandQueue.class": {
+        "ver": 65,
+        "acc": 1537,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/accessor/AccessRenderCommandQueue",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "fabric_submitItem",
+            "acc": 1025,
+            "dsc": "(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/world/item/ItemDisplayContext;III[ILjava/util/List;Lnet/minecraft/client/renderer/rendertype/RenderType;Lnet/minecraft/client/renderer/item/ItemStackRenderState$FoilType;Lnet/fabricmc/fabric/api/renderer/v1/mesh/MeshView;Lnet/fabricmc/fabric/api/renderer/v1/render/ItemRenderTypeGetter;)V",
+            "sig": "(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/world/item/ItemDisplayContext;III[ILjava/util/List<Lnet/minecraft/client/renderer/block/model/BakedQuad;>;Lnet/minecraft/client/renderer/rendertype/RenderType;Lnet/minecraft/client/renderer/item/ItemStackRenderState$FoilType;Lnet/fabricmc/fabric/api/renderer/v1/mesh/MeshView;Lnet/fabricmc/fabric/api/renderer/v1/render/ItemRenderTypeGetter;)V"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/helper/NormalHelper.class": {
+        "ver": 65,
+        "acc": 49,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/helper/NormalHelper",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "()V"
+          },
+          {
+            "nme": "packNormal",
+            "acc": 9,
+            "dsc": "(FFFF)I"
+          },
+          {
+            "nme": "packNormal",
+            "acc": 9,
+            "dsc": "(Lorg/joml/Vector3f;F)I"
+          },
+          {
+            "nme": "packNormal",
+            "acc": 9,
+            "dsc": "(FFF)I"
+          },
+          {
+            "nme": "packNormal",
+            "acc": 9,
+            "dsc": "(Lorg/joml/Vector3f;)I"
+          },
+          {
+            "nme": "unpackNormalX",
+            "acc": 9,
+            "dsc": "(I)F"
+          },
+          {
+            "nme": "unpackNormalY",
+            "acc": 9,
+            "dsc": "(I)F"
+          },
+          {
+            "nme": "unpackNormalZ",
+            "acc": 9,
+            "dsc": "(I)F"
+          },
+          {
+            "nme": "unpackNormalW",
+            "acc": 9,
+            "dsc": "(I)F"
+          },
+          {
+            "nme": "unpackNormal",
+            "acc": 9,
+            "dsc": "(ILorg/joml/Vector3f;)V"
+          },
+          {
+            "nme": "computeFaceNormal",
+            "acc": 9,
+            "dsc": "(Lorg/joml/Vector3f;Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadView;)V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 26,
+            "nme": "PACK",
+            "dsc": "F",
+            "val": 127.0
+          },
+          {
+            "acc": 26,
+            "nme": "UNPACK",
+            "dsc": "F",
+            "val": 0.007874016
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/client/indigo/renderer/ItemFeatureRendererMixin.class": {
+        "ver": 65,
+        "acc": 1056,
+        "nme": "net/fabricmc/fabric/mixin/client/indigo/renderer/ItemFeatureRendererMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "()V"
+          },
+          {
+            "nme": "onReturnRender",
+            "acc": 2,
+            "dsc": "(Lnet/minecraft/client/renderer/SubmitNodeCollection;Lnet/minecraft/client/renderer/MultiBufferSource$BufferSource;Lnet/minecraft/client/renderer/OutlineBufferSource;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Inject;",
+                "vals": [
+                  "method",
+                  [
+                    "render"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "RETURN"
+                      ],
+                      "api": 589824
+                    }
+                  ]
+                ]
+              }
+            ]
+          }
+        ],
+        "flds": [
+          {
+            "acc": 2,
+            "nme": "poseStack",
+            "dsc": "Lcom/mojang/blaze3d/vertex/PoseStack;"
+          },
+          {
+            "acc": 18,
+            "nme": "itemRenderContext",
+            "dsc": "Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/ItemRenderContext;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/client/renderer/feature/ItemFeatureRenderer"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/render/AbstractTerrainRenderContext.class": {
+        "ver": 65,
+        "acc": 1057,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/render/AbstractTerrainRenderContext",
+        "super": "net/fabricmc/fabric/impl/client/indigo/renderer/render/AbstractRenderContext",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 4,
+            "dsc": "()V"
+          },
+          {
+            "nme": "createLightDataProvider",
+            "acc": 1028,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/BlockRenderInfo;)Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/LightDataProvider;"
+          },
+          {
+            "nme": "getVertexConsumer",
+            "acc": 1028,
+            "dsc": "(Lnet/minecraft/client/renderer/chunk/ChunkSectionLayer;)Lcom/mojang/blaze3d/vertex/VertexConsumer;"
+          },
+          {
+            "nme": "prepare",
+            "acc": 4,
+            "dsc": "(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;)V"
+          },
+          {
+            "nme": "bufferQuad",
+            "acc": 4,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;)V"
+          },
+          {
+            "nme": "tintQuad",
+            "acc": 2,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;)V"
+          },
+          {
+            "nme": "shadeQuad",
+            "acc": 2,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;ZZZ)V"
+          },
+          {
+            "nme": "shadeFlatQuad",
+            "acc": 2,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;Z)V"
+          },
+          {
+            "nme": "normalShade",
+            "acc": 2,
+            "dsc": "(FFFZ)F"
+          },
+          {
+            "nme": "flatLight",
+            "acc": 2,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;)I"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 20,
+            "nme": "blockInfo",
+            "dsc": "Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/BlockRenderInfo;"
+          },
+          {
+            "acc": 20,
+            "nme": "lightDataProvider",
+            "dsc": "Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/LightDataProvider;"
+          },
+          {
+            "acc": 18,
+            "nme": "aoCalc",
+            "dsc": "Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoCalculator;"
+          },
+          {
+            "acc": 2,
+            "nme": "cachedTintIndex",
+            "dsc": "I"
+          },
+          {
+            "acc": 2,
+            "nme": "cachedTint",
+            "dsc": "I"
+          },
+          {
+            "acc": 18,
+            "nme": "lightPos",
+            "dsc": "Lnet/minecraft/core/BlockPos$MutableBlockPos;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/render/TerrainLikeRenderContext.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/render/TerrainLikeRenderContext",
+        "super": "net/fabricmc/fabric/impl/client/indigo/renderer/render/AbstractTerrainRenderContext",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "createLightDataProvider",
+            "acc": 4,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/BlockRenderInfo;)Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/LightDataProvider;"
+          },
+          {
+            "nme": "getVertexConsumer",
+            "acc": 4,
+            "dsc": "(Lnet/minecraft/client/renderer/chunk/ChunkSectionLayer;)Lcom/mojang/blaze3d/vertex/VertexConsumer;"
+          },
+          {
+            "nme": "bufferModel",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/world/level/BlockAndTintGetter;Lnet/minecraft/client/renderer/block/model/BlockStateModel;Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/core/BlockPos;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/fabricmc/fabric/api/renderer/v1/render/BlockVertexConsumerProvider;ZJI)V"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "POOL",
+            "dsc": "Ljava/lang/ThreadLocal;",
+            "sig": "Ljava/lang/ThreadLocal<Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/TerrainLikeRenderContext;>;"
+          },
+          {
+            "acc": 18,
+            "nme": "random",
+            "dsc": "Lnet/minecraft/util/RandomSource;"
+          },
+          {
+            "acc": 2,
+            "nme": "vertexConsumers",
+            "dsc": "Lnet/fabricmc/fabric/api/renderer/v1/render/BlockVertexConsumerProvider;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/Indigo$1.class": {
+        "ver": 65,
+        "acc": 4128,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/Indigo$1",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 4120,
+            "nme": "$SwitchMap$net$fabricmc$fabric$api$util$TriState",
+            "dsc": "[I"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/client/indigo/renderer/SectionCompilerMixin.class": {
+        "ver": 65,
+        "acc": 1056,
+        "nme": "net/fabricmc/fabric/mixin/client/indigo/renderer/SectionCompilerMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "()V"
+          },
+          {
+            "nme": "getOrBeginLayer",
+            "acc": 1028,
+            "dsc": "(Ljava/util/Map;Lnet/minecraft/client/renderer/SectionBufferBuilderPack;Lnet/minecraft/client/renderer/chunk/ChunkSectionLayer;)Lcom/mojang/blaze3d/vertex/BufferBuilder;",
+            "sig": "(Ljava/util/Map<Lnet/minecraft/client/renderer/chunk/ChunkSectionLayer;Lcom/mojang/blaze3d/vertex/BufferBuilder;>;Lnet/minecraft/client/renderer/SectionBufferBuilderPack;Lnet/minecraft/client/renderer/chunk/ChunkSectionLayer;)Lcom/mojang/blaze3d/vertex/BufferBuilder;",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/Shadow;"
+              }
+            ]
+          },
+          {
+            "nme": "hookBuild",
+            "acc": 2,
+            "dsc": "(Lnet/minecraft/core/SectionPos;Lnet/minecraft/client/renderer/chunk/RenderSectionRegion;Lcom/mojang/blaze3d/vertex/VertexSorting;Lnet/minecraft/client/renderer/SectionBufferBuilderPack;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable;Lnet/minecraft/core/BlockPos;Lcom/mojang/blaze3d/vertex/PoseStack;Ljava/util/Map;Lnet/minecraft/util/RandomSource;)V",
+            "sig": "(Lnet/minecraft/core/SectionPos;Lnet/minecraft/client/renderer/chunk/RenderSectionRegion;Lcom/mojang/blaze3d/vertex/VertexSorting;Lnet/minecraft/client/renderer/SectionBufferBuilderPack;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable<Lnet/minecraft/client/renderer/chunk/SectionCompiler$Results;>;Lnet/minecraft/core/BlockPos;Lcom/mojang/blaze3d/vertex/PoseStack;Ljava/util/Map<Lnet/minecraft/client/renderer/chunk/ChunkSectionLayer;Lcom/mojang/blaze3d/vertex/BufferBuilder;>;Lnet/minecraft/util/RandomSource;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Inject;",
+                "vals": [
+                  "method",
+                  [
+                    "compile"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "INVOKE",
+                        "target",
+                        "Lnet/minecraft/core/BlockPos;betweenClosed(Lnet/minecraft/core/BlockPos;Lnet/minecraft/core/BlockPos;)Ljava/lang/Iterable;"
+                      ],
+                      "api": 589824
+                    }
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "hookBuildRenderBlock",
+            "acc": 2,
+            "dsc": "(Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/core/SectionPos;Lnet/minecraft/client/renderer/chunk/RenderSectionRegion;Lcom/mojang/blaze3d/vertex/VertexSorting;Lnet/minecraft/client/renderer/SectionBufferBuilderPack;Lnet/minecraft/core/BlockPos;)Lnet/minecraft/world/level/block/RenderShape;",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Redirect;",
+                "vals": [
+                  "method",
+                  [
+                    "compile"
+                  ],
+                  "at",
+                  {
+                    "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                    "values": [
+                      "value",
+                      "INVOKE",
+                      "target",
+                      "Lnet/minecraft/world/level/block/state/BlockState;getRenderShape()Lnet/minecraft/world/level/block/RenderShape;"
+                    ],
+                    "api": 589824
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "hookBuildReturn",
+            "acc": 2,
+            "dsc": "(Lnet/minecraft/core/SectionPos;Lnet/minecraft/client/renderer/chunk/RenderSectionRegion;Lcom/mojang/blaze3d/vertex/VertexSorting;Lnet/minecraft/client/renderer/SectionBufferBuilderPack;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable;)V",
+            "sig": "(Lnet/minecraft/core/SectionPos;Lnet/minecraft/client/renderer/chunk/RenderSectionRegion;Lcom/mojang/blaze3d/vertex/VertexSorting;Lnet/minecraft/client/renderer/SectionBufferBuilderPack;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable<Lnet/minecraft/client/renderer/chunk/SectionCompiler$Results;>;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Inject;",
+                "vals": [
+                  "method",
+                  [
+                    "compile"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "RETURN"
+                      ],
+                      "api": 589824
+                    }
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "lambda$hookBuild$0",
+            "acc": 4098,
+            "dsc": "(Ljava/util/Map;Lnet/minecraft/client/renderer/SectionBufferBuilderPack;Lnet/minecraft/client/renderer/chunk/ChunkSectionLayer;)Lcom/mojang/blaze3d/vertex/BufferBuilder;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 2,
+            "nme": "blockRenderer",
+            "dsc": "Lnet/minecraft/client/renderer/block/BlockRenderDispatcher;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/client/renderer/chunk/SectionCompiler"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace$1.class": {
+        "ver": 65,
+        "acc": 16432,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace$1",
+        "super": "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "(Ljava/lang/String;I[Lnet/minecraft/core/Direction;[I)V"
+          },
+          {
+            "nme": "computeCornerWeights",
+            "acc": 0,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl;I[F)V"
+          },
+          {
+            "nme": "computeDepth",
+            "acc": 0,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl;I)F"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/render/BlockRenderInfo.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/render/BlockRenderInfo",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "prepareForWorld",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/world/level/BlockAndTintGetter;Z)V"
+          },
+          {
+            "nme": "prepareForBlock",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;)V"
+          },
+          {
+            "nme": "release",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "blockColor",
+            "acc": 1,
+            "dsc": "(I)I"
+          },
+          {
+            "nme": "effectiveAo",
+            "acc": 1,
+            "dsc": "(Lnet/fabricmc/fabric/api/util/TriState;)Z"
+          },
+          {
+            "nme": "effectiveRenderLayer",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/client/renderer/chunk/ChunkSectionLayer;)Lnet/minecraft/client/renderer/chunk/ChunkSectionLayer;"
+          },
+          {
+            "nme": "shouldDrawSide",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/core/Direction;)Z"
+          },
+          {
+            "nme": "shouldCullSide",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/core/Direction;)Z"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "blockColorMap",
+            "dsc": "Lnet/minecraft/client/color/block/BlockColors;"
+          },
+          {
+            "acc": 18,
+            "nme": "searchPos",
+            "dsc": "Lnet/minecraft/core/BlockPos$MutableBlockPos;"
+          },
+          {
+            "acc": 1,
+            "nme": "blockView",
+            "dsc": "Lnet/minecraft/world/level/BlockAndTintGetter;"
+          },
+          {
+            "acc": 1,
+            "nme": "blockPos",
+            "dsc": "Lnet/minecraft/core/BlockPos;"
+          },
+          {
+            "acc": 1,
+            "nme": "blockState",
+            "dsc": "Lnet/minecraft/world/level/block/state/BlockState;"
+          },
+          {
+            "acc": 2,
+            "nme": "useAo",
+            "dsc": "Z"
+          },
+          {
+            "acc": 2,
+            "nme": "defaultAo",
+            "dsc": "Z"
+          },
+          {
+            "acc": 2,
+            "nme": "defaultLayer",
+            "dsc": "Lnet/minecraft/client/renderer/chunk/ChunkSectionLayer;"
+          },
+          {
+            "acc": 2,
+            "nme": "enableCulling",
+            "dsc": "Z"
+          },
+          {
+            "acc": 2,
+            "nme": "cullCompletionFlags",
+            "dsc": "I"
+          },
+          {
+            "acc": 2,
+            "nme": "cullResultFlags",
+            "dsc": "I"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoVertexClampFunction.class": {
+        "ver": 65,
+        "acc": 1536,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoVertexClampFunction",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "clamp",
+            "acc": 1025,
+            "dsc": "(F)F"
+          },
+          {
+            "nme": "lambda$static$1",
+            "acc": 4106,
+            "dsc": "(F)F"
+          },
+          {
+            "nme": "lambda$static$0",
+            "acc": 4106,
+            "dsc": "(F)F"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "CLAMP_FUNC",
+            "dsc": "Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoVertexClampFunction;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Ljava/lang/FunctionalInterface;"
+          },
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl.class": {
+        "ver": 65,
+        "acc": 1057,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl",
+        "super": "net/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "clear",
+            "acc": 17,
+            "dsc": "()V"
+          },
+          {
+            "nme": "pos",
+            "acc": 17,
+            "dsc": "(IFFF)Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;"
+          },
+          {
+            "nme": "color",
+            "acc": 17,
+            "dsc": "(II)Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;"
+          },
+          {
+            "nme": "uv",
+            "acc": 17,
+            "dsc": "(IFF)Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;"
+          },
+          {
+            "nme": "lightmap",
+            "acc": 17,
+            "dsc": "(II)Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;"
+          },
+          {
+            "nme": "normalFlags",
+            "acc": 20,
+            "dsc": "(I)V"
+          },
+          {
+            "nme": "normal",
+            "acc": 17,
+            "dsc": "(IFFF)Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;"
+          },
+          {
+            "nme": "populateMissingNormals",
+            "acc": 17,
+            "dsc": "()V"
+          },
+          {
+            "nme": "nominalFace",
+            "acc": 17,
+            "dsc": "(Lnet/minecraft/core/Direction;)Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;"
+          },
+          {
+            "nme": "cullFace",
+            "acc": 17,
+            "dsc": "(Lnet/minecraft/core/Direction;)Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;"
+          },
+          {
+            "nme": "renderLayer",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/client/renderer/chunk/ChunkSectionLayer;)Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;"
+          },
+          {
+            "nme": "emissive",
+            "acc": 1,
+            "dsc": "(Z)Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;"
+          },
+          {
+            "nme": "diffuseShade",
+            "acc": 1,
+            "dsc": "(Z)Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;"
+          },
+          {
+            "nme": "ambientOcclusion",
+            "acc": 1,
+            "dsc": "(Lnet/fabricmc/fabric/api/util/TriState;)Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;"
+          },
+          {
+            "nme": "glint",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/client/renderer/item/ItemStackRenderState$FoilType;)Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;"
+          },
+          {
+            "nme": "shadeMode",
+            "acc": 1,
+            "dsc": "(Lnet/fabricmc/fabric/api/renderer/v1/mesh/ShadeMode;)Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;"
+          },
+          {
+            "nme": "atlas",
+            "acc": 1,
+            "dsc": "(Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadAtlas;)Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;"
+          },
+          {
+            "nme": "tintIndex",
+            "acc": 17,
+            "dsc": "(I)Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;"
+          },
+          {
+            "nme": "tag",
+            "acc": 17,
+            "dsc": "(I)Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;"
+          },
+          {
+            "nme": "copyFrom",
+            "acc": 17,
+            "dsc": "(Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadView;)Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;"
+          },
+          {
+            "nme": "fromBakedQuad",
+            "acc": 17,
+            "dsc": "(Lnet/minecraft/client/renderer/block/model/BakedQuad;)Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;"
+          },
+          {
+            "nme": "pushTransform",
+            "acc": 1,
+            "dsc": "(Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadTransform;)V"
+          },
+          {
+            "nme": "popTransform",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "emitDirectly",
+            "acc": 1028,
+            "dsc": "()V"
+          },
+          {
+            "nme": "transformAndEmit",
+            "acc": 17,
+            "dsc": "()V"
+          },
+          {
+            "nme": "emit",
+            "acc": 17,
+            "dsc": "()Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;"
+          },
+          {
+            "nme": "emit",
+            "acc": 4161,
+            "dsc": "()Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "fromBakedQuad",
+            "acc": 4161,
+            "dsc": "(Lnet/minecraft/client/renderer/block/model/BakedQuad;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "copyFrom",
+            "acc": 4161,
+            "dsc": "(Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadView;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "tag",
+            "acc": 4161,
+            "dsc": "(I)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "tintIndex",
+            "acc": 4161,
+            "dsc": "(I)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "atlas",
+            "acc": 4161,
+            "dsc": "(Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadAtlas;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "shadeMode",
+            "acc": 4161,
+            "dsc": "(Lnet/fabricmc/fabric/api/renderer/v1/mesh/ShadeMode;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "glint",
+            "acc": 4161,
+            "dsc": "(Lnet/minecraft/client/renderer/item/ItemStackRenderState$FoilType;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "ambientOcclusion",
+            "acc": 4161,
+            "dsc": "(Lnet/fabricmc/fabric/api/util/TriState;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "diffuseShade",
+            "acc": 4161,
+            "dsc": "(Z)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "emissive",
+            "acc": 4161,
+            "dsc": "(Z)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "renderLayer",
+            "acc": 4161,
+            "dsc": "(Lnet/minecraft/client/renderer/chunk/ChunkSectionLayer;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "cullFace",
+            "acc": 4161,
+            "dsc": "(Lnet/minecraft/core/Direction;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "nominalFace",
+            "acc": 4161,
+            "dsc": "(Lnet/minecraft/core/Direction;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "normal",
+            "acc": 4161,
+            "dsc": "(IFFF)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "lightmap",
+            "acc": 4161,
+            "dsc": "(II)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "uv",
+            "acc": 4161,
+            "dsc": "(IFF)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "color",
+            "acc": 4161,
+            "dsc": "(II)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "pos",
+            "acc": 4161,
+            "dsc": "(IFFF)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "fromBakedQuad",
+            "acc": 4161,
+            "dsc": "(Lnet/minecraft/client/renderer/block/model/BakedQuad;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "copyFrom",
+            "acc": 4161,
+            "dsc": "(Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadView;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "tag",
+            "acc": 4161,
+            "dsc": "(I)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "tintIndex",
+            "acc": 4161,
+            "dsc": "(I)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "atlas",
+            "acc": 4161,
+            "dsc": "(Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadAtlas;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "shadeMode",
+            "acc": 4161,
+            "dsc": "(Lnet/fabricmc/fabric/api/renderer/v1/mesh/ShadeMode;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "glint",
+            "acc": 4161,
+            "dsc": "(Lnet/minecraft/client/renderer/item/ItemStackRenderState$FoilType;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "ambientOcclusion",
+            "acc": 4161,
+            "dsc": "(Lnet/fabricmc/fabric/api/util/TriState;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "diffuseShade",
+            "acc": 4161,
+            "dsc": "(Z)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "emissive",
+            "acc": 4161,
+            "dsc": "(Z)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "renderLayer",
+            "acc": 4161,
+            "dsc": "(Lnet/minecraft/client/renderer/chunk/ChunkSectionLayer;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "cullFace",
+            "acc": 4161,
+            "dsc": "(Lnet/minecraft/core/Direction;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "nominalFace",
+            "acc": 4161,
+            "dsc": "(Lnet/minecraft/core/Direction;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "normal",
+            "acc": 4161,
+            "dsc": "(IFFF)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "lightmap",
+            "acc": 4161,
+            "dsc": "(II)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "uv",
+            "acc": 4161,
+            "dsc": "(IFF)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "color",
+            "acc": 4161,
+            "dsc": "(II)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "pos",
+            "acc": 4161,
+            "dsc": "(IFFF)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "lambda$new$1",
+            "acc": 4098,
+            "dsc": "(Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;)Z"
+          },
+          {
+            "nme": "lambda$static$0",
+            "acc": 4106,
+            "dsc": "(Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;)Z"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 26,
+            "nme": "NO_TRANSFORM",
+            "dsc": "Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadTransform;"
+          },
+          {
+            "acc": 26,
+            "nme": "DEFAULT_QUAD_DATA",
+            "dsc": "[I"
+          },
+          {
+            "acc": 2,
+            "nme": "activeTransform",
+            "dsc": "Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadTransform;"
+          },
+          {
+            "acc": 18,
+            "nme": "transformStack",
+            "dsc": "Lit/unimi/dsi/fastutil/objects/ObjectArrayList;",
+            "sig": "Lit/unimi/dsi/fastutil/objects/ObjectArrayList<Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadTransform;>;"
+          },
+          {
+            "acc": 18,
+            "nme": "stackTransform",
+            "dsc": "Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadTransform;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/helper/package-info.class": {
+        "ver": 65,
+        "acc": 5632,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/helper/package-info",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lorg/jspecify/annotations/NullMarked;"
+          },
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/client/indigo/renderer/ItemStackRenderStateLayerRenderStateMixin.class": {
+        "ver": 65,
+        "acc": 1056,
+        "nme": "net/fabricmc/fabric/mixin/client/indigo/renderer/ItemStackRenderStateLayerRenderStateMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "()V"
+          },
+          {
+            "nme": "onReturnClear",
+            "acc": 2,
+            "dsc": "(Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Inject;",
+                "vals": [
+                  "method",
+                  [
+                    "clear"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "RETURN"
+                      ],
+                      "api": 589824
+                    }
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "submitItemProxy",
+            "acc": 2,
+            "dsc": "(Lnet/minecraft/client/renderer/SubmitNodeCollector;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/world/item/ItemDisplayContext;III[ILjava/util/List;Lnet/minecraft/client/renderer/rendertype/RenderType;Lnet/minecraft/client/renderer/item/ItemStackRenderState$FoilType;)V",
+            "sig": "(Lnet/minecraft/client/renderer/SubmitNodeCollector;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/world/item/ItemDisplayContext;III[ILjava/util/List<Lnet/minecraft/client/renderer/block/model/BakedQuad;>;Lnet/minecraft/client/renderer/rendertype/RenderType;Lnet/minecraft/client/renderer/item/ItemStackRenderState$FoilType;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Redirect;",
+                "vals": [
+                  "method",
+                  [
+                    "submit"
+                  ],
+                  "at",
+                  {
+                    "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                    "values": [
+                      "value",
+                      "INVOKE",
+                      "target",
+                      "Lnet/minecraft/client/renderer/SubmitNodeCollector;submitItem(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/world/item/ItemDisplayContext;III[ILjava/util/List;Lnet/minecraft/client/renderer/rendertype/RenderType;Lnet/minecraft/client/renderer/item/ItemStackRenderState$FoilType;)V"
+                    ],
+                    "api": 589824
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "fabric_getMutableMesh",
+            "acc": 1,
+            "dsc": "()Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableMeshImpl;"
+          },
+          {
+            "nme": "fabric_setRenderTypeGetter",
+            "acc": 1,
+            "dsc": "(Lnet/fabricmc/fabric/api/renderer/v1/render/ItemRenderTypeGetter;)V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "mutableMesh",
+            "dsc": "Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableMeshImpl;"
+          },
+          {
+            "acc": 2,
+            "nme": "renderTypeGetter",
+            "dsc": "Lnet/fabricmc/fabric/api/renderer/v1/render/ItemRenderTypeGetter;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/client/renderer/item/ItemStackRenderState$LayerRenderState"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/client/indigo/renderer/ItemRendererAccessor.class": {
+        "ver": 65,
+        "acc": 1537,
+        "nme": "net/fabricmc/fabric/mixin/client/indigo/renderer/ItemRendererAccessor",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "fabric_getDynamicDisplayGlintConsumer",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/client/renderer/MultiBufferSource;Lnet/minecraft/client/renderer/rendertype/RenderType;Lcom/mojang/blaze3d/vertex/PoseStack$Pose;)Lcom/mojang/blaze3d/vertex/VertexConsumer;",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/gen/Invoker;",
+                "vals": [
+                  "value",
+                  "getSpecialFoilBuffer"
+                ]
+              }
+            ]
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/client/renderer/entity/ItemRenderer"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/accessor/AccessBatchingRenderCommandQueue.class": {
+        "ver": 65,
+        "acc": 1537,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/accessor/AccessBatchingRenderCommandQueue",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "fabric_getMeshItemCommands",
+            "acc": 1025,
+            "dsc": "()Ljava/util/List;",
+            "sig": "()Ljava/util/List<Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/MeshItemCommand;>;"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/mesh/EncodingFormat.class": {
+        "ver": 65,
+        "acc": 49,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/mesh/EncodingFormat",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "()V"
+          },
+          {
+            "nme": "bitMask",
+            "acc": 10,
+            "dsc": "(II)I"
+          },
+          {
+            "nme": "cullFace",
+            "acc": 8,
+            "dsc": "(I)Lnet/minecraft/core/Direction;"
+          },
+          {
+            "nme": "cullFace",
+            "acc": 8,
+            "dsc": "(ILnet/minecraft/core/Direction;)I"
+          },
+          {
+            "nme": "lightFace",
+            "acc": 8,
+            "dsc": "(I)Lnet/minecraft/core/Direction;"
+          },
+          {
+            "nme": "lightFace",
+            "acc": 8,
+            "dsc": "(ILnet/minecraft/core/Direction;)I"
+          },
+          {
+            "nme": "normalFlags",
+            "acc": 8,
+            "dsc": "(I)I"
+          },
+          {
+            "nme": "normalFlags",
+            "acc": 8,
+            "dsc": "(II)I"
+          },
+          {
+            "nme": "geometryFlags",
+            "acc": 8,
+            "dsc": "(I)I"
+          },
+          {
+            "nme": "geometryFlags",
+            "acc": 8,
+            "dsc": "(II)I"
+          },
+          {
+            "nme": "renderLayer",
+            "acc": 8,
+            "dsc": "(I)Lnet/minecraft/client/renderer/chunk/ChunkSectionLayer;"
+          },
+          {
+            "nme": "renderLayer",
+            "acc": 8,
+            "dsc": "(ILnet/minecraft/client/renderer/chunk/ChunkSectionLayer;)I"
+          },
+          {
+            "nme": "emissive",
+            "acc": 8,
+            "dsc": "(I)Z"
+          },
+          {
+            "nme": "emissive",
+            "acc": 8,
+            "dsc": "(IZ)I"
+          },
+          {
+            "nme": "diffuseShade",
+            "acc": 8,
+            "dsc": "(I)Z"
+          },
+          {
+            "nme": "diffuseShade",
+            "acc": 8,
+            "dsc": "(IZ)I"
+          },
+          {
+            "nme": "ambientOcclusion",
+            "acc": 8,
+            "dsc": "(I)Lnet/fabricmc/fabric/api/util/TriState;"
+          },
+          {
+            "nme": "ambientOcclusion",
+            "acc": 8,
+            "dsc": "(ILnet/fabricmc/fabric/api/util/TriState;)I"
+          },
+          {
+            "nme": "glint",
+            "acc": 8,
+            "dsc": "(I)Lnet/minecraft/client/renderer/item/ItemStackRenderState$FoilType;"
+          },
+          {
+            "nme": "glint",
+            "acc": 8,
+            "dsc": "(ILnet/minecraft/client/renderer/item/ItemStackRenderState$FoilType;)I"
+          },
+          {
+            "nme": "shadeMode",
+            "acc": 8,
+            "dsc": "(I)Lnet/fabricmc/fabric/api/renderer/v1/mesh/ShadeMode;"
+          },
+          {
+            "nme": "shadeMode",
+            "acc": 8,
+            "dsc": "(ILnet/fabricmc/fabric/api/renderer/v1/mesh/ShadeMode;)I"
+          },
+          {
+            "nme": "quadAtlas",
+            "acc": 8,
+            "dsc": "(I)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadAtlas;"
+          },
+          {
+            "nme": "quadAtlas",
+            "acc": 8,
+            "dsc": "(ILnet/fabricmc/fabric/api/renderer/v1/mesh/QuadAtlas;)I"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 24,
+            "nme": "HEADER_BITS",
+            "dsc": "I",
+            "val": 0
+          },
+          {
+            "acc": 24,
+            "nme": "HEADER_FACE_NORMAL",
+            "dsc": "I",
+            "val": 1
+          },
+          {
+            "acc": 24,
+            "nme": "HEADER_TINT_INDEX",
+            "dsc": "I",
+            "val": 2
+          },
+          {
+            "acc": 24,
+            "nme": "HEADER_TAG",
+            "dsc": "I",
+            "val": 3
+          },
+          {
+            "acc": 25,
+            "nme": "HEADER_STRIDE",
+            "dsc": "I",
+            "val": 4
+          },
+          {
+            "acc": 24,
+            "nme": "VERTEX_X",
+            "dsc": "I"
+          },
+          {
+            "acc": 24,
+            "nme": "VERTEX_Y",
+            "dsc": "I"
+          },
+          {
+            "acc": 24,
+            "nme": "VERTEX_Z",
+            "dsc": "I"
+          },
+          {
+            "acc": 24,
+            "nme": "VERTEX_COLOR",
+            "dsc": "I"
+          },
+          {
+            "acc": 24,
+            "nme": "VERTEX_U",
+            "dsc": "I"
+          },
+          {
+            "acc": 24,
+            "nme": "VERTEX_V",
+            "dsc": "I"
+          },
+          {
+            "acc": 24,
+            "nme": "VERTEX_LIGHTMAP",
+            "dsc": "I"
+          },
+          {
+            "acc": 24,
+            "nme": "VERTEX_NORMAL",
+            "dsc": "I"
+          },
+          {
+            "acc": 25,
+            "nme": "VERTEX_STRIDE",
+            "dsc": "I"
+          },
+          {
+            "acc": 25,
+            "nme": "QUAD_STRIDE",
+            "dsc": "I"
+          },
+          {
+            "acc": 25,
+            "nme": "QUAD_STRIDE_BYTES",
+            "dsc": "I"
+          },
+          {
+            "acc": 25,
+            "nme": "TOTAL_STRIDE",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "DIRECTION_COUNT",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "NULLABLE_DIRECTION_COUNT",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "NULLABLE_BLOCK_RENDER_LAYERS",
+            "dsc": "[Lnet/minecraft/client/renderer/chunk/ChunkSectionLayer;"
+          },
+          {
+            "acc": 26,
+            "nme": "NULLABLE_BLOCK_RENDER_LAYER_COUNT",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "TRI_STATES",
+            "dsc": "[Lnet/fabricmc/fabric/api/util/TriState;"
+          },
+          {
+            "acc": 26,
+            "nme": "TRI_STATE_COUNT",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "NULLABLE_GLINTS",
+            "dsc": "[Lnet/minecraft/client/renderer/item/ItemStackRenderState$FoilType;"
+          },
+          {
+            "acc": 26,
+            "nme": "NULLABLE_GLINT_COUNT",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "SHADE_MODES",
+            "dsc": "[Lnet/fabricmc/fabric/api/renderer/v1/mesh/ShadeMode;"
+          },
+          {
+            "acc": 26,
+            "nme": "SHADE_MODE_COUNT",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "QUAD_ATLASES",
+            "dsc": "[Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadAtlas;"
+          },
+          {
+            "acc": 26,
+            "nme": "QUAD_ATLAS_COUNT",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "NULL_RENDER_LAYER_INDEX",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "NULL_GLINT_INDEX",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "CULL_BIT_LENGTH",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "LIGHT_BIT_LENGTH",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "NORMALS_BIT_LENGTH",
+            "dsc": "I",
+            "val": 4
+          },
+          {
+            "acc": 26,
+            "nme": "GEOMETRY_BIT_LENGTH",
+            "dsc": "I",
+            "val": 3
+          },
+          {
+            "acc": 26,
+            "nme": "RENDER_LAYER_BIT_LENGTH",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "EMISSIVE_BIT_LENGTH",
+            "dsc": "I",
+            "val": 1
+          },
+          {
+            "acc": 26,
+            "nme": "DIFFUSE_BIT_LENGTH",
+            "dsc": "I",
+            "val": 1
+          },
+          {
+            "acc": 26,
+            "nme": "AO_BIT_LENGTH",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "GLINT_BIT_LENGTH",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "SHADE_MODE_BIT_LENGTH",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "QUAD_ATLAS_BIT_LENGTH",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "CULL_BIT_OFFSET",
+            "dsc": "I",
+            "val": 0
+          },
+          {
+            "acc": 26,
+            "nme": "LIGHT_BIT_OFFSET",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "NORMALS_BIT_OFFSET",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "GEOMETRY_BIT_OFFSET",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "RENDER_LAYER_BIT_OFFSET",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "EMISSIVE_BIT_OFFSET",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "DIFFUSE_BIT_OFFSET",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "AO_BIT_OFFSET",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "GLINT_BIT_OFFSET",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "SHADE_MODE_BIT_OFFSET",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "QUAD_ATLAS_BIT_OFFSET",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "TOTAL_BIT_LENGTH",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "CULL_MASK",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "LIGHT_MASK",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "NORMALS_MASK",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "GEOMETRY_MASK",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "RENDER_LAYER_MASK",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "EMISSIVE_MASK",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "DIFFUSE_MASK",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "AO_MASK",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "GLINT_MASK",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "SHADE_MODE_MASK",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "QUAD_ATLAS_MASK",
+            "dsc": "I"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace$5.class": {
+        "ver": 65,
+        "acc": 16432,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace$5",
+        "super": "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "(Ljava/lang/String;I[Lnet/minecraft/core/Direction;[I)V"
+          },
+          {
+            "nme": "computeCornerWeights",
+            "acc": 0,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl;I[F)V"
+          },
+          {
+            "nme": "computeDepth",
+            "acc": 0,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl;I)F"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/render/QuadToPosPipe.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/render/QuadToPosPipe",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Ljava/util/function/Consumer;Lorg/joml/Vector3f;)V",
+            "sig": "(Ljava/util/function/Consumer<Lorg/joml/Vector3fc;>;Lorg/joml/Vector3f;)V"
+          },
+          {
+            "nme": "accept",
+            "acc": 1,
+            "dsc": "(Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadView;)V"
+          },
+          {
+            "nme": "accept",
+            "acc": 4161,
+            "dsc": "(Ljava/lang/Object;)V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "posConsumer",
+            "dsc": "Ljava/util/function/Consumer;",
+            "sig": "Ljava/util/function/Consumer<Lorg/joml/Vector3fc;>;"
+          },
+          {
+            "acc": 18,
+            "nme": "vec",
+            "dsc": "Lorg/joml/Vector3f;"
+          },
+          {
+            "acc": 1,
+            "nme": "matrix",
+            "dsc": "Lorg/joml/Matrix4fc;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/render/LightDataProvider.class": {
+        "ver": 65,
+        "acc": 1537,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/render/LightDataProvider",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "light",
+            "acc": 1025,
+            "dsc": "(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;)I"
+          },
+          {
+            "nme": "ao",
+            "acc": 1025,
+            "dsc": "(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;)F"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/client/indigo/renderer/SubmitNodeStorageMixin.class": {
+        "ver": 65,
+        "acc": 1056,
+        "nme": "net/fabricmc/fabric/mixin/client/indigo/renderer/SubmitNodeStorageMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "()V"
+          },
+          {
+            "nme": "fabric_submitItem",
+            "acc": 1,
+            "dsc": "(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/world/item/ItemDisplayContext;III[ILjava/util/List;Lnet/minecraft/client/renderer/rendertype/RenderType;Lnet/minecraft/client/renderer/item/ItemStackRenderState$FoilType;Lnet/fabricmc/fabric/api/renderer/v1/mesh/MeshView;Lnet/fabricmc/fabric/api/renderer/v1/render/ItemRenderTypeGetter;)V",
+            "sig": "(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/world/item/ItemDisplayContext;III[ILjava/util/List<Lnet/minecraft/client/renderer/block/model/BakedQuad;>;Lnet/minecraft/client/renderer/rendertype/RenderType;Lnet/minecraft/client/renderer/item/ItemStackRenderState$FoilType;Lnet/fabricmc/fabric/api/renderer/v1/mesh/MeshView;Lnet/fabricmc/fabric/api/renderer/v1/render/ItemRenderTypeGetter;)V"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/client/renderer/SubmitNodeStorage"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoConfig.class": {
+        "ver": 65,
+        "acc": 16433,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoConfig",
+        "super": "java/lang/Enum",
+        "mthds": [
+          {
+            "nme": "values",
+            "acc": 9,
+            "dsc": "()[Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoConfig;"
+          },
+          {
+            "nme": "valueOf",
+            "acc": 9,
+            "dsc": "(Ljava/lang/String;)Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoConfig;"
+          },
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "(Ljava/lang/String;I)V",
+            "sig": "()V"
+          },
+          {
+            "nme": "$values",
+            "acc": 4106,
+            "dsc": "()[Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoConfig;"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 16409,
+            "nme": "VANILLA",
+            "dsc": "Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoConfig;"
+          },
+          {
+            "acc": 16409,
+            "nme": "ENHANCED",
+            "dsc": "Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoConfig;"
+          },
+          {
+            "acc": 16409,
+            "nme": "EMULATE",
+            "dsc": "Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoConfig;"
+          },
+          {
+            "acc": 16409,
+            "nme": "HYBRID",
+            "dsc": "Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoConfig;"
+          },
+          {
+            "acc": 4122,
+            "nme": "$VALUES",
+            "dsc": "[Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoConfig;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/helper/GeometryHelper$1.class": {
+        "ver": 65,
+        "acc": 4128,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/helper/GeometryHelper$1",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 4120,
+            "nme": "$SwitchMap$net$minecraft$core$Direction",
+            "dsc": "[I"
+          },
+          {
+            "acc": 4120,
+            "nme": "$SwitchMap$net$minecraft$core$Direction$Axis",
+            "dsc": "[I"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/client/indigo/renderer/package-info.class": {
+        "ver": 65,
+        "acc": 5632,
+        "nme": "net/fabricmc/fabric/mixin/client/indigo/renderer/package-info",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lorg/jspecify/annotations/NullMarked;"
+          },
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/render/TerrainRenderContext$LightDataCache.class": {
+        "ver": 65,
+        "acc": 32,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/render/TerrainRenderContext$LightDataCache",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/BlockRenderInfo;)V"
+          },
+          {
+            "nme": "prepare",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/core/BlockPos;)V"
+          },
+          {
+            "nme": "light",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;)I"
+          },
+          {
+            "nme": "ao",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;)F"
+          },
+          {
+            "nme": "cacheIndex",
+            "acc": 2,
+            "dsc": "(Lnet/minecraft/core/BlockPos;)I"
+          },
+          {
+            "nme": "lambda$new$0",
+            "acc": 4098,
+            "dsc": "(Lnet/minecraft/world/level/BlockAndTintGetter;Lnet/minecraft/core/BlockPos;)I"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "lightCache",
+            "dsc": "[I"
+          },
+          {
+            "acc": 18,
+            "nme": "aoCache",
+            "dsc": "[F"
+          },
+          {
+            "acc": 18,
+            "nme": "blockInfo",
+            "dsc": "Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/BlockRenderInfo;"
+          },
+          {
+            "acc": 2,
+            "nme": "sectionOrigin",
+            "dsc": "Lnet/minecraft/core/BlockPos;"
+          },
+          {
+            "acc": 18,
+            "nme": "lightGetter",
+            "dsc": "Lnet/minecraft/client/renderer/LevelRenderer$BrightnessGetter;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/package-info.class": {
+        "ver": 65,
+        "acc": 5632,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/package-info",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lorg/jspecify/annotations/NullMarked;"
+          },
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/helper/GeometryHelper.class": {
+        "ver": 65,
+        "acc": 49,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/helper/GeometryHelper",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "()V"
+          },
+          {
+            "nme": "computeShapeFlags",
+            "acc": 9,
+            "dsc": "(Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadView;)I"
+          },
+          {
+            "nme": "isQuadParallelToFace",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/core/Direction;Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadView;)Z"
+          },
+          {
+            "nme": "isParallelQuadOnFace",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/core/Direction;Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadView;)Z"
+          },
+          {
+            "nme": "isQuadCubic",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/core/Direction;Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadView;)Z"
+          },
+          {
+            "nme": "confirmSquareCorners",
+            "acc": 10,
+            "dsc": "(IILnet/fabricmc/fabric/api/renderer/v1/mesh/QuadView;)Z"
+          },
+          {
+            "nme": "lightFace",
+            "acc": 9,
+            "dsc": "(Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadView;)Lnet/minecraft/core/Direction;"
+          },
+          {
+            "nme": "longestAxis",
+            "acc": 9,
+            "dsc": "(Lorg/joml/Vector3fc;)Lnet/minecraft/core/Direction$Axis;"
+          },
+          {
+            "nme": "longestAxis",
+            "acc": 9,
+            "dsc": "(FFF)Lnet/minecraft/core/Direction$Axis;"
+          },
+          {
+            "nme": "firstCubicVertex",
+            "acc": 9,
+            "dsc": "(Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadView;)I"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "CUBIC_FLAG",
+            "dsc": "I",
+            "val": 1
+          },
+          {
+            "acc": 25,
+            "nme": "AXIS_ALIGNED_FLAG",
+            "dsc": "I",
+            "val": 2
+          },
+          {
+            "acc": 25,
+            "nme": "LIGHT_FACE_FLAG",
+            "dsc": "I",
+            "val": 4
+          },
+          {
+            "acc": 25,
+            "nme": "FLAG_BIT_COUNT",
+            "dsc": "I",
+            "val": 3
+          },
+          {
+            "acc": 26,
+            "nme": "EPS_MIN",
+            "dsc": "F",
+            "val": 1.0E-4
+          },
+          {
+            "acc": 26,
+            "nme": "EPS_MAX",
+            "dsc": "F",
+            "val": 0.9999
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace$2.class": {
+        "ver": 65,
+        "acc": 16432,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace$2",
+        "super": "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "(Ljava/lang/String;I[Lnet/minecraft/core/Direction;[I)V"
+          },
+          {
+            "nme": "computeCornerWeights",
+            "acc": 0,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl;I[F)V"
+          },
+          {
+            "nme": "computeDepth",
+            "acc": 0,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl;I)F"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/client/indigo/renderer/BlockRenderDispatcherMixin.class": {
+        "ver": 65,
+        "acc": 1056,
+        "nme": "net/fabricmc/fabric/mixin/client/indigo/renderer/BlockRenderDispatcherMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "()V"
+          },
+          {
+            "nme": "afterGetModel",
+            "acc": 2,
+            "dsc": "(Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/BlockAndTintGetter;Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;Lnet/minecraft/client/renderer/block/model/BlockStateModel;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Inject;",
+                "vals": [
+                  "method",
+                  [
+                    "renderBreakingTexture"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "INVOKE_ASSIGN",
+                        "target",
+                        "Lnet/minecraft/client/renderer/block/BlockModelShaper;getBlockModel(Lnet/minecraft/world/level/block/state/BlockState;)Lnet/minecraft/client/renderer/block/model/BlockStateModel;",
+                        "shift",
+                        [
+                          "Lorg/spongepowered/asm/mixin/injection/At$Shift;",
+                          "AFTER"
+                        ]
+                      ],
+                      "api": 589824
+                    }
+                  ],
+                  "cancellable",
+                  true
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "renderProxy",
+            "acc": 2,
+            "dsc": "(Lcom/mojang/blaze3d/vertex/PoseStack$Pose;Lcom/mojang/blaze3d/vertex/VertexConsumer;Lnet/minecraft/client/renderer/block/model/BlockStateModel;FFFIILnet/minecraft/world/level/block/state/BlockState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;II)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Redirect;",
+                "vals": [
+                  "method",
+                  [
+                    "renderSingleBlock"
+                  ],
+                  "at",
+                  {
+                    "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                    "values": [
+                      "value",
+                      "INVOKE",
+                      "target",
+                      "Lnet/minecraft/client/renderer/block/ModelBlockRenderer;renderModel(Lcom/mojang/blaze3d/vertex/PoseStack$Pose;Lcom/mojang/blaze3d/vertex/VertexConsumer;Lnet/minecraft/client/renderer/block/model/BlockStateModel;FFFII)V"
+                    ],
+                    "api": 589824
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "lambda$afterGetModel$0",
+            "acc": 4106,
+            "dsc": "(Lcom/mojang/blaze3d/vertex/VertexConsumer;Lnet/minecraft/client/renderer/chunk/ChunkSectionLayer;)Lcom/mojang/blaze3d/vertex/VertexConsumer;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 2,
+            "nme": "modelRenderer",
+            "dsc": "Lnet/minecraft/client/renderer/block/ModelBlockRenderer;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/client/renderer/block/BlockRenderDispatcher"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoLuminanceFix.class": {
+        "ver": 65,
+        "acc": 1537,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoLuminanceFix",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "apply",
+            "acc": 1025,
+            "dsc": "(Lnet/minecraft/world/level/BlockGetter;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;)F"
+          },
+          {
+            "nme": "vanilla",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/world/level/BlockGetter;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;)F"
+          },
+          {
+            "nme": "fixed",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/world/level/BlockGetter;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;)F"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "INSTANCE",
+            "dsc": "Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoLuminanceFix;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Ljava/lang/FunctionalInterface;"
+          },
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/accessor/package-info.class": {
+        "ver": 65,
+        "acc": 5632,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/accessor/package-info",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lorg/jspecify/annotations/NullMarked;"
+          },
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/package-info.class": {
+        "ver": 65,
+        "acc": 5632,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/package-info",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lorg/jspecify/annotations/NullMarked;"
+          },
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/mesh/MeshImpl.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/mesh/MeshImpl",
+        "super": "net/fabricmc/fabric/impl/client/indigo/renderer/mesh/MeshViewImpl",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "([I)V"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableMeshImpl.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableMeshImpl",
+        "super": "net/fabricmc/fabric/impl/client/indigo/renderer/mesh/MeshViewImpl",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "ensureCapacity",
+            "acc": 2,
+            "dsc": "(I)V"
+          },
+          {
+            "nme": "emitter",
+            "acc": 1,
+            "dsc": "()Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "forEachMutable",
+            "acc": 1,
+            "dsc": "(Ljava/util/function/Consumer;)V",
+            "sig": "(Ljava/util/function/Consumer<-Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;>;)V"
+          },
+          {
+            "nme": "immutableCopy",
+            "acc": 1,
+            "dsc": "()Lnet/fabricmc/fabric/api/renderer/v1/mesh/Mesh;"
+          },
+          {
+            "nme": "clear",
+            "acc": 1,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "emitter",
+            "dsc": "Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFaceData.class": {
+        "ver": 65,
+        "acc": 32,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFaceData",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "()V"
+          },
+          {
+            "nme": "l0",
+            "acc": 0,
+            "dsc": "(I)V"
+          },
+          {
+            "nme": "l1",
+            "acc": 0,
+            "dsc": "(I)V"
+          },
+          {
+            "nme": "l2",
+            "acc": 0,
+            "dsc": "(I)V"
+          },
+          {
+            "nme": "l3",
+            "acc": 0,
+            "dsc": "(I)V"
+          },
+          {
+            "nme": "weightedBlockLight",
+            "acc": 0,
+            "dsc": "([F)I"
+          },
+          {
+            "nme": "weightedSkyLight",
+            "acc": 0,
+            "dsc": "([F)I"
+          },
+          {
+            "nme": "weightedCombinedLight",
+            "acc": 0,
+            "dsc": "([F)I"
+          },
+          {
+            "nme": "weightedAo",
+            "acc": 0,
+            "dsc": "([F)F"
+          },
+          {
+            "nme": "toArrays",
+            "acc": 0,
+            "dsc": "([F[I[II)V"
+          },
+          {
+            "nme": "weightedMean",
+            "acc": 8,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFaceData;FLnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFaceData;FLnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFaceData;)Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFaceData;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 0,
+            "nme": "a0",
+            "dsc": "F"
+          },
+          {
+            "acc": 0,
+            "nme": "a1",
+            "dsc": "F"
+          },
+          {
+            "acc": 0,
+            "nme": "a2",
+            "dsc": "F"
+          },
+          {
+            "acc": 0,
+            "nme": "a3",
+            "dsc": "F"
+          },
+          {
+            "acc": 0,
+            "nme": "b0",
+            "dsc": "I"
+          },
+          {
+            "acc": 0,
+            "nme": "b1",
+            "dsc": "I"
+          },
+          {
+            "acc": 0,
+            "nme": "b2",
+            "dsc": "I"
+          },
+          {
+            "acc": 0,
+            "nme": "b3",
+            "dsc": "I"
+          },
+          {
+            "acc": 0,
+            "nme": "s0",
+            "dsc": "I"
+          },
+          {
+            "acc": 0,
+            "nme": "s1",
+            "dsc": "I"
+          },
+          {
+            "acc": 0,
+            "nme": "s2",
+            "dsc": "I"
+          },
+          {
+            "acc": 0,
+            "nme": "s3",
+            "dsc": "I"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace$6.class": {
+        "ver": 65,
+        "acc": 16432,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace$6",
+        "super": "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "(Ljava/lang/String;I[Lnet/minecraft/core/Direction;[I)V"
+          },
+          {
+            "nme": "computeCornerWeights",
+            "acc": 0,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl;I[F)V"
+          },
+          {
+            "nme": "computeDepth",
+            "acc": 0,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl;I)F"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/IndigoRenderer.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/IndigoRenderer",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "()V"
+          },
+          {
+            "nme": "mutableMesh",
+            "acc": 1,
+            "dsc": "()Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableMesh;"
+          },
+          {
+            "nme": "render",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/client/renderer/block/ModelBlockRenderer;Lnet/minecraft/world/level/BlockAndTintGetter;Lnet/minecraft/client/renderer/block/model/BlockStateModel;Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/core/BlockPos;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/fabricmc/fabric/api/renderer/v1/render/BlockVertexConsumerProvider;ZJI)V"
+          },
+          {
+            "nme": "render",
+            "acc": 1,
+            "dsc": "(Lcom/mojang/blaze3d/vertex/PoseStack$Pose;Lnet/fabricmc/fabric/api/renderer/v1/render/BlockVertexConsumerProvider;Lnet/minecraft/client/renderer/block/model/BlockStateModel;FFFIILnet/minecraft/world/level/BlockAndTintGetter;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;)V"
+          },
+          {
+            "nme": "renderBlockAsEntity",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/client/renderer/block/BlockRenderDispatcher;Lnet/minecraft/world/level/block/state/BlockState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;IILnet/minecraft/world/level/BlockAndTintGetter;Lnet/minecraft/core/BlockPos;)V"
+          },
+          {
+            "nme": "getLayerRenderStateEmitter",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/client/renderer/item/ItemStackRenderState$LayerRenderState;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "setLayerRenderTypeGetter",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/client/renderer/item/ItemStackRenderState$LayerRenderState;Lnet/fabricmc/fabric/api/renderer/v1/render/ItemRenderTypeGetter;)V"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "INSTANCE",
+            "dsc": "Lnet/fabricmc/fabric/impl/client/indigo/renderer/IndigoRenderer;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/render/ItemRenderContext.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/render/ItemRenderContext",
+        "super": "net/fabricmc/fabric/impl/client/indigo/renderer/render/AbstractRenderContext",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "renderItem",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/world/item/ItemDisplayContext;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;II[ILjava/util/List;Lnet/fabricmc/fabric/api/renderer/v1/mesh/MeshView;Lnet/minecraft/client/renderer/rendertype/RenderType;Lnet/fabricmc/fabric/api/renderer/v1/render/ItemRenderTypeGetter;Lnet/minecraft/client/renderer/item/ItemStackRenderState$FoilType;Z)V",
+            "sig": "(Lnet/minecraft/world/item/ItemDisplayContext;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;II[ILjava/util/List<Lnet/minecraft/client/renderer/block/model/BakedQuad;>;Lnet/fabricmc/fabric/api/renderer/v1/mesh/MeshView;Lnet/minecraft/client/renderer/rendertype/RenderType;Lnet/fabricmc/fabric/api/renderer/v1/render/ItemRenderTypeGetter;Lnet/minecraft/client/renderer/item/ItemStackRenderState$FoilType;Z)V"
+          },
+          {
+            "nme": "bufferQuads",
+            "acc": 2,
+            "dsc": "(Ljava/util/List;Lnet/fabricmc/fabric/api/renderer/v1/mesh/MeshView;)V",
+            "sig": "(Ljava/util/List<Lnet/minecraft/client/renderer/block/model/BakedQuad;>;Lnet/fabricmc/fabric/api/renderer/v1/mesh/MeshView;)V"
+          },
+          {
+            "nme": "bufferQuad",
+            "acc": 4,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;)V"
+          },
+          {
+            "nme": "tintQuad",
+            "acc": 2,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;)V"
+          },
+          {
+            "nme": "shadeQuad",
+            "acc": 2,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;Z)V"
+          },
+          {
+            "nme": "getVertexConsumer",
+            "acc": 2,
+            "dsc": "(Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadAtlas;Lnet/minecraft/client/renderer/chunk/ChunkSectionLayer;Lnet/minecraft/client/renderer/item/ItemStackRenderState$FoilType;)Lcom/mojang/blaze3d/vertex/VertexConsumer;"
+          },
+          {
+            "nme": "createVertexConsumer",
+            "acc": 2,
+            "dsc": "(Lnet/minecraft/client/renderer/rendertype/RenderType;Lnet/minecraft/client/renderer/item/ItemStackRenderState$FoilType;)Lcom/mojang/blaze3d/vertex/VertexConsumer;"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 26,
+            "nme": "GLINT_COUNT",
+            "dsc": "I"
+          },
+          {
+            "acc": 2,
+            "nme": "displayContext",
+            "dsc": "Lnet/minecraft/world/item/ItemDisplayContext;"
+          },
+          {
+            "acc": 2,
+            "nme": "vertexConsumers",
+            "dsc": "Lnet/minecraft/client/renderer/MultiBufferSource;"
+          },
+          {
+            "acc": 2,
+            "nme": "light",
+            "dsc": "I"
+          },
+          {
+            "acc": 2,
+            "nme": "tints",
+            "dsc": "[I"
+          },
+          {
+            "acc": 2,
+            "nme": "defaultLayer",
+            "dsc": "Lnet/minecraft/client/renderer/rendertype/RenderType;"
+          },
+          {
+            "acc": 2,
+            "nme": "renderTypeGetter",
+            "dsc": "Lnet/fabricmc/fabric/api/renderer/v1/render/ItemRenderTypeGetter;"
+          },
+          {
+            "acc": 2,
+            "nme": "defaultGlint",
+            "dsc": "Lnet/minecraft/client/renderer/item/ItemStackRenderState$FoilType;"
+          },
+          {
+            "acc": 2,
+            "nme": "ignoreQuadGlint",
+            "dsc": "Z"
+          },
+          {
+            "acc": 2,
+            "nme": "specialGlintEntry",
+            "dsc": "Lcom/mojang/blaze3d/vertex/PoseStack$Pose;"
+          },
+          {
+            "acc": 18,
+            "nme": "vertexConsumerCache",
+            "dsc": "[Lcom/mojang/blaze3d/vertex/VertexConsumer;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "load",
+            "acc": 17,
+            "dsc": "()V"
+          },
+          {
+            "nme": "computeGeometry",
+            "acc": 20,
+            "dsc": "()V"
+          },
+          {
+            "nme": "geometryFlags",
+            "acc": 17,
+            "dsc": "()I"
+          },
+          {
+            "nme": "x",
+            "acc": 17,
+            "dsc": "(I)F"
+          },
+          {
+            "nme": "y",
+            "acc": 17,
+            "dsc": "(I)F"
+          },
+          {
+            "nme": "z",
+            "acc": 17,
+            "dsc": "(I)F"
+          },
+          {
+            "nme": "posByIndex",
+            "acc": 17,
+            "dsc": "(II)F"
+          },
+          {
+            "nme": "copyPos",
+            "acc": 17,
+            "dsc": "(ILorg/joml/Vector3f;)Lorg/joml/Vector3f;"
+          },
+          {
+            "nme": "color",
+            "acc": 17,
+            "dsc": "(I)I"
+          },
+          {
+            "nme": "u",
+            "acc": 17,
+            "dsc": "(I)F"
+          },
+          {
+            "nme": "v",
+            "acc": 17,
+            "dsc": "(I)F"
+          },
+          {
+            "nme": "copyUv",
+            "acc": 17,
+            "dsc": "(ILorg/joml/Vector2f;)Lorg/joml/Vector2f;"
+          },
+          {
+            "nme": "lightmap",
+            "acc": 17,
+            "dsc": "(I)I"
+          },
+          {
+            "nme": "normalFlags",
+            "acc": 17,
+            "dsc": "()I"
+          },
+          {
+            "nme": "hasNormal",
+            "acc": 17,
+            "dsc": "(I)Z"
+          },
+          {
+            "nme": "hasVertexNormals",
+            "acc": 17,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "hasAllVertexNormals",
+            "acc": 17,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "normalIndex",
+            "acc": 20,
+            "dsc": "(I)I"
+          },
+          {
+            "nme": "normalX",
+            "acc": 17,
+            "dsc": "(I)F"
+          },
+          {
+            "nme": "normalY",
+            "acc": 17,
+            "dsc": "(I)F"
+          },
+          {
+            "nme": "normalZ",
+            "acc": 17,
+            "dsc": "(I)F"
+          },
+          {
+            "nme": "copyNormal",
+            "acc": 17,
+            "dsc": "(ILorg/joml/Vector3f;)Lorg/joml/Vector3f;"
+          },
+          {
+            "nme": "packedFaceNormal",
+            "acc": 17,
+            "dsc": "()I"
+          },
+          {
+            "nme": "faceNormal",
+            "acc": 17,
+            "dsc": "()Lorg/joml/Vector3fc;"
+          },
+          {
+            "nme": "lightFace",
+            "acc": 17,
+            "dsc": "()Lnet/minecraft/core/Direction;"
+          },
+          {
+            "nme": "nominalFace",
+            "acc": 17,
+            "dsc": "()Lnet/minecraft/core/Direction;"
+          },
+          {
+            "nme": "cullFace",
+            "acc": 17,
+            "dsc": "()Lnet/minecraft/core/Direction;"
+          },
+          {
+            "nme": "renderLayer",
+            "acc": 1,
+            "dsc": "()Lnet/minecraft/client/renderer/chunk/ChunkSectionLayer;"
+          },
+          {
+            "nme": "emissive",
+            "acc": 1,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "diffuseShade",
+            "acc": 1,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "ambientOcclusion",
+            "acc": 1,
+            "dsc": "()Lnet/fabricmc/fabric/api/util/TriState;"
+          },
+          {
+            "nme": "glint",
+            "acc": 1,
+            "dsc": "()Lnet/minecraft/client/renderer/item/ItemStackRenderState$FoilType;"
+          },
+          {
+            "nme": "shadeMode",
+            "acc": 1,
+            "dsc": "()Lnet/fabricmc/fabric/api/renderer/v1/mesh/ShadeMode;"
+          },
+          {
+            "nme": "atlas",
+            "acc": 1,
+            "dsc": "()Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadAtlas;"
+          },
+          {
+            "nme": "tintIndex",
+            "acc": 17,
+            "dsc": "()I"
+          },
+          {
+            "nme": "tag",
+            "acc": 17,
+            "dsc": "()I"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 4,
+            "nme": "nominalFace",
+            "dsc": "Lnet/minecraft/core/Direction;"
+          },
+          {
+            "acc": 4,
+            "nme": "isGeometryInvalid",
+            "dsc": "Z"
+          },
+          {
+            "acc": 20,
+            "nme": "faceNormal",
+            "dsc": "Lorg/joml/Vector3f;"
+          },
+          {
+            "acc": 4,
+            "nme": "data",
+            "dsc": "[I"
+          },
+          {
+            "acc": 4,
+            "nme": "baseIndex",
+            "dsc": "I"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/client/indigo/renderer/BlockRenderDispatcherAccessor.class": {
+        "ver": 65,
+        "acc": 1537,
+        "nme": "net/fabricmc/fabric/mixin/client/indigo/renderer/BlockRenderDispatcherAccessor",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "getBlockColors",
+            "acc": 1025,
+            "dsc": "()Lnet/minecraft/client/color/block/BlockColors;",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/gen/Accessor;",
+                "vals": [
+                  "value",
+                  "blockColors"
+                ]
+              }
+            ]
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/client/renderer/block/BlockRenderDispatcher"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/accessor/AccessLayerRenderState.class": {
+        "ver": 65,
+        "acc": 1537,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/accessor/AccessLayerRenderState",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "fabric_getMutableMesh",
+            "acc": 1025,
+            "dsc": "()Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableMeshImpl;"
+          },
+          {
+            "nme": "fabric_setRenderTypeGetter",
+            "acc": 1025,
+            "dsc": "(Lnet/fabricmc/fabric/api/renderer/v1/render/ItemRenderTypeGetter;)V"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/client/indigo/renderer/RenderSectionRegionMixin.class": {
+        "ver": 65,
+        "acc": 1056,
+        "nme": "net/fabricmc/fabric/mixin/client/indigo/renderer/RenderSectionRegionMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "()V"
+          },
+          {
+            "nme": "fabric_getRenderer",
+            "acc": 1,
+            "dsc": "()Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/TerrainRenderContext;"
+          },
+          {
+            "nme": "fabric_setRenderer",
+            "acc": 1,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/TerrainRenderContext;)V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 2,
+            "nme": "fabric_renderer",
+            "dsc": "Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/TerrainRenderContext;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/client/renderer/chunk/RenderSectionRegion"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/client/indigo/renderer/ItemStackRenderStateMixin.class": {
+        "ver": 65,
+        "acc": 1056,
+        "nme": "net/fabricmc/fabric/mixin/client/indigo/renderer/ItemStackRenderStateMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "()V"
+          },
+          {
+            "nme": "afterInitVecLoad",
+            "acc": 2,
+            "dsc": "(Ljava/util/function/Consumer;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;Lorg/joml/Vector3f;Lcom/llamalad7/mixinextras/sugar/ref/LocalRef;)V",
+            "sig": "(Ljava/util/function/Consumer<Lorg/joml/Vector3fc;>;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;Lorg/joml/Vector3f;Lcom/llamalad7/mixinextras/sugar/ref/LocalRef<Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/QuadToPosPipe;>;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Inject;",
+                "vals": [
+                  "method",
+                  [
+                    "visitExtents"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "NEW",
+                        "target",
+                        "Lcom/mojang/blaze3d/vertex/PoseStack$Pose;"
+                      ],
+                      "api": 589824
+                    }
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "afterLayerLoad",
+            "acc": 2,
+            "dsc": "(Ljava/util/function/Consumer;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;Lorg/joml/Vector3f;Lnet/minecraft/client/renderer/item/ItemStackRenderState$LayerRenderState;Lorg/joml/Matrix4f;Lcom/llamalad7/mixinextras/sugar/ref/LocalRef;)V",
+            "sig": "(Ljava/util/function/Consumer<Lorg/joml/Vector3fc;>;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;Lorg/joml/Vector3f;Lnet/minecraft/client/renderer/item/ItemStackRenderState$LayerRenderState;Lorg/joml/Matrix4f;Lcom/llamalad7/mixinextras/sugar/ref/LocalRef<Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/QuadToPosPipe;>;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Inject;",
+                "vals": [
+                  "method",
+                  [
+                    "visitExtents"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "INVOKE",
+                        "target",
+                        "Lcom/mojang/blaze3d/vertex/PoseStack$Pose;setIdentity()V",
+                        "shift",
+                        [
+                          "Lorg/spongepowered/asm/mixin/injection/At$Shift;",
+                          "BEFORE"
+                        ]
+                      ],
+                      "api": 589824
+                    }
+                  ]
+                ]
+              }
+            ]
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/client/renderer/item/ItemStackRenderState"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoCalculator$1.class": {
+        "ver": 65,
+        "acc": 4128,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoCalculator$1",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 4120,
+            "nme": "$SwitchMap$net$fabricmc$fabric$impl$client$indigo$renderer$aocalc$AoConfig",
+            "dsc": "[I"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl$1.class": {
+        "ver": 65,
+        "acc": 32,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl$1",
+        "super": "net/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "()V"
+          },
+          {
+            "nme": "emitDirectly",
+            "acc": 4,
+            "dsc": "()V"
+          },
+          {
+            "nme": "emit",
+            "acc": 4161,
+            "dsc": "()Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "fromBakedQuad",
+            "acc": 4161,
+            "dsc": "(Lnet/minecraft/client/renderer/block/model/BakedQuad;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "copyFrom",
+            "acc": 4161,
+            "dsc": "(Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadView;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "tag",
+            "acc": 4161,
+            "dsc": "(I)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "tintIndex",
+            "acc": 4161,
+            "dsc": "(I)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "atlas",
+            "acc": 4161,
+            "dsc": "(Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadAtlas;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "shadeMode",
+            "acc": 4161,
+            "dsc": "(Lnet/fabricmc/fabric/api/renderer/v1/mesh/ShadeMode;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "glint",
+            "acc": 4161,
+            "dsc": "(Lnet/minecraft/client/renderer/item/ItemStackRenderState$FoilType;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "ambientOcclusion",
+            "acc": 4161,
+            "dsc": "(Lnet/fabricmc/fabric/api/util/TriState;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "diffuseShade",
+            "acc": 4161,
+            "dsc": "(Z)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "emissive",
+            "acc": 4161,
+            "dsc": "(Z)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "renderLayer",
+            "acc": 4161,
+            "dsc": "(Lnet/minecraft/client/renderer/chunk/ChunkSectionLayer;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "cullFace",
+            "acc": 4161,
+            "dsc": "(Lnet/minecraft/core/Direction;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "nominalFace",
+            "acc": 4161,
+            "dsc": "(Lnet/minecraft/core/Direction;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "normal",
+            "acc": 4161,
+            "dsc": "(IFFF)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "lightmap",
+            "acc": 4161,
+            "dsc": "(II)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "uv",
+            "acc": 4161,
+            "dsc": "(IFF)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "color",
+            "acc": 4161,
+            "dsc": "(II)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "pos",
+            "acc": 4161,
+            "dsc": "(IFFF)Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "fromBakedQuad",
+            "acc": 4161,
+            "dsc": "(Lnet/minecraft/client/renderer/block/model/BakedQuad;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "copyFrom",
+            "acc": 4161,
+            "dsc": "(Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadView;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "tag",
+            "acc": 4161,
+            "dsc": "(I)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "tintIndex",
+            "acc": 4161,
+            "dsc": "(I)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "atlas",
+            "acc": 4161,
+            "dsc": "(Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadAtlas;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "shadeMode",
+            "acc": 4161,
+            "dsc": "(Lnet/fabricmc/fabric/api/renderer/v1/mesh/ShadeMode;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "glint",
+            "acc": 4161,
+            "dsc": "(Lnet/minecraft/client/renderer/item/ItemStackRenderState$FoilType;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "ambientOcclusion",
+            "acc": 4161,
+            "dsc": "(Lnet/fabricmc/fabric/api/util/TriState;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "diffuseShade",
+            "acc": 4161,
+            "dsc": "(Z)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "emissive",
+            "acc": 4161,
+            "dsc": "(Z)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "renderLayer",
+            "acc": 4161,
+            "dsc": "(Lnet/minecraft/client/renderer/chunk/ChunkSectionLayer;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "cullFace",
+            "acc": 4161,
+            "dsc": "(Lnet/minecraft/core/Direction;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "nominalFace",
+            "acc": 4161,
+            "dsc": "(Lnet/minecraft/core/Direction;)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "normal",
+            "acc": 4161,
+            "dsc": "(IFFF)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "lightmap",
+            "acc": 4161,
+            "dsc": "(II)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "uv",
+            "acc": 4161,
+            "dsc": "(IFF)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "color",
+            "acc": 4161,
+            "dsc": "(II)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          },
+          {
+            "nme": "pos",
+            "acc": 4161,
+            "dsc": "(IFFF)Lnet/fabricmc/fabric/api/renderer/v1/mesh/MutableQuadView;"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/accessor/AccessChunkRendererRegion.class": {
+        "ver": 65,
+        "acc": 1537,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/accessor/AccessChunkRendererRegion",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "fabric_getRenderer",
+            "acc": 1025,
+            "dsc": "()Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/TerrainRenderContext;"
+          },
+          {
+            "nme": "fabric_setRenderer",
+            "acc": 1025,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/TerrainRenderContext;)V"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace$3.class": {
+        "ver": 65,
+        "acc": 16432,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace$3",
+        "super": "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "(Ljava/lang/String;I[Lnet/minecraft/core/Direction;[I)V"
+          },
+          {
+            "nme": "computeCornerWeights",
+            "acc": 0,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl;I[F)V"
+          },
+          {
+            "nme": "computeDepth",
+            "acc": 0,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl;I)F"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/render/AbstractRenderContext$1.class": {
+        "ver": 65,
+        "acc": 32,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/render/AbstractRenderContext$1",
+        "super": "net/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/AbstractRenderContext;)V"
+          },
+          {
+            "nme": "emitDirectly",
+            "acc": 4,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 4112,
+            "nme": "this$0",
+            "dsc": "Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/AbstractRenderContext;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoCalculator.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoCalculator",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/BlockRenderInfo;Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/LightDataProvider;)V"
+          },
+          {
+            "nme": "clear",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "compute",
+            "acc": 1,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl;Z)V"
+          },
+          {
+            "nme": "calcVanilla",
+            "acc": 2,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl;)V"
+          },
+          {
+            "nme": "calcVanilla",
+            "acc": 2,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl;[F[I)V"
+          },
+          {
+            "nme": "calcFastVanilla",
+            "acc": 2,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl;)V"
+          },
+          {
+            "nme": "calcEnhanced",
+            "acc": 2,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl;)V"
+          },
+          {
+            "nme": "fullFace",
+            "acc": 2,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl;Lnet/minecraft/core/Direction;Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFaceData;)V"
+          },
+          {
+            "nme": "partialFace",
+            "acc": 2,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl;Lnet/minecraft/core/Direction;Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFaceData;)V"
+          },
+          {
+            "nme": "vanillaFullFace",
+            "acc": 2,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl;Lnet/minecraft/core/Direction;ZZ)V"
+          },
+          {
+            "nme": "vanillaPartialFace",
+            "acc": 2,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl;Lnet/minecraft/core/Direction;ZZ)V"
+          },
+          {
+            "nme": "blendedInsetFace",
+            "acc": 2,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl;ILnet/minecraft/core/Direction;Z)Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFaceData;"
+          },
+          {
+            "nme": "gatherInsetFace",
+            "acc": 2,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl;ILnet/minecraft/core/Direction;Z)Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFaceData;"
+          },
+          {
+            "nme": "blendedFullFace",
+            "acc": 2,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl;Lnet/minecraft/core/Direction;Z)V"
+          },
+          {
+            "nme": "blendedPartialFace",
+            "acc": 2,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl;Lnet/minecraft/core/Direction;Z)V"
+          },
+          {
+            "nme": "irregularFace",
+            "acc": 2,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl;Z)V"
+          },
+          {
+            "nme": "computeFace",
+            "acc": 2,
+            "dsc": "(Lnet/minecraft/core/Direction;ZZ)Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFaceData;"
+          },
+          {
+            "nme": "computeFace",
+            "acc": 2,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFaceData;Lnet/minecraft/core/Direction;ZZ)V"
+          },
+          {
+            "nme": "meanLight",
+            "acc": 10,
+            "dsc": "(IIIIZZZZ)I"
+          },
+          {
+            "nme": "vanillaMeanLight",
+            "acc": 10,
+            "dsc": "(IIII)I"
+          },
+          {
+            "nme": "meanInnerLight",
+            "acc": 10,
+            "dsc": "(IIII)I"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 26,
+            "nme": "LOGGER",
+            "dsc": "Lorg/slf4j/Logger;"
+          },
+          {
+            "acc": 18,
+            "nme": "blockInfo",
+            "dsc": "Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/BlockRenderInfo;"
+          },
+          {
+            "acc": 18,
+            "nme": "dataProvider",
+            "dsc": "Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/LightDataProvider;"
+          },
+          {
+            "acc": 18,
+            "nme": "lightPos",
+            "dsc": "Lnet/minecraft/core/BlockPos$MutableBlockPos;"
+          },
+          {
+            "acc": 18,
+            "nme": "searchPos",
+            "dsc": "Lnet/minecraft/core/BlockPos$MutableBlockPos;"
+          },
+          {
+            "acc": 18,
+            "nme": "faceData",
+            "dsc": "[Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFaceData;"
+          },
+          {
+            "acc": 2,
+            "nme": "completionFlags",
+            "dsc": "I"
+          },
+          {
+            "acc": 18,
+            "nme": "w",
+            "dsc": "[F"
+          },
+          {
+            "acc": 17,
+            "nme": "ao",
+            "dsc": "[F"
+          },
+          {
+            "acc": 17,
+            "nme": "light",
+            "dsc": "[I"
+          },
+          {
+            "acc": 18,
+            "nme": "vanillaCalc",
+            "dsc": "Lnet/minecraft/client/renderer/block/ModelBlockRenderer$AmbientOcclusionRenderStorage;"
+          },
+          {
+            "acc": 18,
+            "nme": "vanillaPos0",
+            "dsc": "Lorg/joml/Vector3f;"
+          },
+          {
+            "acc": 18,
+            "nme": "vanillaPos1",
+            "dsc": "Lorg/joml/Vector3f;"
+          },
+          {
+            "acc": 18,
+            "nme": "vanillaPos2",
+            "dsc": "Lorg/joml/Vector3f;"
+          },
+          {
+            "acc": 18,
+            "nme": "vanillaPos3",
+            "dsc": "Lorg/joml/Vector3f;"
+          },
+          {
+            "acc": 18,
+            "nme": "tmpFace",
+            "dsc": "Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFaceData;"
+          },
+          {
+            "acc": 18,
+            "nme": "vertexNormal",
+            "dsc": "Lorg/joml/Vector3f;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/render/package-info.class": {
+        "ver": 65,
+        "acc": 5632,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/render/package-info",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lorg/jspecify/annotations/NullMarked;"
+          },
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace.class": {
+        "ver": 65,
+        "acc": 17440,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace",
+        "super": "java/lang/Enum",
+        "mthds": [
+          {
+            "nme": "values",
+            "acc": 9,
+            "dsc": "()[Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace;"
+          },
+          {
+            "nme": "valueOf",
+            "acc": 9,
+            "dsc": "(Ljava/lang/String;)Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace;"
+          },
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "(Ljava/lang/String;I[Lnet/minecraft/core/Direction;[I)V",
+            "sig": "([Lnet/minecraft/core/Direction;[I)V"
+          },
+          {
+            "nme": "computeCornerWeights",
+            "acc": 1024,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl;I[F)V"
+          },
+          {
+            "nme": "computeDepth",
+            "acc": 1024,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl;I)F"
+          },
+          {
+            "nme": "get",
+            "acc": 8,
+            "dsc": "(Lnet/minecraft/core/Direction;)Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace;"
+          },
+          {
+            "nme": "$values",
+            "acc": 4106,
+            "dsc": "()[Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace;"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 16409,
+            "nme": "DOWN",
+            "dsc": "Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace;"
+          },
+          {
+            "acc": 16409,
+            "nme": "UP",
+            "dsc": "Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace;"
+          },
+          {
+            "acc": 16409,
+            "nme": "NORTH",
+            "dsc": "Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace;"
+          },
+          {
+            "acc": 16409,
+            "nme": "SOUTH",
+            "dsc": "Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace;"
+          },
+          {
+            "acc": 16409,
+            "nme": "WEST",
+            "dsc": "Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace;"
+          },
+          {
+            "acc": 16409,
+            "nme": "EAST",
+            "dsc": "Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace;"
+          },
+          {
+            "acc": 26,
+            "nme": "VALUES",
+            "dsc": "[Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace;"
+          },
+          {
+            "acc": 16,
+            "nme": "neighbors",
+            "dsc": "[Lnet/minecraft/core/Direction;"
+          },
+          {
+            "acc": 16,
+            "nme": "vertexMap",
+            "dsc": "[I"
+          },
+          {
+            "acc": 4122,
+            "nme": "$VALUES",
+            "dsc": "[Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoFace;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableMeshImpl$1.class": {
+        "ver": 65,
+        "acc": 32,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableMeshImpl$1",
+        "super": "net/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableMeshImpl;)V"
+          },
+          {
+            "nme": "emitDirectly",
+            "acc": 4,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 4112,
+            "nme": "this$0",
+            "dsc": "Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableMeshImpl;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/client/indigo/renderer/ModelBlockRendererMixin.class": {
+        "ver": 65,
+        "acc": 1056,
+        "nme": "net/fabricmc/fabric/mixin/client/indigo/renderer/ModelBlockRendererMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "()V"
+          },
+          {
+            "nme": "renderModel",
+            "acc": 9,
+            "dsc": "(Lcom/mojang/blaze3d/vertex/PoseStack$Pose;Lcom/mojang/blaze3d/vertex/VertexConsumer;Lnet/minecraft/client/renderer/block/model/BlockStateModel;FFFII)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/Overwrite;"
+              }
+            ]
+          },
+          {
+            "nme": "lambda$renderModel$0",
+            "acc": 4106,
+            "dsc": "(Lcom/mojang/blaze3d/vertex/VertexConsumer;Lnet/minecraft/client/renderer/chunk/ChunkSectionLayer;)Lcom/mojang/blaze3d/vertex/VertexConsumer;"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/client/renderer/block/ModelBlockRenderer"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/render/TerrainLikeRenderContext$1.class": {
+        "ver": 65,
+        "acc": 32,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/render/TerrainLikeRenderContext$1",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/TerrainLikeRenderContext;Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/BlockRenderInfo;)V",
+            "sig": "()V"
+          },
+          {
+            "nme": "light",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;)I"
+          },
+          {
+            "nme": "ao",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;)F"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 4112,
+            "nme": "val$blockInfo",
+            "dsc": "Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/BlockRenderInfo;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/render/AbstractRenderContext.class": {
+        "ver": 65,
+        "acc": 1057,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/render/AbstractRenderContext",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "getEmitter",
+            "acc": 4,
+            "dsc": "()Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;"
+          },
+          {
+            "nme": "bufferQuad",
+            "acc": 1028,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;)V"
+          },
+          {
+            "nme": "bufferQuad",
+            "acc": 4,
+            "dsc": "(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;Lcom/mojang/blaze3d/vertex/VertexConsumer;)V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "editorQuad",
+            "dsc": "Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;"
+          },
+          {
+            "acc": 18,
+            "nme": "posVec",
+            "dsc": "Lorg/joml/Vector4f;"
+          },
+          {
+            "acc": 18,
+            "nme": "normalVec",
+            "dsc": "Lorg/joml/Vector3f;"
+          },
+          {
+            "acc": 4,
+            "nme": "matrices",
+            "dsc": "Lcom/mojang/blaze3d/vertex/PoseStack$Pose;"
+          },
+          {
+            "acc": 4,
+            "nme": "overlay",
+            "dsc": "I"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/Indigo.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/Indigo",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "asBoolean",
+            "acc": 10,
+            "dsc": "(Ljava/lang/String;Z)Z"
+          },
+          {
+            "nme": "asEnum",
+            "acc": 10,
+            "dsc": "(Ljava/lang/String;Ljava/lang/Enum;)Ljava/lang/Enum;",
+            "sig": "<T:Ljava/lang/Enum;>(Ljava/lang/String;TT;)TT;"
+          },
+          {
+            "nme": "asTriState",
+            "acc": 10,
+            "dsc": "(Ljava/lang/String;)Lnet/fabricmc/fabric/api/util/TriState;"
+          },
+          {
+            "nme": "onInitializeClient",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "lambda$static$5",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Object;)Ljava/lang/Object;"
+          },
+          {
+            "nme": "lambda$static$4",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Object;)Ljava/lang/Object;"
+          },
+          {
+            "nme": "lambda$static$3",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Object;)Ljava/lang/Object;"
+          },
+          {
+            "nme": "lambda$static$2",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Object;)Ljava/lang/Object;"
+          },
+          {
+            "nme": "lambda$static$1",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Object;)Ljava/lang/Object;"
+          },
+          {
+            "nme": "lambda$static$0",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Object;)Ljava/lang/Object;"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "AMBIENT_OCCLUSION_MODE",
+            "dsc": "Lnet/fabricmc/fabric/impl/client/indigo/renderer/aocalc/AoConfig;"
+          },
+          {
+            "acc": 25,
+            "nme": "DEBUG_COMPARE_LIGHTING",
+            "dsc": "Z"
+          },
+          {
+            "acc": 25,
+            "nme": "FIX_SMOOTH_LIGHTING_OFFSET",
+            "dsc": "Z"
+          },
+          {
+            "acc": 25,
+            "nme": "FIX_MEAN_LIGHT_CALCULATION",
+            "dsc": "Z"
+          },
+          {
+            "acc": 25,
+            "nme": "FIX_EXTERIOR_VERTEX_LIGHTING",
+            "dsc": "Z"
+          },
+          {
+            "acc": 25,
+            "nme": "FIX_LUMINOUS_AO_SHADE",
+            "dsc": "Z"
+          },
+          {
+            "acc": 25,
+            "nme": "LOGGER",
+            "dsc": "Lorg/slf4j/Logger;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/mesh/package-info.class": {
+        "ver": 65,
+        "acc": 5632,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/mesh/package-info",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lorg/jspecify/annotations/NullMarked;"
+          },
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/package-info.class": {
+        "ver": 65,
+        "acc": 5632,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/package-info",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lorg/jspecify/annotations/NullMarked;"
+          },
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/client/indigo/renderer/mesh/MeshViewImpl.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/impl/client/indigo/renderer/mesh/MeshViewImpl",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "()V"
+          },
+          {
+            "nme": "size",
+            "acc": 1,
+            "dsc": "()I"
+          },
+          {
+            "nme": "forEach",
+            "acc": 1,
+            "dsc": "(Ljava/util/function/Consumer;)V",
+            "sig": "(Ljava/util/function/Consumer<-Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadView;>;)V"
+          },
+          {
+            "nme": "forEach",
+            "acc": 0,
+            "dsc": "(Ljava/util/function/Consumer;Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl;)V",
+            "sig": "<C:Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl;>(Ljava/util/function/Consumer<-TC;>;TC;)V"
+          },
+          {
+            "nme": "outputTo",
+            "acc": 1,
+            "dsc": "(Lnet/fabricmc/fabric/api/renderer/v1/mesh/QuadEmitter;)V"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 26,
+            "nme": "CURSOR_POOLS",
+            "dsc": "Ljava/lang/ThreadLocal;",
+            "sig": "Ljava/lang/ThreadLocal<Lit/unimi/dsi/fastutil/objects/ObjectArrayList<Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/QuadViewImpl;>;>;"
+          },
+          {
+            "acc": 0,
+            "nme": "data",
+            "dsc": "[I"
+          },
+          {
+            "acc": 0,
+            "nme": "limit",
+            "dsc": "I"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

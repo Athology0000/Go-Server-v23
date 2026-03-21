@@ -1,0 +1,21 @@
+{
+  "md5": "213d6a1d9507e7208b1d811b364ce006",
+  "sha2": "c9ba70b118d81a229f1b9498f8ccab8968d0afb2",
+  "sha256": "5886a23865e68668a235c25645f4e367e8b4b19b9b12098633fb0f74f1a554b1",
+  "contents": {
+    "classes": {
+      "META-INF/versions/9/module-info.class": {
+        "ver": 53,
+        "acc": 32768,
+        "nme": "module-info",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Ljava/lang/Deprecated;"
+          }
+        ]
+      }
+    }
+  }
+}

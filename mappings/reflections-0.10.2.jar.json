@@ -1,0 +1,4831 @@
+{
+  "md5": "1d0070839d825f57fe6f4d8e2a82989b",
+  "sha2": "b638d7ca0e0fe0146b60a0e7ba232ad852a73b31",
+  "sha256": "938a2d08fe54050d7610b944d8ddc3a09355710d9e6be0aac838dbc04e9a2825",
+  "contents": {
+    "classes": {
+      "org/reflections/vfs/Vfs$DefaultUrlTypes$1.class": {
+        "ver": 52,
+        "acc": 16432,
+        "nme": "org/reflections/vfs/Vfs$DefaultUrlTypes$1",
+        "super": "org/reflections/vfs/Vfs$DefaultUrlTypes",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Ljava/lang/String;I)V"
+          },
+          {
+            "nme": "matches",
+            "acc": 1,
+            "dsc": "(Ljava/net/URL;)Z"
+          },
+          {
+            "nme": "createDir",
+            "acc": 1,
+            "dsc": "(Ljava/net/URL;)Lorg/reflections/vfs/Vfs$Dir;",
+            "exs": [
+              "java/lang/Exception"
+            ]
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/ReflectionUtils$1.class": {
+        "ver": 52,
+        "acc": 48,
+        "nme": "org/reflections/ReflectionUtils$1",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "()V"
+          },
+          {
+            "nme": "get",
+            "acc": 1,
+            "dsc": "(Ljava/lang/Class;)Lorg/reflections/util/QueryFunction;",
+            "sig": "(Ljava/lang/Class<*>;)Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;Ljava/lang/Class<*>;>;"
+          },
+          {
+            "nme": "of",
+            "acc": 1,
+            "dsc": "(Ljava/lang/Class;)Lorg/reflections/util/QueryFunction;",
+            "sig": "(Ljava/lang/Class<*>;)Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;Ljava/lang/Class<*>;>;"
+          },
+          {
+            "nme": "of",
+            "acc": 4161,
+            "dsc": "(Ljava/lang/Object;)Lorg/reflections/util/QueryFunction;"
+          },
+          {
+            "nme": "get",
+            "acc": 4161,
+            "dsc": "(Ljava/lang/Object;)Lorg/reflections/util/QueryFunction;"
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/scanners/Scanners$1.class": {
+        "ver": 52,
+        "acc": 16432,
+        "nme": "org/reflections/scanners/Scanners$1",
+        "super": "org/reflections/scanners/Scanners",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Ljava/lang/String;I)V"
+          },
+          {
+            "nme": "scan",
+            "acc": 1,
+            "dsc": "(Ljavassist/bytecode/ClassFile;Ljava/util/List;)V",
+            "sig": "(Ljavassist/bytecode/ClassFile;Ljava/util/List<Ljava/util/Map$Entry<Ljava/lang/String;Ljava/lang/String;>;>;)V"
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/vfs/JbossDir$1.class": {
+        "ver": 52,
+        "acc": 32,
+        "nme": "org/reflections/vfs/JbossDir$1",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Lorg/reflections/vfs/JbossDir;)V"
+          },
+          {
+            "nme": "hasNext",
+            "acc": 1,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "next",
+            "acc": 1,
+            "dsc": "()Lorg/reflections/vfs/Vfs$File;"
+          },
+          {
+            "nme": "computeNext",
+            "acc": 2,
+            "dsc": "()Lorg/reflections/vfs/Vfs$File;"
+          },
+          {
+            "nme": "next",
+            "acc": 4161,
+            "dsc": "()Ljava/lang/Object;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 0,
+            "nme": "entry",
+            "dsc": "Lorg/reflections/vfs/Vfs$File;"
+          },
+          {
+            "acc": 16,
+            "nme": "stack",
+            "dsc": "Ljava/util/Stack;"
+          },
+          {
+            "acc": 4112,
+            "nme": "this$0",
+            "dsc": "Lorg/reflections/vfs/JbossDir;"
+          }
+        ]
+      },
+      "org/reflections/util/QueryBuilder.class": {
+        "ver": 52,
+        "acc": 1537,
+        "nme": "org/reflections/util/QueryBuilder",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "index",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "get",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;)Lorg/reflections/util/QueryFunction;",
+            "sig": "(Ljava/lang/String;)Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;Ljava/lang/String;>;"
+          },
+          {
+            "nme": "get",
+            "acc": 1,
+            "dsc": "(Ljava/lang/reflect/AnnotatedElement;)Lorg/reflections/util/QueryFunction;",
+            "sig": "(Ljava/lang/reflect/AnnotatedElement;)Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;Ljava/lang/String;>;"
+          },
+          {
+            "nme": "get",
+            "acc": 1,
+            "dsc": "(Ljava/util/Collection;)Lorg/reflections/util/QueryFunction;",
+            "sig": "(Ljava/util/Collection<Ljava/lang/String;>;)Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;Ljava/lang/String;>;"
+          },
+          {
+            "nme": "getAll",
+            "acc": 1,
+            "dsc": "(Ljava/util/Collection;)Lorg/reflections/util/QueryFunction;",
+            "sig": "(Ljava/util/Collection<Ljava/lang/String;>;)Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;Ljava/lang/String;>;"
+          },
+          {
+            "nme": "getAllIncluding",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;)Lorg/reflections/util/QueryFunction;",
+            "sig": "(Ljava/lang/String;)Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;Ljava/lang/String;>;"
+          },
+          {
+            "nme": "getAllIncluding",
+            "acc": 1,
+            "dsc": "(Ljava/util/Collection;)Lorg/reflections/util/QueryFunction;",
+            "sig": "(Ljava/util/Collection<Ljava/lang/String;>;)Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;Ljava/lang/String;>;"
+          },
+          {
+            "nme": "of",
+            "acc": 1,
+            "dsc": "(Ljava/util/Collection;)Lorg/reflections/util/QueryFunction;",
+            "sig": "(Ljava/util/Collection<Ljava/lang/String;>;)Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;Ljava/lang/String;>;"
+          },
+          {
+            "nme": "of",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;)Lorg/reflections/util/QueryFunction;",
+            "sig": "(Ljava/lang/String;)Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;Ljava/lang/String;>;"
+          },
+          {
+            "nme": "of",
+            "acc": 129,
+            "dsc": "([Ljava/lang/reflect/AnnotatedElement;)Lorg/reflections/util/QueryFunction;",
+            "sig": "([Ljava/lang/reflect/AnnotatedElement;)Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;Ljava/lang/String;>;"
+          },
+          {
+            "nme": "of",
+            "acc": 1,
+            "dsc": "(Ljava/util/Set;)Lorg/reflections/util/QueryFunction;",
+            "sig": "(Ljava/util/Set<+Ljava/lang/reflect/AnnotatedElement;>;)Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;Ljava/lang/String;>;"
+          },
+          {
+            "nme": "with",
+            "acc": 1,
+            "dsc": "(Ljava/util/Collection;)Lorg/reflections/util/QueryFunction;",
+            "sig": "(Ljava/util/Collection<Ljava/lang/String;>;)Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;Ljava/lang/String;>;"
+          },
+          {
+            "nme": "with",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;)Lorg/reflections/util/QueryFunction;",
+            "sig": "(Ljava/lang/String;)Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;Ljava/lang/String;>;"
+          },
+          {
+            "nme": "with",
+            "acc": 129,
+            "dsc": "([Ljava/lang/reflect/AnnotatedElement;)Lorg/reflections/util/QueryFunction;",
+            "sig": "([Ljava/lang/reflect/AnnotatedElement;)Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;Ljava/lang/String;>;"
+          },
+          {
+            "nme": "with",
+            "acc": 1,
+            "dsc": "(Ljava/util/Set;)Lorg/reflections/util/QueryFunction;",
+            "sig": "(Ljava/util/Set<+Ljava/lang/reflect/AnnotatedElement;>;)Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;Ljava/lang/String;>;"
+          },
+          {
+            "nme": "of",
+            "acc": 1,
+            "dsc": "(Lorg/reflections/util/QueryFunction;)Lorg/reflections/util/QueryFunction;",
+            "sig": "<T:Ljava/lang/Object;>(Lorg/reflections/util/QueryFunction;)Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;TT;>;"
+          },
+          {
+            "nme": "lambda$get$0",
+            "acc": 4098,
+            "dsc": "(Ljava/lang/String;Lorg/reflections/Store;)Ljava/util/Set;"
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/scanners/MethodParameterScanner.class": {
+        "ver": 52,
+        "acc": 131105,
+        "nme": "org/reflections/scanners/MethodParameterScanner",
+        "super": "org/reflections/scanners/AbstractScanner",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 131073,
+            "dsc": "()V",
+            "vanns": [
+              {
+                "dsc": "Ljava/lang/Deprecated;"
+              }
+            ]
+          },
+          {
+            "nme": "scan",
+            "acc": 4161,
+            "dsc": "(Ljavassist/bytecode/ClassFile;)Ljava/util/List;"
+          },
+          {
+            "nme": "index",
+            "acc": 4161,
+            "dsc": "()Ljava/lang/String;"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Ljava/lang/Deprecated;"
+          }
+        ]
+      },
+      "org/reflections/scanners/SubTypesScanner.class": {
+        "ver": 52,
+        "acc": 131105,
+        "nme": "org/reflections/scanners/SubTypesScanner",
+        "super": "org/reflections/scanners/AbstractScanner",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 131073,
+            "dsc": "()V",
+            "vanns": [
+              {
+                "dsc": "Ljava/lang/Deprecated;"
+              }
+            ]
+          },
+          {
+            "nme": "<init>",
+            "acc": 131073,
+            "dsc": "(Z)V",
+            "vanns": [
+              {
+                "dsc": "Ljava/lang/Deprecated;"
+              }
+            ]
+          },
+          {
+            "nme": "scan",
+            "acc": 1,
+            "dsc": "(Ljavassist/bytecode/ClassFile;)Ljava/util/List;",
+            "sig": "(Ljavassist/bytecode/ClassFile;)Ljava/util/List<Ljava/util/Map$Entry<Ljava/lang/String;Ljava/lang/String;>;>;"
+          },
+          {
+            "nme": "index",
+            "acc": 4161,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "lambda$new$0",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/String;)Z"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Ljava/lang/Deprecated;"
+          }
+        ]
+      },
+      "org/reflections/serializers/JsonSerializer.class": {
+        "ver": 52,
+        "acc": 33,
+        "nme": "org/reflections/serializers/JsonSerializer",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "read",
+            "acc": 1,
+            "dsc": "(Ljava/io/InputStream;)Lorg/reflections/Reflections;"
+          },
+          {
+            "nme": "save",
+            "acc": 1,
+            "dsc": "(Lorg/reflections/Reflections;Ljava/lang/String;)Ljava/io/File;"
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/util/FilterBuilder$Exclude.class": {
+        "ver": 52,
+        "acc": 32,
+        "nme": "org/reflections/util/FilterBuilder$Exclude",
+        "super": "org/reflections/util/FilterBuilder$Matcher",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Ljava/lang/String;)V"
+          },
+          {
+            "nme": "test",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;)Z"
+          },
+          {
+            "nme": "toString",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "test",
+            "acc": 4161,
+            "dsc": "(Ljava/lang/Object;)Z"
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/Store.class": {
+        "ver": 52,
+        "acc": 33,
+        "nme": "org/reflections/Store",
+        "super": "java/util/HashMap",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Ljava/util/Map;)V",
+            "sig": "(Ljava/util/Map<Ljava/lang/String;Ljava/util/Map<Ljava/lang/String;Ljava/util/Set<Ljava/lang/String;>;>;>;)V"
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/vfs/Vfs$DefaultUrlTypes$5.class": {
+        "ver": 52,
+        "acc": 16432,
+        "nme": "org/reflections/vfs/Vfs$DefaultUrlTypes$5",
+        "super": "org/reflections/vfs/Vfs$DefaultUrlTypes",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Ljava/lang/String;I)V"
+          },
+          {
+            "nme": "matches",
+            "acc": 1,
+            "dsc": "(Ljava/net/URL;)Z",
+            "exs": [
+              "java/lang/Exception"
+            ]
+          },
+          {
+            "nme": "createDir",
+            "acc": 1,
+            "dsc": "(Ljava/net/URL;)Lorg/reflections/vfs/Vfs$Dir;",
+            "exs": [
+              "java/lang/Exception"
+            ]
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/vfs/ZipDir.class": {
+        "ver": 52,
+        "acc": 33,
+        "nme": "org/reflections/vfs/ZipDir",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Ljava/util/jar/JarFile;)V"
+          },
+          {
+            "nme": "getPath",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "getFiles",
+            "acc": 1,
+            "dsc": "()Ljava/lang/Iterable;",
+            "sig": "()Ljava/lang/Iterable<Lorg/reflections/vfs/Vfs$File;>;"
+          },
+          {
+            "nme": "close",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "toString",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "lambda$getFiles$2",
+            "acc": 4098,
+            "dsc": "()Ljava/util/Iterator;"
+          },
+          {
+            "nme": "lambda$null$1",
+            "acc": 4098,
+            "dsc": "(Ljava/util/zip/ZipEntry;)Lorg/reflections/vfs/Vfs$File;"
+          },
+          {
+            "nme": "lambda$null$0",
+            "acc": 4106,
+            "dsc": "(Ljava/util/zip/ZipEntry;)Z"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 16,
+            "nme": "jarFile",
+            "dsc": "Ljava/util/zip/ZipFile;"
+          }
+        ]
+      },
+      "org/reflections/scanners/Scanners$4.class": {
+        "ver": 52,
+        "acc": 16432,
+        "nme": "org/reflections/scanners/Scanners$4",
+        "super": "org/reflections/scanners/Scanners",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Ljava/lang/String;I)V"
+          },
+          {
+            "nme": "scan",
+            "acc": 1,
+            "dsc": "(Ljavassist/bytecode/ClassFile;Ljava/util/List;)V",
+            "sig": "(Ljavassist/bytecode/ClassFile;Ljava/util/List<Ljava/util/Map$Entry<Ljava/lang/String;Ljava/lang/String;>;>;)V"
+          },
+          {
+            "nme": "lambda$scan$0",
+            "acc": 4098,
+            "dsc": "(Ljava/util/List;Ljavassist/bytecode/ClassFile;Ljavassist/bytecode/MethodInfo;)V"
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/scanners/Scanners$7.class": {
+        "ver": 52,
+        "acc": 16432,
+        "nme": "org/reflections/scanners/Scanners$7",
+        "super": "org/reflections/scanners/Scanners",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Ljava/lang/String;I)V"
+          },
+          {
+            "nme": "scan",
+            "acc": 1,
+            "dsc": "(Ljavassist/bytecode/ClassFile;Ljava/util/List;)V",
+            "sig": "(Ljavassist/bytecode/ClassFile;Ljava/util/List<Ljava/util/Map$Entry<Ljava/lang/String;Ljava/lang/String;>;>;)V"
+          },
+          {
+            "nme": "lambda$scan$1",
+            "acc": 4098,
+            "dsc": "(Ljavassist/bytecode/ClassFile;Ljava/util/List;Ljavassist/bytecode/MethodInfo;)V"
+          },
+          {
+            "nme": "lambda$null$0",
+            "acc": 4098,
+            "dsc": "(Ljava/util/List;Ljava/lang/String;Ljava/util/List;)V"
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/scanners/Scanner.class": {
+        "ver": 52,
+        "acc": 1537,
+        "nme": "org/reflections/scanners/Scanner",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "scan",
+            "acc": 1025,
+            "dsc": "(Ljavassist/bytecode/ClassFile;)Ljava/util/List;",
+            "sig": "(Ljavassist/bytecode/ClassFile;)Ljava/util/List<Ljava/util/Map$Entry<Ljava/lang/String;Ljava/lang/String;>;>;"
+          },
+          {
+            "nme": "scan",
+            "acc": 1,
+            "dsc": "(Lorg/reflections/vfs/Vfs$File;)Ljava/util/List;",
+            "sig": "(Lorg/reflections/vfs/Vfs$File;)Ljava/util/List<Ljava/util/Map$Entry<Ljava/lang/String;Ljava/lang/String;>;>;",
+            "vanns": [
+              {
+                "dsc": "Ljavax/annotation/Nullable;"
+              }
+            ]
+          },
+          {
+            "nme": "index",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "acceptsInput",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;)Z"
+          },
+          {
+            "nme": "entry",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;Ljava/lang/String;)Ljava/util/Map$Entry;",
+            "sig": "(Ljava/lang/String;Ljava/lang/String;)Ljava/util/Map$Entry<Ljava/lang/String;Ljava/lang/String;>;"
+          },
+          {
+            "nme": "entries",
+            "acc": 1,
+            "dsc": "(Ljava/util/Collection;Ljava/lang/String;)Ljava/util/List;",
+            "sig": "(Ljava/util/Collection<Ljava/lang/String;>;Ljava/lang/String;)Ljava/util/List<Ljava/util/Map$Entry<Ljava/lang/String;Ljava/lang/String;>;>;"
+          },
+          {
+            "nme": "entries",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;Ljava/lang/String;)Ljava/util/List;",
+            "sig": "(Ljava/lang/String;Ljava/lang/String;)Ljava/util/List<Ljava/util/Map$Entry<Ljava/lang/String;Ljava/lang/String;>;>;"
+          },
+          {
+            "nme": "entries",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;Ljava/util/Collection;)Ljava/util/List;",
+            "sig": "(Ljava/lang/String;Ljava/util/Collection<Ljava/lang/String;>;)Ljava/util/List<Ljava/util/Map$Entry<Ljava/lang/String;Ljava/lang/String;>;>;"
+          },
+          {
+            "nme": "lambda$entries$1",
+            "acc": 4098,
+            "dsc": "(Ljava/lang/String;Ljava/lang/String;)Ljava/util/Map$Entry;"
+          },
+          {
+            "nme": "lambda$entries$0",
+            "acc": 4098,
+            "dsc": "(Ljava/lang/String;Ljava/lang/String;)Ljava/util/Map$Entry;"
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/serializers/JavaCodeSerializer.class": {
+        "ver": 52,
+        "acc": 33,
+        "nme": "org/reflections/serializers/JavaCodeSerializer",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "read",
+            "acc": 1,
+            "dsc": "(Ljava/io/InputStream;)Lorg/reflections/Reflections;"
+          },
+          {
+            "nme": "save",
+            "acc": 1,
+            "dsc": "(Lorg/reflections/Reflections;Ljava/lang/String;)Ljava/io/File;"
+          },
+          {
+            "nme": "toString",
+            "acc": 2,
+            "dsc": "(Lorg/reflections/Reflections;)V"
+          },
+          {
+            "nme": "indentOpen",
+            "acc": 4,
+            "dsc": "(Ljava/util/List;Ljava/util/List;)I",
+            "sig": "(Ljava/util/List<Ljava/lang/String;>;Ljava/util/List<Ljava/lang/String;>;)I"
+          },
+          {
+            "nme": "indentClose",
+            "acc": 4,
+            "dsc": "(Ljava/util/List;)V",
+            "sig": "(Ljava/util/List<Ljava/lang/String;>;)V"
+          },
+          {
+            "nme": "addPackages",
+            "acc": 4,
+            "dsc": "(Ljava/util/List;I)V",
+            "sig": "(Ljava/util/List<Ljava/lang/String;>;I)V"
+          },
+          {
+            "nme": "addClass",
+            "acc": 4,
+            "dsc": "(Ljava/util/List;Ljava/lang/String;)V",
+            "sig": "(Ljava/util/List<Ljava/lang/String;>;Ljava/lang/String;)V"
+          },
+          {
+            "nme": "addFields",
+            "acc": 4,
+            "dsc": "(Ljava/util/List;Ljava/util/List;)V",
+            "sig": "(Ljava/util/List<Ljava/lang/String;>;Ljava/util/List<Ljava/lang/String;>;)V"
+          },
+          {
+            "nme": "addMethods",
+            "acc": 4,
+            "dsc": "(Ljava/util/List;Ljava/util/List;Ljava/util/List;)V",
+            "sig": "(Ljava/util/List<Ljava/lang/String;>;Ljava/util/List<Ljava/lang/String;>;Ljava/util/List<Ljava/lang/String;>;)V"
+          },
+          {
+            "nme": "addAnnotations",
+            "acc": 4,
+            "dsc": "(Ljava/util/List;Ljava/util/List;)V",
+            "sig": "(Ljava/util/List<Ljava/lang/String;>;Ljava/util/List<Ljava/lang/String;>;)V"
+          },
+          {
+            "nme": "uniqueName",
+            "acc": 2,
+            "dsc": "(Ljava/lang/String;Ljava/util/List;I)Ljava/lang/String;",
+            "sig": "(Ljava/lang/String;Ljava/util/List<Ljava/lang/String;>;I)Ljava/lang/String;"
+          },
+          {
+            "nme": "normalize",
+            "acc": 2,
+            "dsc": "(Ljava/lang/String;)Ljava/lang/String;"
+          },
+          {
+            "nme": "uniqueName",
+            "acc": 2,
+            "dsc": "(Ljava/lang/String;Ljava/util/List;)Ljava/lang/String;",
+            "sig": "(Ljava/lang/String;Ljava/util/List<Ljava/lang/String;>;)Ljava/lang/String;"
+          },
+          {
+            "nme": "indent",
+            "acc": 2,
+            "dsc": "(I)Ljava/lang/String;"
+          },
+          {
+            "nme": "lambda$indent$2",
+            "acc": 4106,
+            "dsc": "(I)Ljava/lang/String;"
+          },
+          {
+            "nme": "lambda$toString$1",
+            "acc": 4098,
+            "dsc": "(Ljava/util/Map;Ljava/lang/String;)V"
+          },
+          {
+            "nme": "lambda$null$0",
+            "acc": 4106,
+            "dsc": "(Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/String;)V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 26,
+            "nme": "pathSeparator",
+            "dsc": "Ljava/lang/String;",
+            "val": "_"
+          },
+          {
+            "acc": 26,
+            "nme": "doubleSeparator",
+            "dsc": "Ljava/lang/String;",
+            "val": "__"
+          },
+          {
+            "acc": 26,
+            "nme": "dotSeparator",
+            "dsc": "Ljava/lang/String;",
+            "val": "."
+          },
+          {
+            "acc": 26,
+            "nme": "arrayDescriptor",
+            "dsc": "Ljava/lang/String;",
+            "val": "$$"
+          },
+          {
+            "acc": 26,
+            "nme": "tokenSeparator",
+            "dsc": "Ljava/lang/String;",
+            "val": "_"
+          },
+          {
+            "acc": 2,
+            "nme": "sb",
+            "dsc": "Ljava/lang/StringBuilder;"
+          },
+          {
+            "acc": 2,
+            "nme": "prevPaths",
+            "dsc": "Ljava/util/List;",
+            "sig": "Ljava/util/List<Ljava/lang/String;>;"
+          },
+          {
+            "acc": 2,
+            "nme": "indent",
+            "dsc": "I"
+          }
+        ]
+      },
+      "org/reflections/serializers/Serializer.class": {
+        "ver": 52,
+        "acc": 1537,
+        "nme": "org/reflections/serializers/Serializer",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "read",
+            "acc": 1025,
+            "dsc": "(Ljava/io/InputStream;)Lorg/reflections/Reflections;"
+          },
+          {
+            "nme": "save",
+            "acc": 1025,
+            "dsc": "(Lorg/reflections/Reflections;Ljava/lang/String;)Ljava/io/File;"
+          },
+          {
+            "nme": "prepareFile",
+            "acc": 9,
+            "dsc": "(Ljava/lang/String;)Ljava/io/File;"
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/vfs/SystemDir.class": {
+        "ver": 52,
+        "acc": 33,
+        "nme": "org/reflections/vfs/SystemDir",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Ljava/io/File;)V"
+          },
+          {
+            "nme": "getPath",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "getFiles",
+            "acc": 1,
+            "dsc": "()Ljava/lang/Iterable;",
+            "sig": "()Ljava/lang/Iterable<Lorg/reflections/vfs/Vfs$File;>;"
+          },
+          {
+            "nme": "lambda$getFiles$2",
+            "acc": 4098,
+            "dsc": "()Ljava/util/Iterator;"
+          },
+          {
+            "nme": "lambda$null$1",
+            "acc": 4098,
+            "dsc": "(Ljava/nio/file/Path;)Lorg/reflections/vfs/Vfs$File;"
+          },
+          {
+            "nme": "lambda$null$0",
+            "acc": 4106,
+            "dsc": "(Ljava/nio/file/Path;)Z"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "file",
+            "dsc": "Ljava/io/File;"
+          }
+        ]
+      },
+      "org/reflections/vfs/UrlTypeVFS.class": {
+        "ver": 52,
+        "acc": 33,
+        "nme": "org/reflections/vfs/UrlTypeVFS",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "matches",
+            "acc": 1,
+            "dsc": "(Ljava/net/URL;)Z"
+          },
+          {
+            "nme": "createDir",
+            "acc": 1,
+            "dsc": "(Ljava/net/URL;)Lorg/reflections/vfs/Vfs$Dir;"
+          },
+          {
+            "nme": "adaptURL",
+            "acc": 1,
+            "dsc": "(Ljava/net/URL;)Ljava/net/URL;",
+            "exs": [
+              "java/net/MalformedURLException"
+            ]
+          },
+          {
+            "nme": "replaceZipSeparators",
+            "acc": 0,
+            "dsc": "(Ljava/lang/String;Ljava/util/function/Predicate;)Ljava/net/URL;",
+            "sig": "(Ljava/lang/String;Ljava/util/function/Predicate<Ljava/io/File;>;)Ljava/net/URL;",
+            "exs": [
+              "java/net/MalformedURLException"
+            ]
+          },
+          {
+            "nme": "findFirstMatchOfDeployableExtention",
+            "acc": 0,
+            "dsc": "(Ljava/lang/String;I)I"
+          },
+          {
+            "nme": "replaceZipSeparatorStartingFrom",
+            "acc": 0,
+            "dsc": "(Ljava/lang/String;I)Ljava/net/URL;",
+            "exs": [
+              "java/net/MalformedURLException"
+            ]
+          },
+          {
+            "nme": "lambda$adaptURL$0",
+            "acc": 4106,
+            "dsc": "(Ljava/io/File;)Z"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "REPLACE_EXTENSION",
+            "dsc": "[Ljava/lang/String;"
+          },
+          {
+            "acc": 16,
+            "nme": "VFSZIP",
+            "dsc": "Ljava/lang/String;",
+            "val": "vfszip"
+          },
+          {
+            "acc": 16,
+            "nme": "VFSFILE",
+            "dsc": "Ljava/lang/String;",
+            "val": "vfsfile"
+          }
+        ]
+      },
+      "org/reflections/Configuration.class": {
+        "ver": 52,
+        "acc": 1537,
+        "nme": "org/reflections/Configuration",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "getScanners",
+            "acc": 1025,
+            "dsc": "()Ljava/util/Set;",
+            "sig": "()Ljava/util/Set<Lorg/reflections/scanners/Scanner;>;"
+          },
+          {
+            "nme": "getUrls",
+            "acc": 1025,
+            "dsc": "()Ljava/util/Set;",
+            "sig": "()Ljava/util/Set<Ljava/net/URL;>;"
+          },
+          {
+            "nme": "getInputsFilter",
+            "acc": 1025,
+            "dsc": "()Ljava/util/function/Predicate;",
+            "sig": "()Ljava/util/function/Predicate<Ljava/lang/String;>;"
+          },
+          {
+            "nme": "isParallel",
+            "acc": 1025,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "getClassLoaders",
+            "acc": 1025,
+            "dsc": "()[Ljava/lang/ClassLoader;"
+          },
+          {
+            "nme": "shouldExpandSuperTypes",
+            "acc": 1025,
+            "dsc": "()Z"
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/Reflections.class": {
+        "ver": 52,
+        "acc": 33,
+        "nme": "org/reflections/Reflections",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Lorg/reflections/Configuration;)V"
+          },
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Lorg/reflections/Store;)V"
+          },
+          {
+            "nme": "<init>",
+            "acc": 129,
+            "dsc": "(Ljava/lang/String;[Lorg/reflections/scanners/Scanner;)V"
+          },
+          {
+            "nme": "<init>",
+            "acc": 129,
+            "dsc": "([Ljava/lang/Object;)V"
+          },
+          {
+            "nme": "<init>",
+            "acc": 4,
+            "dsc": "()V"
+          },
+          {
+            "nme": "scan",
+            "acc": 4,
+            "dsc": "()Ljava/util/Map;",
+            "sig": "()Ljava/util/Map<Ljava/lang/String;Ljava/util/Map<Ljava/lang/String;Ljava/util/Set<Ljava/lang/String;>;>;>;"
+          },
+          {
+            "nme": "doFilter",
+            "acc": 2,
+            "dsc": "(Lorg/reflections/vfs/Vfs$File;Ljava/util/function/Predicate;)Z",
+            "sig": "(Lorg/reflections/vfs/Vfs$File;Ljava/util/function/Predicate<Ljava/lang/String;>;)Z"
+          },
+          {
+            "nme": "getClassFile",
+            "acc": 2,
+            "dsc": "(Lorg/reflections/vfs/Vfs$File;)Ljavassist/bytecode/ClassFile;"
+          },
+          {
+            "nme": "collect",
+            "acc": 9,
+            "dsc": "()Lorg/reflections/Reflections;"
+          },
+          {
+            "nme": "collect",
+            "acc": 9,
+            "dsc": "(Ljava/lang/String;Ljava/util/function/Predicate;)Lorg/reflections/Reflections;",
+            "sig": "(Ljava/lang/String;Ljava/util/function/Predicate<Ljava/lang/String;>;)Lorg/reflections/Reflections;"
+          },
+          {
+            "nme": "collect",
+            "acc": 9,
+            "dsc": "(Ljava/lang/String;Ljava/util/function/Predicate;Lorg/reflections/serializers/Serializer;)Lorg/reflections/Reflections;",
+            "sig": "(Ljava/lang/String;Ljava/util/function/Predicate<Ljava/lang/String;>;Lorg/reflections/serializers/Serializer;)Lorg/reflections/Reflections;"
+          },
+          {
+            "nme": "collect",
+            "acc": 1,
+            "dsc": "(Ljava/io/InputStream;Lorg/reflections/serializers/Serializer;)Lorg/reflections/Reflections;"
+          },
+          {
+            "nme": "collect",
+            "acc": 1,
+            "dsc": "(Ljava/io/File;Lorg/reflections/serializers/Serializer;)Lorg/reflections/Reflections;"
+          },
+          {
+            "nme": "merge",
+            "acc": 1,
+            "dsc": "(Lorg/reflections/Reflections;)Lorg/reflections/Reflections;"
+          },
+          {
+            "nme": "expandSuperTypes",
+            "acc": 1,
+            "dsc": "(Ljava/util/Map;Ljava/util/Map;)V",
+            "sig": "(Ljava/util/Map<Ljava/lang/String;Ljava/util/Set<Ljava/lang/String;>;>;Ljava/util/Map<Ljava/lang/String;Ljava/util/Set<Ljava/lang/String;>;>;)V"
+          },
+          {
+            "nme": "expandSupertypes",
+            "acc": 2,
+            "dsc": "(Ljava/util/Map;Ljava/util/Map;Ljava/lang/String;Ljava/lang/Class;)V",
+            "sig": "(Ljava/util/Map<Ljava/lang/String;Ljava/util/Set<Ljava/lang/String;>;>;Ljava/util/Map<Ljava/lang/String;Ljava/util/Set<Ljava/lang/String;>;>;Ljava/lang/String;Ljava/lang/Class<*>;)V"
+          },
+          {
+            "nme": "get",
+            "acc": 1,
+            "dsc": "(Lorg/reflections/util/QueryFunction;)Ljava/util/Set;",
+            "sig": "<T:Ljava/lang/Object;>(Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;TT;>;)Ljava/util/Set<TT;>;"
+          },
+          {
+            "nme": "getSubTypesOf",
+            "acc": 1,
+            "dsc": "(Ljava/lang/Class;)Ljava/util/Set;",
+            "sig": "<T:Ljava/lang/Object;>(Ljava/lang/Class<TT;>;)Ljava/util/Set<Ljava/lang/Class<+TT;>;>;"
+          },
+          {
+            "nme": "getTypesAnnotatedWith",
+            "acc": 1,
+            "dsc": "(Ljava/lang/Class;)Ljava/util/Set;",
+            "sig": "(Ljava/lang/Class<+Ljava/lang/annotation/Annotation;>;)Ljava/util/Set<Ljava/lang/Class<*>;>;"
+          },
+          {
+            "nme": "getTypesAnnotatedWith",
+            "acc": 1,
+            "dsc": "(Ljava/lang/Class;Z)Ljava/util/Set;",
+            "sig": "(Ljava/lang/Class<+Ljava/lang/annotation/Annotation;>;Z)Ljava/util/Set<Ljava/lang/Class<*>;>;"
+          },
+          {
+            "nme": "getTypesAnnotatedWith",
+            "acc": 1,
+            "dsc": "(Ljava/lang/annotation/Annotation;)Ljava/util/Set;",
+            "sig": "(Ljava/lang/annotation/Annotation;)Ljava/util/Set<Ljava/lang/Class<*>;>;"
+          },
+          {
+            "nme": "getTypesAnnotatedWith",
+            "acc": 1,
+            "dsc": "(Ljava/lang/annotation/Annotation;Z)Ljava/util/Set;",
+            "sig": "(Ljava/lang/annotation/Annotation;Z)Ljava/util/Set<Ljava/lang/Class<*>;>;"
+          },
+          {
+            "nme": "getMethodsAnnotatedWith",
+            "acc": 1,
+            "dsc": "(Ljava/lang/Class;)Ljava/util/Set;",
+            "sig": "(Ljava/lang/Class<+Ljava/lang/annotation/Annotation;>;)Ljava/util/Set<Ljava/lang/reflect/Method;>;"
+          },
+          {
+            "nme": "getMethodsAnnotatedWith",
+            "acc": 1,
+            "dsc": "(Ljava/lang/annotation/Annotation;)Ljava/util/Set;",
+            "sig": "(Ljava/lang/annotation/Annotation;)Ljava/util/Set<Ljava/lang/reflect/Method;>;"
+          },
+          {
+            "nme": "getMethodsWithSignature",
+            "acc": 129,
+            "dsc": "([Ljava/lang/Class;)Ljava/util/Set;",
+            "sig": "([Ljava/lang/Class<*>;)Ljava/util/Set<Ljava/lang/reflect/Method;>;"
+          },
+          {
+            "nme": "getMethodsWithParameter",
+            "acc": 1,
+            "dsc": "(Ljava/lang/reflect/AnnotatedElement;)Ljava/util/Set;",
+            "sig": "(Ljava/lang/reflect/AnnotatedElement;)Ljava/util/Set<Ljava/lang/reflect/Method;>;"
+          },
+          {
+            "nme": "getMethodsReturn",
+            "acc": 1,
+            "dsc": "(Ljava/lang/Class;)Ljava/util/Set;",
+            "sig": "(Ljava/lang/Class<*>;)Ljava/util/Set<Ljava/lang/reflect/Method;>;"
+          },
+          {
+            "nme": "getConstructorsAnnotatedWith",
+            "acc": 1,
+            "dsc": "(Ljava/lang/Class;)Ljava/util/Set;",
+            "sig": "(Ljava/lang/Class<+Ljava/lang/annotation/Annotation;>;)Ljava/util/Set<Ljava/lang/reflect/Constructor;>;"
+          },
+          {
+            "nme": "getConstructorsAnnotatedWith",
+            "acc": 1,
+            "dsc": "(Ljava/lang/annotation/Annotation;)Ljava/util/Set;",
+            "sig": "(Ljava/lang/annotation/Annotation;)Ljava/util/Set<Ljava/lang/reflect/Constructor;>;"
+          },
+          {
+            "nme": "getConstructorsWithSignature",
+            "acc": 129,
+            "dsc": "([Ljava/lang/Class;)Ljava/util/Set;",
+            "sig": "([Ljava/lang/Class<*>;)Ljava/util/Set<Ljava/lang/reflect/Constructor;>;"
+          },
+          {
+            "nme": "getConstructorsWithParameter",
+            "acc": 1,
+            "dsc": "(Ljava/lang/reflect/AnnotatedElement;)Ljava/util/Set;",
+            "sig": "(Ljava/lang/reflect/AnnotatedElement;)Ljava/util/Set<Ljava/lang/reflect/Constructor;>;"
+          },
+          {
+            "nme": "getFieldsAnnotatedWith",
+            "acc": 1,
+            "dsc": "(Ljava/lang/Class;)Ljava/util/Set;",
+            "sig": "(Ljava/lang/Class<+Ljava/lang/annotation/Annotation;>;)Ljava/util/Set<Ljava/lang/reflect/Field;>;"
+          },
+          {
+            "nme": "getFieldsAnnotatedWith",
+            "acc": 1,
+            "dsc": "(Ljava/lang/annotation/Annotation;)Ljava/util/Set;",
+            "sig": "(Ljava/lang/annotation/Annotation;)Ljava/util/Set<Ljava/lang/reflect/Field;>;"
+          },
+          {
+            "nme": "getResources",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;)Ljava/util/Set;",
+            "sig": "(Ljava/lang/String;)Ljava/util/Set<Ljava/lang/String;>;"
+          },
+          {
+            "nme": "getResources",
+            "acc": 1,
+            "dsc": "(Ljava/util/regex/Pattern;)Ljava/util/Set;",
+            "sig": "(Ljava/util/regex/Pattern;)Ljava/util/Set<Ljava/lang/String;>;"
+          },
+          {
+            "nme": "getMemberParameterNames",
+            "acc": 1,
+            "dsc": "(Ljava/lang/reflect/Member;)Ljava/util/List;",
+            "sig": "(Ljava/lang/reflect/Member;)Ljava/util/List<Ljava/lang/String;>;"
+          },
+          {
+            "nme": "getMemberUsage",
+            "acc": 1,
+            "dsc": "(Ljava/lang/reflect/Member;)Ljava/util/Collection;",
+            "sig": "(Ljava/lang/reflect/Member;)Ljava/util/Collection<Ljava/lang/reflect/Member;>;"
+          },
+          {
+            "nme": "getAllTypes",
+            "acc": 131073,
+            "dsc": "()Ljava/util/Set;",
+            "sig": "()Ljava/util/Set<Ljava/lang/String;>;",
+            "vanns": [
+              {
+                "dsc": "Ljava/lang/Deprecated;"
+              }
+            ]
+          },
+          {
+            "nme": "getAll",
+            "acc": 1,
+            "dsc": "(Lorg/reflections/scanners/Scanner;)Ljava/util/Set;",
+            "sig": "(Lorg/reflections/scanners/Scanner;)Ljava/util/Set<Ljava/lang/String;>;"
+          },
+          {
+            "nme": "getStore",
+            "acc": 1,
+            "dsc": "()Lorg/reflections/Store;"
+          },
+          {
+            "nme": "getConfiguration",
+            "acc": 1,
+            "dsc": "()Lorg/reflections/Configuration;"
+          },
+          {
+            "nme": "save",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;)Ljava/io/File;"
+          },
+          {
+            "nme": "save",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;Lorg/reflections/serializers/Serializer;)Ljava/io/File;"
+          },
+          {
+            "nme": "loaders",
+            "acc": 0,
+            "dsc": "()[Ljava/lang/ClassLoader;"
+          },
+          {
+            "nme": "lambda$getMemberParameterNames$15",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/String;)Ljava/util/stream/Stream;"
+          },
+          {
+            "nme": "lambda$getTypesAnnotatedWith$14",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Class;)Z"
+          },
+          {
+            "nme": "lambda$getTypesAnnotatedWith$13",
+            "acc": 4098,
+            "dsc": "(Ljava/lang/annotation/Annotation;Ljava/lang/String;)Z"
+          },
+          {
+            "nme": "lambda$getTypesAnnotatedWith$12",
+            "acc": 4098,
+            "dsc": "(Ljava/lang/String;)Z"
+          },
+          {
+            "nme": "lambda$expandSupertypes$11",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/String;)Ljava/util/Set;"
+          },
+          {
+            "nme": "lambda$expandSupertypes$10",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/String;)Ljava/util/Set;"
+          },
+          {
+            "nme": "lambda$merge$9",
+            "acc": 4098,
+            "dsc": "(Ljava/lang/String;Ljava/util/Map;)V"
+          },
+          {
+            "nme": "lambda$null$8",
+            "acc": 4106,
+            "dsc": "(Ljava/util/Map;Ljava/util/Map;)Ljava/util/Map;"
+          },
+          {
+            "nme": "lambda$null$7",
+            "acc": 4106,
+            "dsc": "(Ljava/util/Map;Ljava/lang/String;Ljava/util/Set;)V"
+          },
+          {
+            "nme": "lambda$null$6",
+            "acc": 4106,
+            "dsc": "(Ljava/util/Set;Ljava/util/Set;)Ljava/util/Set;"
+          },
+          {
+            "nme": "lambda$collect$5",
+            "acc": 4106,
+            "dsc": "(Lorg/reflections/Reflections;Lorg/reflections/serializers/Serializer;Lorg/reflections/vfs/Vfs$File;)V"
+          },
+          {
+            "nme": "lambda$scan$4",
+            "acc": 4106,
+            "dsc": "(Ljava/util/Map$Entry;)Ljava/util/Map;"
+          },
+          {
+            "nme": "lambda$null$3",
+            "acc": 4106,
+            "dsc": "(Ljava/util/Map$Entry;)Z"
+          },
+          {
+            "nme": "lambda$scan$2",
+            "acc": 4098,
+            "dsc": "(Ljava/util/Map;Ljava/net/URL;)V"
+          },
+          {
+            "nme": "lambda$scan$1",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/String;)Ljava/util/Set;"
+          },
+          {
+            "nme": "lambda$scan$0",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/String;)Ljava/lang/String;"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "log",
+            "dsc": "Lorg/slf4j/Logger;"
+          },
+          {
+            "acc": 148,
+            "nme": "configuration",
+            "dsc": "Lorg/reflections/Configuration;"
+          },
+          {
+            "acc": 20,
+            "nme": "store",
+            "dsc": "Lorg/reflections/Store;"
+          }
+        ]
+      },
+      "org/reflections/vfs/Vfs$DefaultUrlTypes$2.class": {
+        "ver": 52,
+        "acc": 16432,
+        "nme": "org/reflections/vfs/Vfs$DefaultUrlTypes$2",
+        "super": "org/reflections/vfs/Vfs$DefaultUrlTypes",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Ljava/lang/String;I)V"
+          },
+          {
+            "nme": "matches",
+            "acc": 1,
+            "dsc": "(Ljava/net/URL;)Z"
+          },
+          {
+            "nme": "createDir",
+            "acc": 1,
+            "dsc": "(Ljava/net/URL;)Lorg/reflections/vfs/Vfs$Dir;",
+            "exs": [
+              "java/lang/Exception"
+            ]
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/vfs/JbossFile.class": {
+        "ver": 52,
+        "acc": 33,
+        "nme": "org/reflections/vfs/JbossFile",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Lorg/reflections/vfs/JbossDir;Lorg/jboss/vfs/VirtualFile;)V"
+          },
+          {
+            "nme": "getName",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "getRelativePath",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "openInputStream",
+            "acc": 1,
+            "dsc": "()Ljava/io/InputStream;",
+            "exs": [
+              "java/io/IOException"
+            ]
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "root",
+            "dsc": "Lorg/reflections/vfs/JbossDir;"
+          },
+          {
+            "acc": 18,
+            "nme": "virtualFile",
+            "dsc": "Lorg/jboss/vfs/VirtualFile;"
+          }
+        ]
+      },
+      "org/reflections/scanners/Scanners.class": {
+        "ver": 52,
+        "acc": 17441,
+        "nme": "org/reflections/scanners/Scanners",
+        "super": "java/lang/Enum",
+        "mthds": [
+          {
+            "nme": "values",
+            "acc": 9,
+            "dsc": "()[Lorg/reflections/scanners/Scanners;"
+          },
+          {
+            "nme": "valueOf",
+            "acc": 9,
+            "dsc": "(Ljava/lang/String;)Lorg/reflections/scanners/Scanners;"
+          },
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "(Ljava/lang/String;I)V",
+            "sig": "()V"
+          },
+          {
+            "nme": "index",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "filterResultsBy",
+            "acc": 1,
+            "dsc": "(Ljava/util/function/Predicate;)Lorg/reflections/scanners/Scanners;",
+            "sig": "(Ljava/util/function/Predicate<Ljava/lang/String;>;)Lorg/reflections/scanners/Scanners;"
+          },
+          {
+            "nme": "scan",
+            "acc": 17,
+            "dsc": "(Ljavassist/bytecode/ClassFile;)Ljava/util/List;",
+            "sig": "(Ljavassist/bytecode/ClassFile;)Ljava/util/List<Ljava/util/Map$Entry<Ljava/lang/String;Ljava/lang/String;>;>;"
+          },
+          {
+            "nme": "scan",
+            "acc": 1024,
+            "dsc": "(Ljavassist/bytecode/ClassFile;Ljava/util/List;)V",
+            "sig": "(Ljavassist/bytecode/ClassFile;Ljava/util/List<Ljava/util/Map$Entry<Ljava/lang/String;Ljava/lang/String;>;>;)V"
+          },
+          {
+            "nme": "acceptResult",
+            "acc": 4,
+            "dsc": "(Ljava/lang/String;)Z"
+          },
+          {
+            "nme": "lambda$scan$1",
+            "acc": 4098,
+            "dsc": "(Ljava/util/Map$Entry;)Z"
+          },
+          {
+            "nme": "lambda$new$0",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/String;)Z"
+          },
+          {
+            "nme": "<init>",
+            "acc": 4096,
+            "dsc": "(Ljava/lang/String;ILorg/reflections/scanners/Scanners$1;)V"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 16409,
+            "nme": "SubTypes",
+            "dsc": "Lorg/reflections/scanners/Scanners;"
+          },
+          {
+            "acc": 16409,
+            "nme": "TypesAnnotated",
+            "dsc": "Lorg/reflections/scanners/Scanners;"
+          },
+          {
+            "acc": 16409,
+            "nme": "MethodsAnnotated",
+            "dsc": "Lorg/reflections/scanners/Scanners;"
+          },
+          {
+            "acc": 16409,
+            "nme": "ConstructorsAnnotated",
+            "dsc": "Lorg/reflections/scanners/Scanners;"
+          },
+          {
+            "acc": 16409,
+            "nme": "FieldsAnnotated",
+            "dsc": "Lorg/reflections/scanners/Scanners;"
+          },
+          {
+            "acc": 16409,
+            "nme": "Resources",
+            "dsc": "Lorg/reflections/scanners/Scanners;"
+          },
+          {
+            "acc": 16409,
+            "nme": "MethodsParameter",
+            "dsc": "Lorg/reflections/scanners/Scanners;"
+          },
+          {
+            "acc": 16409,
+            "nme": "ConstructorsParameter",
+            "dsc": "Lorg/reflections/scanners/Scanners;"
+          },
+          {
+            "acc": 16409,
+            "nme": "MethodsSignature",
+            "dsc": "Lorg/reflections/scanners/Scanners;"
+          },
+          {
+            "acc": 16409,
+            "nme": "ConstructorsSignature",
+            "dsc": "Lorg/reflections/scanners/Scanners;"
+          },
+          {
+            "acc": 16409,
+            "nme": "MethodsReturn",
+            "dsc": "Lorg/reflections/scanners/Scanners;"
+          },
+          {
+            "acc": 2,
+            "nme": "resultFilter",
+            "dsc": "Ljava/util/function/Predicate;",
+            "sig": "Ljava/util/function/Predicate<Ljava/lang/String;>;"
+          },
+          {
+            "acc": 4122,
+            "nme": "$VALUES",
+            "dsc": "[Lorg/reflections/scanners/Scanners;"
+          }
+        ]
+      },
+      "org/reflections/ReflectionsException.class": {
+        "ver": 52,
+        "acc": 33,
+        "nme": "org/reflections/ReflectionsException",
+        "super": "java/lang/RuntimeException",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;)V"
+          },
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;Ljava/lang/Throwable;)V"
+          },
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Ljava/lang/Throwable;)V"
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/util/AnnotationMergeCollector.class": {
+        "ver": 52,
+        "acc": 33,
+        "nme": "org/reflections/util/AnnotationMergeCollector",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Ljava/lang/reflect/AnnotatedElement;Ljava/util/function/BiFunction;)V",
+            "sig": "(Ljava/lang/reflect/AnnotatedElement;Ljava/util/function/BiFunction<Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;>;)V"
+          },
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Ljava/lang/reflect/AnnotatedElement;)V"
+          },
+          {
+            "nme": "supplier",
+            "acc": 1,
+            "dsc": "()Ljava/util/function/Supplier;",
+            "sig": "()Ljava/util/function/Supplier<Ljava/util/Map<Ljava/lang/String;Ljava/lang/Object;>;>;"
+          },
+          {
+            "nme": "accumulator",
+            "acc": 1,
+            "dsc": "()Ljava/util/function/BiConsumer;",
+            "sig": "()Ljava/util/function/BiConsumer<Ljava/util/Map<Ljava/lang/String;Ljava/lang/Object;>;Ljava/lang/annotation/Annotation;>;"
+          },
+          {
+            "nme": "combiner",
+            "acc": 1,
+            "dsc": "()Ljava/util/function/BinaryOperator;",
+            "sig": "()Ljava/util/function/BinaryOperator<Ljava/util/Map<Ljava/lang/String;Ljava/lang/Object;>;>;"
+          },
+          {
+            "nme": "finisher",
+            "acc": 1,
+            "dsc": "()Ljava/util/function/Function;",
+            "sig": "()Ljava/util/function/Function<Ljava/util/Map<Ljava/lang/String;Ljava/lang/Object;>;Ljava/util/Map<Ljava/lang/String;Ljava/lang/Object;>;>;"
+          },
+          {
+            "nme": "characteristics",
+            "acc": 1,
+            "dsc": "()Ljava/util/Set;",
+            "sig": "()Ljava/util/Set<Ljava/util/stream/Collector$Characteristics;>;"
+          },
+          {
+            "nme": "mergeMaps",
+            "acc": 2,
+            "dsc": "(Ljava/util/Map;Ljava/util/Map;)Ljava/util/Map;",
+            "sig": "(Ljava/util/Map<Ljava/lang/String;Ljava/lang/Object;>;Ljava/util/Map<Ljava/lang/String;Ljava/lang/Object;>;)Ljava/util/Map<Ljava/lang/String;Ljava/lang/Object;>;"
+          },
+          {
+            "nme": "concatValues",
+            "acc": 10,
+            "dsc": "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;"
+          },
+          {
+            "nme": "arrayAdd",
+            "acc": 10,
+            "dsc": "([Ljava/lang/Object;[Ljava/lang/Object;)[Ljava/lang/Object;"
+          },
+          {
+            "nme": "stringArrayConcat",
+            "acc": 10,
+            "dsc": "([Ljava/lang/String;[Ljava/lang/String;)Ljava/lang/Object;"
+          },
+          {
+            "nme": "stringConcat",
+            "acc": 10,
+            "dsc": "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;"
+          },
+          {
+            "nme": "lambda$stringArrayConcat$5",
+            "acc": 4106,
+            "dsc": "(I)[Ljava/lang/String;"
+          },
+          {
+            "nme": "lambda$stringArrayConcat$4",
+            "acc": 4106,
+            "dsc": "([Ljava/lang/String;Ljava/lang/String;)Ljava/util/stream/Stream;"
+          },
+          {
+            "nme": "lambda$null$3",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;"
+          },
+          {
+            "nme": "lambda$arrayAdd$2",
+            "acc": 4106,
+            "dsc": "(I)[Ljava/lang/Object;"
+          },
+          {
+            "nme": "lambda$mergeMaps$1",
+            "acc": 4098,
+            "dsc": "(Ljava/util/Map;Ljava/lang/String;Ljava/lang/Object;)V"
+          },
+          {
+            "nme": "lambda$accumulator$0",
+            "acc": 4098,
+            "dsc": "(Ljava/util/Map;Ljava/lang/annotation/Annotation;)V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "annotatedElement",
+            "dsc": "Ljava/lang/reflect/AnnotatedElement;"
+          },
+          {
+            "acc": 18,
+            "nme": "mergeFunction",
+            "dsc": "Ljava/util/function/BiFunction;",
+            "sig": "Ljava/util/function/BiFunction<Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;>;"
+          }
+        ]
+      },
+      "org/reflections/scanners/MethodParameterNamesScanner.class": {
+        "ver": 52,
+        "acc": 33,
+        "nme": "org/reflections/scanners/MethodParameterNamesScanner",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "scan",
+            "acc": 1,
+            "dsc": "(Ljavassist/bytecode/ClassFile;)Ljava/util/List;",
+            "sig": "(Ljavassist/bytecode/ClassFile;)Ljava/util/List<Ljava/util/Map$Entry<Ljava/lang/String;Ljava/lang/String;>;>;"
+          },
+          {
+            "nme": "getString",
+            "acc": 2,
+            "dsc": "(Ljavassist/bytecode/MethodInfo;)Ljava/lang/String;"
+          },
+          {
+            "nme": "lambda$getString$1",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/String;)Z"
+          },
+          {
+            "nme": "lambda$getString$0",
+            "acc": 4106,
+            "dsc": "(Ljavassist/bytecode/MethodInfo;Ljavassist/bytecode/LocalVariableAttribute;I)Ljava/lang/String;"
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/scanners/Scanners$3.class": {
+        "ver": 52,
+        "acc": 16432,
+        "nme": "org/reflections/scanners/Scanners$3",
+        "super": "org/reflections/scanners/Scanners",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Ljava/lang/String;I)V"
+          },
+          {
+            "nme": "scan",
+            "acc": 1,
+            "dsc": "(Ljavassist/bytecode/ClassFile;Ljava/util/List;)V",
+            "sig": "(Ljavassist/bytecode/ClassFile;Ljava/util/List<Ljava/util/Map$Entry<Ljava/lang/String;Ljava/lang/String;>;>;)V"
+          },
+          {
+            "nme": "lambda$scan$0",
+            "acc": 4098,
+            "dsc": "(Ljava/util/List;Ljavassist/bytecode/ClassFile;Ljavassist/bytecode/MethodInfo;)V"
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/util/FilterBuilder$Matcher.class": {
+        "ver": 52,
+        "acc": 1056,
+        "nme": "org/reflections/util/FilterBuilder$Matcher",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Ljava/lang/String;)V"
+          },
+          {
+            "nme": "hashCode",
+            "acc": 1,
+            "dsc": "()I"
+          },
+          {
+            "nme": "equals",
+            "acc": 1,
+            "dsc": "(Ljava/lang/Object;)Z"
+          },
+          {
+            "nme": "toString",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 16,
+            "nme": "pattern",
+            "dsc": "Ljava/util/regex/Pattern;"
+          }
+        ]
+      },
+      "org/reflections/scanners/Scanners$10.class": {
+        "ver": 52,
+        "acc": 16432,
+        "nme": "org/reflections/scanners/Scanners$10",
+        "super": "org/reflections/scanners/Scanners",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Ljava/lang/String;I)V"
+          },
+          {
+            "nme": "scan",
+            "acc": 1,
+            "dsc": "(Ljavassist/bytecode/ClassFile;Ljava/util/List;)V",
+            "sig": "(Ljavassist/bytecode/ClassFile;Ljava/util/List<Ljava/util/Map$Entry<Ljava/lang/String;Ljava/lang/String;>;>;)V"
+          },
+          {
+            "nme": "with",
+            "acc": 129,
+            "dsc": "([Ljava/lang/reflect/AnnotatedElement;)Lorg/reflections/util/QueryFunction;",
+            "sig": "([Ljava/lang/reflect/AnnotatedElement;)Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;Ljava/lang/String;>;"
+          },
+          {
+            "nme": "lambda$scan$0",
+            "acc": 4098,
+            "dsc": "(Ljava/util/List;Ljavassist/bytecode/ClassFile;Ljavassist/bytecode/MethodInfo;)V"
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/util/ConfigurationBuilder.class": {
+        "ver": 52,
+        "acc": 33,
+        "nme": "org/reflections/util/ConfigurationBuilder",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "build",
+            "acc": 137,
+            "dsc": "([Ljava/lang/Object;)Lorg/reflections/util/ConfigurationBuilder;"
+          },
+          {
+            "nme": "forPackage",
+            "acc": 129,
+            "dsc": "(Ljava/lang/String;[Ljava/lang/ClassLoader;)Lorg/reflections/util/ConfigurationBuilder;"
+          },
+          {
+            "nme": "forPackages",
+            "acc": 129,
+            "dsc": "([Ljava/lang/String;)Lorg/reflections/util/ConfigurationBuilder;"
+          },
+          {
+            "nme": "getScanners",
+            "acc": 1,
+            "dsc": "()Ljava/util/Set;",
+            "sig": "()Ljava/util/Set<Lorg/reflections/scanners/Scanner;>;"
+          },
+          {
+            "nme": "setScanners",
+            "acc": 129,
+            "dsc": "([Lorg/reflections/scanners/Scanner;)Lorg/reflections/util/ConfigurationBuilder;"
+          },
+          {
+            "nme": "addScanners",
+            "acc": 129,
+            "dsc": "([Lorg/reflections/scanners/Scanner;)Lorg/reflections/util/ConfigurationBuilder;"
+          },
+          {
+            "nme": "getUrls",
+            "acc": 1,
+            "dsc": "()Ljava/util/Set;",
+            "sig": "()Ljava/util/Set<Ljava/net/URL;>;"
+          },
+          {
+            "nme": "setUrls",
+            "acc": 1,
+            "dsc": "(Ljava/util/Collection;)Lorg/reflections/util/ConfigurationBuilder;",
+            "sig": "(Ljava/util/Collection<Ljava/net/URL;>;)Lorg/reflections/util/ConfigurationBuilder;"
+          },
+          {
+            "nme": "setUrls",
+            "acc": 129,
+            "dsc": "([Ljava/net/URL;)Lorg/reflections/util/ConfigurationBuilder;"
+          },
+          {
+            "nme": "addUrls",
+            "acc": 1,
+            "dsc": "(Ljava/util/Collection;)Lorg/reflections/util/ConfigurationBuilder;",
+            "sig": "(Ljava/util/Collection<Ljava/net/URL;>;)Lorg/reflections/util/ConfigurationBuilder;"
+          },
+          {
+            "nme": "addUrls",
+            "acc": 129,
+            "dsc": "([Ljava/net/URL;)Lorg/reflections/util/ConfigurationBuilder;"
+          },
+          {
+            "nme": "getInputsFilter",
+            "acc": 1,
+            "dsc": "()Ljava/util/function/Predicate;",
+            "sig": "()Ljava/util/function/Predicate<Ljava/lang/String;>;"
+          },
+          {
+            "nme": "setInputsFilter",
+            "acc": 1,
+            "dsc": "(Ljava/util/function/Predicate;)Lorg/reflections/util/ConfigurationBuilder;",
+            "sig": "(Ljava/util/function/Predicate<Ljava/lang/String;>;)Lorg/reflections/util/ConfigurationBuilder;"
+          },
+          {
+            "nme": "filterInputsBy",
+            "acc": 1,
+            "dsc": "(Ljava/util/function/Predicate;)Lorg/reflections/util/ConfigurationBuilder;",
+            "sig": "(Ljava/util/function/Predicate<Ljava/lang/String;>;)Lorg/reflections/util/ConfigurationBuilder;"
+          },
+          {
+            "nme": "isParallel",
+            "acc": 1,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "setParallel",
+            "acc": 1,
+            "dsc": "(Z)Lorg/reflections/util/ConfigurationBuilder;"
+          },
+          {
+            "nme": "getClassLoaders",
+            "acc": 1,
+            "dsc": "()[Ljava/lang/ClassLoader;"
+          },
+          {
+            "nme": "setClassLoaders",
+            "acc": 1,
+            "dsc": "([Ljava/lang/ClassLoader;)Lorg/reflections/util/ConfigurationBuilder;"
+          },
+          {
+            "nme": "addClassLoaders",
+            "acc": 129,
+            "dsc": "([Ljava/lang/ClassLoader;)Lorg/reflections/util/ConfigurationBuilder;"
+          },
+          {
+            "nme": "shouldExpandSuperTypes",
+            "acc": 1,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "setExpandSuperTypes",
+            "acc": 1,
+            "dsc": "(Z)Lorg/reflections/util/ConfigurationBuilder;"
+          },
+          {
+            "nme": "lambda$addClassLoaders$3",
+            "acc": 4106,
+            "dsc": "(I)[Ljava/lang/ClassLoader;"
+          },
+          {
+            "nme": "lambda$build$2",
+            "acc": 4106,
+            "dsc": "(I)[Ljava/lang/ClassLoader;"
+          },
+          {
+            "nme": "lambda$build$1",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Object;)Z"
+          },
+          {
+            "nme": "lambda$static$0",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/String;)Z"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "DEFAULT_SCANNERS",
+            "dsc": "Ljava/util/Set;",
+            "sig": "Ljava/util/Set<Lorg/reflections/scanners/Scanner;>;"
+          },
+          {
+            "acc": 25,
+            "nme": "DEFAULT_INPUTS_FILTER",
+            "dsc": "Ljava/util/function/Predicate;",
+            "sig": "Ljava/util/function/Predicate<Ljava/lang/String;>;"
+          },
+          {
+            "acc": 2,
+            "nme": "scanners",
+            "dsc": "Ljava/util/Set;",
+            "sig": "Ljava/util/Set<Lorg/reflections/scanners/Scanner;>;"
+          },
+          {
+            "acc": 2,
+            "nme": "urls",
+            "dsc": "Ljava/util/Set;",
+            "sig": "Ljava/util/Set<Ljava/net/URL;>;"
+          },
+          {
+            "acc": 2,
+            "nme": "inputsFilter",
+            "dsc": "Ljava/util/function/Predicate;",
+            "sig": "Ljava/util/function/Predicate<Ljava/lang/String;>;"
+          },
+          {
+            "acc": 2,
+            "nme": "isParallel",
+            "dsc": "Z"
+          },
+          {
+            "acc": 2,
+            "nme": "classLoaders",
+            "dsc": "[Ljava/lang/ClassLoader;"
+          },
+          {
+            "acc": 2,
+            "nme": "expandSuperTypes",
+            "dsc": "Z"
+          }
+        ]
+      },
+      "org/reflections/vfs/Vfs$Dir.class": {
+        "ver": 52,
+        "acc": 1537,
+        "nme": "org/reflections/vfs/Vfs$Dir",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "getPath",
+            "acc": 1025,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "getFiles",
+            "acc": 1025,
+            "dsc": "()Ljava/lang/Iterable;",
+            "sig": "()Ljava/lang/Iterable<Lorg/reflections/vfs/Vfs$File;>;"
+          },
+          {
+            "nme": "close",
+            "acc": 1,
+            "dsc": "()V"
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/scanners/Scanners$11.class": {
+        "ver": 52,
+        "acc": 16432,
+        "nme": "org/reflections/scanners/Scanners$11",
+        "super": "org/reflections/scanners/Scanners",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Ljava/lang/String;I)V"
+          },
+          {
+            "nme": "scan",
+            "acc": 1,
+            "dsc": "(Ljavassist/bytecode/ClassFile;Ljava/util/List;)V",
+            "sig": "(Ljavassist/bytecode/ClassFile;Ljava/util/List<Ljava/util/Map$Entry<Ljava/lang/String;Ljava/lang/String;>;>;)V"
+          },
+          {
+            "nme": "lambda$scan$0",
+            "acc": 4098,
+            "dsc": "(Ljava/util/List;Ljavassist/bytecode/ClassFile;Ljavassist/bytecode/MethodInfo;)V"
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/vfs/Vfs.class": {
+        "ver": 52,
+        "acc": 1057,
+        "nme": "org/reflections/vfs/Vfs",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "getDefaultUrlTypes",
+            "acc": 9,
+            "dsc": "()Ljava/util/List;",
+            "sig": "()Ljava/util/List<Lorg/reflections/vfs/Vfs$UrlType;>;"
+          },
+          {
+            "nme": "setDefaultURLTypes",
+            "acc": 9,
+            "dsc": "(Ljava/util/List;)V",
+            "sig": "(Ljava/util/List<Lorg/reflections/vfs/Vfs$UrlType;>;)V"
+          },
+          {
+            "nme": "addDefaultURLTypes",
+            "acc": 9,
+            "dsc": "(Lorg/reflections/vfs/Vfs$UrlType;)V"
+          },
+          {
+            "nme": "fromURL",
+            "acc": 9,
+            "dsc": "(Ljava/net/URL;)Lorg/reflections/vfs/Vfs$Dir;"
+          },
+          {
+            "nme": "fromURL",
+            "acc": 9,
+            "dsc": "(Ljava/net/URL;Ljava/util/List;)Lorg/reflections/vfs/Vfs$Dir;",
+            "sig": "(Ljava/net/URL;Ljava/util/List<Lorg/reflections/vfs/Vfs$UrlType;>;)Lorg/reflections/vfs/Vfs$Dir;"
+          },
+          {
+            "nme": "fromURL",
+            "acc": 137,
+            "dsc": "(Ljava/net/URL;[Lorg/reflections/vfs/Vfs$UrlType;)Lorg/reflections/vfs/Vfs$Dir;"
+          },
+          {
+            "nme": "findFiles",
+            "acc": 9,
+            "dsc": "(Ljava/util/Collection;Ljava/lang/String;Ljava/util/function/Predicate;)Ljava/lang/Iterable;",
+            "sig": "(Ljava/util/Collection<Ljava/net/URL;>;Ljava/lang/String;Ljava/util/function/Predicate<Ljava/lang/String;>;)Ljava/lang/Iterable<Lorg/reflections/vfs/Vfs$File;>;"
+          },
+          {
+            "nme": "findFiles",
+            "acc": 9,
+            "dsc": "(Ljava/util/Collection;Ljava/util/function/Predicate;)Ljava/lang/Iterable;",
+            "sig": "(Ljava/util/Collection<Ljava/net/URL;>;Ljava/util/function/Predicate<Lorg/reflections/vfs/Vfs$File;>;)Ljava/lang/Iterable<Lorg/reflections/vfs/Vfs$File;>;"
+          },
+          {
+            "nme": "getFile",
+            "acc": 9,
+            "dsc": "(Ljava/net/URL;)Ljava/io/File;"
+          },
+          {
+            "nme": "hasJarFileInPath",
+            "acc": 10,
+            "dsc": "(Ljava/net/URL;)Z"
+          },
+          {
+            "nme": "hasInnerJarFileInPath",
+            "acc": 10,
+            "dsc": "(Ljava/net/URL;)Z"
+          },
+          {
+            "nme": "lambda$findFiles$2",
+            "acc": 4106,
+            "dsc": "(Ljava/util/Collection;Ljava/util/function/Predicate;)Ljava/util/Iterator;"
+          },
+          {
+            "nme": "lambda$null$1",
+            "acc": 4106,
+            "dsc": "(Ljava/net/URL;)Ljava/util/stream/Stream;"
+          },
+          {
+            "nme": "lambda$findFiles$0",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/String;Ljava/util/function/Predicate;Lorg/reflections/vfs/Vfs$File;)Z"
+          },
+          {
+            "nme": "access$100",
+            "acc": 4104,
+            "dsc": "(Ljava/net/URL;)Z"
+          },
+          {
+            "nme": "access$200",
+            "acc": 4104,
+            "dsc": "(Ljava/net/URL;)Z"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 10,
+            "nme": "defaultUrlTypes",
+            "dsc": "Ljava/util/List;",
+            "sig": "Ljava/util/List<Lorg/reflections/vfs/Vfs$UrlType;>;"
+          }
+        ]
+      },
+      "org/reflections/util/UtilQueryBuilder.class": {
+        "ver": 52,
+        "acc": 1537,
+        "nme": "org/reflections/util/UtilQueryBuilder",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "get",
+            "acc": 1025,
+            "dsc": "(Ljava/lang/Object;)Lorg/reflections/util/QueryFunction;",
+            "sig": "(TF;)Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;TE;>;"
+          },
+          {
+            "nme": "of",
+            "acc": 1,
+            "dsc": "(Ljava/lang/Object;)Lorg/reflections/util/QueryFunction;",
+            "sig": "(TF;)Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;TE;>;"
+          },
+          {
+            "nme": "of",
+            "acc": 1,
+            "dsc": "(Ljava/lang/Object;Ljava/util/function/Predicate;)Lorg/reflections/util/QueryFunction;",
+            "sig": "(TF;Ljava/util/function/Predicate<-TE;>;)Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;TE;>;"
+          },
+          {
+            "nme": "of",
+            "acc": 1,
+            "dsc": "(Lorg/reflections/util/QueryFunction;)Lorg/reflections/util/QueryFunction;",
+            "sig": "<T:Ljava/lang/Object;>(Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;TT;>;)Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;TE;>;"
+          },
+          {
+            "nme": "lambda$of$1",
+            "acc": 4098,
+            "dsc": "(Lorg/reflections/util/QueryFunction;Lorg/reflections/Store;)Ljava/util/Set;"
+          },
+          {
+            "nme": "lambda$null$0",
+            "acc": 4098,
+            "dsc": "(Lorg/reflections/Store;Ljava/lang/Object;)Ljava/util/stream/Stream;"
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/scanners/MemberUsageScanner.class": {
+        "ver": 52,
+        "acc": 33,
+        "nme": "org/reflections/scanners/MemberUsageScanner",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "([Ljava/lang/ClassLoader;)V"
+          },
+          {
+            "nme": "scan",
+            "acc": 1,
+            "dsc": "(Ljavassist/bytecode/ClassFile;)Ljava/util/List;",
+            "sig": "(Ljavassist/bytecode/ClassFile;)Ljava/util/List<Ljava/util/Map$Entry<Ljava/lang/String;Ljava/lang/String;>;>;"
+          },
+          {
+            "nme": "filterResultsBy",
+            "acc": 1,
+            "dsc": "(Ljava/util/function/Predicate;)Lorg/reflections/scanners/Scanner;",
+            "sig": "(Ljava/util/function/Predicate<Ljava/lang/String;>;)Lorg/reflections/scanners/Scanner;"
+          },
+          {
+            "nme": "scanMember",
+            "acc": 2,
+            "dsc": "(Ljavassist/CtBehavior;Ljava/util/List;)V",
+            "sig": "(Ljavassist/CtBehavior;Ljava/util/List<Ljava/util/Map$Entry<Ljava/lang/String;Ljava/lang/String;>;>;)V",
+            "exs": [
+              "javassist/CannotCompileException"
+            ]
+          },
+          {
+            "nme": "add",
+            "acc": 2,
+            "dsc": "(Ljava/util/List;Ljava/lang/String;Ljava/lang/String;)V",
+            "sig": "(Ljava/util/List<Ljava/util/Map$Entry<Ljava/lang/String;Ljava/lang/String;>;>;Ljava/lang/String;Ljava/lang/String;)V"
+          },
+          {
+            "nme": "parameterNames",
+            "acc": 9,
+            "dsc": "(Ljavassist/bytecode/MethodInfo;)Ljava/lang/String;"
+          },
+          {
+            "nme": "getClassPool",
+            "acc": 2,
+            "dsc": "()Ljavassist/ClassPool;"
+          },
+          {
+            "nme": "lambda$new$0",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/String;)Z"
+          },
+          {
+            "nme": "access$000",
+            "acc": 4104,
+            "dsc": "(Lorg/reflections/scanners/MemberUsageScanner;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;)V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 2,
+            "nme": "resultFilter",
+            "dsc": "Ljava/util/function/Predicate;",
+            "sig": "Ljava/util/function/Predicate<Ljava/lang/String;>;"
+          },
+          {
+            "acc": 18,
+            "nme": "classLoaders",
+            "dsc": "[Ljava/lang/ClassLoader;"
+          },
+          {
+            "acc": 66,
+            "nme": "classPool",
+            "dsc": "Ljavassist/ClassPool;"
+          }
+        ]
+      },
+      "org/reflections/vfs/Vfs$DefaultUrlTypes$6.class": {
+        "ver": 52,
+        "acc": 16432,
+        "nme": "org/reflections/vfs/Vfs$DefaultUrlTypes$6",
+        "super": "org/reflections/vfs/Vfs$DefaultUrlTypes",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Ljava/lang/String;I)V"
+          },
+          {
+            "nme": "matches",
+            "acc": 1,
+            "dsc": "(Ljava/net/URL;)Z",
+            "exs": [
+              "java/lang/Exception"
+            ]
+          },
+          {
+            "nme": "createDir",
+            "acc": 1,
+            "dsc": "(Ljava/net/URL;)Lorg/reflections/vfs/Vfs$Dir;",
+            "exs": [
+              "java/lang/Exception"
+            ]
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/vfs/Vfs$DefaultUrlTypes$3.class": {
+        "ver": 52,
+        "acc": 16432,
+        "nme": "org/reflections/vfs/Vfs$DefaultUrlTypes$3",
+        "super": "org/reflections/vfs/Vfs$DefaultUrlTypes",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Ljava/lang/String;I)V"
+          },
+          {
+            "nme": "matches",
+            "acc": 1,
+            "dsc": "(Ljava/net/URL;)Z"
+          },
+          {
+            "nme": "createDir",
+            "acc": 1,
+            "dsc": "(Ljava/net/URL;)Lorg/reflections/vfs/Vfs$Dir;",
+            "exs": [
+              "java/lang/Exception"
+            ]
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/scanners/Scanners$6.class": {
+        "ver": 52,
+        "acc": 16432,
+        "nme": "org/reflections/scanners/Scanners$6",
+        "super": "org/reflections/scanners/Scanners",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Ljava/lang/String;I)V"
+          },
+          {
+            "nme": "acceptsInput",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;)Z"
+          },
+          {
+            "nme": "scan",
+            "acc": 1,
+            "dsc": "(Lorg/reflections/vfs/Vfs$File;)Ljava/util/List;",
+            "sig": "(Lorg/reflections/vfs/Vfs$File;)Ljava/util/List<Ljava/util/Map$Entry<Ljava/lang/String;Ljava/lang/String;>;>;"
+          },
+          {
+            "nme": "scan",
+            "acc": 1,
+            "dsc": "(Ljavassist/bytecode/ClassFile;Ljava/util/List;)V",
+            "sig": "(Ljavassist/bytecode/ClassFile;Ljava/util/List<Ljava/util/Map$Entry<Ljava/lang/String;Ljava/lang/String;>;>;)V"
+          },
+          {
+            "nme": "with",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;)Lorg/reflections/util/QueryFunction;",
+            "sig": "(Ljava/lang/String;)Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;Ljava/lang/String;>;"
+          },
+          {
+            "nme": "lambda$with$2",
+            "acc": 4098,
+            "dsc": "(Ljava/lang/String;Lorg/reflections/Store;)Ljava/util/Set;"
+          },
+          {
+            "nme": "lambda$null$1",
+            "acc": 4106,
+            "dsc": "(Ljava/util/Map$Entry;)Ljava/util/stream/Stream;"
+          },
+          {
+            "nme": "lambda$null$0",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/String;Ljava/util/Map$Entry;)Z"
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/scanners/TypeElementsScanner.class": {
+        "ver": 52,
+        "acc": 33,
+        "nme": "org/reflections/scanners/TypeElementsScanner",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "scan",
+            "acc": 1,
+            "dsc": "(Ljavassist/bytecode/ClassFile;)Ljava/util/List;",
+            "sig": "(Ljavassist/bytecode/ClassFile;)Ljava/util/List<Ljava/util/Map$Entry<Ljava/lang/String;Ljava/lang/String;>;>;"
+          },
+          {
+            "nme": "isPublic",
+            "acc": 2,
+            "dsc": "(Ljava/lang/Object;)Z"
+          },
+          {
+            "nme": "filterResultsBy",
+            "acc": 1,
+            "dsc": "(Ljava/util/function/Predicate;)Lorg/reflections/scanners/TypeElementsScanner;",
+            "sig": "(Ljava/util/function/Predicate<Ljava/lang/String;>;)Lorg/reflections/scanners/TypeElementsScanner;"
+          },
+          {
+            "nme": "includeFields",
+            "acc": 1,
+            "dsc": "()Lorg/reflections/scanners/TypeElementsScanner;"
+          },
+          {
+            "nme": "includeFields",
+            "acc": 1,
+            "dsc": "(Z)Lorg/reflections/scanners/TypeElementsScanner;"
+          },
+          {
+            "nme": "includeMethods",
+            "acc": 1,
+            "dsc": "()Lorg/reflections/scanners/TypeElementsScanner;"
+          },
+          {
+            "nme": "includeMethods",
+            "acc": 1,
+            "dsc": "(Z)Lorg/reflections/scanners/TypeElementsScanner;"
+          },
+          {
+            "nme": "includeAnnotations",
+            "acc": 1,
+            "dsc": "()Lorg/reflections/scanners/TypeElementsScanner;"
+          },
+          {
+            "nme": "includeAnnotations",
+            "acc": 1,
+            "dsc": "(Z)Lorg/reflections/scanners/TypeElementsScanner;"
+          },
+          {
+            "nme": "publicOnly",
+            "acc": 1,
+            "dsc": "(Z)Lorg/reflections/scanners/TypeElementsScanner;"
+          },
+          {
+            "nme": "publicOnly",
+            "acc": 1,
+            "dsc": "()Lorg/reflections/scanners/TypeElementsScanner;"
+          },
+          {
+            "nme": "lambda$scan$3",
+            "acc": 4098,
+            "dsc": "(Ljava/util/List;Ljava/lang/String;Ljava/lang/String;)V"
+          },
+          {
+            "nme": "lambda$scan$2",
+            "acc": 4098,
+            "dsc": "(Ljava/util/List;Ljava/lang/String;Ljavassist/bytecode/MethodInfo;)V"
+          },
+          {
+            "nme": "lambda$scan$1",
+            "acc": 4098,
+            "dsc": "(Ljava/util/List;Ljava/lang/String;Ljavassist/bytecode/FieldInfo;)V"
+          },
+          {
+            "nme": "lambda$new$0",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/String;)Z"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 2,
+            "nme": "includeFields",
+            "dsc": "Z"
+          },
+          {
+            "acc": 2,
+            "nme": "includeMethods",
+            "dsc": "Z"
+          },
+          {
+            "acc": 2,
+            "nme": "includeAnnotations",
+            "dsc": "Z"
+          },
+          {
+            "acc": 2,
+            "nme": "publicOnly",
+            "dsc": "Z"
+          },
+          {
+            "acc": 2,
+            "nme": "resultFilter",
+            "dsc": "Ljava/util/function/Predicate;",
+            "sig": "Ljava/util/function/Predicate<Ljava/lang/String;>;"
+          }
+        ]
+      },
+      "org/reflections/vfs/Vfs$UrlType.class": {
+        "ver": 52,
+        "acc": 1537,
+        "nme": "org/reflections/vfs/Vfs$UrlType",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "matches",
+            "acc": 1025,
+            "dsc": "(Ljava/net/URL;)Z",
+            "exs": [
+              "java/lang/Exception"
+            ]
+          },
+          {
+            "nme": "createDir",
+            "acc": 1025,
+            "dsc": "(Ljava/net/URL;)Lorg/reflections/vfs/Vfs$Dir;",
+            "exs": [
+              "java/lang/Exception"
+            ]
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/scanners/AbstractScanner.class": {
+        "ver": 52,
+        "acc": 131104,
+        "nme": "org/reflections/scanners/AbstractScanner",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Lorg/reflections/scanners/Scanner;)V"
+          },
+          {
+            "nme": "index",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "scan",
+            "acc": 1,
+            "dsc": "(Ljavassist/bytecode/ClassFile;)Ljava/util/List;",
+            "sig": "(Ljavassist/bytecode/ClassFile;)Ljava/util/List<Ljava/util/Map$Entry<Ljava/lang/String;Ljava/lang/String;>;>;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 20,
+            "nme": "scanner",
+            "dsc": "Lorg/reflections/scanners/Scanner;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Ljava/lang/Deprecated;"
+          }
+        ]
+      },
+      "org/reflections/scanners/MemberUsageScanner$1.class": {
+        "ver": 52,
+        "acc": 32,
+        "nme": "org/reflections/scanners/MemberUsageScanner$1",
+        "super": "javassist/expr/ExprEditor",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Lorg/reflections/scanners/MemberUsageScanner;Ljava/util/List;Ljava/lang/String;)V"
+          },
+          {
+            "nme": "edit",
+            "acc": 1,
+            "dsc": "(Ljavassist/expr/NewExpr;)V"
+          },
+          {
+            "nme": "edit",
+            "acc": 1,
+            "dsc": "(Ljavassist/expr/MethodCall;)V"
+          },
+          {
+            "nme": "edit",
+            "acc": 1,
+            "dsc": "(Ljavassist/expr/ConstructorCall;)V"
+          },
+          {
+            "nme": "edit",
+            "acc": 1,
+            "dsc": "(Ljavassist/expr/FieldAccess;)V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 4112,
+            "nme": "val$entries",
+            "dsc": "Ljava/util/List;"
+          },
+          {
+            "acc": 4112,
+            "nme": "val$key",
+            "dsc": "Ljava/lang/String;"
+          },
+          {
+            "acc": 4112,
+            "nme": "this$0",
+            "dsc": "Lorg/reflections/scanners/MemberUsageScanner;"
+          }
+        ]
+      },
+      "org/reflections/vfs/JarInputDir.class": {
+        "ver": 52,
+        "acc": 33,
+        "nme": "org/reflections/vfs/JarInputDir",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Ljava/net/URL;)V"
+          },
+          {
+            "nme": "getPath",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "getFiles",
+            "acc": 1,
+            "dsc": "()Ljava/lang/Iterable;",
+            "sig": "()Ljava/lang/Iterable<Lorg/reflections/vfs/Vfs$File;>;"
+          },
+          {
+            "nme": "close",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "lambda$getFiles$0",
+            "acc": 4098,
+            "dsc": "()Ljava/util/Iterator;"
+          },
+          {
+            "nme": "access$000",
+            "acc": 4104,
+            "dsc": "(Lorg/reflections/vfs/JarInputDir;)Ljava/net/URL;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "url",
+            "dsc": "Ljava/net/URL;"
+          },
+          {
+            "acc": 0,
+            "nme": "jarInputStream",
+            "dsc": "Ljava/util/jar/JarInputStream;"
+          },
+          {
+            "acc": 0,
+            "nme": "cursor",
+            "dsc": "J"
+          },
+          {
+            "acc": 0,
+            "nme": "nextCursor",
+            "dsc": "J"
+          }
+        ]
+      },
+      "org/reflections/util/QueryFunction.class": {
+        "ver": 52,
+        "acc": 1537,
+        "nme": "org/reflections/util/QueryFunction",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "apply",
+            "acc": 1025,
+            "dsc": "(Ljava/lang/Object;)Ljava/util/Set;",
+            "sig": "(TC;)Ljava/util/Set<TT;>;"
+          },
+          {
+            "nme": "empty",
+            "acc": 9,
+            "dsc": "()Lorg/reflections/util/QueryFunction;",
+            "sig": "<C:Ljava/lang/Object;T:Ljava/lang/Object;>()Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;TT;>;"
+          },
+          {
+            "nme": "single",
+            "acc": 9,
+            "dsc": "(Ljava/lang/Object;)Lorg/reflections/util/QueryFunction;",
+            "sig": "<C:Ljava/lang/Object;T:Ljava/lang/Object;>(TT;)Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;TT;>;"
+          },
+          {
+            "nme": "set",
+            "acc": 9,
+            "dsc": "(Ljava/util/Collection;)Lorg/reflections/util/QueryFunction;",
+            "sig": "<C:Ljava/lang/Object;T:Ljava/lang/Object;>(Ljava/util/Collection<TT;>;)Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;TT;>;"
+          },
+          {
+            "nme": "filter",
+            "acc": 1,
+            "dsc": "(Ljava/util/function/Predicate;)Lorg/reflections/util/QueryFunction;",
+            "sig": "(Ljava/util/function/Predicate<-TT;>;)Lorg/reflections/util/QueryFunction<TC;TT;>;"
+          },
+          {
+            "nme": "map",
+            "acc": 1,
+            "dsc": "(Ljava/util/function/Function;)Lorg/reflections/util/QueryFunction;",
+            "sig": "<R:Ljava/lang/Object;>(Ljava/util/function/Function<-TT;+TR;>;)Lorg/reflections/util/QueryFunction<TC;TR;>;"
+          },
+          {
+            "nme": "flatMap",
+            "acc": 1,
+            "dsc": "(Ljava/util/function/Function;)Lorg/reflections/util/QueryFunction;",
+            "sig": "<R:Ljava/lang/Object;>(Ljava/util/function/Function<TT;+Ljava/util/function/Function<TC;Ljava/util/Set<TR;>;>;>;)Lorg/reflections/util/QueryFunction<TC;TR;>;"
+          },
+          {
+            "nme": "getAll",
+            "acc": 1,
+            "dsc": "(Ljava/util/function/Function;)Lorg/reflections/util/QueryFunction;",
+            "sig": "(Ljava/util/function/Function<TT;Lorg/reflections/util/QueryFunction<TC;TT;>;>;)Lorg/reflections/util/QueryFunction<TC;TT;>;"
+          },
+          {
+            "nme": "getAll",
+            "acc": 1,
+            "dsc": "(Ljava/util/function/Function;Ljava/util/function/Function;)Lorg/reflections/util/QueryFunction;",
+            "sig": "<R:Ljava/lang/Object;>(Ljava/util/function/Function<TT;Lorg/reflections/util/QueryFunction<TC;TR;>;>;Ljava/util/function/Function<TR;TT;>;)Lorg/reflections/util/QueryFunction<TC;TR;>;"
+          },
+          {
+            "nme": "add",
+            "acc": 1,
+            "dsc": "(Lorg/reflections/util/QueryFunction;)Lorg/reflections/util/QueryFunction;",
+            "sig": "<R:Ljava/lang/Object;>(Lorg/reflections/util/QueryFunction<TC;TT;>;)Lorg/reflections/util/QueryFunction<TC;TT;>;"
+          },
+          {
+            "nme": "as",
+            "acc": 129,
+            "dsc": "(Ljava/lang/Class;[Ljava/lang/ClassLoader;)Lorg/reflections/util/QueryFunction;",
+            "sig": "<R:Ljava/lang/Object;>(Ljava/lang/Class<+TR;>;[Ljava/lang/ClassLoader;)Lorg/reflections/util/QueryFunction<TC;TR;>;"
+          },
+          {
+            "nme": "asClass",
+            "acc": 129,
+            "dsc": "([Ljava/lang/ClassLoader;)Lorg/reflections/util/QueryFunction;",
+            "sig": "<R:Ljava/lang/Object;>([Ljava/lang/ClassLoader;)Lorg/reflections/util/QueryFunction<TC;Ljava/lang/Class<*>;>;"
+          },
+          {
+            "nme": "asString",
+            "acc": 1,
+            "dsc": "()Lorg/reflections/util/QueryFunction;",
+            "sig": "()Lorg/reflections/util/QueryFunction<TC;Ljava/lang/String;>;"
+          },
+          {
+            "nme": "as",
+            "acc": 1,
+            "dsc": "()Lorg/reflections/util/QueryFunction;",
+            "sig": "<R:Ljava/lang/Object;>()Lorg/reflections/util/QueryFunction<TC;Ljava/lang/Class<+TR;>;>;"
+          },
+          {
+            "nme": "apply",
+            "acc": 4161,
+            "dsc": "(Ljava/lang/Object;)Ljava/lang/Object;"
+          },
+          {
+            "nme": "lambda$as$15",
+            "acc": 4098,
+            "dsc": "(Ljava/lang/Object;)Ljava/util/Set;"
+          },
+          {
+            "nme": "lambda$asString$14",
+            "acc": 4098,
+            "dsc": "(Ljava/lang/Object;)Ljava/util/Set;"
+          },
+          {
+            "nme": "lambda$asClass$13",
+            "acc": 4098,
+            "dsc": "([Ljava/lang/ClassLoader;Ljava/lang/Object;)Ljava/util/Set;"
+          },
+          {
+            "nme": "lambda$as$12",
+            "acc": 4098,
+            "dsc": "(Ljava/lang/Class;[Ljava/lang/ClassLoader;Ljava/lang/Object;)Ljava/util/Set;"
+          },
+          {
+            "nme": "lambda$null$11",
+            "acc": 4098,
+            "dsc": "(Ljava/lang/Class;Ljava/util/Set;[Ljava/lang/ClassLoader;Ljava/lang/Object;)Ljava/util/Set;"
+          },
+          {
+            "nme": "lambda$null$10",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Object;)Ljava/lang/Object;"
+          },
+          {
+            "nme": "lambda$add$9",
+            "acc": 4098,
+            "dsc": "(Lorg/reflections/util/QueryFunction;Ljava/lang/Object;)Ljava/util/Set;"
+          },
+          {
+            "nme": "lambda$getAll$8",
+            "acc": 4098,
+            "dsc": "(Ljava/util/function/Function;Ljava/util/function/Function;Ljava/lang/Object;)Ljava/util/Set;"
+          },
+          {
+            "nme": "lambda$getAll$7",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Object;)Ljava/lang/Object;"
+          },
+          {
+            "nme": "lambda$flatMap$6",
+            "acc": 4098,
+            "dsc": "(Ljava/util/function/Function;Ljava/lang/Object;)Ljava/util/Set;"
+          },
+          {
+            "nme": "lambda$null$5",
+            "acc": 4106,
+            "dsc": "(Ljava/util/function/Function;Ljava/lang/Object;Ljava/lang/Object;)Ljava/util/stream/Stream;"
+          },
+          {
+            "nme": "lambda$map$4",
+            "acc": 4098,
+            "dsc": "(Ljava/util/function/Function;Ljava/lang/Object;)Ljava/util/Set;"
+          },
+          {
+            "nme": "lambda$filter$3",
+            "acc": 4098,
+            "dsc": "(Ljava/util/function/Predicate;Ljava/lang/Object;)Ljava/util/Set;"
+          },
+          {
+            "nme": "lambda$set$2",
+            "acc": 4106,
+            "dsc": "(Ljava/util/Collection;Lorg/reflections/Store;)Ljava/util/Set;"
+          },
+          {
+            "nme": "lambda$single$1",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Object;Lorg/reflections/Store;)Ljava/util/Set;"
+          },
+          {
+            "nme": "lambda$empty$0",
+            "acc": 4106,
+            "dsc": "(Lorg/reflections/Store;)Ljava/util/Set;"
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/ReflectionUtils$3.class": {
+        "ver": 52,
+        "acc": 48,
+        "nme": "org/reflections/ReflectionUtils$3",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "()V"
+          },
+          {
+            "nme": "get",
+            "acc": 1,
+            "dsc": "(Ljava/lang/reflect/AnnotatedElement;)Lorg/reflections/util/QueryFunction;",
+            "sig": "(Ljava/lang/reflect/AnnotatedElement;)Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;Ljava/lang/Class<+Ljava/lang/annotation/Annotation;>;>;"
+          },
+          {
+            "nme": "of",
+            "acc": 1,
+            "dsc": "(Ljava/lang/reflect/AnnotatedElement;)Lorg/reflections/util/QueryFunction;",
+            "sig": "(Ljava/lang/reflect/AnnotatedElement;)Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;Ljava/lang/Class<+Ljava/lang/annotation/Annotation;>;>;"
+          },
+          {
+            "nme": "of",
+            "acc": 4161,
+            "dsc": "(Ljava/lang/Object;)Lorg/reflections/util/QueryFunction;"
+          },
+          {
+            "nme": "get",
+            "acc": 4161,
+            "dsc": "(Ljava/lang/Object;)Lorg/reflections/util/QueryFunction;"
+          },
+          {
+            "nme": "lambda$of$0",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Class;)Ljava/lang/reflect/AnnotatedElement;"
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/scanners/ResourcesScanner.class": {
+        "ver": 52,
+        "acc": 131105,
+        "nme": "org/reflections/scanners/ResourcesScanner",
+        "super": "org/reflections/scanners/AbstractScanner",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 131073,
+            "dsc": "()V",
+            "vanns": [
+              {
+                "dsc": "Ljava/lang/Deprecated;"
+              }
+            ]
+          },
+          {
+            "nme": "scan",
+            "acc": 4161,
+            "dsc": "(Ljavassist/bytecode/ClassFile;)Ljava/util/List;"
+          },
+          {
+            "nme": "index",
+            "acc": 4161,
+            "dsc": "()Ljava/lang/String;"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Ljava/lang/Deprecated;"
+          }
+        ]
+      },
+      "org/reflections/scanners/Scanners$9.class": {
+        "ver": 52,
+        "acc": 16432,
+        "nme": "org/reflections/scanners/Scanners$9",
+        "super": "org/reflections/scanners/Scanners",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Ljava/lang/String;I)V"
+          },
+          {
+            "nme": "scan",
+            "acc": 1,
+            "dsc": "(Ljavassist/bytecode/ClassFile;Ljava/util/List;)V",
+            "sig": "(Ljavassist/bytecode/ClassFile;Ljava/util/List<Ljava/util/Map$Entry<Ljava/lang/String;Ljava/lang/String;>;>;)V"
+          },
+          {
+            "nme": "with",
+            "acc": 129,
+            "dsc": "([Ljava/lang/reflect/AnnotatedElement;)Lorg/reflections/util/QueryFunction;",
+            "sig": "([Ljava/lang/reflect/AnnotatedElement;)Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;Ljava/lang/String;>;"
+          },
+          {
+            "nme": "lambda$scan$0",
+            "acc": 4098,
+            "dsc": "(Ljava/util/List;Ljavassist/bytecode/ClassFile;Ljavassist/bytecode/MethodInfo;)V"
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/util/NameHelper.class": {
+        "ver": 52,
+        "acc": 1537,
+        "nme": "org/reflections/util/NameHelper",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "toName",
+            "acc": 1,
+            "dsc": "(Ljava/lang/reflect/AnnotatedElement;)Ljava/lang/String;"
+          },
+          {
+            "nme": "toName",
+            "acc": 1,
+            "dsc": "(Ljava/lang/Class;)Ljava/lang/String;",
+            "sig": "(Ljava/lang/Class<*>;)Ljava/lang/String;"
+          },
+          {
+            "nme": "toName",
+            "acc": 1,
+            "dsc": "(Ljava/lang/reflect/Constructor;)Ljava/lang/String;",
+            "sig": "(Ljava/lang/reflect/Constructor<*>;)Ljava/lang/String;"
+          },
+          {
+            "nme": "toName",
+            "acc": 1,
+            "dsc": "(Ljava/lang/reflect/Method;)Ljava/lang/String;"
+          },
+          {
+            "nme": "toName",
+            "acc": 1,
+            "dsc": "(Ljava/lang/reflect/Field;)Ljava/lang/String;"
+          },
+          {
+            "nme": "toNames",
+            "acc": 1,
+            "dsc": "(Ljava/util/Collection;)Ljava/util/Collection;",
+            "sig": "(Ljava/util/Collection<+Ljava/lang/reflect/AnnotatedElement;>;)Ljava/util/Collection<Ljava/lang/String;>;"
+          },
+          {
+            "nme": "toNames",
+            "acc": 129,
+            "dsc": "([Ljava/lang/reflect/AnnotatedElement;)Ljava/util/Collection;",
+            "sig": "([Ljava/lang/reflect/AnnotatedElement;)Ljava/util/Collection<Ljava/lang/String;>;"
+          },
+          {
+            "nme": "forName",
+            "acc": 129,
+            "dsc": "(Ljava/lang/String;Ljava/lang/Class;[Ljava/lang/ClassLoader;)Ljava/lang/Object;",
+            "sig": "<T:Ljava/lang/Object;>(Ljava/lang/String;Ljava/lang/Class<TT;>;[Ljava/lang/ClassLoader;)TT;"
+          },
+          {
+            "nme": "forClass",
+            "acc": 129,
+            "dsc": "(Ljava/lang/String;[Ljava/lang/ClassLoader;)Ljava/lang/Class;",
+            "sig": "(Ljava/lang/String;[Ljava/lang/ClassLoader;)Ljava/lang/Class<*>;"
+          },
+          {
+            "nme": "forMember",
+            "acc": 129,
+            "dsc": "(Ljava/lang/String;[Ljava/lang/ClassLoader;)Ljava/lang/reflect/Member;",
+            "exs": [
+              "org/reflections/ReflectionsException"
+            ]
+          },
+          {
+            "nme": "forElement",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;Ljava/lang/Class;[Ljava/lang/ClassLoader;)Ljava/lang/reflect/AnnotatedElement;",
+            "sig": "<T::Ljava/lang/reflect/AnnotatedElement;>(Ljava/lang/String;Ljava/lang/Class<TT;>;[Ljava/lang/ClassLoader;)TT;",
+            "vanns": [
+              {
+                "dsc": "Ljavax/annotation/Nullable;"
+              }
+            ]
+          },
+          {
+            "nme": "forMethod",
+            "acc": 129,
+            "dsc": "(Ljava/lang/String;[Ljava/lang/ClassLoader;)Ljava/lang/reflect/Method;",
+            "exs": [
+              "org/reflections/ReflectionsException"
+            ],
+            "vanns": [
+              {
+                "dsc": "Ljavax/annotation/Nullable;"
+              }
+            ]
+          },
+          {
+            "nme": "forConstructor",
+            "acc": 129,
+            "dsc": "(Ljava/lang/String;[Ljava/lang/ClassLoader;)Ljava/lang/reflect/Constructor;",
+            "sig": "(Ljava/lang/String;[Ljava/lang/ClassLoader;)Ljava/lang/reflect/Constructor<*>;",
+            "exs": [
+              "org/reflections/ReflectionsException"
+            ]
+          },
+          {
+            "nme": "forField",
+            "acc": 129,
+            "dsc": "(Ljava/lang/String;[Ljava/lang/ClassLoader;)Ljava/lang/reflect/Field;",
+            "vanns": [
+              {
+                "dsc": "Ljavax/annotation/Nullable;"
+              }
+            ]
+          },
+          {
+            "nme": "forNames",
+            "acc": 129,
+            "dsc": "(Ljava/util/Collection;Ljava/lang/Class;[Ljava/lang/ClassLoader;)Ljava/util/Collection;",
+            "sig": "<T:Ljava/lang/Object;>(Ljava/util/Collection<Ljava/lang/String;>;Ljava/lang/Class<TT;>;[Ljava/lang/ClassLoader;)Ljava/util/Collection<TT;>;"
+          },
+          {
+            "nme": "forNames",
+            "acc": 129,
+            "dsc": "(Ljava/util/Collection;[Ljava/lang/ClassLoader;)Ljava/util/Collection;",
+            "sig": "(Ljava/util/Collection<Ljava/lang/String;>;[Ljava/lang/ClassLoader;)Ljava/util/Collection<Ljava/lang/Class<*>;>;"
+          },
+          {
+            "nme": "lambda$forNames$2",
+            "acc": 4098,
+            "dsc": "(Ljava/lang/Class;[Ljava/lang/ClassLoader;Ljava/lang/String;)Ljava/lang/Object;"
+          },
+          {
+            "nme": "lambda$forMember$1",
+            "acc": 4106,
+            "dsc": "(I)[Ljava/lang/Class;"
+          },
+          {
+            "nme": "lambda$forMember$0",
+            "acc": 4098,
+            "dsc": "([Ljava/lang/ClassLoader;Ljava/lang/String;)Ljava/lang/Class;"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "primitiveNames",
+            "dsc": "Ljava/util/List;",
+            "sig": "Ljava/util/List<Ljava/lang/String;>;"
+          },
+          {
+            "acc": 25,
+            "nme": "primitiveTypes",
+            "dsc": "Ljava/util/List;",
+            "sig": "Ljava/util/List<Ljava/lang/Class<*>;>;"
+          },
+          {
+            "acc": 25,
+            "nme": "primitiveDescriptors",
+            "dsc": "Ljava/util/List;",
+            "sig": "Ljava/util/List<Ljava/lang/String;>;"
+          }
+        ]
+      },
+      "org/reflections/scanners/FieldAnnotationsScanner.class": {
+        "ver": 52,
+        "acc": 131105,
+        "nme": "org/reflections/scanners/FieldAnnotationsScanner",
+        "super": "org/reflections/scanners/AbstractScanner",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 131073,
+            "dsc": "()V",
+            "vanns": [
+              {
+                "dsc": "Ljava/lang/Deprecated;"
+              }
+            ]
+          },
+          {
+            "nme": "scan",
+            "acc": 4161,
+            "dsc": "(Ljavassist/bytecode/ClassFile;)Ljava/util/List;"
+          },
+          {
+            "nme": "index",
+            "acc": 4161,
+            "dsc": "()Ljava/lang/String;"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Ljava/lang/Deprecated;"
+          }
+        ]
+      },
+      "org/reflections/vfs/Vfs$DefaultUrlTypes.class": {
+        "ver": 52,
+        "acc": 17441,
+        "nme": "org/reflections/vfs/Vfs$DefaultUrlTypes",
+        "super": "java/lang/Enum",
+        "mthds": [
+          {
+            "nme": "values",
+            "acc": 9,
+            "dsc": "()[Lorg/reflections/vfs/Vfs$DefaultUrlTypes;"
+          },
+          {
+            "nme": "valueOf",
+            "acc": 9,
+            "dsc": "(Ljava/lang/String;)Lorg/reflections/vfs/Vfs$DefaultUrlTypes;"
+          },
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "(Ljava/lang/String;I)V",
+            "sig": "()V"
+          },
+          {
+            "nme": "<init>",
+            "acc": 4096,
+            "dsc": "(Ljava/lang/String;ILorg/reflections/vfs/Vfs$1;)V"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 16409,
+            "nme": "jarFile",
+            "dsc": "Lorg/reflections/vfs/Vfs$DefaultUrlTypes;"
+          },
+          {
+            "acc": 16409,
+            "nme": "jarUrl",
+            "dsc": "Lorg/reflections/vfs/Vfs$DefaultUrlTypes;"
+          },
+          {
+            "acc": 16409,
+            "nme": "directory",
+            "dsc": "Lorg/reflections/vfs/Vfs$DefaultUrlTypes;"
+          },
+          {
+            "acc": 16409,
+            "nme": "jboss_vfs",
+            "dsc": "Lorg/reflections/vfs/Vfs$DefaultUrlTypes;"
+          },
+          {
+            "acc": 16409,
+            "nme": "jboss_vfsfile",
+            "dsc": "Lorg/reflections/vfs/Vfs$DefaultUrlTypes;"
+          },
+          {
+            "acc": 16409,
+            "nme": "bundle",
+            "dsc": "Lorg/reflections/vfs/Vfs$DefaultUrlTypes;"
+          },
+          {
+            "acc": 16409,
+            "nme": "jarInputStream",
+            "dsc": "Lorg/reflections/vfs/Vfs$DefaultUrlTypes;"
+          },
+          {
+            "acc": 4122,
+            "nme": "$VALUES",
+            "dsc": "[Lorg/reflections/vfs/Vfs$DefaultUrlTypes;"
+          }
+        ]
+      },
+      "org/reflections/util/ReflectionUtilsPredicates.class": {
+        "ver": 52,
+        "acc": 33,
+        "nme": "org/reflections/util/ReflectionUtilsPredicates",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "withName",
+            "acc": 9,
+            "dsc": "(Ljava/lang/String;)Ljava/util/function/Predicate;",
+            "sig": "<T::Ljava/lang/reflect/Member;>(Ljava/lang/String;)Ljava/util/function/Predicate<TT;>;"
+          },
+          {
+            "nme": "withPrefix",
+            "acc": 9,
+            "dsc": "(Ljava/lang/String;)Ljava/util/function/Predicate;",
+            "sig": "<T::Ljava/lang/reflect/Member;>(Ljava/lang/String;)Ljava/util/function/Predicate<TT;>;"
+          },
+          {
+            "nme": "withNamePrefix",
+            "acc": 9,
+            "dsc": "(Ljava/lang/String;)Ljava/util/function/Predicate;",
+            "sig": "<T:Ljava/lang/Object;>(Ljava/lang/String;)Ljava/util/function/Predicate<TT;>;"
+          },
+          {
+            "nme": "withPattern",
+            "acc": 9,
+            "dsc": "(Ljava/lang/String;)Ljava/util/function/Predicate;",
+            "sig": "<T::Ljava/lang/reflect/AnnotatedElement;>(Ljava/lang/String;)Ljava/util/function/Predicate<TT;>;"
+          },
+          {
+            "nme": "withAnnotation",
+            "acc": 9,
+            "dsc": "(Ljava/lang/Class;)Ljava/util/function/Predicate;",
+            "sig": "<T::Ljava/lang/reflect/AnnotatedElement;>(Ljava/lang/Class<+Ljava/lang/annotation/Annotation;>;)Ljava/util/function/Predicate<TT;>;"
+          },
+          {
+            "nme": "withAnnotations",
+            "acc": 137,
+            "dsc": "([Ljava/lang/Class;)Ljava/util/function/Predicate;",
+            "sig": "<T::Ljava/lang/reflect/AnnotatedElement;>([Ljava/lang/Class<+Ljava/lang/annotation/Annotation;>;)Ljava/util/function/Predicate<TT;>;"
+          },
+          {
+            "nme": "withAnnotation",
+            "acc": 9,
+            "dsc": "(Ljava/lang/annotation/Annotation;)Ljava/util/function/Predicate;",
+            "sig": "<T::Ljava/lang/reflect/AnnotatedElement;>(Ljava/lang/annotation/Annotation;)Ljava/util/function/Predicate<TT;>;"
+          },
+          {
+            "nme": "withAnnotations",
+            "acc": 137,
+            "dsc": "([Ljava/lang/annotation/Annotation;)Ljava/util/function/Predicate;",
+            "sig": "<T::Ljava/lang/reflect/AnnotatedElement;>([Ljava/lang/annotation/Annotation;)Ljava/util/function/Predicate<TT;>;"
+          },
+          {
+            "nme": "withParameters",
+            "acc": 137,
+            "dsc": "([Ljava/lang/Class;)Ljava/util/function/Predicate;",
+            "sig": "([Ljava/lang/Class<*>;)Ljava/util/function/Predicate<Ljava/lang/reflect/Member;>;"
+          },
+          {
+            "nme": "withParametersAssignableTo",
+            "acc": 137,
+            "dsc": "([Ljava/lang/Class;)Ljava/util/function/Predicate;",
+            "sig": "([Ljava/lang/Class;)Ljava/util/function/Predicate<Ljava/lang/reflect/Member;>;"
+          },
+          {
+            "nme": "withParametersAssignableFrom",
+            "acc": 137,
+            "dsc": "([Ljava/lang/Class;)Ljava/util/function/Predicate;",
+            "sig": "([Ljava/lang/Class;)Ljava/util/function/Predicate<Ljava/lang/reflect/Member;>;"
+          },
+          {
+            "nme": "withParametersCount",
+            "acc": 9,
+            "dsc": "(I)Ljava/util/function/Predicate;",
+            "sig": "(I)Ljava/util/function/Predicate<Ljava/lang/reflect/Member;>;"
+          },
+          {
+            "nme": "withAnyParameterAnnotation",
+            "acc": 9,
+            "dsc": "(Ljava/lang/Class;)Ljava/util/function/Predicate;",
+            "sig": "(Ljava/lang/Class<+Ljava/lang/annotation/Annotation;>;)Ljava/util/function/Predicate<Ljava/lang/reflect/Member;>;"
+          },
+          {
+            "nme": "withAnyParameterAnnotation",
+            "acc": 9,
+            "dsc": "(Ljava/lang/annotation/Annotation;)Ljava/util/function/Predicate;",
+            "sig": "(Ljava/lang/annotation/Annotation;)Ljava/util/function/Predicate<Ljava/lang/reflect/Member;>;"
+          },
+          {
+            "nme": "withType",
+            "acc": 9,
+            "dsc": "(Ljava/lang/Class;)Ljava/util/function/Predicate;",
+            "sig": "<T:Ljava/lang/Object;>(Ljava/lang/Class<TT;>;)Ljava/util/function/Predicate<Ljava/lang/reflect/Field;>;"
+          },
+          {
+            "nme": "withTypeAssignableTo",
+            "acc": 9,
+            "dsc": "(Ljava/lang/Class;)Ljava/util/function/Predicate;",
+            "sig": "<T:Ljava/lang/Object;>(Ljava/lang/Class<TT;>;)Ljava/util/function/Predicate<Ljava/lang/reflect/Field;>;"
+          },
+          {
+            "nme": "withReturnType",
+            "acc": 9,
+            "dsc": "(Ljava/lang/Class;)Ljava/util/function/Predicate;",
+            "sig": "<T:Ljava/lang/Object;>(Ljava/lang/Class<TT;>;)Ljava/util/function/Predicate<Ljava/lang/reflect/Method;>;"
+          },
+          {
+            "nme": "withReturnTypeAssignableFrom",
+            "acc": 9,
+            "dsc": "(Ljava/lang/Class;)Ljava/util/function/Predicate;",
+            "sig": "<T:Ljava/lang/Object;>(Ljava/lang/Class<TT;>;)Ljava/util/function/Predicate<Ljava/lang/reflect/Method;>;"
+          },
+          {
+            "nme": "withModifier",
+            "acc": 9,
+            "dsc": "(I)Ljava/util/function/Predicate;",
+            "sig": "<T::Ljava/lang/reflect/Member;>(I)Ljava/util/function/Predicate<TT;>;"
+          },
+          {
+            "nme": "withPublic",
+            "acc": 9,
+            "dsc": "()Ljava/util/function/Predicate;",
+            "sig": "<T::Ljava/lang/reflect/Member;>()Ljava/util/function/Predicate<TT;>;"
+          },
+          {
+            "nme": "withStatic",
+            "acc": 9,
+            "dsc": "()Ljava/util/function/Predicate;",
+            "sig": "<T::Ljava/lang/reflect/Member;>()Ljava/util/function/Predicate<TT;>;"
+          },
+          {
+            "nme": "withInterface",
+            "acc": 9,
+            "dsc": "()Ljava/util/function/Predicate;",
+            "sig": "<T::Ljava/lang/reflect/Member;>()Ljava/util/function/Predicate<TT;>;"
+          },
+          {
+            "nme": "withClassModifier",
+            "acc": 9,
+            "dsc": "(I)Ljava/util/function/Predicate;",
+            "sig": "(I)Ljava/util/function/Predicate<Ljava/lang/Class<*>;>;"
+          },
+          {
+            "nme": "isAssignable",
+            "acc": 9,
+            "dsc": "([Ljava/lang/Class;[Ljava/lang/Class;)Z"
+          },
+          {
+            "nme": "toName",
+            "acc": 10,
+            "dsc": "(Ljava/lang/Object;)Ljava/lang/String;"
+          },
+          {
+            "nme": "parameterTypes",
+            "acc": 10,
+            "dsc": "(Ljava/lang/reflect/Member;)[Ljava/lang/Class;"
+          },
+          {
+            "nme": "parameterAnnotations",
+            "acc": 10,
+            "dsc": "(Ljava/lang/reflect/Member;)Ljava/util/Set;",
+            "sig": "(Ljava/lang/reflect/Member;)Ljava/util/Set<Ljava/lang/annotation/Annotation;>;"
+          },
+          {
+            "nme": "annotationTypes",
+            "acc": 10,
+            "dsc": "(Ljava/util/Collection;)Ljava/util/Set;",
+            "sig": "(Ljava/util/Collection<Ljava/lang/annotation/Annotation;>;)Ljava/util/Set<Ljava/lang/Class<+Ljava/lang/annotation/Annotation;>;>;"
+          },
+          {
+            "nme": "annotationTypes",
+            "acc": 10,
+            "dsc": "([Ljava/lang/annotation/Annotation;)[Ljava/lang/Class;",
+            "sig": "([Ljava/lang/annotation/Annotation;)[Ljava/lang/Class<+Ljava/lang/annotation/Annotation;>;"
+          },
+          {
+            "nme": "areAnnotationMembersMatching",
+            "acc": 10,
+            "dsc": "(Ljava/lang/annotation/Annotation;Ljava/lang/annotation/Annotation;)Z"
+          },
+          {
+            "nme": "lambda$annotationTypes$24",
+            "acc": 4106,
+            "dsc": "(I)[Ljava/lang/Class;"
+          },
+          {
+            "nme": "lambda$isAssignable$23",
+            "acc": 4106,
+            "dsc": "([Ljava/lang/Class;[Ljava/lang/Class;I)Z"
+          },
+          {
+            "nme": "lambda$withClassModifier$22",
+            "acc": 4106,
+            "dsc": "(ILjava/lang/Class;)Z"
+          },
+          {
+            "nme": "lambda$withModifier$21",
+            "acc": 4106,
+            "dsc": "(ILjava/lang/reflect/Member;)Z"
+          },
+          {
+            "nme": "lambda$withReturnTypeAssignableFrom$20",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Class;Ljava/lang/reflect/Method;)Z"
+          },
+          {
+            "nme": "lambda$withReturnType$19",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Class;Ljava/lang/reflect/Method;)Z"
+          },
+          {
+            "nme": "lambda$withTypeAssignableTo$18",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Class;Ljava/lang/reflect/Field;)Z"
+          },
+          {
+            "nme": "lambda$withType$17",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Class;Ljava/lang/reflect/Field;)Z"
+          },
+          {
+            "nme": "lambda$withAnyParameterAnnotation$16",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/annotation/Annotation;Ljava/lang/reflect/Member;)Z"
+          },
+          {
+            "nme": "lambda$null$15",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/annotation/Annotation;Ljava/lang/annotation/Annotation;)Z"
+          },
+          {
+            "nme": "lambda$withAnyParameterAnnotation$14",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Class;Ljava/lang/reflect/Member;)Z"
+          },
+          {
+            "nme": "lambda$null$13",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Class;Ljava/lang/Class;)Z"
+          },
+          {
+            "nme": "lambda$withParametersCount$12",
+            "acc": 4106,
+            "dsc": "(ILjava/lang/reflect/Member;)Z"
+          },
+          {
+            "nme": "lambda$withParametersAssignableFrom$11",
+            "acc": 4106,
+            "dsc": "([Ljava/lang/Class;Ljava/lang/reflect/Member;)Z"
+          },
+          {
+            "nme": "lambda$withParametersAssignableTo$10",
+            "acc": 4106,
+            "dsc": "([Ljava/lang/Class;Ljava/lang/reflect/Member;)Z"
+          },
+          {
+            "nme": "lambda$withParameters$9",
+            "acc": 4106,
+            "dsc": "([Ljava/lang/Class;Ljava/lang/reflect/Member;)Z"
+          },
+          {
+            "nme": "lambda$withAnnotations$8",
+            "acc": 4106,
+            "dsc": "([Ljava/lang/annotation/Annotation;Ljava/lang/reflect/AnnotatedElement;)Z"
+          },
+          {
+            "nme": "lambda$null$7",
+            "acc": 4106,
+            "dsc": "([Ljava/lang/annotation/Annotation;[Ljava/lang/annotation/Annotation;I)Z"
+          },
+          {
+            "nme": "lambda$withAnnotation$6",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/annotation/Annotation;Ljava/lang/reflect/AnnotatedElement;)Z"
+          },
+          {
+            "nme": "lambda$withAnnotations$5",
+            "acc": 4106,
+            "dsc": "([Ljava/lang/Class;Ljava/lang/reflect/AnnotatedElement;)Z"
+          },
+          {
+            "nme": "lambda$withAnnotation$4",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Class;Ljava/lang/reflect/AnnotatedElement;)Z"
+          },
+          {
+            "nme": "lambda$withPattern$3",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/String;Ljava/lang/reflect/AnnotatedElement;)Z"
+          },
+          {
+            "nme": "lambda$withNamePrefix$2",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/String;Ljava/lang/Object;)Z"
+          },
+          {
+            "nme": "lambda$withPrefix$1",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/String;Ljava/lang/reflect/Member;)Z"
+          },
+          {
+            "nme": "lambda$withName$0",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/String;Ljava/lang/reflect/Member;)Z"
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/vfs/JarInputFile.class": {
+        "ver": 52,
+        "acc": 33,
+        "nme": "org/reflections/vfs/JarInputFile",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Ljava/util/zip/ZipEntry;Lorg/reflections/vfs/JarInputDir;JJ)V"
+          },
+          {
+            "nme": "getName",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "getRelativePath",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "openInputStream",
+            "acc": 1,
+            "dsc": "()Ljava/io/InputStream;"
+          },
+          {
+            "nme": "access$000",
+            "acc": 4104,
+            "dsc": "(Lorg/reflections/vfs/JarInputFile;)Lorg/reflections/vfs/JarInputDir;"
+          },
+          {
+            "nme": "access$100",
+            "acc": 4104,
+            "dsc": "(Lorg/reflections/vfs/JarInputFile;)J"
+          },
+          {
+            "nme": "access$200",
+            "acc": 4104,
+            "dsc": "(Lorg/reflections/vfs/JarInputFile;)J"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "entry",
+            "dsc": "Ljava/util/zip/ZipEntry;"
+          },
+          {
+            "acc": 18,
+            "nme": "jarInputDir",
+            "dsc": "Lorg/reflections/vfs/JarInputDir;"
+          },
+          {
+            "acc": 18,
+            "nme": "fromIndex",
+            "dsc": "J"
+          },
+          {
+            "acc": 18,
+            "nme": "endIndex",
+            "dsc": "J"
+          }
+        ]
+      },
+      "org/reflections/vfs/SystemFile.class": {
+        "ver": 52,
+        "acc": 33,
+        "nme": "org/reflections/vfs/SystemFile",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Lorg/reflections/vfs/SystemDir;Ljava/io/File;)V"
+          },
+          {
+            "nme": "getName",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "getRelativePath",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "openInputStream",
+            "acc": 1,
+            "dsc": "()Ljava/io/InputStream;"
+          },
+          {
+            "nme": "toString",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "root",
+            "dsc": "Lorg/reflections/vfs/SystemDir;"
+          },
+          {
+            "acc": 18,
+            "nme": "file",
+            "dsc": "Ljava/io/File;"
+          }
+        ]
+      },
+      "org/reflections/ReflectionUtils$2.class": {
+        "ver": 52,
+        "acc": 48,
+        "nme": "org/reflections/ReflectionUtils$2",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "()V"
+          },
+          {
+            "nme": "get",
+            "acc": 1,
+            "dsc": "(Ljava/lang/reflect/AnnotatedElement;)Lorg/reflections/util/QueryFunction;",
+            "sig": "(Ljava/lang/reflect/AnnotatedElement;)Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;Ljava/lang/annotation/Annotation;>;"
+          },
+          {
+            "nme": "of",
+            "acc": 1,
+            "dsc": "(Ljava/lang/reflect/AnnotatedElement;)Lorg/reflections/util/QueryFunction;",
+            "sig": "(Ljava/lang/reflect/AnnotatedElement;)Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;Ljava/lang/annotation/Annotation;>;"
+          },
+          {
+            "nme": "of",
+            "acc": 4161,
+            "dsc": "(Ljava/lang/Object;)Lorg/reflections/util/QueryFunction;"
+          },
+          {
+            "nme": "get",
+            "acc": 4161,
+            "dsc": "(Ljava/lang/Object;)Lorg/reflections/util/QueryFunction;"
+          },
+          {
+            "nme": "lambda$get$0",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/reflect/AnnotatedElement;Lorg/reflections/Store;)Ljava/util/Set;"
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/scanners/MethodAnnotationsScanner.class": {
+        "ver": 52,
+        "acc": 131105,
+        "nme": "org/reflections/scanners/MethodAnnotationsScanner",
+        "super": "org/reflections/scanners/AbstractScanner",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 131073,
+            "dsc": "()V",
+            "vanns": [
+              {
+                "dsc": "Ljava/lang/Deprecated;"
+              }
+            ]
+          },
+          {
+            "nme": "scan",
+            "acc": 4161,
+            "dsc": "(Ljavassist/bytecode/ClassFile;)Ljava/util/List;"
+          },
+          {
+            "nme": "index",
+            "acc": 4161,
+            "dsc": "()Ljava/lang/String;"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Ljava/lang/Deprecated;"
+          }
+        ]
+      },
+      "org/reflections/scanners/Scanners$2.class": {
+        "ver": 52,
+        "acc": 16432,
+        "nme": "org/reflections/scanners/Scanners$2",
+        "super": "org/reflections/scanners/Scanners",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Ljava/lang/String;I)V"
+          },
+          {
+            "nme": "acceptResult",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;)Z"
+          },
+          {
+            "nme": "scan",
+            "acc": 1,
+            "dsc": "(Ljavassist/bytecode/ClassFile;Ljava/util/List;)V",
+            "sig": "(Ljavassist/bytecode/ClassFile;Ljava/util/List<Ljava/util/Map$Entry<Ljava/lang/String;Ljava/lang/String;>;>;)V"
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/vfs/ZipFile.class": {
+        "ver": 52,
+        "acc": 33,
+        "nme": "org/reflections/vfs/ZipFile",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Lorg/reflections/vfs/ZipDir;Ljava/util/zip/ZipEntry;)V"
+          },
+          {
+            "nme": "getName",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "getRelativePath",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "openInputStream",
+            "acc": 1,
+            "dsc": "()Ljava/io/InputStream;",
+            "exs": [
+              "java/io/IOException"
+            ]
+          },
+          {
+            "nme": "toString",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "root",
+            "dsc": "Lorg/reflections/vfs/ZipDir;"
+          },
+          {
+            "acc": 18,
+            "nme": "entry",
+            "dsc": "Ljava/util/zip/ZipEntry;"
+          }
+        ]
+      },
+      "org/reflections/scanners/TypeAnnotationsScanner.class": {
+        "ver": 52,
+        "acc": 131105,
+        "nme": "org/reflections/scanners/TypeAnnotationsScanner",
+        "super": "org/reflections/scanners/AbstractScanner",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 131073,
+            "dsc": "()V",
+            "vanns": [
+              {
+                "dsc": "Ljava/lang/Deprecated;"
+              }
+            ]
+          },
+          {
+            "nme": "scan",
+            "acc": 4161,
+            "dsc": "(Ljavassist/bytecode/ClassFile;)Ljava/util/List;"
+          },
+          {
+            "nme": "index",
+            "acc": 4161,
+            "dsc": "()Ljava/lang/String;"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Ljava/lang/Deprecated;"
+          }
+        ]
+      },
+      "org/reflections/vfs/Vfs$DefaultUrlTypes$7.class": {
+        "ver": 52,
+        "acc": 16432,
+        "nme": "org/reflections/vfs/Vfs$DefaultUrlTypes$7",
+        "super": "org/reflections/vfs/Vfs$DefaultUrlTypes",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Ljava/lang/String;I)V"
+          },
+          {
+            "nme": "matches",
+            "acc": 1,
+            "dsc": "(Ljava/net/URL;)Z",
+            "exs": [
+              "java/lang/Exception"
+            ]
+          },
+          {
+            "nme": "createDir",
+            "acc": 1,
+            "dsc": "(Ljava/net/URL;)Lorg/reflections/vfs/Vfs$Dir;",
+            "exs": [
+              "java/lang/Exception"
+            ]
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/util/FilterBuilder.class": {
+        "ver": 52,
+        "acc": 33,
+        "nme": "org/reflections/util/FilterBuilder",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "(Ljava/util/Collection;)V",
+            "sig": "(Ljava/util/Collection<Ljava/util/function/Predicate<Ljava/lang/String;>;>;)V"
+          },
+          {
+            "nme": "includePackage",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;)Lorg/reflections/util/FilterBuilder;"
+          },
+          {
+            "nme": "excludePackage",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;)Lorg/reflections/util/FilterBuilder;"
+          },
+          {
+            "nme": "includePattern",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;)Lorg/reflections/util/FilterBuilder;"
+          },
+          {
+            "nme": "excludePattern",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;)Lorg/reflections/util/FilterBuilder;"
+          },
+          {
+            "nme": "include",
+            "acc": 131073,
+            "dsc": "(Ljava/lang/String;)Lorg/reflections/util/FilterBuilder;",
+            "vanns": [
+              {
+                "dsc": "Ljava/lang/Deprecated;"
+              }
+            ]
+          },
+          {
+            "nme": "exclude",
+            "acc": 131073,
+            "dsc": "(Ljava/lang/String;)Lorg/reflections/util/FilterBuilder;",
+            "vanns": [
+              {
+                "dsc": "Ljava/lang/Deprecated;"
+              }
+            ]
+          },
+          {
+            "nme": "parsePackages",
+            "acc": 9,
+            "dsc": "(Ljava/lang/String;)Lorg/reflections/util/FilterBuilder;"
+          },
+          {
+            "nme": "add",
+            "acc": 1,
+            "dsc": "(Ljava/util/function/Predicate;)Lorg/reflections/util/FilterBuilder;",
+            "sig": "(Ljava/util/function/Predicate<Ljava/lang/String;>;)Lorg/reflections/util/FilterBuilder;"
+          },
+          {
+            "nme": "test",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;)Z"
+          },
+          {
+            "nme": "equals",
+            "acc": 1,
+            "dsc": "(Ljava/lang/Object;)Z"
+          },
+          {
+            "nme": "hashCode",
+            "acc": 1,
+            "dsc": "()I"
+          },
+          {
+            "nme": "toString",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "prefixPattern",
+            "acc": 10,
+            "dsc": "(Ljava/lang/String;)Ljava/lang/String;"
+          },
+          {
+            "nme": "test",
+            "acc": 4161,
+            "dsc": "(Ljava/lang/Object;)Z"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "chain",
+            "dsc": "Ljava/util/List;",
+            "sig": "Ljava/util/List<Ljava/util/function/Predicate<Ljava/lang/String;>;>;"
+          }
+        ]
+      },
+      "org/reflections/vfs/Vfs$File.class": {
+        "ver": 52,
+        "acc": 1537,
+        "nme": "org/reflections/vfs/Vfs$File",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "getName",
+            "acc": 1025,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "getRelativePath",
+            "acc": 1025,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "openInputStream",
+            "acc": 1025,
+            "dsc": "()Ljava/io/InputStream;",
+            "exs": [
+              "java/io/IOException"
+            ]
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/serializers/XmlSerializer.class": {
+        "ver": 52,
+        "acc": 33,
+        "nme": "org/reflections/serializers/XmlSerializer",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "read",
+            "acc": 1,
+            "dsc": "(Ljava/io/InputStream;)Lorg/reflections/Reflections;"
+          },
+          {
+            "nme": "save",
+            "acc": 1,
+            "dsc": "(Lorg/reflections/Reflections;Ljava/lang/String;)Ljava/io/File;"
+          },
+          {
+            "nme": "createDocument",
+            "acc": 2,
+            "dsc": "(Lorg/reflections/Store;)Lorg/dom4j/Document;"
+          },
+          {
+            "nme": "lambda$createDocument$5",
+            "acc": 4106,
+            "dsc": "(Lorg/dom4j/Element;Ljava/lang/String;Ljava/util/Map;)V"
+          },
+          {
+            "nme": "lambda$null$4",
+            "acc": 4106,
+            "dsc": "(Lorg/dom4j/Element;Ljava/lang/String;Ljava/util/Set;)V"
+          },
+          {
+            "nme": "lambda$null$3",
+            "acc": 4106,
+            "dsc": "(Lorg/dom4j/Element;Ljava/lang/String;)V"
+          },
+          {
+            "nme": "lambda$read$2",
+            "acc": 4106,
+            "dsc": "(Lorg/dom4j/Element;)Ljava/util/Map;"
+          },
+          {
+            "nme": "lambda$null$1",
+            "acc": 4106,
+            "dsc": "(Lorg/dom4j/Element;)Ljava/util/Set;"
+          },
+          {
+            "nme": "lambda$null$0",
+            "acc": 4106,
+            "dsc": "(Lorg/dom4j/Element;)Ljava/lang/String;"
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/vfs/Vfs$DefaultUrlTypes$4.class": {
+        "ver": 52,
+        "acc": 16432,
+        "nme": "org/reflections/vfs/Vfs$DefaultUrlTypes$4",
+        "super": "org/reflections/vfs/Vfs$DefaultUrlTypes",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Ljava/lang/String;I)V"
+          },
+          {
+            "nme": "matches",
+            "acc": 1,
+            "dsc": "(Ljava/net/URL;)Z"
+          },
+          {
+            "nme": "createDir",
+            "acc": 1,
+            "dsc": "(Ljava/net/URL;)Lorg/reflections/vfs/Vfs$Dir;",
+            "exs": [
+              "java/lang/Exception"
+            ]
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/vfs/JarInputDir$1.class": {
+        "ver": 52,
+        "acc": 32,
+        "nme": "org/reflections/vfs/JarInputDir$1",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Lorg/reflections/vfs/JarInputDir;)V",
+            "exs": [
+              "java/lang/Error"
+            ]
+          },
+          {
+            "nme": "hasNext",
+            "acc": 1,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "next",
+            "acc": 1,
+            "dsc": "()Lorg/reflections/vfs/Vfs$File;"
+          },
+          {
+            "nme": "computeNext",
+            "acc": 2,
+            "dsc": "()Lorg/reflections/vfs/Vfs$File;"
+          },
+          {
+            "nme": "next",
+            "acc": 4161,
+            "dsc": "()Ljava/lang/Object;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 0,
+            "nme": "entry",
+            "dsc": "Lorg/reflections/vfs/Vfs$File;"
+          },
+          {
+            "acc": 4112,
+            "nme": "this$0",
+            "dsc": "Lorg/reflections/vfs/JarInputDir;"
+          }
+        ]
+      },
+      "org/reflections/util/FilterBuilder$Include.class": {
+        "ver": 52,
+        "acc": 32,
+        "nme": "org/reflections/util/FilterBuilder$Include",
+        "super": "org/reflections/util/FilterBuilder$Matcher",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Ljava/lang/String;)V"
+          },
+          {
+            "nme": "test",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;)Z"
+          },
+          {
+            "nme": "toString",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "test",
+            "acc": 4161,
+            "dsc": "(Ljava/lang/Object;)Z"
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/scanners/Scanners$5.class": {
+        "ver": 52,
+        "acc": 16432,
+        "nme": "org/reflections/scanners/Scanners$5",
+        "super": "org/reflections/scanners/Scanners",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Ljava/lang/String;I)V"
+          },
+          {
+            "nme": "scan",
+            "acc": 1,
+            "dsc": "(Ljavassist/bytecode/ClassFile;Ljava/util/List;)V",
+            "sig": "(Ljavassist/bytecode/ClassFile;Ljava/util/List<Ljava/util/Map$Entry<Ljava/lang/String;Ljava/lang/String;>;>;)V"
+          },
+          {
+            "nme": "lambda$scan$0",
+            "acc": 4098,
+            "dsc": "(Ljava/util/List;Ljavassist/bytecode/ClassFile;Ljavassist/bytecode/FieldInfo;)V"
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/util/ClasspathHelper.class": {
+        "ver": 52,
+        "acc": 1057,
+        "nme": "org/reflections/util/ClasspathHelper",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "contextClassLoader",
+            "acc": 9,
+            "dsc": "()Ljava/lang/ClassLoader;"
+          },
+          {
+            "nme": "staticClassLoader",
+            "acc": 9,
+            "dsc": "()Ljava/lang/ClassLoader;"
+          },
+          {
+            "nme": "classLoaders",
+            "acc": 137,
+            "dsc": "([Ljava/lang/ClassLoader;)[Ljava/lang/ClassLoader;"
+          },
+          {
+            "nme": "forPackage",
+            "acc": 137,
+            "dsc": "(Ljava/lang/String;[Ljava/lang/ClassLoader;)Ljava/util/Collection;",
+            "sig": "(Ljava/lang/String;[Ljava/lang/ClassLoader;)Ljava/util/Collection<Ljava/net/URL;>;"
+          },
+          {
+            "nme": "forResource",
+            "acc": 137,
+            "dsc": "(Ljava/lang/String;[Ljava/lang/ClassLoader;)Ljava/util/Collection;",
+            "sig": "(Ljava/lang/String;[Ljava/lang/ClassLoader;)Ljava/util/Collection<Ljava/net/URL;>;"
+          },
+          {
+            "nme": "forClass",
+            "acc": 137,
+            "dsc": "(Ljava/lang/Class;[Ljava/lang/ClassLoader;)Ljava/net/URL;",
+            "sig": "(Ljava/lang/Class<*>;[Ljava/lang/ClassLoader;)Ljava/net/URL;"
+          },
+          {
+            "nme": "forClassLoader",
+            "acc": 9,
+            "dsc": "()Ljava/util/Collection;",
+            "sig": "()Ljava/util/Collection<Ljava/net/URL;>;"
+          },
+          {
+            "nme": "forClassLoader",
+            "acc": 137,
+            "dsc": "([Ljava/lang/ClassLoader;)Ljava/util/Collection;",
+            "sig": "([Ljava/lang/ClassLoader;)Ljava/util/Collection<Ljava/net/URL;>;"
+          },
+          {
+            "nme": "forJavaClassPath",
+            "acc": 9,
+            "dsc": "()Ljava/util/Collection;",
+            "sig": "()Ljava/util/Collection<Ljava/net/URL;>;"
+          },
+          {
+            "nme": "forWebInfLib",
+            "acc": 9,
+            "dsc": "(Ljavax/servlet/ServletContext;)Ljava/util/Collection;",
+            "sig": "(Ljavax/servlet/ServletContext;)Ljava/util/Collection<Ljava/net/URL;>;"
+          },
+          {
+            "nme": "forWebInfClasses",
+            "acc": 9,
+            "dsc": "(Ljavax/servlet/ServletContext;)Ljava/net/URL;"
+          },
+          {
+            "nme": "forManifest",
+            "acc": 9,
+            "dsc": "()Ljava/util/Collection;",
+            "sig": "()Ljava/util/Collection<Ljava/net/URL;>;"
+          },
+          {
+            "nme": "forManifest",
+            "acc": 9,
+            "dsc": "(Ljava/net/URL;)Ljava/util/Collection;",
+            "sig": "(Ljava/net/URL;)Ljava/util/Collection<Ljava/net/URL;>;"
+          },
+          {
+            "nme": "forManifest",
+            "acc": 9,
+            "dsc": "(Ljava/lang/Iterable;)Ljava/util/Collection;",
+            "sig": "(Ljava/lang/Iterable<Ljava/net/URL;>;)Ljava/util/Collection<Ljava/net/URL;>;"
+          },
+          {
+            "nme": "tryToGetValidUrl",
+            "acc": 8,
+            "dsc": "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/net/URL;"
+          },
+          {
+            "nme": "cleanPath",
+            "acc": 9,
+            "dsc": "(Ljava/net/URL;)Ljava/lang/String;"
+          },
+          {
+            "nme": "resourceName",
+            "acc": 10,
+            "dsc": "(Ljava/lang/String;)Ljava/lang/String;"
+          },
+          {
+            "nme": "distinctUrls",
+            "acc": 10,
+            "dsc": "(Ljava/util/Collection;)Ljava/util/Collection;",
+            "sig": "(Ljava/util/Collection<Ljava/net/URL;>;)Ljava/util/Collection<Ljava/net/URL;>;"
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/ReflectionUtils.class": {
+        "ver": 52,
+        "acc": 1057,
+        "nme": "org/reflections/ReflectionUtils",
+        "super": "org/reflections/util/ReflectionUtilsPredicates",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "get",
+            "acc": 9,
+            "dsc": "(Lorg/reflections/util/QueryFunction;)Ljava/util/Set;",
+            "sig": "<C:Ljava/lang/Object;T:Ljava/lang/Object;>(Lorg/reflections/util/QueryFunction<TC;TT;>;)Ljava/util/Set<TT;>;"
+          },
+          {
+            "nme": "get",
+            "acc": 137,
+            "dsc": "(Lorg/reflections/util/QueryFunction;[Ljava/util/function/Predicate;)Ljava/util/Set;",
+            "sig": "<T:Ljava/lang/Object;>(Lorg/reflections/util/QueryFunction<Lorg/reflections/Store;TT;>;[Ljava/util/function/Predicate<-TT;>;)Ljava/util/Set<TT;>;"
+          },
+          {
+            "nme": "extendType",
+            "acc": 9,
+            "dsc": "()Lorg/reflections/util/UtilQueryBuilder;",
+            "sig": "<T::Ljava/lang/reflect/AnnotatedElement;>()Lorg/reflections/util/UtilQueryBuilder<Ljava/lang/reflect/AnnotatedElement;TT;>;"
+          },
+          {
+            "nme": "getAllAnnotations",
+            "acc": 137,
+            "dsc": "(Ljava/lang/reflect/AnnotatedElement;[Ljava/util/function/Predicate;)Ljava/util/Set;",
+            "sig": "<T::Ljava/lang/reflect/AnnotatedElement;>(TT;[Ljava/util/function/Predicate<Ljava/lang/annotation/Annotation;>;)Ljava/util/Set<Ljava/lang/annotation/Annotation;>;"
+          },
+          {
+            "nme": "getAllSuperTypes",
+            "acc": 137,
+            "dsc": "(Ljava/lang/Class;[Ljava/util/function/Predicate;)Ljava/util/Set;",
+            "sig": "(Ljava/lang/Class<*>;[Ljava/util/function/Predicate<-Ljava/lang/Class<*>;>;)Ljava/util/Set<Ljava/lang/Class<*>;>;"
+          },
+          {
+            "nme": "getSuperTypes",
+            "acc": 9,
+            "dsc": "(Ljava/lang/Class;)Ljava/util/Set;",
+            "sig": "(Ljava/lang/Class<*>;)Ljava/util/Set<Ljava/lang/Class<*>;>;"
+          },
+          {
+            "nme": "getAllMethods",
+            "acc": 137,
+            "dsc": "(Ljava/lang/Class;[Ljava/util/function/Predicate;)Ljava/util/Set;",
+            "sig": "(Ljava/lang/Class<*>;[Ljava/util/function/Predicate<-Ljava/lang/reflect/Method;>;)Ljava/util/Set<Ljava/lang/reflect/Method;>;"
+          },
+          {
+            "nme": "getMethods",
+            "acc": 137,
+            "dsc": "(Ljava/lang/Class;[Ljava/util/function/Predicate;)Ljava/util/Set;",
+            "sig": "(Ljava/lang/Class<*>;[Ljava/util/function/Predicate<-Ljava/lang/reflect/Method;>;)Ljava/util/Set<Ljava/lang/reflect/Method;>;"
+          },
+          {
+            "nme": "getAllConstructors",
+            "acc": 137,
+            "dsc": "(Ljava/lang/Class;[Ljava/util/function/Predicate;)Ljava/util/Set;",
+            "sig": "(Ljava/lang/Class<*>;[Ljava/util/function/Predicate<-Ljava/lang/reflect/Constructor;>;)Ljava/util/Set<Ljava/lang/reflect/Constructor;>;"
+          },
+          {
+            "nme": "getConstructors",
+            "acc": 137,
+            "dsc": "(Ljava/lang/Class;[Ljava/util/function/Predicate;)Ljava/util/Set;",
+            "sig": "(Ljava/lang/Class<*>;[Ljava/util/function/Predicate<-Ljava/lang/reflect/Constructor;>;)Ljava/util/Set<Ljava/lang/reflect/Constructor;>;"
+          },
+          {
+            "nme": "getAllFields",
+            "acc": 137,
+            "dsc": "(Ljava/lang/Class;[Ljava/util/function/Predicate;)Ljava/util/Set;",
+            "sig": "(Ljava/lang/Class<*>;[Ljava/util/function/Predicate<-Ljava/lang/reflect/Field;>;)Ljava/util/Set<Ljava/lang/reflect/Field;>;"
+          },
+          {
+            "nme": "getFields",
+            "acc": 137,
+            "dsc": "(Ljava/lang/Class;[Ljava/util/function/Predicate;)Ljava/util/Set;",
+            "sig": "(Ljava/lang/Class<*>;[Ljava/util/function/Predicate<-Ljava/lang/reflect/Field;>;)Ljava/util/Set<Ljava/lang/reflect/Field;>;"
+          },
+          {
+            "nme": "getAnnotations",
+            "acc": 137,
+            "dsc": "(Ljava/lang/reflect/AnnotatedElement;[Ljava/util/function/Predicate;)Ljava/util/Set;",
+            "sig": "<T::Ljava/lang/reflect/AnnotatedElement;>(TT;[Ljava/util/function/Predicate<Ljava/lang/annotation/Annotation;>;)Ljava/util/Set<Ljava/lang/annotation/Annotation;>;"
+          },
+          {
+            "nme": "toMap",
+            "acc": 9,
+            "dsc": "(Ljava/lang/annotation/Annotation;)Ljava/util/Map;",
+            "sig": "(Ljava/lang/annotation/Annotation;)Ljava/util/Map<Ljava/lang/String;Ljava/lang/Object;>;"
+          },
+          {
+            "nme": "toMap",
+            "acc": 9,
+            "dsc": "(Ljava/lang/annotation/Annotation;Ljava/lang/reflect/AnnotatedElement;)Ljava/util/Map;",
+            "sig": "(Ljava/lang/annotation/Annotation;Ljava/lang/reflect/AnnotatedElement;)Ljava/util/Map<Ljava/lang/String;Ljava/lang/Object;>;"
+          },
+          {
+            "nme": "toAnnotation",
+            "acc": 9,
+            "dsc": "(Ljava/util/Map;)Ljava/lang/annotation/Annotation;",
+            "sig": "(Ljava/util/Map<Ljava/lang/String;Ljava/lang/Object;>;)Ljava/lang/annotation/Annotation;"
+          },
+          {
+            "nme": "toAnnotation",
+            "acc": 9,
+            "dsc": "(Ljava/util/Map;Ljava/lang/Class;)Ljava/lang/annotation/Annotation;",
+            "sig": "<T::Ljava/lang/annotation/Annotation;>(Ljava/util/Map<Ljava/lang/String;Ljava/lang/Object;>;Ljava/lang/Class<TT;>;)TT;"
+          },
+          {
+            "nme": "invoke",
+            "acc": 137,
+            "dsc": "(Ljava/lang/reflect/Method;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;"
+          },
+          {
+            "nme": "lambda$toAnnotation$17",
+            "acc": 4106,
+            "dsc": "(Ljava/util/Map;Ljava/lang/Object;Ljava/lang/reflect/Method;[Ljava/lang/Object;)Ljava/lang/Object;",
+            "exs": [
+              "java/lang/Throwable"
+            ]
+          },
+          {
+            "nme": "lambda$toMap$16",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/annotation/Annotation;Ljava/lang/reflect/Method;)Ljava/lang/Object;"
+          },
+          {
+            "nme": "lambda$getAllSuperTypes$15",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Object;)Z"
+          },
+          {
+            "nme": "lambda$extendType$14",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/reflect/AnnotatedElement;)Lorg/reflections/util/QueryFunction;"
+          },
+          {
+            "nme": "lambda$static$13",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/String;)Lorg/reflections/util/QueryFunction;"
+          },
+          {
+            "nme": "lambda$null$12",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/String;Lorg/reflections/Store;)Ljava/util/Set;"
+          },
+          {
+            "nme": "lambda$static$11",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Class;)Lorg/reflections/util/QueryFunction;"
+          },
+          {
+            "nme": "lambda$null$10",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Class;Lorg/reflections/Store;)Ljava/util/Set;"
+          },
+          {
+            "nme": "lambda$static$9",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Class;)Lorg/reflections/util/QueryFunction;"
+          },
+          {
+            "nme": "lambda$null$8",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Class;Lorg/reflections/Store;)Ljava/util/Set;"
+          },
+          {
+            "nme": "lambda$static$7",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Class;)Lorg/reflections/util/QueryFunction;"
+          },
+          {
+            "nme": "lambda$null$6",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Class;Lorg/reflections/Store;)Ljava/util/Set;"
+          },
+          {
+            "nme": "lambda$static$5",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Class;)Lorg/reflections/util/QueryFunction;"
+          },
+          {
+            "nme": "lambda$null$4",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Class;Lorg/reflections/Store;)Ljava/util/Set;"
+          },
+          {
+            "nme": "lambda$static$3",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Class;)Lorg/reflections/util/QueryFunction;"
+          },
+          {
+            "nme": "lambda$null$2",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Class;Lorg/reflections/Store;)Ljava/util/Set;"
+          },
+          {
+            "nme": "lambda$static$1",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/reflect/Method;)Z"
+          },
+          {
+            "nme": "lambda$get$0",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Object;)Z"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 26,
+            "nme": "objectMethodNames",
+            "dsc": "Ljava/util/List;",
+            "sig": "Ljava/util/List<Ljava/lang/String;>;"
+          },
+          {
+            "acc": 25,
+            "nme": "notObjectMethod",
+            "dsc": "Ljava/util/function/Predicate;",
+            "sig": "Ljava/util/function/Predicate<Ljava/lang/reflect/Method;>;"
+          },
+          {
+            "acc": 25,
+            "nme": "SuperClass",
+            "dsc": "Lorg/reflections/util/UtilQueryBuilder;",
+            "sig": "Lorg/reflections/util/UtilQueryBuilder<Ljava/lang/Class<*>;Ljava/lang/Class<*>;>;"
+          },
+          {
+            "acc": 25,
+            "nme": "Interfaces",
+            "dsc": "Lorg/reflections/util/UtilQueryBuilder;",
+            "sig": "Lorg/reflections/util/UtilQueryBuilder<Ljava/lang/Class<*>;Ljava/lang/Class<*>;>;"
+          },
+          {
+            "acc": 25,
+            "nme": "SuperTypes",
+            "dsc": "Lorg/reflections/util/UtilQueryBuilder;",
+            "sig": "Lorg/reflections/util/UtilQueryBuilder<Ljava/lang/Class<*>;Ljava/lang/Class<*>;>;"
+          },
+          {
+            "acc": 25,
+            "nme": "Annotations",
+            "dsc": "Lorg/reflections/util/UtilQueryBuilder;",
+            "sig": "Lorg/reflections/util/UtilQueryBuilder<Ljava/lang/reflect/AnnotatedElement;Ljava/lang/annotation/Annotation;>;"
+          },
+          {
+            "acc": 25,
+            "nme": "AnnotationTypes",
+            "dsc": "Lorg/reflections/util/UtilQueryBuilder;",
+            "sig": "Lorg/reflections/util/UtilQueryBuilder<Ljava/lang/reflect/AnnotatedElement;Ljava/lang/Class<+Ljava/lang/annotation/Annotation;>;>;"
+          },
+          {
+            "acc": 25,
+            "nme": "Methods",
+            "dsc": "Lorg/reflections/util/UtilQueryBuilder;",
+            "sig": "Lorg/reflections/util/UtilQueryBuilder<Ljava/lang/Class<*>;Ljava/lang/reflect/Method;>;"
+          },
+          {
+            "acc": 25,
+            "nme": "Constructors",
+            "dsc": "Lorg/reflections/util/UtilQueryBuilder;",
+            "sig": "Lorg/reflections/util/UtilQueryBuilder<Ljava/lang/Class<*>;Ljava/lang/reflect/Constructor;>;"
+          },
+          {
+            "acc": 25,
+            "nme": "Fields",
+            "dsc": "Lorg/reflections/util/UtilQueryBuilder;",
+            "sig": "Lorg/reflections/util/UtilQueryBuilder<Ljava/lang/Class<*>;Ljava/lang/reflect/Field;>;"
+          },
+          {
+            "acc": 25,
+            "nme": "Resources",
+            "dsc": "Lorg/reflections/util/UtilQueryBuilder;",
+            "sig": "Lorg/reflections/util/UtilQueryBuilder<Ljava/lang/String;Ljava/net/URL;>;"
+          }
+        ]
+      },
+      "org/reflections/vfs/JarInputFile$1.class": {
+        "ver": 52,
+        "acc": 32,
+        "nme": "org/reflections/vfs/JarInputFile$1",
+        "super": "java/io/InputStream",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Lorg/reflections/vfs/JarInputFile;)V"
+          },
+          {
+            "nme": "read",
+            "acc": 1,
+            "dsc": "()I",
+            "exs": [
+              "java/io/IOException"
+            ]
+          }
+        ],
+        "flds": [
+          {
+            "acc": 4112,
+            "nme": "this$0",
+            "dsc": "Lorg/reflections/vfs/JarInputFile;"
+          }
+        ]
+      },
+      "org/reflections/vfs/Vfs$1.class": {
+        "ver": 52,
+        "acc": 4128,
+        "nme": "org/reflections/vfs/Vfs$1",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": []
+      },
+      "org/reflections/scanners/Scanners$8.class": {
+        "ver": 52,
+        "acc": 16432,
+        "nme": "org/reflections/scanners/Scanners$8",
+        "super": "org/reflections/scanners/Scanners",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Ljava/lang/String;I)V"
+          },
+          {
+            "nme": "scan",
+            "acc": 1,
+            "dsc": "(Ljavassist/bytecode/ClassFile;Ljava/util/List;)V",
+            "sig": "(Ljavassist/bytecode/ClassFile;Ljava/util/List<Ljava/util/Map$Entry<Ljava/lang/String;Ljava/lang/String;>;>;)V"
+          },
+          {
+            "nme": "lambda$scan$1",
+            "acc": 4098,
+            "dsc": "(Ljavassist/bytecode/ClassFile;Ljava/util/List;Ljavassist/bytecode/MethodInfo;)V"
+          },
+          {
+            "nme": "lambda$null$0",
+            "acc": 4098,
+            "dsc": "(Ljava/util/List;Ljava/lang/String;Ljava/util/List;)V"
+          }
+        ],
+        "flds": []
+      },
+      "org/reflections/util/JavassistHelper.class": {
+        "ver": 52,
+        "acc": 33,
+        "nme": "org/reflections/util/JavassistHelper",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "fieldName",
+            "acc": 9,
+            "dsc": "(Ljavassist/bytecode/ClassFile;Ljavassist/bytecode/FieldInfo;)Ljava/lang/String;"
+          },
+          {
+            "nme": "methodName",
+            "acc": 9,
+            "dsc": "(Ljavassist/bytecode/ClassFile;Ljavassist/bytecode/MethodInfo;)Ljava/lang/String;"
+          },
+          {
+            "nme": "isPublic",
+            "acc": 9,
+            "dsc": "(Ljava/lang/Object;)Z"
+          },
+          {
+            "nme": "getMethods",
+            "acc": 9,
+            "dsc": "(Ljavassist/bytecode/ClassFile;)Ljava/util/stream/Stream;",
+            "sig": "(Ljavassist/bytecode/ClassFile;)Ljava/util/stream/Stream<Ljavassist/bytecode/MethodInfo;>;"
+          },
+          {
+            "nme": "getConstructors",
+            "acc": 9,
+            "dsc": "(Ljavassist/bytecode/ClassFile;)Ljava/util/stream/Stream;",
+            "sig": "(Ljavassist/bytecode/ClassFile;)Ljava/util/stream/Stream<Ljavassist/bytecode/MethodInfo;>;"
+          },
+          {
+            "nme": "getParameters",
+            "acc": 9,
+            "dsc": "(Ljavassist/bytecode/MethodInfo;)Ljava/util/List;",
+            "sig": "(Ljavassist/bytecode/MethodInfo;)Ljava/util/List<Ljava/lang/String;>;"
+          },
+          {
+            "nme": "getReturnType",
+            "acc": 9,
+            "dsc": "(Ljavassist/bytecode/MethodInfo;)Ljava/lang/String;"
+          },
+          {
+            "nme": "getAnnotations",
+            "acc": 9,
+            "dsc": "(Ljava/util/function/Function;)Ljava/util/List;",
+            "sig": "(Ljava/util/function/Function<Ljava/lang/String;Ljavassist/bytecode/AttributeInfo;>;)Ljava/util/List<Ljava/lang/String;>;"
+          },
+          {
+            "nme": "getParametersAnnotations",
+            "acc": 9,
+            "dsc": "(Ljavassist/bytecode/MethodInfo;)Ljava/util/List;",
+            "sig": "(Ljavassist/bytecode/MethodInfo;)Ljava/util/List<Ljava/util/List<Ljava/lang/String;>;>;"
+          },
+          {
+            "nme": "annotationNames",
+            "acc": 10,
+            "dsc": "([Ljavassist/bytecode/annotation/Annotation;)Ljava/util/List;",
+            "sig": "([Ljavassist/bytecode/annotation/Annotation;)Ljava/util/List<Ljava/lang/String;>;"
+          },
+          {
+            "nme": "lambda$getParametersAnnotations$3",
+            "acc": 4106,
+            "dsc": "([[Ljavassist/bytecode/annotation/Annotation;)Ljava/util/List;"
+          },
+          {
+            "nme": "lambda$getParametersAnnotations$2",
+            "acc": 4106,
+            "dsc": "(Ljavassist/bytecode/AttributeInfo;)[[Ljavassist/bytecode/annotation/Annotation;"
+          },
+          {
+            "nme": "lambda$getAnnotations$1",
+            "acc": 4106,
+            "dsc": "(Ljavassist/bytecode/AttributeInfo;)[Ljavassist/bytecode/annotation/Annotation;"
+          },
+          {
+            "nme": "lambda$getConstructors$0",
+            "acc": 4106,
+            "dsc": "(Ljavassist/bytecode/MethodInfo;)Z"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 9,
+            "nme": "includeInvisibleTag",
+            "dsc": "Z"
+          }
+        ]
+      },
+      "org/reflections/vfs/JbossDir.class": {
+        "ver": 52,
+        "acc": 33,
+        "nme": "org/reflections/vfs/JbossDir",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "(Lorg/jboss/vfs/VirtualFile;)V"
+          },
+          {
+            "nme": "createDir",
+            "acc": 9,
+            "dsc": "(Ljava/net/URL;)Lorg/reflections/vfs/Vfs$Dir;",
+            "exs": [
+              "java/lang/Exception"
+            ]
+          },
+          {
+            "nme": "getPath",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "getFiles",
+            "acc": 1,
+            "dsc": "()Ljava/lang/Iterable;",
+            "sig": "()Ljava/lang/Iterable<Lorg/reflections/vfs/Vfs$File;>;"
+          },
+          {
+            "nme": "lambda$getFiles$0",
+            "acc": 4098,
+            "dsc": "()Ljava/util/Iterator;"
+          },
+          {
+            "nme": "access$000",
+            "acc": 4104,
+            "dsc": "(Lorg/reflections/vfs/JbossDir;)Lorg/jboss/vfs/VirtualFile;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "virtualFile",
+            "dsc": "Lorg/jboss/vfs/VirtualFile;"
+          }
+        ]
+      }
+    }
+  }
+}

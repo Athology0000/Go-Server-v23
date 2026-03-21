@@ -1,0 +1,3668 @@
+{
+  "md5": "682c9a52b3cbf11335f63f7047a86a38",
+  "sha2": "fad29f53ad0c239ba525b637a152bfcaa8631f0f",
+  "sha256": "97cd462f8e8ab92571ab8805070e4450c52cb1ad63c224208f71a10943a01e46",
+  "contents": {
+    "classes": {
+      "kotlinx/atomicfu/locks/ExperimentalThreadBlockingApi.class": {
+        "ver": 52,
+        "acc": 9729,
+        "nme": "kotlinx/atomicfu/locks/ExperimentalThreadBlockingApi",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/annotation/Retention;",
+            "vals": [
+              "value",
+              [
+                "Lkotlin/annotation/AnnotationRetention;",
+                "BINARY"
+              ]
+            ]
+          },
+          {
+            "dsc": "Lkotlin/annotation/Target;",
+            "vals": [
+              "allowedTargets",
+              [
+                [
+                  "Lkotlin/annotation/AnnotationTarget;",
+                  "CLASS"
+                ],
+                [
+                  "Lkotlin/annotation/AnnotationTarget;",
+                  "FUNCTION"
+                ],
+                [
+                  "Lkotlin/annotation/AnnotationTarget;",
+                  "PROPERTY"
+                ],
+                [
+                  "Lkotlin/annotation/AnnotationTarget;",
+                  "TYPEALIAS"
+                ]
+              ]
+            ]
+          },
+          {
+            "dsc": "Ljava/lang/annotation/Retention;",
+            "vals": [
+              "value",
+              [
+                "Ljava/lang/annotation/RetentionPolicy;",
+                "CLASS"
+              ]
+            ]
+          },
+          {
+            "dsc": "Ljava/lang/annotation/Target;",
+            "vals": [
+              "value",
+              [
+                [
+                  "Ljava/lang/annotation/ElementType;",
+                  "TYPE"
+                ],
+                [
+                  "Ljava/lang/annotation/ElementType;",
+                  "METHOD"
+                ]
+              ]
+            ]
+          },
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\n\n\u0002\u0018\u0002\n\u0002\u0010\u001b\n\u0000\b\u0002\u0018\u00002\u00020\u0001B\u0000¨\u0006\u0002"
+              ],
+              "d2",
+              [
+                "Lkotlinx/atomicfu/locks/ExperimentalThreadBlockingApi;",
+                "",
+                "atomicfu"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lkotlin/RequiresOptIn;",
+            "vals": [
+              "message",
+              "This API is experimental. It is low-level and might change in the future.",
+              "level",
+              [
+                "Lkotlin/RequiresOptIn$Level;",
+                "ERROR"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/AtomicBoolean$Companion.class": {
+        "ver": 52,
+        "acc": 48,
+        "nme": "kotlinx/atomicfu/AtomicBoolean$Companion",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "()V"
+          },
+          {
+            "nme": "<init>",
+            "acc": 4097,
+            "dsc": "(Lkotlin/jvm/internal/DefaultConstructorMarker;)V"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\u0018\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0002\b\u0003\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\b\u0002\b\u0003\u0018\u00002\u00020\u0001B\t\b\u0002¢\u0006\u0004\b\u0002\u0010\u0003R2\u0010\u0004\u001a&\u0012\f\u0012\n \u0007*\u0004\u0018\u00010\u00060\u0006 \u0007*\u0012\u0012\f\u0012\n \u0007*\u0004\u0018\u00010\u00060\u0006\u0018\u00010\u00050\u0005X\u0004¢\u0006\u0002\n\u0000¨\u0006\b"
+              ],
+              "d2",
+              [
+                "Lkotlinx/atomicfu/AtomicBoolean$Companion;",
+                "",
+                "<init>",
+                "()V",
+                "FU",
+                "Ljava/util/concurrent/atomic/AtomicIntegerFieldUpdater;",
+                "Lkotlinx/atomicfu/AtomicBoolean;",
+                "kotlin.jvm.PlatformType",
+                "atomicfu"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/AtomicLong.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/atomicfu/AtomicLong",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(JLkotlinx/atomicfu/TraceBase;)V"
+          },
+          {
+            "nme": "getTrace",
+            "acc": 131089,
+            "dsc": "()Lkotlinx/atomicfu/TraceBase;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "getTrace$annotations",
+            "acc": 135177,
+            "dsc": "()V",
+            "vanns": [
+              {
+                "dsc": "Lkotlin/Deprecated;",
+                "vals": [
+                  "message",
+                  "The property was intended for internal use only and will be hidden in the future release."
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "getValue",
+            "acc": 17,
+            "dsc": "()J"
+          },
+          {
+            "nme": "setValue",
+            "acc": 17,
+            "dsc": "(J)V"
+          },
+          {
+            "nme": "getValue",
+            "acc": 18,
+            "dsc": "(Ljava/lang/Object;Lkotlin/reflect/KProperty;)J",
+            "sig": "(Ljava/lang/Object;Lkotlin/reflect/KProperty<*>;)J",
+            "invanns": [
+              {
+                "dsc": "Lkotlin/internal/InlineOnly;"
+              }
+            ]
+          },
+          {
+            "nme": "setValue",
+            "acc": 18,
+            "dsc": "(Ljava/lang/Object;Lkotlin/reflect/KProperty;J)V",
+            "sig": "(Ljava/lang/Object;Lkotlin/reflect/KProperty<*>;J)V",
+            "invanns": [
+              {
+                "dsc": "Lkotlin/internal/InlineOnly;"
+              }
+            ]
+          },
+          {
+            "nme": "lazySet",
+            "acc": 17,
+            "dsc": "(J)V"
+          },
+          {
+            "nme": "compareAndSet",
+            "acc": 17,
+            "dsc": "(JJ)Z"
+          },
+          {
+            "nme": "getAndSet",
+            "acc": 17,
+            "dsc": "(J)J"
+          },
+          {
+            "nme": "getAndIncrement",
+            "acc": 17,
+            "dsc": "()J"
+          },
+          {
+            "nme": "getAndDecrement",
+            "acc": 17,
+            "dsc": "()J"
+          },
+          {
+            "nme": "getAndAdd",
+            "acc": 17,
+            "dsc": "(J)J"
+          },
+          {
+            "nme": "addAndGet",
+            "acc": 17,
+            "dsc": "(J)J"
+          },
+          {
+            "nme": "incrementAndGet",
+            "acc": 17,
+            "dsc": "()J"
+          },
+          {
+            "nme": "decrementAndGet",
+            "acc": 17,
+            "dsc": "()J"
+          },
+          {
+            "nme": "plusAssign",
+            "acc": 17,
+            "dsc": "(J)V"
+          },
+          {
+            "nme": "minusAssign",
+            "acc": 17,
+            "dsc": "(J)V"
+          },
+          {
+            "nme": "toString",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 26,
+            "nme": "Companion",
+            "dsc": "Lkotlinx/atomicfu/AtomicLong$Companion;"
+          },
+          {
+            "acc": 131090,
+            "nme": "trace",
+            "dsc": "Lkotlinx/atomicfu/TraceBase;"
+          },
+          {
+            "acc": 66,
+            "nme": "value",
+            "dsc": "J"
+          },
+          {
+            "acc": 26,
+            "nme": "FU",
+            "dsc": "Ljava/util/concurrent/atomic/AtomicLongFieldUpdater;",
+            "sig": "Ljava/util/concurrent/atomic/AtomicLongFieldUpdater<Lkotlinx/atomicfu/AtomicLong;>;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u00004\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0000\n\u0002\u0010\t\n\u0000\n\u0002\u0018\u0002\n\u0002\b\f\n\u0002\u0018\u0002\n\u0002\u0010\u0002\n\u0002\b\u0002\n\u0002\u0010\u000b\n\u0002\b\r\n\u0002\u0010\u000e\n\u0002\b\u0002\u0018\u0000 %2\u00020\u0001:\u0001%B\u0019\b\u0000\u0012\u0006\u0010\u0002\u001a\u00020\u0003\u0012\u0006\u0010\u0004\u001a\u00020\u0005¢\u0006\u0004\b\u0006\u0010\u0007J\u001f\u0010\f\u001a\u00020\u00032\b\u0010\u0010\u001a\u0004\u0018\u00010\u00012\n\u0010\u0011\u001a\u0006\u0012\u0002\b\u00030\u0012H\nJ'\u0010\u000e\u001a\u00020\u00132\b\u0010\u0010\u001a\u0004\u0018\u00010\u00012\n\u0010\u0011\u001a\u0006\u0012\u0002\b\u00030\u00122\u0006\u0010\u0002\u001a\u00020\u0003H\nJ\u000e\u0010\u0014\u001a\u00020\u00132\u0006\u0010\u0002\u001a\u00020\u0003J\u0016\u0010\u0015\u001a\u00020\u00162\u0006\u0010\u0017\u001a\u00020\u00032\u0006\u0010\u0018\u001a\u00020\u0003J\u000e\u0010\u0019\u001a\u00020\u00032\u0006\u0010\u0002\u001a\u00020\u0003J\u0006\u0010\u001a\u001a\u00020\u0003J\u0006\u0010\u001b\u001a\u00020\u0003J\u000e\u0010\u001c\u001a\u00020\u00032\u0006\u0010\u001d\u001a\u00020\u0003J\u000e\u0010\u001e\u001a\u00020\u00032\u0006\u0010\u001d\u001a\u00020\u0003J\u0006\u0010\u001f\u001a\u00020\u0003J\u0006\u0010 \u001a\u00020\u0003J\u0011\u0010!\u001a\u00020\u00132\u0006\u0010\u001d\u001a\u00020\u0003H\nJ\u0011\u0010\"\u001a\u00020\u00132\u0006\u0010\u001d\u001a\u00020\u0003H\nJ\b\u0010#\u001a\u00020$H\u0016R\u001c\u0010\u0004\u001a\u00020\u00058\u0006X\u0004¢\u0006\u000e\n\u0000\u0012\u0004\b\b\u0010\t\u001a\u0004\b\n\u0010\u000bR$\u0010\u0002\u001a\u00020\u00032\u0006\u0010\u0002\u001a\u00020\u0003@FX\u000e¢\u0006\u000e\n\u0000\u001a\u0004\b\f\u0010\r\"\u0004\b\u000e\u0010\u000f¨\u0006&"
+              ],
+              "d2",
+              [
+                "Lkotlinx/atomicfu/AtomicLong;",
+                "",
+                "value",
+                "",
+                "trace",
+                "Lkotlinx/atomicfu/TraceBase;",
+                "<init>",
+                "(JLkotlinx/atomicfu/TraceBase;)V",
+                "getTrace$annotations",
+                "()V",
+                "getTrace",
+                "()Lkotlinx/atomicfu/TraceBase;",
+                "getValue",
+                "()J",
+                "setValue",
+                "(J)V",
+                "thisRef",
+                "property",
+                "Lkotlin/reflect/KProperty;",
+                "",
+                "lazySet",
+                "compareAndSet",
+                "",
+                "expect",
+                "update",
+                "getAndSet",
+                "getAndIncrement",
+                "getAndDecrement",
+                "getAndAdd",
+                "delta",
+                "addAndGet",
+                "incrementAndGet",
+                "decrementAndGet",
+                "plusAssign",
+                "minusAssign",
+                "toString",
+                "",
+                "Companion",
+                "atomicfu"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lkotlin/jvm/internal/SourceDebugExtension;",
+            "vals": [
+              "value",
+              [
+                "SMAP\nAtomicFU.kt\nKotlin\n*S Kotlin\n*F\n+ 1 AtomicFU.kt\nkotlinx/atomicfu/AtomicLong\n+ 2 fake.kt\nkotlin/jvm/internal/FakeKt\n*L\n1#1,469:1\n1#2:470\n*E\n"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/locks/ParkingDelegatorKt.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/atomicfu/locks/ParkingDelegatorKt",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "addNanosToSeconds",
+            "acc": 25,
+            "dsc": "(IJ)I"
+          },
+          {
+            "nme": "addNanosToSeconds",
+            "acc": 25,
+            "dsc": "(JJ)J"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              2,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\u000e\n\u0000\n\u0002\u0010\b\n\u0000\n\u0002\u0010\t\n\u0000\u001a\u0014\u0010\u0000\u001a\u00020\u0001*\u00020\u00012\u0006\u0010\u0002\u001a\u00020\u0003H\u0000\u001a\u0014\u0010\u0000\u001a\u00020\u0003*\u00020\u00032\u0006\u0010\u0002\u001a\u00020\u0003H\u0000¨\u0006\u0004"
+              ],
+              "d2",
+              [
+                "addNanosToSeconds",
+                "",
+                "nanos",
+                "",
+                "atomicfu"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lkotlin/jvm/internal/SourceDebugExtension;",
+            "vals": [
+              "value",
+              [
+                "SMAP\nParkingDelegator.kt\nKotlin\n*S Kotlin\n*F\n+ 1 ParkingDelegator.kt\nkotlinx/atomicfu/locks/ParkingDelegatorKt\n+ 2 fake.kt\nkotlin/jvm/internal/FakeKt\n*L\n1#1,41:1\n1#2:42\n*E\n"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/AtomicFU_commonKt.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/atomicfu/AtomicFU_commonKt",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "atomicArrayOfNulls",
+            "acc": 25,
+            "dsc": "(I)Lkotlinx/atomicfu/AtomicArray;",
+            "sig": "<T:Ljava/lang/Object;>(I)Lkotlinx/atomicfu/AtomicArray<TT;>;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "loop",
+            "acc": 25,
+            "dsc": "(Lkotlinx/atomicfu/AtomicRef;Lkotlin/jvm/functions/Function1;)Ljava/lang/Void;",
+            "sig": "<T:Ljava/lang/Object;>(Lkotlinx/atomicfu/AtomicRef<TT;>;Lkotlin/jvm/functions/Function1<-TT;Lkotlin/Unit;>;)Ljava/lang/Void;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "update",
+            "acc": 25,
+            "dsc": "(Lkotlinx/atomicfu/AtomicRef;Lkotlin/jvm/functions/Function1;)V",
+            "sig": "<T:Ljava/lang/Object;>(Lkotlinx/atomicfu/AtomicRef<TT;>;Lkotlin/jvm/functions/Function1<-TT;+TT;>;)V"
+          },
+          {
+            "nme": "getAndUpdate",
+            "acc": 25,
+            "dsc": "(Lkotlinx/atomicfu/AtomicRef;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;",
+            "sig": "<T:Ljava/lang/Object;>(Lkotlinx/atomicfu/AtomicRef<TT;>;Lkotlin/jvm/functions/Function1<-TT;+TT;>;)TT;"
+          },
+          {
+            "nme": "updateAndGet",
+            "acc": 25,
+            "dsc": "(Lkotlinx/atomicfu/AtomicRef;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;",
+            "sig": "<T:Ljava/lang/Object;>(Lkotlinx/atomicfu/AtomicRef<TT;>;Lkotlin/jvm/functions/Function1<-TT;+TT;>;)TT;"
+          },
+          {
+            "nme": "loop",
+            "acc": 25,
+            "dsc": "(Lkotlinx/atomicfu/AtomicBoolean;Lkotlin/jvm/functions/Function1;)Ljava/lang/Void;",
+            "sig": "(Lkotlinx/atomicfu/AtomicBoolean;Lkotlin/jvm/functions/Function1<-Ljava/lang/Boolean;Lkotlin/Unit;>;)Ljava/lang/Void;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "update",
+            "acc": 25,
+            "dsc": "(Lkotlinx/atomicfu/AtomicBoolean;Lkotlin/jvm/functions/Function1;)V",
+            "sig": "(Lkotlinx/atomicfu/AtomicBoolean;Lkotlin/jvm/functions/Function1<-Ljava/lang/Boolean;Ljava/lang/Boolean;>;)V"
+          },
+          {
+            "nme": "getAndUpdate",
+            "acc": 25,
+            "dsc": "(Lkotlinx/atomicfu/AtomicBoolean;Lkotlin/jvm/functions/Function1;)Z",
+            "sig": "(Lkotlinx/atomicfu/AtomicBoolean;Lkotlin/jvm/functions/Function1<-Ljava/lang/Boolean;Ljava/lang/Boolean;>;)Z"
+          },
+          {
+            "nme": "updateAndGet",
+            "acc": 25,
+            "dsc": "(Lkotlinx/atomicfu/AtomicBoolean;Lkotlin/jvm/functions/Function1;)Z",
+            "sig": "(Lkotlinx/atomicfu/AtomicBoolean;Lkotlin/jvm/functions/Function1<-Ljava/lang/Boolean;Ljava/lang/Boolean;>;)Z"
+          },
+          {
+            "nme": "loop",
+            "acc": 25,
+            "dsc": "(Lkotlinx/atomicfu/AtomicInt;Lkotlin/jvm/functions/Function1;)Ljava/lang/Void;",
+            "sig": "(Lkotlinx/atomicfu/AtomicInt;Lkotlin/jvm/functions/Function1<-Ljava/lang/Integer;Lkotlin/Unit;>;)Ljava/lang/Void;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "update",
+            "acc": 25,
+            "dsc": "(Lkotlinx/atomicfu/AtomicInt;Lkotlin/jvm/functions/Function1;)V",
+            "sig": "(Lkotlinx/atomicfu/AtomicInt;Lkotlin/jvm/functions/Function1<-Ljava/lang/Integer;Ljava/lang/Integer;>;)V"
+          },
+          {
+            "nme": "getAndUpdate",
+            "acc": 25,
+            "dsc": "(Lkotlinx/atomicfu/AtomicInt;Lkotlin/jvm/functions/Function1;)I",
+            "sig": "(Lkotlinx/atomicfu/AtomicInt;Lkotlin/jvm/functions/Function1<-Ljava/lang/Integer;Ljava/lang/Integer;>;)I"
+          },
+          {
+            "nme": "updateAndGet",
+            "acc": 25,
+            "dsc": "(Lkotlinx/atomicfu/AtomicInt;Lkotlin/jvm/functions/Function1;)I",
+            "sig": "(Lkotlinx/atomicfu/AtomicInt;Lkotlin/jvm/functions/Function1<-Ljava/lang/Integer;Ljava/lang/Integer;>;)I"
+          },
+          {
+            "nme": "loop",
+            "acc": 25,
+            "dsc": "(Lkotlinx/atomicfu/AtomicLong;Lkotlin/jvm/functions/Function1;)Ljava/lang/Void;",
+            "sig": "(Lkotlinx/atomicfu/AtomicLong;Lkotlin/jvm/functions/Function1<-Ljava/lang/Long;Lkotlin/Unit;>;)Ljava/lang/Void;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "update",
+            "acc": 25,
+            "dsc": "(Lkotlinx/atomicfu/AtomicLong;Lkotlin/jvm/functions/Function1;)V",
+            "sig": "(Lkotlinx/atomicfu/AtomicLong;Lkotlin/jvm/functions/Function1<-Ljava/lang/Long;Ljava/lang/Long;>;)V"
+          },
+          {
+            "nme": "getAndUpdate",
+            "acc": 25,
+            "dsc": "(Lkotlinx/atomicfu/AtomicLong;Lkotlin/jvm/functions/Function1;)J",
+            "sig": "(Lkotlinx/atomicfu/AtomicLong;Lkotlin/jvm/functions/Function1<-Ljava/lang/Long;Ljava/lang/Long;>;)J"
+          },
+          {
+            "nme": "updateAndGet",
+            "acc": 25,
+            "dsc": "(Lkotlinx/atomicfu/AtomicLong;Lkotlin/jvm/functions/Function1;)J",
+            "sig": "(Lkotlinx/atomicfu/AtomicLong;Lkotlin/jvm/functions/Function1<-Ljava/lang/Long;Ljava/lang/Long;>;)J"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              2,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000<\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0002\n\u0002\u0010\b\n\u0000\n\u0002\u0010\u0001\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\u0010\u0002\n\u0002\b\u0005\n\u0002\u0018\u0002\n\u0002\u0010\u000b\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\u0010\t\n\u0000\u001a\u001e\u0010\u0000\u001a\n\u0012\u0006\u0012\u0004\u0018\u0001H\u00020\u0001\"\u0004\b\u0000\u0010\u00022\u0006\u0010\u0003\u001a\u00020\u0004H\u0007\u001a0\u0010\u0005\u001a\u00020\u0006\"\u0004\b\u0000\u0010\u0002*\b\u0012\u0004\u0012\u0002H\u00020\u00072\u0012\u0010\b\u001a\u000e\u0012\u0004\u0012\u0002H\u0002\u0012\u0004\u0012\u00020\n0\tH\bø\u0001\u0000\u001a0\u0010\u000b\u001a\u00020\n\"\u0004\b\u0000\u0010\u0002*\b\u0012\u0004\u0012\u0002H\u00020\u00072\u0012\u0010\f\u001a\u000e\u0012\u0004\u0012\u0002H\u0002\u0012\u0004\u0012\u0002H\u00020\tH\bø\u0001\u0000\u001a5\u0010\r\u001a\u0002H\u0002\"\u0004\b\u0000\u0010\u0002*\b\u0012\u0004\u0012\u0002H\u00020\u00072\u0012\u0010\f\u001a\u000e\u0012\u0004\u0012\u0002H\u0002\u0012\u0004\u0012\u0002H\u00020\tH\bø\u0001\u0000¢\u0006\u0002\u0010\u000e\u001a5\u0010\u000f\u001a\u0002H\u0002\"\u0004\b\u0000\u0010\u0002*\b\u0012\u0004\u0012\u0002H\u00020\u00072\u0012\u0010\f\u001a\u000e\u0012\u0004\u0012\u0002H\u0002\u0012\u0004\u0012\u0002H\u00020\tH\bø\u0001\u0000¢\u0006\u0002\u0010\u000e\u001a$\u0010\u0005\u001a\u00020\u0006*\u00020\u00102\u0012\u0010\b\u001a\u000e\u0012\u0004\u0012\u00020\u0011\u0012\u0004\u0012\u00020\n0\tH\bø\u0001\u0000\u001a$\u0010\u000b\u001a\u00020\n*\u00020\u00102\u0012\u0010\f\u001a\u000e\u0012\u0004\u0012\u00020\u0011\u0012\u0004\u0012\u00020\u00110\tH\bø\u0001\u0000\u001a$\u0010\r\u001a\u00020\u0011*\u00020\u00102\u0012\u0010\f\u001a\u000e\u0012\u0004\u0012\u00020\u0011\u0012\u0004\u0012\u00020\u00110\tH\bø\u0001\u0000\u001a$\u0010\u000f\u001a\u00020\u0011*\u00020\u00102\u0012\u0010\f\u001a\u000e\u0012\u0004\u0012\u00020\u0011\u0012\u0004\u0012\u00020\u00110\tH\bø\u0001\u0000\u001a$\u0010\u0005\u001a\u00020\u0006*\u00020\u00122\u0012\u0010\b\u001a\u000e\u0012\u0004\u0012\u00020\u0004\u0012\u0004\u0012\u00020\n0\tH\bø\u0001\u0000\u001a$\u0010\u000b\u001a\u00020\n*\u00020\u00122\u0012\u0010\f\u001a\u000e\u0012\u0004\u0012\u00020\u0004\u0012\u0004\u0012\u00020\u00040\tH\bø\u0001\u0000\u001a$\u0010\r\u001a\u00020\u0004*\u00020\u00122\u0012\u0010\f\u001a\u000e\u0012\u0004\u0012\u00020\u0004\u0012\u0004\u0012\u00020\u00040\tH\bø\u0001\u0000\u001a$\u0010\u000f\u001a\u00020\u0004*\u00020\u00122\u0012\u0010\f\u001a\u000e\u0012\u0004\u0012\u00020\u0004\u0012\u0004\u0012\u00020\u00040\tH\bø\u0001\u0000\u001a$\u0010\u0005\u001a\u00020\u0006*\u00020\u00132\u0012\u0010\b\u001a\u000e\u0012\u0004\u0012\u00020\u0014\u0012\u0004\u0012\u00020\n0\tH\bø\u0001\u0000\u001a$\u0010\u000b\u001a\u00020\n*\u00020\u00132\u0012\u0010\f\u001a\u000e\u0012\u0004\u0012\u00020\u0014\u0012\u0004\u0012\u00020\u00140\tH\bø\u0001\u0000\u001a$\u0010\r\u001a\u00020\u0014*\u00020\u00132\u0012\u0010\f\u001a\u000e\u0012\u0004\u0012\u00020\u0014\u0012\u0004\u0012\u00020\u00140\tH\bø\u0001\u0000\u001a$\u0010\u000f\u001a\u00020\u0014*\u00020\u00132\u0012\u0010\f\u001a\u000e\u0012\u0004\u0012\u00020\u0014\u0012\u0004\u0012\u00020\u00140\tH\bø\u0001\u0000\u0002\u0007\n\u0005\b20\u0001¨\u0006\u0015"
+              ],
+              "d2",
+              [
+                "atomicArrayOfNulls",
+                "Lkotlinx/atomicfu/AtomicArray;",
+                "T",
+                "size",
+                "",
+                "loop",
+                "",
+                "Lkotlinx/atomicfu/AtomicRef;",
+                "action",
+                "Lkotlin/Function1;",
+                "",
+                "update",
+                "function",
+                "getAndUpdate",
+                "(Lkotlinx/atomicfu/AtomicRef;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;",
+                "updateAndGet",
+                "Lkotlinx/atomicfu/AtomicBoolean;",
+                "",
+                "Lkotlinx/atomicfu/AtomicInt;",
+                "Lkotlinx/atomicfu/AtomicLong;",
+                "",
+                "atomicfu"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/TraceBase$None.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/atomicfu/TraceBase$None",
+        "super": "kotlinx/atomicfu/TraceBase",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "()V"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "INSTANCE",
+            "dsc": "Lkotlinx/atomicfu/TraceBase$None;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\f\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\b\u0003\bÆ\u0002\u0018\u00002\u00020\u0001B\t\b\u0002¢\u0006\u0004\b\u0002\u0010\u0003¨\u0006\u0004"
+              ],
+              "d2",
+              [
+                "Lkotlinx/atomicfu/TraceBase$None;",
+                "Lkotlinx/atomicfu/TraceBase;",
+                "<init>",
+                "()V",
+                "atomicfu"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/TraceFormat.class": {
+        "ver": 52,
+        "acc": 33,
+        "nme": "kotlinx/atomicfu/TraceFormat",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "format",
+            "acc": 1,
+            "dsc": "(ILjava/lang/Object;)Ljava/lang/String;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\u001a\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0002\b\u0003\n\u0002\u0010\u000e\n\u0000\n\u0002\u0010\b\n\u0002\b\u0002\b\u0017\u0018\u00002\u00020\u0001B\u0007¢\u0006\u0004\b\u0002\u0010\u0003J\u0018\u0010\u0004\u001a\u00020\u00052\u0006\u0010\u0006\u001a\u00020\u00072\u0006\u0010\b\u001a\u00020\u0001H\u0017¨\u0006\t"
+              ],
+              "d2",
+              [
+                "Lkotlinx/atomicfu/TraceFormat;",
+                "",
+                "<init>",
+                "()V",
+                "format",
+                "",
+                "index",
+                "",
+                "event",
+                "atomicfu"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/locks/Free.class": {
+        "ver": 52,
+        "acc": 48,
+        "nme": "kotlinx/atomicfu/locks/Free",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "()V"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "INSTANCE",
+            "dsc": "Lkotlinx/atomicfu/locks/Free;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\f\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\b\u0003\bÂ\u0002\u0018\u00002\u00020\u0001B\t\b\u0002¢\u0006\u0004\b\u0002\u0010\u0003¨\u0006\u0004"
+              ],
+              "d2",
+              [
+                "Lkotlinx/atomicfu/locks/Free;",
+                "Lkotlinx/atomicfu/locks/ParkingState;",
+                "<init>",
+                "()V",
+                "atomicfu"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/locks/JvmParkingDelegatorKt.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/atomicfu/locks/JvmParkingDelegatorKt",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "ParkingData$annotations",
+            "acc": 135177,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              2,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\b\n\u0000\n\u0002\u0018\u0002\n\u0000*\f\b\u0000\u0010\u0000\"\u00020\u00012\u00020\u0001¨\u0006\u0002"
+              ],
+              "d2",
+              [
+                "ParkingData",
+                "Ljava/lang/Thread;",
+                "atomicfu"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/AtomicInt$Companion.class": {
+        "ver": 52,
+        "acc": 48,
+        "nme": "kotlinx/atomicfu/AtomicInt$Companion",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "()V"
+          },
+          {
+            "nme": "<init>",
+            "acc": 4097,
+            "dsc": "(Lkotlin/jvm/internal/DefaultConstructorMarker;)V"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\u0018\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0002\b\u0003\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\b\u0002\b\u0003\u0018\u00002\u00020\u0001B\t\b\u0002¢\u0006\u0004\b\u0002\u0010\u0003R2\u0010\u0004\u001a&\u0012\f\u0012\n \u0007*\u0004\u0018\u00010\u00060\u0006 \u0007*\u0012\u0012\f\u0012\n \u0007*\u0004\u0018\u00010\u00060\u0006\u0018\u00010\u00050\u0005X\u0004¢\u0006\u0002\n\u0000¨\u0006\b"
+              ],
+              "d2",
+              [
+                "Lkotlinx/atomicfu/AtomicInt$Companion;",
+                "",
+                "<init>",
+                "()V",
+                "FU",
+                "Ljava/util/concurrent/atomic/AtomicIntegerFieldUpdater;",
+                "Lkotlinx/atomicfu/AtomicInt;",
+                "kotlin.jvm.PlatformType",
+                "atomicfu"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/locks/ParkingSupportKt.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/atomicfu/locks/ParkingSupportKt",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "ParkingHandle$annotations",
+            "acc": 135177,
+            "dsc": "()V",
+            "invanns": [
+              {
+                "dsc": "Lkotlinx/atomicfu/locks/ExperimentalThreadBlockingApi;"
+              }
+            ]
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              2,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\f\n\u0000\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0000*\u0010\b\u0007\u0010\u0000\"\u00020\u00012\u00020\u0001B\u0002\b\u0002¨\u0006\u0003"
+              ],
+              "d2",
+              [
+                "ParkingHandle",
+                "Ljava/lang/Thread;",
+                "Lkotlinx/atomicfu/locks/ExperimentalThreadBlockingApi;",
+                "atomicfu"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/TraceImpl.class": {
+        "ver": 52,
+        "acc": 48,
+        "nme": "kotlinx/atomicfu/TraceImpl",
+        "super": "kotlinx/atomicfu/TraceBase",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(ILkotlinx/atomicfu/TraceFormat;)V"
+          },
+          {
+            "nme": "append",
+            "acc": 1,
+            "dsc": "(Ljava/lang/Object;)V"
+          },
+          {
+            "nme": "append",
+            "acc": 1,
+            "dsc": "(Ljava/lang/Object;Ljava/lang/Object;)V"
+          },
+          {
+            "nme": "append",
+            "acc": 1,
+            "dsc": "(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)V"
+          },
+          {
+            "nme": "append",
+            "acc": 1,
+            "dsc": "(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)V"
+          },
+          {
+            "nme": "toString",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "format",
+            "dsc": "Lkotlinx/atomicfu/TraceFormat;"
+          },
+          {
+            "acc": 18,
+            "nme": "size",
+            "dsc": "I"
+          },
+          {
+            "acc": 18,
+            "nme": "mask",
+            "dsc": "I"
+          },
+          {
+            "acc": 18,
+            "nme": "trace",
+            "dsc": "[Ljava/lang/Object;"
+          },
+          {
+            "acc": 18,
+            "nme": "index",
+            "dsc": "Ljava/util/concurrent/atomic/AtomicInteger;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u00008\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0000\n\u0002\u0010\b\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0004\n\u0002\u0010\u0011\n\u0002\u0010\u0000\n\u0002\b\u0002\n\u0002\u0018\u0002\n\u0000\n\u0002\u0010\u0002\n\u0002\b\u0006\n\u0002\u0010\u000e\n\u0000\b\u0002\u0018\u00002\u00020\u0001B\u0017\u0012\u0006\u0010\u0002\u001a\u00020\u0003\u0012\u0006\u0010\u0004\u001a\u00020\u0005¢\u0006\u0004\b\u0006\u0010\u0007J\u0010\u0010\u000f\u001a\u00020\u00102\u0006\u0010\u0011\u001a\u00020\u000bH\u0016J\u0018\u0010\u000f\u001a\u00020\u00102\u0006\u0010\u0012\u001a\u00020\u000b2\u0006\u0010\u0013\u001a\u00020\u000bH\u0016J \u0010\u000f\u001a\u00020\u00102\u0006\u0010\u0012\u001a\u00020\u000b2\u0006\u0010\u0013\u001a\u00020\u000b2\u0006\u0010\u0014\u001a\u00020\u000bH\u0016J(\u0010\u000f\u001a\u00020\u00102\u0006\u0010\u0012\u001a\u00020\u000b2\u0006\u0010\u0013\u001a\u00020\u000b2\u0006\u0010\u0014\u001a\u00020\u000b2\u0006\u0010\u0015\u001a\u00020\u000bH\u0016J\b\u0010\u0016\u001a\u00020\u0017H\u0016R\u000e\u0010\u0004\u001a\u00020\u0005X\u0004¢\u0006\u0002\n\u0000R\u000e\u0010\u0002\u001a\u00020\u0003X\u0004¢\u0006\u0002\n\u0000R\u000e\u0010\b\u001a\u00020\u0003X\u0004¢\u0006\u0002\n\u0000R\u0018\u0010\t\u001a\n\u0012\u0006\u0012\u0004\u0018\u00010\u000b0\nX\u0004¢\u0006\u0004\n\u0002\u0010\fR\u000e\u0010\r\u001a\u00020\u000eX\u0004¢\u0006\u0002\n\u0000¨\u0006\u0018"
+              ],
+              "d2",
+              [
+                "Lkotlinx/atomicfu/TraceImpl;",
+                "Lkotlinx/atomicfu/TraceBase;",
+                "size",
+                "",
+                "format",
+                "Lkotlinx/atomicfu/TraceFormat;",
+                "<init>",
+                "(ILkotlinx/atomicfu/TraceFormat;)V",
+                "mask",
+                "trace",
+                "",
+                "",
+                "[Ljava/lang/Object;",
+                "index",
+                "Ljava/util/concurrent/atomic/AtomicInteger;",
+                "append",
+                "",
+                "event",
+                "event1",
+                "event2",
+                "event3",
+                "event4",
+                "toString",
+                "",
+                "atomicfu"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/AtomicFU.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/atomicfu/AtomicFU",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "atomic",
+            "acc": 25,
+            "dsc": "(Ljava/lang/Object;Lkotlinx/atomicfu/TraceBase;)Lkotlinx/atomicfu/AtomicRef;",
+            "sig": "<T:Ljava/lang/Object;>(TT;Lkotlinx/atomicfu/TraceBase;)Lkotlinx/atomicfu/AtomicRef<TT;>;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "atomic$default",
+            "acc": 4105,
+            "dsc": "(Ljava/lang/Object;Lkotlinx/atomicfu/TraceBase;ILjava/lang/Object;)Lkotlinx/atomicfu/AtomicRef;"
+          },
+          {
+            "nme": "atomic",
+            "acc": 25,
+            "dsc": "(Ljava/lang/Object;)Lkotlinx/atomicfu/AtomicRef;",
+            "sig": "<T:Ljava/lang/Object;>(TT;)Lkotlinx/atomicfu/AtomicRef<TT;>;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "atomic",
+            "acc": 25,
+            "dsc": "(ILkotlinx/atomicfu/TraceBase;)Lkotlinx/atomicfu/AtomicInt;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "atomic$default",
+            "acc": 4105,
+            "dsc": "(ILkotlinx/atomicfu/TraceBase;ILjava/lang/Object;)Lkotlinx/atomicfu/AtomicInt;"
+          },
+          {
+            "nme": "atomic",
+            "acc": 25,
+            "dsc": "(I)Lkotlinx/atomicfu/AtomicInt;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "atomic",
+            "acc": 25,
+            "dsc": "(JLkotlinx/atomicfu/TraceBase;)Lkotlinx/atomicfu/AtomicLong;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "atomic$default",
+            "acc": 4105,
+            "dsc": "(JLkotlinx/atomicfu/TraceBase;ILjava/lang/Object;)Lkotlinx/atomicfu/AtomicLong;"
+          },
+          {
+            "nme": "atomic",
+            "acc": 25,
+            "dsc": "(J)Lkotlinx/atomicfu/AtomicLong;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "atomic",
+            "acc": 25,
+            "dsc": "(ZLkotlinx/atomicfu/TraceBase;)Lkotlinx/atomicfu/AtomicBoolean;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "atomic$default",
+            "acc": 4105,
+            "dsc": "(ZLkotlinx/atomicfu/TraceBase;ILjava/lang/Object;)Lkotlinx/atomicfu/AtomicBoolean;"
+          },
+          {
+            "nme": "atomic",
+            "acc": 25,
+            "dsc": "(Z)Lkotlinx/atomicfu/AtomicBoolean;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              2,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000,\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0003\n\u0002\u0018\u0002\n\u0002\b\u0002\n\u0002\u0018\u0002\n\u0002\u0010\b\n\u0002\u0018\u0002\n\u0002\u0010\t\n\u0002\u0018\u0002\n\u0002\u0010\u000b\n\u0000\u001a)\u0010\u0000\u001a\b\u0012\u0004\u0012\u0002H\u00020\u0001\"\u0004\b\u0000\u0010\u00022\u0006\u0010\u0003\u001a\u0002H\u00022\b\b\u0002\u0010\u0004\u001a\u00020\u0005¢\u0006\u0002\u0010\u0006\u001a\u001f\u0010\u0000\u001a\b\u0012\u0004\u0012\u0002H\u00020\u0001\"\u0004\b\u0000\u0010\u00022\u0006\u0010\u0003\u001a\u0002H\u0002¢\u0006\u0002\u0010\u0007\u001a\u0018\u0010\u0000\u001a\u00020\b2\u0006\u0010\u0003\u001a\u00020\t2\b\b\u0002\u0010\u0004\u001a\u00020\u0005\u001a\u000e\u0010\u0000\u001a\u00020\b2\u0006\u0010\u0003\u001a\u00020\t\u001a\u0018\u0010\u0000\u001a\u00020\n2\u0006\u0010\u0003\u001a\u00020\u000b2\b\b\u0002\u0010\u0004\u001a\u00020\u0005\u001a\u000e\u0010\u0000\u001a\u00020\n2\u0006\u0010\u0003\u001a\u00020\u000b\u001a\u0018\u0010\u0000\u001a\u00020\f2\u0006\u0010\u0003\u001a\u00020\r2\b\b\u0002\u0010\u0004\u001a\u00020\u0005\u001a\u000e\u0010\u0000\u001a\u00020\f2\u0006\u0010\u0003\u001a\u00020\r¨\u0006\u000e"
+              ],
+              "d2",
+              [
+                "atomic",
+                "Lkotlinx/atomicfu/AtomicRef;",
+                "T",
+                "initial",
+                "trace",
+                "Lkotlinx/atomicfu/TraceBase;",
+                "(Ljava/lang/Object;Lkotlinx/atomicfu/TraceBase;)Lkotlinx/atomicfu/AtomicRef;",
+                "(Ljava/lang/Object;)Lkotlinx/atomicfu/AtomicRef;",
+                "Lkotlinx/atomicfu/AtomicInt;",
+                "",
+                "Lkotlinx/atomicfu/AtomicLong;",
+                "",
+                "Lkotlinx/atomicfu/AtomicBoolean;",
+                "",
+                "atomicfu"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lkotlin/jvm/JvmName;",
+            "vals": [
+              "name",
+              "AtomicFU"
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/locks/Parked.class": {
+        "ver": 52,
+        "acc": 48,
+        "nme": "kotlinx/atomicfu/locks/Parked",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Ljava/lang/Thread;)V"
+          },
+          {
+            "nme": "getData",
+            "acc": 17,
+            "dsc": "()Ljava/lang/Thread;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "data",
+            "dsc": "Ljava/lang/Thread;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\u0016\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\b\u0006\b\u0002\u0018\u00002\u00020\u0001B\u0013\u0012\n\u0010\u0002\u001a\u00060\u0003j\u0002`\u0004¢\u0006\u0004\b\u0005\u0010\u0006R\u0017\u0010\u0002\u001a\u00060\u0003j\u0002`\u0004¢\u0006\n\n\u0002\u0010\t\u001a\u0004\b\u0007\u0010\b¨\u0006\n"
+              ],
+              "d2",
+              [
+                "Lkotlinx/atomicfu/locks/Parked;",
+                "Lkotlinx/atomicfu/locks/ParkingState;",
+                "data",
+                "Ljava/lang/Thread;",
+                "Lkotlinx/atomicfu/locks/ParkingData;",
+                "<init>",
+                "(Ljava/lang/Thread;)V",
+                "getData",
+                "()Ljava/lang/Thread;",
+                "Ljava/lang/Thread;",
+                "atomicfu"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/locks/ThreadParker.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/atomicfu/locks/ThreadParker",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "park",
+            "acc": 17,
+            "dsc": "()V"
+          },
+          {
+            "nme": "parkNanos",
+            "acc": 17,
+            "dsc": "(J)V"
+          },
+          {
+            "nme": "parkWith",
+            "acc": 18,
+            "dsc": "(Lkotlin/jvm/functions/Function1;)V",
+            "sig": "(Lkotlin/jvm/functions/Function1<-Ljava/lang/Thread;Lkotlin/Unit;>;)V"
+          },
+          {
+            "nme": "unpark",
+            "acc": 17,
+            "dsc": "()V"
+          },
+          {
+            "nme": "park$lambda$1$lambda$0",
+            "acc": 26,
+            "dsc": "(Lkotlinx/atomicfu/locks/ThreadParker;)Z"
+          },
+          {
+            "nme": "park$lambda$1",
+            "acc": 26,
+            "dsc": "(Lkotlinx/atomicfu/locks/ThreadParker;Ljava/lang/Thread;)Lkotlin/Unit;"
+          },
+          {
+            "nme": "parkNanos$lambda$3$lambda$2",
+            "acc": 26,
+            "dsc": "(Lkotlinx/atomicfu/locks/ThreadParker;)Z"
+          },
+          {
+            "nme": "parkNanos$lambda$3",
+            "acc": 26,
+            "dsc": "(JJLkotlinx/atomicfu/locks/ThreadParker;Ljava/lang/Thread;)Lkotlin/Unit;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "delegator",
+            "dsc": "Lkotlinx/atomicfu/locks/ParkingDelegator;"
+          },
+          {
+            "acc": 18,
+            "nme": "state",
+            "dsc": "Lkotlinx/atomicfu/AtomicRef;",
+            "sig": "Lkotlinx/atomicfu/AtomicRef<Lkotlinx/atomicfu/locks/ParkingState;>;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000<\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0002\b\u0003\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0000\n\u0002\u0010\u0002\n\u0002\b\u0002\n\u0002\u0010\t\n\u0002\b\u0002\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\b\u0002\b\u0000\u0018\u00002\u00020\u0001B\u0007¢\u0006\u0004\b\u0002\u0010\u0003J\u0006\u0010\t\u001a\u00020\nJ\u000e\u0010\u000b\u001a\u00020\n2\u0006\u0010\f\u001a\u00020\rJ \u0010\u000e\u001a\u00020\n2\u0016\u0010\u000f\u001a\u0012\u0012\b\u0012\u00060\u0011j\u0002`\u0012\u0012\u0004\u0012\u00020\n0\u0010H\u0002J\u0006\u0010\u0013\u001a\u00020\nR\u000e\u0010\u0004\u001a\u00020\u0005X\u0004¢\u0006\u0002\n\u0000R\u0014\u0010\u0006\u001a\b\u0012\u0004\u0012\u00020\b0\u0007X\u0004¢\u0006\u0002\n\u0000¨\u0006\u0014"
+              ],
+              "d2",
+              [
+                "Lkotlinx/atomicfu/locks/ThreadParker;",
+                "",
+                "<init>",
+                "()V",
+                "delegator",
+                "Lkotlinx/atomicfu/locks/ParkingDelegator;",
+                "state",
+                "Lkotlinx/atomicfu/AtomicRef;",
+                "Lkotlinx/atomicfu/locks/ParkingState;",
+                "park",
+                "",
+                "parkNanos",
+                "nanos",
+                "",
+                "parkWith",
+                "invokeWait",
+                "Lkotlin/Function1;",
+                "Ljava/lang/Thread;",
+                "Lkotlinx/atomicfu/locks/ParkingData;",
+                "unpark",
+                "atomicfu"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/AtomicLongArray.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/atomicfu/AtomicLongArray",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(I)V"
+          },
+          {
+            "nme": "getSize",
+            "acc": 17,
+            "dsc": "()I"
+          },
+          {
+            "nme": "getSize$annotations",
+            "acc": 135177,
+            "dsc": "()V"
+          },
+          {
+            "nme": "get",
+            "acc": 17,
+            "dsc": "(I)Lkotlinx/atomicfu/AtomicLong;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "array",
+            "dsc": "[Lkotlinx/atomicfu/AtomicLong;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\u001e\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0000\n\u0002\u0010\b\n\u0002\b\u0003\n\u0002\u0010\u0011\n\u0002\u0018\u0002\n\u0002\b\b\b\u0007\u0018\u00002\u00020\u0001B\u000f\u0012\u0006\u0010\u0002\u001a\u00020\u0003¢\u0006\u0004\b\u0004\u0010\u0005J\u0011\u0010\u000e\u001a\u00020\b2\u0006\u0010\u000f\u001a\u00020\u0003H\u0002R\u0016\u0010\u0006\u001a\b\u0012\u0004\u0012\u00020\b0\u0007X\u0004¢\u0006\u0004\n\u0002\u0010\tR\u001a\u0010\u0002\u001a\u00020\u00038FX\u0004¢\u0006\f\u0012\u0004\b\n\u0010\u000b\u001a\u0004\b\f\u0010\r¨\u0006\u0010"
+              ],
+              "d2",
+              [
+                "Lkotlinx/atomicfu/AtomicLongArray;",
+                "",
+                "size",
+                "",
+                "<init>",
+                "(I)V",
+                "array",
+                "",
+                "Lkotlinx/atomicfu/AtomicLong;",
+                "[Lkotlinx/atomicfu/AtomicLong;",
+                "getSize$annotations",
+                "()V",
+                "getSize",
+                "()I",
+                "get",
+                "index",
+                "atomicfu"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/locks/Unparking.class": {
+        "ver": 52,
+        "acc": 48,
+        "nme": "kotlinx/atomicfu/locks/Unparking",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\f\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\b\u0003\b\u0002\u0018\u00002\u00020\u0001B\u0007¢\u0006\u0004\b\u0002\u0010\u0003¨\u0006\u0004"
+              ],
+              "d2",
+              [
+                "Lkotlinx/atomicfu/locks/Unparking;",
+                "Lkotlinx/atomicfu/locks/ParkingState;",
+                "<init>",
+                "()V",
+                "atomicfu"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/AtomicBoolean.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/atomicfu/AtomicBoolean",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(ZLkotlinx/atomicfu/TraceBase;)V"
+          },
+          {
+            "nme": "getTrace",
+            "acc": 131089,
+            "dsc": "()Lkotlinx/atomicfu/TraceBase;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "getTrace$annotations",
+            "acc": 135177,
+            "dsc": "()V",
+            "vanns": [
+              {
+                "dsc": "Lkotlin/Deprecated;",
+                "vals": [
+                  "message",
+                  "The property was intended for internal use only and will be hidden in the future release."
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "getValue",
+            "acc": 18,
+            "dsc": "(Ljava/lang/Object;Lkotlin/reflect/KProperty;)Z",
+            "sig": "(Ljava/lang/Object;Lkotlin/reflect/KProperty<*>;)Z",
+            "invanns": [
+              {
+                "dsc": "Lkotlin/internal/InlineOnly;"
+              }
+            ]
+          },
+          {
+            "nme": "setValue",
+            "acc": 18,
+            "dsc": "(Ljava/lang/Object;Lkotlin/reflect/KProperty;Z)V",
+            "sig": "(Ljava/lang/Object;Lkotlin/reflect/KProperty<*>;Z)V",
+            "invanns": [
+              {
+                "dsc": "Lkotlin/internal/InlineOnly;"
+              }
+            ]
+          },
+          {
+            "nme": "getValue",
+            "acc": 17,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "setValue",
+            "acc": 17,
+            "dsc": "(Z)V"
+          },
+          {
+            "nme": "lazySet",
+            "acc": 17,
+            "dsc": "(Z)V"
+          },
+          {
+            "nme": "compareAndSet",
+            "acc": 17,
+            "dsc": "(ZZ)Z"
+          },
+          {
+            "nme": "getAndSet",
+            "acc": 17,
+            "dsc": "(Z)Z"
+          },
+          {
+            "nme": "toString",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 26,
+            "nme": "Companion",
+            "dsc": "Lkotlinx/atomicfu/AtomicBoolean$Companion;"
+          },
+          {
+            "acc": 131090,
+            "nme": "trace",
+            "dsc": "Lkotlinx/atomicfu/TraceBase;"
+          },
+          {
+            "acc": 66,
+            "nme": "_value",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "FU",
+            "dsc": "Ljava/util/concurrent/atomic/AtomicIntegerFieldUpdater;",
+            "sig": "Ljava/util/concurrent/atomic/AtomicIntegerFieldUpdater<Lkotlinx/atomicfu/AtomicBoolean;>;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u00006\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0000\n\u0002\u0010\u000b\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0007\n\u0002\u0010\b\n\u0002\b\u0003\n\u0002\u0018\u0002\n\u0000\n\u0002\u0010\u0002\n\u0002\b\t\n\u0002\u0010\u000e\n\u0002\b\u0002\u0018\u0000 \u001e2\u00020\u0001:\u0001\u001eB\u0019\b\u0000\u0012\u0006\u0010\u0002\u001a\u00020\u0003\u0012\u0006\u0010\u0004\u001a\u00020\u0005¢\u0006\u0004\b\u0006\u0010\u0007J\u001f\u0010\u000e\u001a\u00020\u00032\b\u0010\u000f\u001a\u0004\u0018\u00010\u00012\n\u0010\u0010\u001a\u0006\u0012\u0002\b\u00030\u0011H\nJ'\u0010\u0012\u001a\u00020\u00132\b\u0010\u000f\u001a\u0004\u0018\u00010\u00012\n\u0010\u0010\u001a\u0006\u0012\u0002\b\u00030\u00112\u0006\u0010\u0014\u001a\u00020\u0003H\nJ\u000e\u0010\u0017\u001a\u00020\u00132\u0006\u0010\u0014\u001a\u00020\u0003J\u0016\u0010\u0018\u001a\u00020\u00032\u0006\u0010\u0019\u001a\u00020\u00032\u0006\u0010\u001a\u001a\u00020\u0003J\u000e\u0010\u001b\u001a\u00020\u00032\u0006\u0010\u0014\u001a\u00020\u0003J\b\u0010\u001c\u001a\u00020\u001dH\u0016R\u001c\u0010\u0004\u001a\u00020\u00058\u0006X\u0004¢\u0006\u000e\n\u0000\u0012\u0004\b\b\u0010\t\u001a\u0004\b\n\u0010\u000bR\u000e\u0010\f\u001a\u00020\rX\u000e¢\u0006\u0002\n\u0000R$\u0010\u0014\u001a\u00020\u00032\u0006\u0010\u0014\u001a\u00020\u00038F@FX\u000e¢\u0006\f\u001a\u0004\b\u000e\u0010\u0015\"\u0004\b\u0012\u0010\u0016¨\u0006\u001f"
+              ],
+              "d2",
+              [
+                "Lkotlinx/atomicfu/AtomicBoolean;",
+                "",
+                "v",
+                "",
+                "trace",
+                "Lkotlinx/atomicfu/TraceBase;",
+                "<init>",
+                "(ZLkotlinx/atomicfu/TraceBase;)V",
+                "getTrace$annotations",
+                "()V",
+                "getTrace",
+                "()Lkotlinx/atomicfu/TraceBase;",
+                "_value",
+                "",
+                "getValue",
+                "thisRef",
+                "property",
+                "Lkotlin/reflect/KProperty;",
+                "setValue",
+                "",
+                "value",
+                "()Z",
+                "(Z)V",
+                "lazySet",
+                "compareAndSet",
+                "expect",
+                "update",
+                "getAndSet",
+                "toString",
+                "",
+                "Companion",
+                "atomicfu"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lkotlin/jvm/internal/SourceDebugExtension;",
+            "vals": [
+              "value",
+              [
+                "SMAP\nAtomicFU.kt\nKotlin\n*S Kotlin\n*F\n+ 1 AtomicFU.kt\nkotlinx/atomicfu/AtomicBoolean\n+ 2 fake.kt\nkotlin/jvm/internal/FakeKt\n*L\n1#1,469:1\n1#2:470\n*E\n"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/AtomicRef.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/atomicfu/AtomicRef",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Ljava/lang/Object;Lkotlinx/atomicfu/TraceBase;)V",
+            "sig": "(TT;Lkotlinx/atomicfu/TraceBase;)V"
+          },
+          {
+            "nme": "getTrace",
+            "acc": 131089,
+            "dsc": "()Lkotlinx/atomicfu/TraceBase;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "getTrace$annotations",
+            "acc": 135177,
+            "dsc": "()V",
+            "vanns": [
+              {
+                "dsc": "Lkotlin/Deprecated;",
+                "vals": [
+                  "message",
+                  "The property was intended for internal use only and will be hidden in the future release."
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "getValue",
+            "acc": 17,
+            "dsc": "()Ljava/lang/Object;",
+            "sig": "()TT;"
+          },
+          {
+            "nme": "setValue",
+            "acc": 17,
+            "dsc": "(Ljava/lang/Object;)V",
+            "sig": "(TT;)V"
+          },
+          {
+            "nme": "getValue",
+            "acc": 18,
+            "dsc": "(Ljava/lang/Object;Lkotlin/reflect/KProperty;)Ljava/lang/Object;",
+            "sig": "(Ljava/lang/Object;Lkotlin/reflect/KProperty<*>;)TT;",
+            "invanns": [
+              {
+                "dsc": "Lkotlin/internal/InlineOnly;"
+              }
+            ]
+          },
+          {
+            "nme": "setValue",
+            "acc": 18,
+            "dsc": "(Ljava/lang/Object;Lkotlin/reflect/KProperty;Ljava/lang/Object;)V",
+            "sig": "(Ljava/lang/Object;Lkotlin/reflect/KProperty<*>;TT;)V",
+            "invanns": [
+              {
+                "dsc": "Lkotlin/internal/InlineOnly;"
+              }
+            ]
+          },
+          {
+            "nme": "lazySet",
+            "acc": 17,
+            "dsc": "(Ljava/lang/Object;)V",
+            "sig": "(TT;)V"
+          },
+          {
+            "nme": "compareAndSet",
+            "acc": 17,
+            "dsc": "(Ljava/lang/Object;Ljava/lang/Object;)Z",
+            "sig": "(TT;TT;)Z"
+          },
+          {
+            "nme": "getAndSet",
+            "acc": 17,
+            "dsc": "(Ljava/lang/Object;)Ljava/lang/Object;",
+            "sig": "(TT;)TT;"
+          },
+          {
+            "nme": "toString",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 26,
+            "nme": "Companion",
+            "dsc": "Lkotlinx/atomicfu/AtomicRef$Companion;"
+          },
+          {
+            "acc": 131090,
+            "nme": "trace",
+            "dsc": "Lkotlinx/atomicfu/TraceBase;"
+          },
+          {
+            "acc": 66,
+            "nme": "value",
+            "dsc": "Ljava/lang/Object;",
+            "sig": "TT;"
+          },
+          {
+            "acc": 26,
+            "nme": "FU",
+            "dsc": "Ljava/util/concurrent/atomic/AtomicReferenceFieldUpdater;",
+            "sig": "Ljava/util/concurrent/atomic/AtomicReferenceFieldUpdater<Lkotlinx/atomicfu/AtomicRef<*>;Ljava/lang/Object;>;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u00004\n\u0002\u0018\u0002\n\u0000\n\u0002\u0010\u0000\n\u0002\b\u0002\n\u0002\u0018\u0002\n\u0002\b\r\n\u0002\u0018\u0002\n\u0000\n\u0002\u0010\u0002\n\u0002\b\u0003\n\u0002\u0010\u000b\n\u0002\b\u0006\n\u0002\u0010\u000e\n\u0002\b\u0002\u0018\u0000 !*\u0004\b\u0000\u0010\u00012\u00020\u0002:\u0001!B\u0019\b\u0000\u0012\u0006\u0010\u0003\u001a\u00028\u0000\u0012\u0006\u0010\u0004\u001a\u00020\u0005¢\u0006\u0004\b\u0006\u0010\u0007J$\u0010\f\u001a\u00028\u00002\b\u0010\u0011\u001a\u0004\u0018\u00010\u00022\n\u0010\u0012\u001a\u0006\u0012\u0002\b\u00030\u0013H\n¢\u0006\u0002\u0010\u0014J,\u0010\u000e\u001a\u00020\u00152\b\u0010\u0011\u001a\u0004\u0018\u00010\u00022\n\u0010\u0012\u001a\u0006\u0012\u0002\b\u00030\u00132\u0006\u0010\u0003\u001a\u00028\u0000H\n¢\u0006\u0002\u0010\u0016J\u0013\u0010\u0017\u001a\u00020\u00152\u0006\u0010\u0003\u001a\u00028\u0000¢\u0006\u0002\u0010\u000fJ\u001b\u0010\u0018\u001a\u00020\u00192\u0006\u0010\u001a\u001a\u00028\u00002\u0006\u0010\u001b\u001a\u00028\u0000¢\u0006\u0002\u0010\u001cJ\u0013\u0010\u001d\u001a\u00028\u00002\u0006\u0010\u0003\u001a\u00028\u0000¢\u0006\u0002\u0010\u001eJ\b\u0010\u001f\u001a\u00020 H\u0016R\u001c\u0010\u0004\u001a\u00020\u00058\u0006X\u0004¢\u0006\u000e\n\u0000\u0012\u0004\b\b\u0010\t\u001a\u0004\b\n\u0010\u000bR&\u0010\u0003\u001a\u00028\u00002\u0006\u0010\u0003\u001a\u00028\u0000@FX\u000e¢\u0006\u0010\n\u0002\u0010\u0010\u001a\u0004\b\f\u0010\r\"\u0004\b\u000e\u0010\u000f¨\u0006\""
+              ],
+              "d2",
+              [
+                "Lkotlinx/atomicfu/AtomicRef;",
+                "T",
+                "",
+                "value",
+                "trace",
+                "Lkotlinx/atomicfu/TraceBase;",
+                "<init>",
+                "(Ljava/lang/Object;Lkotlinx/atomicfu/TraceBase;)V",
+                "getTrace$annotations",
+                "()V",
+                "getTrace",
+                "()Lkotlinx/atomicfu/TraceBase;",
+                "getValue",
+                "()Ljava/lang/Object;",
+                "setValue",
+                "(Ljava/lang/Object;)V",
+                "Ljava/lang/Object;",
+                "thisRef",
+                "property",
+                "Lkotlin/reflect/KProperty;",
+                "(Ljava/lang/Object;Lkotlin/reflect/KProperty;)Ljava/lang/Object;",
+                "",
+                "(Ljava/lang/Object;Lkotlin/reflect/KProperty;Ljava/lang/Object;)V",
+                "lazySet",
+                "compareAndSet",
+                "",
+                "expect",
+                "update",
+                "(Ljava/lang/Object;Ljava/lang/Object;)Z",
+                "getAndSet",
+                "(Ljava/lang/Object;)Ljava/lang/Object;",
+                "toString",
+                "",
+                "Companion",
+                "atomicfu"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lkotlin/jvm/internal/SourceDebugExtension;",
+            "vals": [
+              "value",
+              [
+                "SMAP\nAtomicFU.kt\nKotlin\n*S Kotlin\n*F\n+ 1 AtomicFU.kt\nkotlinx/atomicfu/AtomicRef\n+ 2 fake.kt\nkotlin/jvm/internal/FakeKt\n*L\n1#1,469:1\n1#2:470\n*E\n"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/AtomicBooleanArray.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/atomicfu/AtomicBooleanArray",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(I)V"
+          },
+          {
+            "nme": "getSize",
+            "acc": 17,
+            "dsc": "()I"
+          },
+          {
+            "nme": "getSize$annotations",
+            "acc": 135177,
+            "dsc": "()V"
+          },
+          {
+            "nme": "get",
+            "acc": 17,
+            "dsc": "(I)Lkotlinx/atomicfu/AtomicBoolean;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "array",
+            "dsc": "[Lkotlinx/atomicfu/AtomicBoolean;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\u001e\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0000\n\u0002\u0010\b\n\u0002\b\u0003\n\u0002\u0010\u0011\n\u0002\u0018\u0002\n\u0002\b\b\b\u0007\u0018\u00002\u00020\u0001B\u000f\u0012\u0006\u0010\u0002\u001a\u00020\u0003¢\u0006\u0004\b\u0004\u0010\u0005J\u0011\u0010\u000e\u001a\u00020\b2\u0006\u0010\u000f\u001a\u00020\u0003H\u0002R\u0016\u0010\u0006\u001a\b\u0012\u0004\u0012\u00020\b0\u0007X\u0004¢\u0006\u0004\n\u0002\u0010\tR\u001a\u0010\u0002\u001a\u00020\u00038FX\u0004¢\u0006\f\u0012\u0004\b\n\u0010\u000b\u001a\u0004\b\f\u0010\r¨\u0006\u0010"
+              ],
+              "d2",
+              [
+                "Lkotlinx/atomicfu/AtomicBooleanArray;",
+                "",
+                "size",
+                "",
+                "<init>",
+                "(I)V",
+                "array",
+                "",
+                "Lkotlinx/atomicfu/AtomicBoolean;",
+                "[Lkotlinx/atomicfu/AtomicBoolean;",
+                "getSize$annotations",
+                "()V",
+                "getSize",
+                "()I",
+                "get",
+                "index",
+                "atomicfu"
+              ]
+            ]
+          }
+        ]
+      },
+      "META-INF/versions/9/module-info.class": {
+        "ver": 53,
+        "acc": 32768,
+        "nme": "module-info",
+        "mthds": [],
+        "flds": []
+      },
+      "kotlinx/atomicfu/AtomicLong$Companion.class": {
+        "ver": 52,
+        "acc": 48,
+        "nme": "kotlinx/atomicfu/AtomicLong$Companion",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "()V"
+          },
+          {
+            "nme": "<init>",
+            "acc": 4097,
+            "dsc": "(Lkotlin/jvm/internal/DefaultConstructorMarker;)V"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\u0018\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0002\b\u0003\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\b\u0002\b\u0003\u0018\u00002\u00020\u0001B\t\b\u0002¢\u0006\u0004\b\u0002\u0010\u0003R2\u0010\u0004\u001a&\u0012\f\u0012\n \u0007*\u0004\u0018\u00010\u00060\u0006 \u0007*\u0012\u0012\f\u0012\n \u0007*\u0004\u0018\u00010\u00060\u0006\u0018\u00010\u00050\u0005X\u0004¢\u0006\u0002\n\u0000¨\u0006\b"
+              ],
+              "d2",
+              [
+                "Lkotlinx/atomicfu/AtomicLong$Companion;",
+                "",
+                "<init>",
+                "()V",
+                "FU",
+                "Ljava/util/concurrent/atomic/AtomicLongFieldUpdater;",
+                "Lkotlinx/atomicfu/AtomicLong;",
+                "kotlin.jvm.PlatformType",
+                "atomicfu"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/TraceFormatKt.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/atomicfu/TraceFormatKt",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "TraceFormat",
+            "acc": 26,
+            "dsc": "(Lkotlin/jvm/functions/Function2;)Lkotlinx/atomicfu/TraceFormat;",
+            "sig": "(Lkotlin/jvm/functions/Function2<-Ljava/lang/Integer;Ljava/lang/Object;Ljava/lang/String;>;)Lkotlinx/atomicfu/TraceFormat;",
+            "invanns": [
+              {
+                "dsc": "Lkotlin/internal/InlineOnly;"
+              }
+            ]
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              2,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000$\n\u0000\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\u0010\b\n\u0002\u0018\u0002\n\u0002\b\u0002\n\u0002\u0010\u0000\n\u0000\n\u0002\u0010\u000e\n\u0000\u001aF\u0010\u0000\u001a\u00020\u000128\b\u0004\u0010\u0002\u001a2\u0012\u0013\u0012\u00110\u0004¢\u0006\f\b\u0005\u0012\b\b\u0006\u0012\u0004\b\b(\u0007\u0012\u0013\u0012\u00110\b¢\u0006\f\b\u0005\u0012\b\b\u0006\u0012\u0004\b\b(\t\u0012\u0004\u0012\u00020\n0\u0003H\bø\u0001\u0000\u0002\u0007\n\u0005\b20\u0001¨\u0006\u000b"
+              ],
+              "d2",
+              [
+                "TraceFormat",
+                "Lkotlinx/atomicfu/TraceFormat;",
+                "format",
+                "Lkotlin/Function2;",
+                "",
+                "Lkotlin/ParameterName;",
+                "name",
+                "index",
+                "",
+                "event",
+                "",
+                "atomicfu"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/locks/SynchronizedKt.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/atomicfu/locks/SynchronizedKt",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "reentrantLock",
+            "acc": 26,
+            "dsc": "()Ljava/util/concurrent/locks/ReentrantLock;",
+            "invanns": [
+              {
+                "dsc": "Lkotlin/internal/InlineOnly;"
+              }
+            ]
+          },
+          {
+            "nme": "withLock",
+            "acc": 26,
+            "dsc": "(Ljava/util/concurrent/locks/ReentrantLock;Lkotlin/jvm/functions/Function0;)Ljava/lang/Object;",
+            "sig": "<T:Ljava/lang/Object;>(Ljava/util/concurrent/locks/ReentrantLock;Lkotlin/jvm/functions/Function0<+TT;>;)TT;",
+            "invanns": [
+              {
+                "dsc": "Lkotlin/internal/InlineOnly;"
+              }
+            ]
+          },
+          {
+            "nme": "synchronized",
+            "acc": 26,
+            "dsc": "(Ljava/lang/Object;Lkotlin/jvm/functions/Function0;)Ljava/lang/Object;",
+            "sig": "<T:Ljava/lang/Object;>(Ljava/lang/Object;Lkotlin/jvm/functions/Function0<+TT;>;)TT;",
+            "invanns": [
+              {
+                "dsc": "Lkotlin/internal/InlineOnly;"
+              }
+            ]
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              2,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000$\n\u0000\n\u0002\u0010\u0000\n\u0000\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\b\u0004\n\u0002\u0018\u0002\n\u0002\b\u0003\n\u0002\u0018\u0002\n\u0002\b\u0002\u001a\r\u0010\u0002\u001a\u00060\u0003j\u0002`\u0004H\b\u001a-\u0010\u0006\u001a\u0002H\u0007\"\u0004\b\u0000\u0010\u0007*\u00060\u0003j\u0002`\u00042\f\u0010\b\u001a\b\u0012\u0004\u0012\u0002H\u00070\tH\bø\u0001\u0000¢\u0006\u0002\u0010\n\u001a1\u0010\u000b\u001a\u0002H\u0007\"\u0004\b\u0000\u0010\u00072\n\u0010\f\u001a\u00060\u0001j\u0002`\r2\f\u0010\b\u001a\b\u0012\u0004\u0012\u0002H\u00070\tH\bø\u0001\u0000¢\u0006\u0002\u0010\u000e*\n\u0010\u0000\"\u00020\u00012\u00020\u0001*\n\u0010\u0005\"\u00020\u00032\u00020\u0003\u0002\u0007\n\u0005\b20\u0001¨\u0006\u000f"
+              ],
+              "d2",
+              [
+                "SynchronizedObject",
+                "",
+                "reentrantLock",
+                "Ljava/util/concurrent/locks/ReentrantLock;",
+                "Lkotlinx/atomicfu/locks/ReentrantLock;",
+                "ReentrantLock",
+                "withLock",
+                "T",
+                "block",
+                "Lkotlin/Function0;",
+                "(Ljava/util/concurrent/locks/ReentrantLock;Lkotlin/jvm/functions/Function0;)Ljava/lang/Object;",
+                "synchronized",
+                "lock",
+                "Lkotlinx/atomicfu/locks/SynchronizedObject;",
+                "(Ljava/lang/Object;Lkotlin/jvm/functions/Function0;)Ljava/lang/Object;",
+                "atomicfu"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/TraceBase.class": {
+        "ver": 52,
+        "acc": 33,
+        "nme": "kotlinx/atomicfu/TraceBase",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "append",
+            "acc": 1,
+            "dsc": "(Ljava/lang/Object;)V"
+          },
+          {
+            "nme": "append",
+            "acc": 1,
+            "dsc": "(Ljava/lang/Object;Ljava/lang/Object;)V"
+          },
+          {
+            "nme": "append",
+            "acc": 1,
+            "dsc": "(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)V"
+          },
+          {
+            "nme": "append",
+            "acc": 1,
+            "dsc": "(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)V"
+          },
+          {
+            "nme": "invoke",
+            "acc": 18,
+            "dsc": "(Lkotlin/jvm/functions/Function0;)V",
+            "sig": "(Lkotlin/jvm/functions/Function0<+Ljava/lang/Object;>;)V",
+            "invanns": [
+              {
+                "dsc": "Lkotlin/internal/InlineOnly;"
+              }
+            ]
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\u001c\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0002\b\u0003\n\u0002\u0010\u0002\n\u0002\b\u0006\n\u0002\u0018\u0002\n\u0002\b\u0002\b\u0017\u0018\u00002\u00020\u0001:\u0001\rB\t\b\u0000¢\u0006\u0004\b\u0002\u0010\u0003J\u0010\u0010\u0004\u001a\u00020\u00052\u0006\u0010\u0006\u001a\u00020\u0001H\u0017J\u0018\u0010\u0004\u001a\u00020\u00052\u0006\u0010\u0007\u001a\u00020\u00012\u0006\u0010\b\u001a\u00020\u0001H\u0017J \u0010\u0004\u001a\u00020\u00052\u0006\u0010\u0007\u001a\u00020\u00012\u0006\u0010\b\u001a\u00020\u00012\u0006\u0010\t\u001a\u00020\u0001H\u0017J(\u0010\u0004\u001a\u00020\u00052\u0006\u0010\u0007\u001a\u00020\u00012\u0006\u0010\b\u001a\u00020\u00012\u0006\u0010\t\u001a\u00020\u00012\u0006\u0010\n\u001a\u00020\u0001H\u0017J\u001a\u0010\u000b\u001a\u00020\u00052\f\u0010\u0006\u001a\b\u0012\u0004\u0012\u00020\u00010\fH\nø\u0001\u0000\u0002\u0007\n\u0005\b20\u0001¨\u0006\u000e"
+              ],
+              "d2",
+              [
+                "Lkotlinx/atomicfu/TraceBase;",
+                "",
+                "<init>",
+                "()V",
+                "append",
+                "",
+                "event",
+                "event1",
+                "event2",
+                "event3",
+                "event4",
+                "invoke",
+                "Lkotlin/Function0;",
+                "None",
+                "atomicfu"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/locks/ParkingSupport.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/atomicfu/locks/ParkingSupport",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "()V"
+          },
+          {
+            "nme": "park-LRDsOJo",
+            "acc": 17,
+            "dsc": "(J)V"
+          },
+          {
+            "nme": "parkUntil",
+            "acc": 17,
+            "dsc": "(Lkotlin/time/TimeMark;)V"
+          },
+          {
+            "nme": "unpark",
+            "acc": 17,
+            "dsc": "(Ljava/lang/Thread;)V"
+          },
+          {
+            "nme": "currentThreadHandle",
+            "acc": 17,
+            "dsc": "()Ljava/lang/Thread;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "INSTANCE",
+            "dsc": "Lkotlinx/atomicfu/locks/ParkingSupport;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000.\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0002\b\u0003\n\u0002\u0010\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0004\n\u0002\u0018\u0002\n\u0002\b\u0002\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\b\u0002\bÇ\u0002\u0018\u00002\u00020\u0001B\t\b\u0002¢\u0006\u0004\b\u0002\u0010\u0003J\u0015\u0010\u0004\u001a\u00020\u00052\u0006\u0010\u0006\u001a\u00020\u0007¢\u0006\u0004\b\b\u0010\tJ\u000e\u0010\n\u001a\u00020\u00052\u0006\u0010\u000b\u001a\u00020\fJ\u0012\u0010\r\u001a\u00020\u00052\n\u0010\u000e\u001a\u00060\u000fj\u0002`\u0010J\n\u0010\u0011\u001a\u00060\u000fj\u0002`\u0010¨\u0006\u0012"
+              ],
+              "d2",
+              [
+                "Lkotlinx/atomicfu/locks/ParkingSupport;",
+                "",
+                "<init>",
+                "()V",
+                "park",
+                "",
+                "timeout",
+                "Lkotlin/time/Duration;",
+                "park-LRDsOJo",
+                "(J)V",
+                "parkUntil",
+                "deadline",
+                "Lkotlin/time/TimeMark;",
+                "unpark",
+                "handle",
+                "Ljava/lang/Thread;",
+                "Lkotlinx/atomicfu/locks/ParkingHandle;",
+                "currentThreadHandle",
+                "atomicfu"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lkotlinx/atomicfu/locks/ExperimentalThreadBlockingApi;"
+          }
+        ]
+      },
+      "kotlinx/atomicfu/AtomicArray.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/atomicfu/AtomicArray",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(I)V"
+          },
+          {
+            "nme": "getSize",
+            "acc": 17,
+            "dsc": "()I"
+          },
+          {
+            "nme": "getSize$annotations",
+            "acc": 135177,
+            "dsc": "()V"
+          },
+          {
+            "nme": "get",
+            "acc": 17,
+            "dsc": "(I)Lkotlinx/atomicfu/AtomicRef;",
+            "sig": "(I)Lkotlinx/atomicfu/AtomicRef<TT;>;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "array",
+            "dsc": "[Lkotlinx/atomicfu/AtomicRef;",
+            "sig": "[Lkotlinx/atomicfu/AtomicRef<TT;>;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000 \n\u0002\u0018\u0002\n\u0000\n\u0002\u0010\u0000\n\u0000\n\u0002\u0010\b\n\u0002\b\u0003\n\u0002\u0010\u0011\n\u0002\u0018\u0002\n\u0002\b\b\b\u0007\u0018\u0000*\u0004\b\u0000\u0010\u00012\u00020\u0002B\u0011\b\u0000\u0012\u0006\u0010\u0003\u001a\u00020\u0004¢\u0006\u0004\b\u0005\u0010\u0006J\u0019\u0010\u000f\u001a\n\u0012\u0006\u0012\u0004\u0018\u00018\u00000\t2\u0006\u0010\u0010\u001a\u00020\u0004H\u0002R\u001e\u0010\u0007\u001a\u0010\u0012\f\u0012\n\u0012\u0006\u0012\u0004\u0018\u00018\u00000\t0\bX\u0004¢\u0006\u0004\n\u0002\u0010\nR\u001a\u0010\u0003\u001a\u00020\u00048FX\u0004¢\u0006\f\u0012\u0004\b\u000b\u0010\f\u001a\u0004\b\r\u0010\u000e¨\u0006\u0011"
+              ],
+              "d2",
+              [
+                "Lkotlinx/atomicfu/AtomicArray;",
+                "T",
+                "",
+                "size",
+                "",
+                "<init>",
+                "(I)V",
+                "array",
+                "",
+                "Lkotlinx/atomicfu/AtomicRef;",
+                "[Lkotlinx/atomicfu/AtomicRef;",
+                "getSize$annotations",
+                "()V",
+                "getSize",
+                "()I",
+                "get",
+                "index",
+                "atomicfu"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/AtomicRef$Companion.class": {
+        "ver": 52,
+        "acc": 48,
+        "nme": "kotlinx/atomicfu/AtomicRef$Companion",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "()V"
+          },
+          {
+            "nme": "<init>",
+            "acc": 4097,
+            "dsc": "(Lkotlin/jvm/internal/DefaultConstructorMarker;)V"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\u0018\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0002\b\u0003\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\b\u0002\b\u0003\u0018\u00002\u00020\u0001B\t\b\u0002¢\u0006\u0004\b\u0002\u0010\u0003R^\u0010\u0004\u001aR\u0012\u0014\u0012\u0012\u0012\u0002\b\u0003 \u0007*\b\u0012\u0002\b\u0003\u0018\u00010\u00060\u0006\u0012\f\u0012\n \u0007*\u0004\u0018\u00010\u00010\u0001 \u0007*(\u0012\u0014\u0012\u0012\u0012\u0002\b\u0003 \u0007*\b\u0012\u0002\b\u0003\u0018\u00010\u00060\u0006\u0012\f\u0012\n \u0007*\u0004\u0018\u00010\u00010\u0001\u0018\u00010\u00050\u0005X\u0004¢\u0006\u0002\n\u0000¨\u0006\b"
+              ],
+              "d2",
+              [
+                "Lkotlinx/atomicfu/AtomicRef$Companion;",
+                "",
+                "<init>",
+                "()V",
+                "FU",
+                "Ljava/util/concurrent/atomic/AtomicReferenceFieldUpdater;",
+                "Lkotlinx/atomicfu/AtomicRef;",
+                "kotlin.jvm.PlatformType",
+                "atomicfu"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/locks/ParkingDelegator.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/atomicfu/locks/ParkingDelegator",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "()V"
+          },
+          {
+            "nme": "createRef",
+            "acc": 17,
+            "dsc": "()Ljava/lang/Thread;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "wait",
+            "acc": 17,
+            "dsc": "(Ljava/lang/Thread;Lkotlin/jvm/functions/Function0;)V",
+            "sig": "(Ljava/lang/Thread;Lkotlin/jvm/functions/Function0<Ljava/lang/Boolean;>;)V"
+          },
+          {
+            "nme": "timedWait",
+            "acc": 17,
+            "dsc": "(Ljava/lang/Thread;JLkotlin/jvm/functions/Function0;)V",
+            "sig": "(Ljava/lang/Thread;JLkotlin/jvm/functions/Function0<Ljava/lang/Boolean;>;)V"
+          },
+          {
+            "nme": "wake",
+            "acc": 17,
+            "dsc": "(Ljava/lang/Thread;)V"
+          },
+          {
+            "nme": "destroyRef",
+            "acc": 17,
+            "dsc": "(Ljava/lang/Thread;)V"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "INSTANCE",
+            "dsc": "Lkotlinx/atomicfu/locks/ParkingDelegator;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u00002\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0002\b\u0003\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0000\n\u0002\u0010\u0002\n\u0002\b\u0002\n\u0002\u0018\u0002\n\u0002\u0010\u000b\n\u0002\b\u0002\n\u0002\u0010\t\n\u0002\b\u0003\bÀ\u0002\u0018\u00002\u00020\u0001B\t\b\u0002¢\u0006\u0004\b\u0002\u0010\u0003J\n\u0010\u0004\u001a\u00060\u0005j\u0002`\u0006J \u0010\u0007\u001a\u00020\b2\n\u0010\t\u001a\u00060\u0005j\u0002`\u00062\f\u0010\n\u001a\b\u0012\u0004\u0012\u00020\f0\u000bJ(\u0010\r\u001a\u00020\b2\n\u0010\t\u001a\u00060\u0005j\u0002`\u00062\u0006\u0010\u000e\u001a\u00020\u000f2\f\u0010\n\u001a\b\u0012\u0004\u0012\u00020\f0\u000bJ\u0012\u0010\u0010\u001a\u00020\b2\n\u0010\t\u001a\u00060\u0005j\u0002`\u0006J\u0012\u0010\u0011\u001a\u00020\b2\n\u0010\t\u001a\u00060\u0005j\u0002`\u0006¨\u0006\u0012"
+              ],
+              "d2",
+              [
+                "Lkotlinx/atomicfu/locks/ParkingDelegator;",
+                "",
+                "<init>",
+                "()V",
+                "createRef",
+                "Ljava/lang/Thread;",
+                "Lkotlinx/atomicfu/locks/ParkingData;",
+                "wait",
+                "",
+                "ref",
+                "shouldWait",
+                "Lkotlin/Function0;",
+                "",
+                "timedWait",
+                "nanos",
+                "",
+                "wake",
+                "destroyRef",
+                "atomicfu"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/NamedTrace.class": {
+        "ver": 52,
+        "acc": 48,
+        "nme": "kotlinx/atomicfu/NamedTrace",
+        "super": "kotlinx/atomicfu/TraceBase",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Lkotlinx/atomicfu/TraceBase;Ljava/lang/String;)V"
+          },
+          {
+            "nme": "append",
+            "acc": 1,
+            "dsc": "(Ljava/lang/Object;)V"
+          },
+          {
+            "nme": "append",
+            "acc": 1,
+            "dsc": "(Ljava/lang/Object;Ljava/lang/Object;)V"
+          },
+          {
+            "nme": "append",
+            "acc": 1,
+            "dsc": "(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)V"
+          },
+          {
+            "nme": "append",
+            "acc": 1,
+            "dsc": "(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)V"
+          },
+          {
+            "nme": "toString",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "trace",
+            "dsc": "Lkotlinx/atomicfu/TraceBase;"
+          },
+          {
+            "acc": 18,
+            "nme": "name",
+            "dsc": "Ljava/lang/String;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\"\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\b\u0002\n\u0002\u0010\u000e\n\u0002\b\u0003\n\u0002\u0010\u0002\n\u0000\n\u0002\u0010\u0000\n\u0002\b\u0006\b\u0002\u0018\u00002\u00020\u0001B\u0017\u0012\u0006\u0010\u0002\u001a\u00020\u0001\u0012\u0006\u0010\u0003\u001a\u00020\u0004¢\u0006\u0004\b\u0005\u0010\u0006J\u0010\u0010\u0007\u001a\u00020\b2\u0006\u0010\t\u001a\u00020\nH\u0016J\u0018\u0010\u0007\u001a\u00020\b2\u0006\u0010\u000b\u001a\u00020\n2\u0006\u0010\f\u001a\u00020\nH\u0016J \u0010\u0007\u001a\u00020\b2\u0006\u0010\u000b\u001a\u00020\n2\u0006\u0010\f\u001a\u00020\n2\u0006\u0010\r\u001a\u00020\nH\u0016J(\u0010\u0007\u001a\u00020\b2\u0006\u0010\u000b\u001a\u00020\n2\u0006\u0010\f\u001a\u00020\n2\u0006\u0010\r\u001a\u00020\n2\u0006\u0010\u000e\u001a\u00020\nH\u0016J\b\u0010\u000f\u001a\u00020\u0004H\u0016R\u000e\u0010\u0002\u001a\u00020\u0001X\u0004¢\u0006\u0002\n\u0000R\u000e\u0010\u0003\u001a\u00020\u0004X\u0004¢\u0006\u0002\n\u0000¨\u0006\u0010"
+              ],
+              "d2",
+              [
+                "Lkotlinx/atomicfu/NamedTrace;",
+                "Lkotlinx/atomicfu/TraceBase;",
+                "trace",
+                "name",
+                "",
+                "<init>",
+                "(Lkotlinx/atomicfu/TraceBase;Ljava/lang/String;)V",
+                "append",
+                "",
+                "event",
+                "",
+                "event1",
+                "event2",
+                "event3",
+                "event4",
+                "toString",
+                "atomicfu"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/TraceFormatThread.class": {
+        "ver": 52,
+        "acc": 48,
+        "nme": "kotlinx/atomicfu/TraceFormatThread",
+        "super": "kotlinx/atomicfu/TraceFormat",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "format",
+            "acc": 1,
+            "dsc": "(ILjava/lang/Object;)Ljava/lang/String;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\u001e\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\b\u0003\n\u0002\u0010\u000e\n\u0000\n\u0002\u0010\b\n\u0000\n\u0002\u0010\u0000\n\u0000\b\u0002\u0018\u00002\u00020\u0001B\u0007¢\u0006\u0004\b\u0002\u0010\u0003J\u0018\u0010\u0004\u001a\u00020\u00052\u0006\u0010\u0006\u001a\u00020\u00072\u0006\u0010\b\u001a\u00020\tH\u0016¨\u0006\n"
+              ],
+              "d2",
+              [
+                "Lkotlinx/atomicfu/TraceFormatThread;",
+                "Lkotlinx/atomicfu/TraceFormat;",
+                "<init>",
+                "()V",
+                "format",
+                "",
+                "index",
+                "",
+                "event",
+                "",
+                "atomicfu"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/TraceFormatKt$TraceFormat$1.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/atomicfu/TraceFormatKt$TraceFormat$1",
+        "super": "kotlinx/atomicfu/TraceFormat",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Lkotlin/jvm/functions/Function2;)V",
+            "sig": "(Lkotlin/jvm/functions/Function2<-Ljava/lang/Integer;Ljava/lang/Object;Ljava/lang/String;>;)V"
+          },
+          {
+            "nme": "format",
+            "acc": 1,
+            "dsc": "(ILjava/lang/Object;)Ljava/lang/String;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 4112,
+            "nme": "$format",
+            "dsc": "Lkotlin/jvm/functions/Function2;",
+            "sig": "Lkotlin/jvm/functions/Function2<Ljava/lang/Integer;Ljava/lang/Object;Ljava/lang/String;>;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              176,
+              "d1",
+              [
+                "\u0000\u001d\n\u0000\n\u0002\u0018\u0002\n\u0000\n\u0002\u0010\u000e\n\u0000\n\u0002\u0010\b\n\u0000\n\u0002\u0010\u0000\n\u0000*\u0001\u0000\b\n\u0018\u00002\u00020\u0001J\u0018\u0010\u0002\u001a\u00020\u00032\u0006\u0010\u0004\u001a\u00020\u00052\u0006\u0010\u0006\u001a\u00020\u0007H\u0016¨\u0006\b"
+              ],
+              "d2",
+              [
+                "kotlinx/atomicfu/TraceFormatKt$TraceFormat$1",
+                "Lkotlinx/atomicfu/TraceFormat;",
+                "format",
+                "",
+                "index",
+                "",
+                "event",
+                "",
+                "atomicfu"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lkotlin/jvm/internal/SourceDebugExtension;",
+            "vals": [
+              "value",
+              [
+                "SMAP\nTraceFormat.kt\nKotlin\n*S Kotlin\n*F\n+ 1 TraceFormat.kt\nkotlinx/atomicfu/TraceFormatKt$TraceFormat$1\n*L\n1#1,34:1\n*E\n"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/locks/ParkingState.class": {
+        "ver": 52,
+        "acc": 1536,
+        "nme": "kotlinx/atomicfu/locks/ParkingState",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\u001a\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0000\br\u0018\u00002\u00020\u0001\u0001\u0004\u0002\u0003\u0004\u0005¨\u0006\u0006À\u0006\u0003"
+              ],
+              "d2",
+              [
+                "Lkotlinx/atomicfu/locks/ParkingState;",
+                "",
+                "Lkotlinx/atomicfu/locks/Free;",
+                "Lkotlinx/atomicfu/locks/Parked;",
+                "Lkotlinx/atomicfu/locks/Unparked;",
+                "Lkotlinx/atomicfu/locks/Unparking;",
+                "atomicfu"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/TraceKt.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/atomicfu/TraceKt",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "Trace",
+            "acc": 25,
+            "dsc": "(ILkotlinx/atomicfu/TraceFormat;)Lkotlinx/atomicfu/TraceBase;",
+            "invanns": [
+              {
+                "dsc": "Lkotlin/internal/InlineOnly;"
+              },
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "Trace$default",
+            "acc": 4105,
+            "dsc": "(ILkotlinx/atomicfu/TraceFormat;ILjava/lang/Object;)Lkotlinx/atomicfu/TraceBase;"
+          },
+          {
+            "nme": "named",
+            "acc": 25,
+            "dsc": "(Lkotlinx/atomicfu/TraceBase;Ljava/lang/String;)Lkotlinx/atomicfu/TraceBase;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "getSystemProperty",
+            "acc": 26,
+            "dsc": "(Ljava/lang/String;)Ljava/lang/String;"
+          },
+          {
+            "nme": "getTraceFormatDefault",
+            "acc": 25,
+            "dsc": "()Lkotlinx/atomicfu/TraceFormat;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 26,
+            "nme": "traceFormatDefault",
+            "dsc": "Lkotlinx/atomicfu/TraceFormat;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              2,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\u001e\n\u0000\n\u0002\u0018\u0002\n\u0000\n\u0002\u0010\b\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0002\n\u0002\u0010\u000e\n\u0002\b\u0006\u001a\u001c\u0010\u0000\u001a\u00020\u00012\b\b\u0002\u0010\u0002\u001a\u00020\u00032\b\b\u0002\u0010\u0004\u001a\u00020\u0005H\u0007\u001a\u0012\u0010\u0006\u001a\u00020\u0001*\u00020\u00012\u0006\u0010\u0007\u001a\u00020\b\u001a\u0012\u0010\t\u001a\u0004\u0018\u00010\b2\u0006\u0010\n\u001a\u00020\bH\u0002\"\u0011\u0010\u000b\u001a\u00020\u0005¢\u0006\b\n\u0000\u001a\u0004\b\f\u0010\r¨\u0006\u000e"
+              ],
+              "d2",
+              [
+                "Trace",
+                "Lkotlinx/atomicfu/TraceBase;",
+                "size",
+                "",
+                "format",
+                "Lkotlinx/atomicfu/TraceFormat;",
+                "named",
+                "name",
+                "",
+                "getSystemProperty",
+                "key",
+                "traceFormatDefault",
+                "getTraceFormatDefault",
+                "()Lkotlinx/atomicfu/TraceFormat;",
+                "atomicfu"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/MangledJsNamesKt.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/atomicfu/MangledJsNamesKt",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "ATOMIC_REF_FACTORY",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomic$ref$"
+          },
+          {
+            "acc": 25,
+            "nme": "ATOMIC_REF_FACTORY_BINARY_COMPATIBILITY",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomic$ref$1"
+          },
+          {
+            "acc": 25,
+            "nme": "ATOMIC_INT_FACTORY",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomic$int$"
+          },
+          {
+            "acc": 25,
+            "nme": "ATOMIC_INT_FACTORY_BINARY_COMPATIBILITY",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomic$int$1"
+          },
+          {
+            "acc": 25,
+            "nme": "ATOMIC_LONG_FACTORY",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomic$long$"
+          },
+          {
+            "acc": 25,
+            "nme": "ATOMIC_LONG_FACTORY_BINARY_COMPATIBILITY",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomic$long$1"
+          },
+          {
+            "acc": 25,
+            "nme": "ATOMIC_BOOLEAN_FACTORY",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomic$boolean$"
+          },
+          {
+            "acc": 25,
+            "nme": "ATOMIC_BOOLEAN_FACTORY_BINARY_COMPATIBILITY",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomic$boolean$1"
+          },
+          {
+            "acc": 25,
+            "nme": "ATOMIC_VALUE",
+            "dsc": "Ljava/lang/String;",
+            "val": "kotlinx$atomicfu$value"
+          },
+          {
+            "acc": 25,
+            "nme": "COMPARE_AND_SET",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomicfu$compareAndSet"
+          },
+          {
+            "acc": 25,
+            "nme": "GET_AND_SET",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomicfu$getAndSet"
+          },
+          {
+            "acc": 25,
+            "nme": "GET_AND_INCREMENT",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomicfu$getAndIncrement"
+          },
+          {
+            "acc": 25,
+            "nme": "GET_AND_INCREMENT_LONG",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomicfu$getAndIncrement$long"
+          },
+          {
+            "acc": 25,
+            "nme": "GET_AND_DECREMENT",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomicfu$getAndDecrement"
+          },
+          {
+            "acc": 25,
+            "nme": "GET_AND_DECREMENT_LONG",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomicfu$getAndDecrement$long"
+          },
+          {
+            "acc": 25,
+            "nme": "INCREMENT_AND_GET",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomicfu$incrementAndGet"
+          },
+          {
+            "acc": 25,
+            "nme": "INCREMENT_AND_GET_LONG",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomicfu$incrementAndGet$long"
+          },
+          {
+            "acc": 25,
+            "nme": "DECREMENT_AND_GET",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomicfu$decrementAndGet"
+          },
+          {
+            "acc": 25,
+            "nme": "DECREMENT_AND_GET_LONG",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomicfu$decrementAndGet$long"
+          },
+          {
+            "acc": 25,
+            "nme": "GET_AND_ADD",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomicfu$getAndAdd"
+          },
+          {
+            "acc": 25,
+            "nme": "GET_AND_ADD_LONG",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomicfu$getAndAdd$long"
+          },
+          {
+            "acc": 25,
+            "nme": "ADD_AND_GET",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomicfu$addAndGet"
+          },
+          {
+            "acc": 25,
+            "nme": "ADD_AND_GET_LONG",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomicfu$addAndGet$long"
+          },
+          {
+            "acc": 25,
+            "nme": "ATOMIC_ARRAY_OF_NULLS",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomicfu$AtomicRefArray$ofNulls"
+          },
+          {
+            "acc": 25,
+            "nme": "ATOMIC_INT_ARRAY",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomicfu$AtomicIntArray$int"
+          },
+          {
+            "acc": 25,
+            "nme": "ATOMIC_LONG_ARRAY",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomicfu$AtomicLongArray$long"
+          },
+          {
+            "acc": 25,
+            "nme": "ATOMIC_BOOLEAN_ARRAY",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomicfu$AtomicBooleanArray$boolean"
+          },
+          {
+            "acc": 25,
+            "nme": "ATOMIC_REF_ARRAY",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomicfu$AtomicRefArray$ref"
+          },
+          {
+            "acc": 25,
+            "nme": "ARRAY_SIZE",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomicfu$size"
+          },
+          {
+            "acc": 25,
+            "nme": "ARRAY_ELEMENT_GET",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomicfu$get"
+          },
+          {
+            "acc": 25,
+            "nme": "REENTRANT_LOCK",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomicfu$reentrantLock"
+          },
+          {
+            "acc": 25,
+            "nme": "TRACE_FACTORY_FUNCTION",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomicfu$Trace"
+          },
+          {
+            "acc": 25,
+            "nme": "TRACE_BASE_CONSTRUCTOR",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomicfu$TraceBase"
+          },
+          {
+            "acc": 25,
+            "nme": "TRACE_NAMED",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomicfu$Trace$named"
+          },
+          {
+            "acc": 25,
+            "nme": "TRACE_FORMAT_CLASS",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomicfu$TraceFormat"
+          },
+          {
+            "acc": 25,
+            "nme": "TRACE_FORMAT_FORMAT_FUNCTION",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomicfu$TraceFormat$format"
+          },
+          {
+            "acc": 25,
+            "nme": "TRACE_APPEND_1",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomicfu$Trace$append$1"
+          },
+          {
+            "acc": 25,
+            "nme": "TRACE_APPEND_2",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomicfu$Trace$append$2"
+          },
+          {
+            "acc": 25,
+            "nme": "TRACE_APPEND_3",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomicfu$Trace$append$3"
+          },
+          {
+            "acc": 25,
+            "nme": "TRACE_APPEND_4",
+            "dsc": "Ljava/lang/String;",
+            "val": "atomicfu$Trace$append$4"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              2,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\n\n\u0000\n\u0002\u0010\u000e\n\u0002\b(\"\u000e\u0010\u0000\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0002\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0003\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0004\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0005\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0006\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0007\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\b\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\t\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\n\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u000b\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\f\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\r\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u000e\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u000f\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0010\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0011\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0012\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0013\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0014\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0015\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0016\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0017\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0018\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u0019\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u001a\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u001b\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u001c\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u001d\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u001e\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\u001f\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010 \u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010!\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010\"\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010#\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010$\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010%\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010&\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010'\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000\"\u000e\u0010(\u001a\u00020\u0001XT¢\u0006\u0002\n\u0000¨\u0006)"
+              ],
+              "d2",
+              [
+                "ATOMIC_REF_FACTORY",
+                "",
+                "ATOMIC_REF_FACTORY_BINARY_COMPATIBILITY",
+                "ATOMIC_INT_FACTORY",
+                "ATOMIC_INT_FACTORY_BINARY_COMPATIBILITY",
+                "ATOMIC_LONG_FACTORY",
+                "ATOMIC_LONG_FACTORY_BINARY_COMPATIBILITY",
+                "ATOMIC_BOOLEAN_FACTORY",
+                "ATOMIC_BOOLEAN_FACTORY_BINARY_COMPATIBILITY",
+                "ATOMIC_VALUE",
+                "COMPARE_AND_SET",
+                "GET_AND_SET",
+                "GET_AND_INCREMENT",
+                "GET_AND_INCREMENT_LONG",
+                "GET_AND_DECREMENT",
+                "GET_AND_DECREMENT_LONG",
+                "INCREMENT_AND_GET",
+                "INCREMENT_AND_GET_LONG",
+                "DECREMENT_AND_GET",
+                "DECREMENT_AND_GET_LONG",
+                "GET_AND_ADD",
+                "GET_AND_ADD_LONG",
+                "ADD_AND_GET",
+                "ADD_AND_GET_LONG",
+                "ATOMIC_ARRAY_OF_NULLS",
+                "ATOMIC_INT_ARRAY",
+                "ATOMIC_LONG_ARRAY",
+                "ATOMIC_BOOLEAN_ARRAY",
+                "ATOMIC_REF_ARRAY",
+                "ARRAY_SIZE",
+                "ARRAY_ELEMENT_GET",
+                "REENTRANT_LOCK",
+                "TRACE_FACTORY_FUNCTION",
+                "TRACE_BASE_CONSTRUCTOR",
+                "TRACE_NAMED",
+                "TRACE_FORMAT_CLASS",
+                "TRACE_FORMAT_FORMAT_FUNCTION",
+                "TRACE_APPEND_1",
+                "TRACE_APPEND_2",
+                "TRACE_APPEND_3",
+                "TRACE_APPEND_4",
+                "atomicfu"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/locks/Unparked.class": {
+        "ver": 52,
+        "acc": 48,
+        "nme": "kotlinx/atomicfu/locks/Unparked",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "()V"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "INSTANCE",
+            "dsc": "Lkotlinx/atomicfu/locks/Unparked;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\f\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\b\u0003\bÂ\u0002\u0018\u00002\u00020\u0001B\t\b\u0002¢\u0006\u0004\b\u0002\u0010\u0003¨\u0006\u0004"
+              ],
+              "d2",
+              [
+                "Lkotlinx/atomicfu/locks/Unparked;",
+                "Lkotlinx/atomicfu/locks/ParkingState;",
+                "<init>",
+                "()V",
+                "atomicfu"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/AtomicIntArray.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/atomicfu/AtomicIntArray",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(I)V"
+          },
+          {
+            "nme": "getSize",
+            "acc": 17,
+            "dsc": "()I"
+          },
+          {
+            "nme": "getSize$annotations",
+            "acc": 135177,
+            "dsc": "()V"
+          },
+          {
+            "nme": "get",
+            "acc": 17,
+            "dsc": "(I)Lkotlinx/atomicfu/AtomicInt;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "array",
+            "dsc": "[Lkotlinx/atomicfu/AtomicInt;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\u001e\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0000\n\u0002\u0010\b\n\u0002\b\u0003\n\u0002\u0010\u0011\n\u0002\u0018\u0002\n\u0002\b\b\b\u0007\u0018\u00002\u00020\u0001B\u000f\u0012\u0006\u0010\u0002\u001a\u00020\u0003¢\u0006\u0004\b\u0004\u0010\u0005J\u0011\u0010\u000e\u001a\u00020\b2\u0006\u0010\u000f\u001a\u00020\u0003H\u0002R\u0016\u0010\u0006\u001a\b\u0012\u0004\u0012\u00020\b0\u0007X\u0004¢\u0006\u0004\n\u0002\u0010\tR\u001a\u0010\u0002\u001a\u00020\u00038FX\u0004¢\u0006\f\u0012\u0004\b\n\u0010\u000b\u001a\u0004\b\f\u0010\r¨\u0006\u0010"
+              ],
+              "d2",
+              [
+                "Lkotlinx/atomicfu/AtomicIntArray;",
+                "",
+                "size",
+                "",
+                "<init>",
+                "(I)V",
+                "array",
+                "",
+                "Lkotlinx/atomicfu/AtomicInt;",
+                "[Lkotlinx/atomicfu/AtomicInt;",
+                "getSize$annotations",
+                "()V",
+                "getSize",
+                "()I",
+                "get",
+                "index",
+                "atomicfu"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/atomicfu/AtomicInt.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/atomicfu/AtomicInt",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(ILkotlinx/atomicfu/TraceBase;)V"
+          },
+          {
+            "nme": "getTrace",
+            "acc": 131089,
+            "dsc": "()Lkotlinx/atomicfu/TraceBase;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "getTrace$annotations",
+            "acc": 135177,
+            "dsc": "()V",
+            "vanns": [
+              {
+                "dsc": "Lkotlin/Deprecated;",
+                "vals": [
+                  "message",
+                  "The property was intended for internal use only and will be hidden in the future release."
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "getValue",
+            "acc": 17,
+            "dsc": "()I"
+          },
+          {
+            "nme": "setValue",
+            "acc": 17,
+            "dsc": "(I)V"
+          },
+          {
+            "nme": "getValue",
+            "acc": 18,
+            "dsc": "(Ljava/lang/Object;Lkotlin/reflect/KProperty;)I",
+            "sig": "(Ljava/lang/Object;Lkotlin/reflect/KProperty<*>;)I",
+            "invanns": [
+              {
+                "dsc": "Lkotlin/internal/InlineOnly;"
+              }
+            ]
+          },
+          {
+            "nme": "setValue",
+            "acc": 18,
+            "dsc": "(Ljava/lang/Object;Lkotlin/reflect/KProperty;I)V",
+            "sig": "(Ljava/lang/Object;Lkotlin/reflect/KProperty<*>;I)V",
+            "invanns": [
+              {
+                "dsc": "Lkotlin/internal/InlineOnly;"
+              }
+            ]
+          },
+          {
+            "nme": "lazySet",
+            "acc": 17,
+            "dsc": "(I)V"
+          },
+          {
+            "nme": "compareAndSet",
+            "acc": 17,
+            "dsc": "(II)Z"
+          },
+          {
+            "nme": "getAndSet",
+            "acc": 17,
+            "dsc": "(I)I"
+          },
+          {
+            "nme": "getAndIncrement",
+            "acc": 17,
+            "dsc": "()I"
+          },
+          {
+            "nme": "getAndDecrement",
+            "acc": 17,
+            "dsc": "()I"
+          },
+          {
+            "nme": "getAndAdd",
+            "acc": 17,
+            "dsc": "(I)I"
+          },
+          {
+            "nme": "addAndGet",
+            "acc": 17,
+            "dsc": "(I)I"
+          },
+          {
+            "nme": "incrementAndGet",
+            "acc": 17,
+            "dsc": "()I"
+          },
+          {
+            "nme": "decrementAndGet",
+            "acc": 17,
+            "dsc": "()I"
+          },
+          {
+            "nme": "plusAssign",
+            "acc": 17,
+            "dsc": "(I)V"
+          },
+          {
+            "nme": "minusAssign",
+            "acc": 17,
+            "dsc": "(I)V"
+          },
+          {
+            "nme": "toString",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 26,
+            "nme": "Companion",
+            "dsc": "Lkotlinx/atomicfu/AtomicInt$Companion;"
+          },
+          {
+            "acc": 131090,
+            "nme": "trace",
+            "dsc": "Lkotlinx/atomicfu/TraceBase;"
+          },
+          {
+            "acc": 66,
+            "nme": "value",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "FU",
+            "dsc": "Ljava/util/concurrent/atomic/AtomicIntegerFieldUpdater;",
+            "sig": "Ljava/util/concurrent/atomic/AtomicIntegerFieldUpdater<Lkotlinx/atomicfu/AtomicInt;>;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u00004\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0000\n\u0002\u0010\b\n\u0000\n\u0002\u0018\u0002\n\u0002\b\f\n\u0002\u0018\u0002\n\u0002\u0010\u0002\n\u0002\b\u0002\n\u0002\u0010\u000b\n\u0002\b\r\n\u0002\u0010\u000e\n\u0002\b\u0002\u0018\u0000 %2\u00020\u0001:\u0001%B\u0019\b\u0000\u0012\u0006\u0010\u0002\u001a\u00020\u0003\u0012\u0006\u0010\u0004\u001a\u00020\u0005¢\u0006\u0004\b\u0006\u0010\u0007J\u001f\u0010\f\u001a\u00020\u00032\b\u0010\u0010\u001a\u0004\u0018\u00010\u00012\n\u0010\u0011\u001a\u0006\u0012\u0002\b\u00030\u0012H\nJ'\u0010\u000e\u001a\u00020\u00132\b\u0010\u0010\u001a\u0004\u0018\u00010\u00012\n\u0010\u0011\u001a\u0006\u0012\u0002\b\u00030\u00122\u0006\u0010\u0002\u001a\u00020\u0003H\nJ\u000e\u0010\u0014\u001a\u00020\u00132\u0006\u0010\u0002\u001a\u00020\u0003J\u0016\u0010\u0015\u001a\u00020\u00162\u0006\u0010\u0017\u001a\u00020\u00032\u0006\u0010\u0018\u001a\u00020\u0003J\u000e\u0010\u0019\u001a\u00020\u00032\u0006\u0010\u0002\u001a\u00020\u0003J\u0006\u0010\u001a\u001a\u00020\u0003J\u0006\u0010\u001b\u001a\u00020\u0003J\u000e\u0010\u001c\u001a\u00020\u00032\u0006\u0010\u001d\u001a\u00020\u0003J\u000e\u0010\u001e\u001a\u00020\u00032\u0006\u0010\u001d\u001a\u00020\u0003J\u0006\u0010\u001f\u001a\u00020\u0003J\u0006\u0010 \u001a\u00020\u0003J\u0011\u0010!\u001a\u00020\u00132\u0006\u0010\u001d\u001a\u00020\u0003H\nJ\u0011\u0010\"\u001a\u00020\u00132\u0006\u0010\u001d\u001a\u00020\u0003H\nJ\b\u0010#\u001a\u00020$H\u0016R\u001c\u0010\u0004\u001a\u00020\u00058\u0006X\u0004¢\u0006\u000e\n\u0000\u0012\u0004\b\b\u0010\t\u001a\u0004\b\n\u0010\u000bR$\u0010\u0002\u001a\u00020\u00032\u0006\u0010\u0002\u001a\u00020\u0003@FX\u000e¢\u0006\u000e\n\u0000\u001a\u0004\b\f\u0010\r\"\u0004\b\u000e\u0010\u000f¨\u0006&"
+              ],
+              "d2",
+              [
+                "Lkotlinx/atomicfu/AtomicInt;",
+                "",
+                "value",
+                "",
+                "trace",
+                "Lkotlinx/atomicfu/TraceBase;",
+                "<init>",
+                "(ILkotlinx/atomicfu/TraceBase;)V",
+                "getTrace$annotations",
+                "()V",
+                "getTrace",
+                "()Lkotlinx/atomicfu/TraceBase;",
+                "getValue",
+                "()I",
+                "setValue",
+                "(I)V",
+                "thisRef",
+                "property",
+                "Lkotlin/reflect/KProperty;",
+                "",
+                "lazySet",
+                "compareAndSet",
+                "",
+                "expect",
+                "update",
+                "getAndSet",
+                "getAndIncrement",
+                "getAndDecrement",
+                "getAndAdd",
+                "delta",
+                "addAndGet",
+                "incrementAndGet",
+                "decrementAndGet",
+                "plusAssign",
+                "minusAssign",
+                "toString",
+                "",
+                "Companion",
+                "atomicfu"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lkotlin/jvm/internal/SourceDebugExtension;",
+            "vals": [
+              "value",
+              [
+                "SMAP\nAtomicFU.kt\nKotlin\n*S Kotlin\n*F\n+ 1 AtomicFU.kt\nkotlinx/atomicfu/AtomicInt\n+ 2 fake.kt\nkotlin/jvm/internal/FakeKt\n*L\n1#1,469:1\n1#2:470\n*E\n"
+              ]
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

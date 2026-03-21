@@ -1,0 +1,995 @@
+{
+  "md5": "1c0e77748c8b9052fa8ccf109248d697",
+  "sha2": "553f70936cce7e2a7cc560bb7a1761efc2aca0ef",
+  "sha256": "722a32631e3eaa4c73c01c9fde21252bb4c6d5196bb2da392007d4efc31a64ea",
+  "contents": {
+    "classes": {
+      "net/fabricmc/fabric/api/tag/client/v1/package-info.class": {
+        "ver": 65,
+        "acc": 5632,
+        "nme": "net/fabricmc/fabric/api/tag/client/v1/package-info",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lorg/jspecify/annotations/NullMarked;"
+          },
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/tag/SimpleRegistry3Mixin.class": {
+        "ver": 65,
+        "acc": 1056,
+        "nme": "net/fabricmc/fabric/mixin/tag/SimpleRegistry3Mixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "()V"
+          },
+          {
+            "nme": "applyTagAliases",
+            "acc": 2,
+            "dsc": "(Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Inject;",
+                "vals": [
+                  "method",
+                  [
+                    "apply"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "INVOKE",
+                        "target",
+                        "Lnet/minecraft/core/MappedRegistry;refreshTagsInHolders()V"
+                      ],
+                      "api": 589824
+                    }
+                  ]
+                ]
+              }
+            ]
+          }
+        ],
+        "flds": [
+          {
+            "acc": 0,
+            "nme": "field_53689",
+            "dsc": "Lnet/minecraft/core/MappedRegistry;",
+            "sig": "Lnet/minecraft/core/MappedRegistry<*>;"
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "targets",
+              [
+                "net/minecraft/core/MappedRegistry$3"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/tag/MappedRegistryMixin.class": {
+        "ver": 65,
+        "acc": 1056,
+        "nme": "net/fabricmc/fabric/mixin/tag/MappedRegistryMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "()V"
+          },
+          {
+            "nme": "createTag",
+            "acc": 1028,
+            "dsc": "(Lnet/minecraft/tags/TagKey;)Lnet/minecraft/core/HolderSet$Named;",
+            "sig": "(Lnet/minecraft/tags/TagKey<TT;>;)Lnet/minecraft/core/HolderSet$Named<TT;>;",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/Shadow;"
+              }
+            ]
+          },
+          {
+            "nme": "refreshTagsInHolders",
+            "acc": 1024,
+            "dsc": "()V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/Shadow;"
+              }
+            ]
+          },
+          {
+            "nme": "key",
+            "acc": 1025,
+            "dsc": "()Lnet/minecraft/resources/ResourceKey;",
+            "sig": "()Lnet/minecraft/resources/ResourceKey<+Lnet/minecraft/core/Registry<TT;>;>;",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/Shadow;"
+              }
+            ]
+          },
+          {
+            "nme": "fabric_loadTagAliases",
+            "acc": 1,
+            "dsc": "(Ljava/util/Map;)V",
+            "sig": "(Ljava/util/Map<Lnet/minecraft/tags/TagKey<*>;Ljava/util/Set<Lnet/minecraft/tags/TagKey<*>;>;>;)V"
+          },
+          {
+            "nme": "fabric_applyPendingTagAliases",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "fabric_refreshTags",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 26,
+            "nme": "LOGGER",
+            "dsc": "Lorg/slf4j/Logger;"
+          },
+          {
+            "acc": 2,
+            "nme": "pendingTagAliasGroups",
+            "dsc": "Ljava/util/Map;",
+            "sig": "Ljava/util/Map<Lnet/minecraft/tags/TagKey<*>;Ljava/util/Set<Lnet/minecraft/tags/TagKey<*>;>;>;"
+          },
+          {
+            "acc": 2,
+            "nme": "key",
+            "dsc": "Lnet/minecraft/resources/ResourceKey;",
+            "sig": "Lnet/minecraft/resources/ResourceKey<+Lnet/minecraft/core/Registry<TT;>;>;"
+          },
+          {
+            "acc": 0,
+            "nme": "allTags",
+            "dsc": "Lnet/minecraft/core/MappedRegistry$TagSet;",
+            "sig": "Lnet/minecraft/core/MappedRegistry$TagSet<TT;>;"
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/core/MappedRegistry"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/tag/TagAliasLoader.class": {
+        "ver": 65,
+        "acc": 49,
+        "nme": "net/fabricmc/fabric/impl/tag/TagAliasLoader",
+        "super": "net/fabricmc/fabric/api/resource/v1/reloader/SimpleResourceReloader",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "prepare",
+            "acc": 4,
+            "dsc": "(Lnet/minecraft/server/packs/resources/PreparableReloadListener$SharedState;)Ljava/util/Map;",
+            "sig": "(Lnet/minecraft/server/packs/resources/PreparableReloadListener$SharedState;)Ljava/util/Map<Lnet/minecraft/resources/ResourceKey<+Lnet/minecraft/core/Registry<*>;>;Ljava/util/List<Lnet/fabricmc/fabric/impl/tag/TagAliasLoader$Data;>;>;"
+          },
+          {
+            "nme": "getDirectory",
+            "acc": 10,
+            "dsc": "(Lnet/minecraft/resources/ResourceKey;)Ljava/lang/String;",
+            "sig": "(Lnet/minecraft/resources/ResourceKey<+Lnet/minecraft/core/Registry<*>;>;)Ljava/lang/String;"
+          },
+          {
+            "nme": "apply",
+            "acc": 4,
+            "dsc": "(Ljava/util/Map;Lnet/minecraft/server/packs/resources/PreparableReloadListener$SharedState;)V",
+            "sig": "(Ljava/util/Map<Lnet/minecraft/resources/ResourceKey<+Lnet/minecraft/core/Registry<*>;>;Ljava/util/List<Lnet/fabricmc/fabric/impl/tag/TagAliasLoader$Data;>;>;Lnet/minecraft/server/packs/resources/PreparableReloadListener$SharedState;)V"
+          },
+          {
+            "nme": "applyToDynamicRegistries",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/core/LayeredRegistryAccess;Ljava/lang/Object;)V",
+            "sig": "<T:Ljava/lang/Object;>(Lnet/minecraft/core/LayeredRegistryAccess<TT;>;TT;)V"
+          },
+          {
+            "nme": "apply",
+            "acc": 4164,
+            "dsc": "(Ljava/lang/Object;Lnet/minecraft/server/packs/resources/PreparableReloadListener$SharedState;)V"
+          },
+          {
+            "nme": "prepare",
+            "acc": 4164,
+            "dsc": "(Lnet/minecraft/server/packs/resources/PreparableReloadListener$SharedState;)Ljava/lang/Object;"
+          },
+          {
+            "nme": "lambda$apply$1",
+            "acc": 4106,
+            "dsc": "(Ljava/util/Set;)Z"
+          },
+          {
+            "nme": "lambda$prepare$0",
+            "acc": 4106,
+            "dsc": "(Lnet/minecraft/resources/ResourceKey;)Ljava/util/List;"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "ID",
+            "dsc": "Lnet/minecraft/resources/Identifier;"
+          },
+          {
+            "acc": 26,
+            "nme": "LOGGER",
+            "dsc": "Lorg/slf4j/Logger;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/tag/SimpleRegistryTagLookup2Accessor.class": {
+        "ver": 65,
+        "acc": 1537,
+        "nme": "net/fabricmc/fabric/mixin/tag/SimpleRegistryTagLookup2Accessor",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "fabric_getTagMap",
+            "acc": 1025,
+            "dsc": "()Ljava/util/Map;",
+            "sig": "()Ljava/util/Map<Lnet/minecraft/tags/TagKey<TT;>;Lnet/minecraft/core/HolderSet$Named<TT;>;>;",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/gen/Accessor;",
+                "vals": [
+                  "value",
+                  "val$tags"
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "fabric_setTagMap",
+            "acc": 1025,
+            "dsc": "(Ljava/util/Map;)V",
+            "sig": "(Ljava/util/Map<Lnet/minecraft/tags/TagKey<TT;>;Lnet/minecraft/core/HolderSet$Named<TT;>;>;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/gen/Accessor;",
+                "vals": [
+                  "value",
+                  "val$tags"
+                ]
+              },
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/Mutable;"
+              }
+            ]
+          }
+        ],
+        "flds": [],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "targets",
+              [
+                "net/minecraft/core/MappedRegistry$TagSet$2"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/tag/client/ClientTagsLoader.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/impl/tag/client/ClientTagsLoader",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "loadTag",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/tags/TagKey;)Lnet/fabricmc/fabric/impl/tag/client/ClientTagsLoader$LoadedTag;",
+            "sig": "(Lnet/minecraft/tags/TagKey<*>;)Lnet/fabricmc/fabric/impl/tag/client/ClientTagsLoader$LoadedTag;"
+          },
+          {
+            "nme": "getTagFiles",
+            "acc": 10,
+            "dsc": "(Lnet/minecraft/resources/ResourceKey;Lnet/minecraft/resources/Identifier;)Ljava/util/HashSet;",
+            "sig": "(Lnet/minecraft/resources/ResourceKey<+Lnet/minecraft/core/Registry<*>;>;Lnet/minecraft/resources/Identifier;)Ljava/util/HashSet<Ljava/nio/file/Path;>;"
+          },
+          {
+            "nme": "getTagFiles",
+            "acc": 10,
+            "dsc": "(Ljava/lang/String;Lnet/minecraft/resources/Identifier;)Ljava/util/HashSet;",
+            "sig": "(Ljava/lang/String;Lnet/minecraft/resources/Identifier;)Ljava/util/HashSet<Ljava/nio/file/Path;>;"
+          },
+          {
+            "nme": "getResourcePaths",
+            "acc": 10,
+            "dsc": "(Ljava/lang/String;)Ljava/util/HashSet;",
+            "sig": "(Ljava/lang/String;)Ljava/util/HashSet<Ljava/nio/file/Path;>;"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 26,
+            "nme": "LOGGER",
+            "dsc": "Lorg/slf4j/Logger;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/tag/package-info.class": {
+        "ver": 65,
+        "acc": 5632,
+        "nme": "net/fabricmc/fabric/impl/tag/package-info",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lorg/jspecify/annotations/NullMarked;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/tag/client/ClientTagsLoader$1.class": {
+        "ver": 65,
+        "acc": 32,
+        "nme": "net/fabricmc/fabric/impl/tag/client/ClientTagsLoader$1",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Ljava/util/HashSet;Lnet/minecraft/tags/TagKey;Ljava/util/HashSet;)V"
+          },
+          {
+            "nme": "element",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/resources/Identifier;Z)Lnet/minecraft/resources/Identifier;"
+          },
+          {
+            "nme": "tag",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/resources/Identifier;)Ljava/util/Collection;",
+            "sig": "(Lnet/minecraft/resources/Identifier;)Ljava/util/Collection<Lnet/minecraft/resources/Identifier;>;"
+          },
+          {
+            "nme": "element",
+            "acc": 4161,
+            "dsc": "(Lnet/minecraft/resources/Identifier;Z)Ljava/lang/Object;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 4112,
+            "nme": "val$immediateChildIds",
+            "dsc": "Ljava/util/HashSet;"
+          },
+          {
+            "acc": 4112,
+            "nme": "val$tagKey",
+            "dsc": "Lnet/minecraft/tags/TagKey;"
+          },
+          {
+            "acc": 4112,
+            "nme": "val$immediateChildTags",
+            "dsc": "Ljava/util/HashSet;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/tag/SimpleRegistry2Mixin.class": {
+        "ver": 65,
+        "acc": 1056,
+        "nme": "net/fabricmc/fabric/mixin/tag/SimpleRegistry2Mixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "()V"
+          },
+          {
+            "nme": "parent",
+            "acc": 1025,
+            "dsc": "()Lnet/minecraft/core/HolderLookup$RegistryLookup;",
+            "sig": "()Lnet/minecraft/core/HolderLookup$RegistryLookup<TT;>;",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/Shadow;"
+              }
+            ]
+          },
+          {
+            "nme": "fabric_loadTagAliases",
+            "acc": 1,
+            "dsc": "(Ljava/util/Map;)V",
+            "sig": "(Ljava/util/Map<Lnet/minecraft/tags/TagKey<*>;Ljava/util/Set<Lnet/minecraft/tags/TagKey<*>;>;>;)V"
+          }
+        ],
+        "flds": [],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "targets",
+              [
+                "net/minecraft/core/MappedRegistry$2"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/tag/TagAliasEnabledRegistryWrapper.class": {
+        "ver": 65,
+        "acc": 1537,
+        "nme": "net/fabricmc/fabric/impl/tag/TagAliasEnabledRegistryWrapper",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "fabric_loadTagAliases",
+            "acc": 1025,
+            "dsc": "(Ljava/util/Map;)V",
+            "sig": "(Ljava/util/Map<Lnet/minecraft/tags/TagKey<*>;Ljava/util/Set<Lnet/minecraft/tags/TagKey<*>;>;>;)V"
+          }
+        ],
+        "flds": []
+      },
+      "net/fabricmc/fabric/api/tag/v1/package-info.class": {
+        "ver": 65,
+        "acc": 5632,
+        "nme": "net/fabricmc/fabric/api/tag/v1/package-info",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lorg/jspecify/annotations/NullMarked;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/tag/client/package-info.class": {
+        "ver": 65,
+        "acc": 5632,
+        "nme": "net/fabricmc/fabric/impl/tag/client/package-info",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lorg/jspecify/annotations/NullMarked;"
+          },
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/tag/SimpleRegistryExtension.class": {
+        "ver": 65,
+        "acc": 1537,
+        "nme": "net/fabricmc/fabric/impl/tag/SimpleRegistryExtension",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "fabric_applyPendingTagAliases",
+            "acc": 1025,
+            "dsc": "()V"
+          },
+          {
+            "nme": "fabric_refreshTags",
+            "acc": 1025,
+            "dsc": "()V"
+          }
+        ],
+        "flds": []
+      },
+      "net/fabricmc/fabric/impl/tag/TagInit.class": {
+        "ver": 65,
+        "acc": 49,
+        "nme": "net/fabricmc/fabric/impl/tag/TagInit",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "onInitialize",
+            "acc": 1,
+            "dsc": "()V"
+          }
+        ],
+        "flds": []
+      },
+      "net/fabricmc/fabric/api/tag/client/v1/ClientTags.class": {
+        "ver": 65,
+        "acc": 49,
+        "nme": "net/fabricmc/fabric/api/tag/client/v1/ClientTags",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "()V"
+          },
+          {
+            "nme": "getOrCreateLocalTag",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/tags/TagKey;)Ljava/util/Set;",
+            "sig": "(Lnet/minecraft/tags/TagKey<*>;)Ljava/util/Set<Lnet/minecraft/resources/Identifier;>;"
+          },
+          {
+            "nme": "isInWithLocalFallback",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/tags/TagKey;Ljava/lang/Object;)Z",
+            "sig": "<T:Ljava/lang/Object;>(Lnet/minecraft/tags/TagKey<TT;>;TT;)Z"
+          },
+          {
+            "nme": "isInWithLocalFallback",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/tags/TagKey;Lnet/minecraft/core/Holder;)Z",
+            "sig": "<T:Ljava/lang/Object;>(Lnet/minecraft/tags/TagKey<TT;>;Lnet/minecraft/core/Holder<TT;>;)Z"
+          },
+          {
+            "nme": "isInLocal",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/tags/TagKey;Lnet/minecraft/resources/ResourceKey;)Z",
+            "sig": "<T:Ljava/lang/Object;>(Lnet/minecraft/tags/TagKey<TT;>;Lnet/minecraft/resources/ResourceKey<TT;>;)Z"
+          },
+          {
+            "nme": "lambda$isInWithLocalFallback$0",
+            "acc": 4106,
+            "dsc": "(Lnet/minecraft/tags/TagKey;Lnet/minecraft/core/Holder;)Ljava/lang/Boolean;"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/tag/TagAliasGroup.class": {
+        "ver": 65,
+        "acc": 65585,
+        "nme": "net/fabricmc/fabric/impl/tag/TagAliasGroup",
+        "super": "java/lang/Record",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Ljava/util/List;)V",
+            "sig": "(Ljava/util/List<Lnet/minecraft/tags/TagKey<TT;>;>;)V"
+          },
+          {
+            "nme": "codec",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/resources/ResourceKey;)Lcom/mojang/serialization/Codec;",
+            "sig": "<T:Ljava/lang/Object;>(Lnet/minecraft/resources/ResourceKey<+Lnet/minecraft/core/Registry<TT;>;>;)Lcom/mojang/serialization/Codec<Lnet/fabricmc/fabric/impl/tag/TagAliasGroup<TT;>;>;"
+          },
+          {
+            "nme": "toString",
+            "acc": 17,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "hashCode",
+            "acc": 17,
+            "dsc": "()I"
+          },
+          {
+            "nme": "equals",
+            "acc": 17,
+            "dsc": "(Ljava/lang/Object;)Z"
+          },
+          {
+            "nme": "tags",
+            "acc": 1,
+            "dsc": "()Ljava/util/List;",
+            "sig": "()Ljava/util/List<Lnet/minecraft/tags/TagKey<TT;>;>;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "tags",
+            "dsc": "Ljava/util/List;",
+            "sig": "Ljava/util/List<Lnet/minecraft/tags/TagKey<TT;>;>;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/tag/package-info.class": {
+        "ver": 65,
+        "acc": 5632,
+        "nme": "net/fabricmc/fabric/mixin/tag/package-info",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lorg/jspecify/annotations/NullMarked;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/tag/ReloadableServerResourcesMixin.class": {
+        "ver": 65,
+        "acc": 1056,
+        "nme": "net/fabricmc/fabric/mixin/tag/ReloadableServerResourcesMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "()V"
+          },
+          {
+            "nme": "storeDynamicRegistries",
+            "acc": 2,
+            "dsc": "(Lnet/minecraft/core/LayeredRegistryAccess;Lnet/minecraft/core/HolderLookup$Provider;Lnet/minecraft/world/flag/FeatureFlagSet;Lnet/minecraft/commands/Commands$CommandSelection;Ljava/util/List;Lnet/minecraft/server/permissions/PermissionSet;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V",
+            "sig": "(Lnet/minecraft/core/LayeredRegistryAccess<Lnet/minecraft/server/RegistryLayer;>;Lnet/minecraft/core/HolderLookup$Provider;Lnet/minecraft/world/flag/FeatureFlagSet;Lnet/minecraft/commands/Commands$CommandSelection;Ljava/util/List<*>;Lnet/minecraft/server/permissions/PermissionSet;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Inject;",
+                "vals": [
+                  "method",
+                  [
+                    "<init>"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "RETURN"
+                      ],
+                      "api": 589824
+                    }
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "applyDynamicTagAliases",
+            "acc": 2,
+            "dsc": "(Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Inject;",
+                "vals": [
+                  "method",
+                  [
+                    "updateStaticRegistryTags"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "RETURN"
+                      ],
+                      "api": 589824
+                    }
+                  ]
+                ]
+              }
+            ]
+          }
+        ],
+        "flds": [
+          {
+            "acc": 2,
+            "nme": "dynamicRegistriesByType",
+            "dsc": "Lnet/minecraft/core/LayeredRegistryAccess;",
+            "sig": "Lnet/minecraft/core/LayeredRegistryAccess<Lnet/minecraft/server/RegistryLayer;>;"
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/server/ReloadableServerResources"
+                }
+              ],
+              "priority",
+              999
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/tag/client/ClientTagsImpl.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/impl/tag/client/ClientTagsImpl",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "isInWithLocalFallback",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/tags/TagKey;Lnet/minecraft/core/Holder;)Z",
+            "sig": "<T:Ljava/lang/Object;>(Lnet/minecraft/tags/TagKey<TT;>;Lnet/minecraft/core/Holder<TT;>;)Z"
+          },
+          {
+            "nme": "isInWithLocalFallback",
+            "acc": 10,
+            "dsc": "(Lnet/minecraft/tags/TagKey;Lnet/minecraft/core/Holder;Ljava/util/Set;)Z",
+            "sig": "<T:Ljava/lang/Object;>(Lnet/minecraft/tags/TagKey<TT;>;Lnet/minecraft/core/Holder<TT;>;Ljava/util/Set<Lnet/minecraft/tags/TagKey<TT;>;>;)Z"
+          },
+          {
+            "nme": "getRegistry",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/tags/TagKey;)Ljava/util/Optional;",
+            "sig": "<T:Ljava/lang/Object;>(Lnet/minecraft/tags/TagKey<TT;>;)Ljava/util/Optional<+Lnet/minecraft/core/Registry<TT;>;>;"
+          },
+          {
+            "nme": "getRegistryEntry",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/tags/TagKey;Ljava/lang/Object;)Ljava/util/Optional;",
+            "sig": "<T:Ljava/lang/Object;>(Lnet/minecraft/tags/TagKey<TT;>;TT;)Ljava/util/Optional<Lnet/minecraft/core/Holder<TT;>;>;"
+          },
+          {
+            "nme": "getOrCreatePartiallySyncedTag",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/tags/TagKey;)Lnet/fabricmc/fabric/impl/tag/client/ClientTagsLoader$LoadedTag;",
+            "sig": "(Lnet/minecraft/tags/TagKey<*>;)Lnet/fabricmc/fabric/impl/tag/client/ClientTagsLoader$LoadedTag;"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 26,
+            "nme": "LOCAL_TAG_HIERARCHY",
+            "dsc": "Ljava/util/Map;",
+            "sig": "Ljava/util/Map<Lnet/minecraft/tags/TagKey<*>;Lnet/fabricmc/fabric/impl/tag/client/ClientTagsLoader$LoadedTag;>;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/tag/TagAliasLoader$Data.class": {
+        "ver": 65,
+        "acc": 65585,
+        "nme": "net/fabricmc/fabric/impl/tag/TagAliasLoader$Data",
+        "super": "java/lang/Record",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 4,
+            "dsc": "(Lnet/minecraft/resources/Identifier;Lnet/fabricmc/fabric/impl/tag/TagAliasGroup;)V",
+            "sig": "(Lnet/minecraft/resources/Identifier;Lnet/fabricmc/fabric/impl/tag/TagAliasGroup<*>;)V"
+          },
+          {
+            "nme": "toString",
+            "acc": 17,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "hashCode",
+            "acc": 17,
+            "dsc": "()I"
+          },
+          {
+            "nme": "equals",
+            "acc": 17,
+            "dsc": "(Ljava/lang/Object;)Z"
+          },
+          {
+            "nme": "groupId",
+            "acc": 1,
+            "dsc": "()Lnet/minecraft/resources/Identifier;"
+          },
+          {
+            "nme": "group",
+            "acc": 1,
+            "dsc": "()Lnet/fabricmc/fabric/impl/tag/TagAliasGroup;",
+            "sig": "()Lnet/fabricmc/fabric/impl/tag/TagAliasGroup<*>;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "groupId",
+            "dsc": "Lnet/minecraft/resources/Identifier;"
+          },
+          {
+            "acc": 18,
+            "nme": "group",
+            "dsc": "Lnet/fabricmc/fabric/impl/tag/TagAliasGroup;",
+            "sig": "Lnet/fabricmc/fabric/impl/tag/TagAliasGroup<*>;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/tag/client/ClientTagsLoader$LoadedTag.class": {
+        "ver": 65,
+        "acc": 65585,
+        "nme": "net/fabricmc/fabric/impl/tag/client/ClientTagsLoader$LoadedTag",
+        "super": "java/lang/Record",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Ljava/util/Set;Ljava/util/Set;Ljava/util/Set;)V",
+            "sig": "(Ljava/util/Set<Lnet/minecraft/resources/Identifier;>;Ljava/util/Set<Lnet/minecraft/tags/TagKey<*>;>;Ljava/util/Set<Lnet/minecraft/resources/Identifier;>;)V"
+          },
+          {
+            "nme": "toString",
+            "acc": 17,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "hashCode",
+            "acc": 17,
+            "dsc": "()I"
+          },
+          {
+            "nme": "equals",
+            "acc": 17,
+            "dsc": "(Ljava/lang/Object;)Z"
+          },
+          {
+            "nme": "completeIds",
+            "acc": 1,
+            "dsc": "()Ljava/util/Set;",
+            "sig": "()Ljava/util/Set<Lnet/minecraft/resources/Identifier;>;"
+          },
+          {
+            "nme": "immediateChildTags",
+            "acc": 1,
+            "dsc": "()Ljava/util/Set;",
+            "sig": "()Ljava/util/Set<Lnet/minecraft/tags/TagKey<*>;>;"
+          },
+          {
+            "nme": "immediateChildIds",
+            "acc": 1,
+            "dsc": "()Ljava/util/Set;",
+            "sig": "()Ljava/util/Set<Lnet/minecraft/resources/Identifier;>;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "completeIds",
+            "dsc": "Ljava/util/Set;",
+            "sig": "Ljava/util/Set<Lnet/minecraft/resources/Identifier;>;"
+          },
+          {
+            "acc": 18,
+            "nme": "immediateChildTags",
+            "dsc": "Ljava/util/Set;",
+            "sig": "Ljava/util/Set<Lnet/minecraft/tags/TagKey<*>;>;"
+          },
+          {
+            "acc": 18,
+            "nme": "immediateChildIds",
+            "dsc": "Ljava/util/Set;",
+            "sig": "Ljava/util/Set<Lnet/minecraft/resources/Identifier;>;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,1414 @@
+{
+  "md5": "b6a72a4e88b5b115d31cd7e96d1cc783",
+  "sha2": "89c5399596250e71f2bba6d2415972a078a525c7",
+  "sha256": "3da805e9da2ff3cb119f744dcd11de6a18e32a5b933518f17418ba5795cfa775",
+  "contents": {
+    "classes": {
+      "kotlinx/io/bytestring/ByteStringBuilder.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/io/bytestring/ByteStringBuilder",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(I)V"
+          },
+          {
+            "nme": "<init>",
+            "acc": 4097,
+            "dsc": "(IILkotlin/jvm/internal/DefaultConstructorMarker;)V"
+          },
+          {
+            "nme": "getSize",
+            "acc": 17,
+            "dsc": "()I"
+          },
+          {
+            "nme": "getCapacity",
+            "acc": 17,
+            "dsc": "()I"
+          },
+          {
+            "nme": "toByteString",
+            "acc": 17,
+            "dsc": "()Lkotlinx/io/bytestring/ByteString;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "append",
+            "acc": 17,
+            "dsc": "(B)V"
+          },
+          {
+            "nme": "append",
+            "acc": 17,
+            "dsc": "([BII)V"
+          },
+          {
+            "nme": "append$default",
+            "acc": 4105,
+            "dsc": "(Lkotlinx/io/bytestring/ByteStringBuilder;[BIIILjava/lang/Object;)V"
+          },
+          {
+            "nme": "ensureCapacity",
+            "acc": 18,
+            "dsc": "(I)V"
+          },
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 2,
+            "nme": "buffer",
+            "dsc": "[B"
+          },
+          {
+            "acc": 2,
+            "nme": "offset",
+            "dsc": "I"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000.\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0000\n\u0002\u0010\b\n\u0002\b\u0003\n\u0002\u0010\u0012\n\u0002\b\u0007\n\u0002\u0018\u0002\n\u0000\n\u0002\u0010\u0002\n\u0000\n\u0002\u0010\u0005\n\u0002\b\u0006\u0018\u00002\u00020\u0001B\u0011\u0012\b\b\u0002\u0010\u0002\u001a\u00020\u0003¢\u0006\u0004\b\u0004\u0010\u0005J\u0006\u0010\u000e\u001a\u00020\u000fJ\u000e\u0010\u0010\u001a\u00020\u00112\u0006\u0010\u0012\u001a\u00020\u0013J\"\u0010\u0010\u001a\u00020\u00112\u0006\u0010\u0014\u001a\u00020\u00072\b\b\u0002\u0010\u0015\u001a\u00020\u00032\b\b\u0002\u0010\u0016\u001a\u00020\u0003J\u0010\u0010\u0017\u001a\u00020\u00112\u0006\u0010\u0018\u001a\u00020\u0003H\u0002R\u000e\u0010\u0006\u001a\u00020\u0007X\u000e¢\u0006\u0002\n\u0000R\u000e\u0010\b\u001a\u00020\u0003X\u000e¢\u0006\u0002\n\u0000R\u0011\u0010\t\u001a\u00020\u00038F¢\u0006\u0006\u001a\u0004\b\n\u0010\u000bR\u0011\u0010\f\u001a\u00020\u00038F¢\u0006\u0006\u001a\u0004\b\r\u0010\u000b¨\u0006\u0019"
+              ],
+              "d2",
+              [
+                "Lkotlinx/io/bytestring/ByteStringBuilder;",
+                "",
+                "initialCapacity",
+                "",
+                "<init>",
+                "(I)V",
+                "buffer",
+                "",
+                "offset",
+                "size",
+                "getSize",
+                "()I",
+                "capacity",
+                "getCapacity",
+                "toByteString",
+                "Lkotlinx/io/bytestring/ByteString;",
+                "append",
+                "",
+                "byte",
+                "",
+                "array",
+                "startIndex",
+                "endIndex",
+                "ensureCapacity",
+                "requiredCapacity",
+                "kotlinx-io-bytestring"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lkotlin/jvm/internal/SourceDebugExtension;",
+            "vals": [
+              "value",
+              [
+                "SMAP\nByteStringBuilder.kt\nKotlin\n*S Kotlin\n*F\n+ 1 ByteStringBuilder.kt\nkotlinx/io/bytestring/ByteStringBuilder\n+ 2 fake.kt\nkotlin/jvm/internal/FakeKt\n*L\n1#1,129:1\n1#2:130\n*E\n"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/io/bytestring/unsafe/UnsafeByteStringOperations.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/io/bytestring/unsafe/UnsafeByteStringOperations",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "()V"
+          },
+          {
+            "nme": "wrapUnsafe",
+            "acc": 17,
+            "dsc": "([B)Lkotlinx/io/bytestring/ByteString;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "withByteArrayUnsafe",
+            "acc": 17,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;Lkotlin/jvm/functions/Function1;)V",
+            "sig": "(Lkotlinx/io/bytestring/ByteString;Lkotlin/jvm/functions/Function1<-[BLkotlin/Unit;>;)V"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "INSTANCE",
+            "dsc": "Lkotlinx/io/bytestring/unsafe/UnsafeByteStringOperations;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000&\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0002\b\u0003\n\u0002\u0018\u0002\n\u0000\n\u0002\u0010\u0012\n\u0000\n\u0002\u0010\u0002\n\u0002\b\u0002\n\u0002\u0018\u0002\n\u0000\bÇ\u0002\u0018\u00002\u00020\u0001B\t\b\u0002¢\u0006\u0004\b\u0002\u0010\u0003J\u000e\u0010\u0004\u001a\u00020\u00052\u0006\u0010\u0006\u001a\u00020\u0007J5\u0010\b\u001a\u00020\t2\u0006\u0010\n\u001a\u00020\u00052\u0012\u0010\u000b\u001a\u000e\u0012\u0004\u0012\u00020\u0007\u0012\u0004\u0012\u00020\t0\fH\bø\u0001\u0000\u0002\n\n\b\b\u0001\u0012\u0002\u0010\u0002 \u0001\u0002\u0007\n\u0005\b20\u0001¨\u0006\r"
+              ],
+              "d2",
+              [
+                "Lkotlinx/io/bytestring/unsafe/UnsafeByteStringOperations;",
+                "",
+                "<init>",
+                "()V",
+                "wrapUnsafe",
+                "Lkotlinx/io/bytestring/ByteString;",
+                "array",
+                "",
+                "withByteArrayUnsafe",
+                "",
+                "byteString",
+                "block",
+                "Lkotlin/Function1;",
+                "kotlinx-io-bytestring"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lkotlinx/io/bytestring/unsafe/UnsafeByteStringApi;"
+          }
+        ]
+      },
+      "kotlinx/io/bytestring/ByteString$Companion.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/io/bytestring/ByteString$Companion",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "()V"
+          },
+          {
+            "nme": "getEMPTY$kotlinx_io_bytestring",
+            "acc": 17,
+            "dsc": "()Lkotlinx/io/bytestring/ByteString;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "wrap$kotlinx_io_bytestring",
+            "acc": 17,
+            "dsc": "([B)Lkotlinx/io/bytestring/ByteString;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "<init>",
+            "acc": 4097,
+            "dsc": "(Lkotlin/jvm/internal/DefaultConstructorMarker;)V"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\"\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0002\b\u0003\n\u0002\u0018\u0002\n\u0002\b\u0004\n\u0002\u0010\u0012\n\u0002\b\u0002\n\u0002\u0010\u0019\n\u0000\b\u0003\u0018\u00002\u00020\u0001B\t\b\u0002¢\u0006\u0004\b\u0002\u0010\u0003J\u0015\u0010\b\u001a\u00020\u00052\u0006\u0010\t\u001a\u00020\nH\u0000¢\u0006\u0002\b\u000bR\u0014\u0010\u0004\u001a\u00020\u0005X\u0004¢\u0006\b\n\u0000\u001a\u0004\b\u0006\u0010\u0007R\u000e\u0010\f\u001a\u00020\rX\u0004¢\u0006\u0002\n\u0000¨\u0006\u000e"
+              ],
+              "d2",
+              [
+                "Lkotlinx/io/bytestring/ByteString$Companion;",
+                "",
+                "<init>",
+                "()V",
+                "EMPTY",
+                "Lkotlinx/io/bytestring/ByteString;",
+                "getEMPTY$kotlinx_io_bytestring",
+                "()Lkotlinx/io/bytestring/ByteString;",
+                "wrap",
+                "byteArray",
+                "",
+                "wrap$kotlinx_io_bytestring",
+                "HEX_DIGITS",
+                "",
+                "kotlinx-io-bytestring"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/io/bytestring/ByteStringJvmExtKt.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/io/bytestring/ByteStringJvmExtKt",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "decodeToString",
+            "acc": 25,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;Ljava/nio/charset/Charset;)Ljava/lang/String;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "encodeToByteString",
+            "acc": 25,
+            "dsc": "(Ljava/lang/String;Ljava/nio/charset/Charset;)Lkotlinx/io/bytestring/ByteString;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "asReadOnlyByteBuffer",
+            "acc": 25,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;)Ljava/nio/ByteBuffer;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "getByteString",
+            "acc": 25,
+            "dsc": "(Ljava/nio/ByteBuffer;I)Lkotlinx/io/bytestring/ByteString;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "getByteString$default",
+            "acc": 4105,
+            "dsc": "(Ljava/nio/ByteBuffer;IILjava/lang/Object;)Lkotlinx/io/bytestring/ByteString;"
+          },
+          {
+            "nme": "getByteString",
+            "acc": 25,
+            "dsc": "(Ljava/nio/ByteBuffer;II)Lkotlinx/io/bytestring/ByteString;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "putByteString",
+            "acc": 25,
+            "dsc": "(Ljava/nio/ByteBuffer;Lkotlinx/io/bytestring/ByteString;)V"
+          },
+          {
+            "nme": "putByteString",
+            "acc": 25,
+            "dsc": "(Ljava/nio/ByteBuffer;ILkotlinx/io/bytestring/ByteString;)V"
+          },
+          {
+            "nme": "checkIndexAndCapacity",
+            "acc": 26,
+            "dsc": "(Ljava/nio/ByteBuffer;II)V"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              2,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000,\n\u0000\n\u0002\u0010\u000e\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0002\n\u0002\u0018\u0002\n\u0002\b\u0002\n\u0002\u0010\b\n\u0002\b\u0002\n\u0002\u0010\u0002\n\u0002\b\u0004\u001a\u0012\u0010\u0000\u001a\u00020\u0001*\u00020\u00022\u0006\u0010\u0003\u001a\u00020\u0004\u001a\u0012\u0010\u0005\u001a\u00020\u0002*\u00020\u00012\u0006\u0010\u0003\u001a\u00020\u0004\u001a\n\u0010\u0006\u001a\u00020\u0007*\u00020\u0002\u001a\u0014\u0010\b\u001a\u00020\u0002*\u00020\u00072\b\b\u0002\u0010\t\u001a\u00020\n\u001a\u001a\u0010\b\u001a\u00020\u0002*\u00020\u00072\u0006\u0010\u000b\u001a\u00020\n2\u0006\u0010\t\u001a\u00020\n\u001a\u0012\u0010\f\u001a\u00020\r*\u00020\u00072\u0006\u0010\u000e\u001a\u00020\u0002\u001a\u001a\u0010\f\u001a\u00020\r*\u00020\u00072\u0006\u0010\u000b\u001a\u00020\n2\u0006\u0010\u000e\u001a\u00020\u0002\u001a\u001c\u0010\u000f\u001a\u00020\r*\u00020\u00072\u0006\u0010\u0010\u001a\u00020\n2\u0006\u0010\t\u001a\u00020\nH\u0002¨\u0006\u0011"
+              ],
+              "d2",
+              [
+                "decodeToString",
+                "",
+                "Lkotlinx/io/bytestring/ByteString;",
+                "charset",
+                "Ljava/nio/charset/Charset;",
+                "encodeToByteString",
+                "asReadOnlyByteBuffer",
+                "Ljava/nio/ByteBuffer;",
+                "getByteString",
+                "length",
+                "",
+                "at",
+                "putByteString",
+                "",
+                "string",
+                "checkIndexAndCapacity",
+                "idx",
+                "kotlinx-io-bytestring"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lkotlin/jvm/internal/SourceDebugExtension;",
+            "vals": [
+              "value",
+              [
+                "SMAP\nByteStringJvmExt.kt\nKotlin\n*S Kotlin\n*F\n+ 1 ByteStringJvmExt.kt\nkotlinx/io/bytestring/ByteStringJvmExtKt\n+ 2 UnsafeByteStringOperations.kt\nkotlinx/io/bytestring/unsafe/UnsafeByteStringOperations\n*L\n1#1,137:1\n42#2,2:138\n42#2,2:140\n*S KotlinDebug\n*F\n+ 1 ByteStringJvmExt.kt\nkotlinx/io/bytestring/ByteStringJvmExtKt\n*L\n37#1:138,2\n101#1:140,2\n*E\n"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/io/bytestring/ByteString.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/io/bytestring/ByteString",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "([BLjava/lang/Object;)V"
+          },
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "([BII)V"
+          },
+          {
+            "nme": "<init>",
+            "acc": 4097,
+            "dsc": "([BIIILkotlin/jvm/internal/DefaultConstructorMarker;)V"
+          },
+          {
+            "nme": "getSize",
+            "acc": 17,
+            "dsc": "()I"
+          },
+          {
+            "nme": "equals",
+            "acc": 1,
+            "dsc": "(Ljava/lang/Object;)Z"
+          },
+          {
+            "nme": "hashCode",
+            "acc": 1,
+            "dsc": "()I"
+          },
+          {
+            "nme": "get",
+            "acc": 17,
+            "dsc": "(I)B"
+          },
+          {
+            "nme": "toByteArray",
+            "acc": 17,
+            "dsc": "(II)[B",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "toByteArray$default",
+            "acc": 4105,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;IIILjava/lang/Object;)[B"
+          },
+          {
+            "nme": "copyInto",
+            "acc": 17,
+            "dsc": "([BIII)V"
+          },
+          {
+            "nme": "copyInto$default",
+            "acc": 4105,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;[BIIIILjava/lang/Object;)V"
+          },
+          {
+            "nme": "substring",
+            "acc": 17,
+            "dsc": "(II)Lkotlinx/io/bytestring/ByteString;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "substring$default",
+            "acc": 4105,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;IIILjava/lang/Object;)Lkotlinx/io/bytestring/ByteString;"
+          },
+          {
+            "nme": "compareTo",
+            "acc": 1,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;)I"
+          },
+          {
+            "nme": "toString",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "getBackingArrayReference",
+            "acc": 17,
+            "dsc": "()[B",
+            "invanns": [
+              {
+                "dsc": "Lkotlin/PublishedApi;"
+              },
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "compareTo",
+            "acc": 4161,
+            "dsc": "(Ljava/lang/Object;)I"
+          },
+          {
+            "nme": "access$getEMPTY$cp",
+            "acc": 4121,
+            "dsc": "()Lkotlinx/io/bytestring/ByteString;"
+          },
+          {
+            "nme": "<init>",
+            "acc": 4097,
+            "dsc": "([BLjava/lang/Object;Lkotlin/jvm/internal/DefaultConstructorMarker;)V"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "Companion",
+            "dsc": "Lkotlinx/io/bytestring/ByteString$Companion;"
+          },
+          {
+            "acc": 18,
+            "nme": "data",
+            "dsc": "[B"
+          },
+          {
+            "acc": 2,
+            "nme": "hashCode",
+            "dsc": "I"
+          },
+          {
+            "acc": 26,
+            "nme": "EMPTY",
+            "dsc": "Lkotlinx/io/bytestring/ByteString;"
+          },
+          {
+            "acc": 26,
+            "nme": "HEX_DIGITS",
+            "dsc": "[C"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000@\n\u0002\u0018\u0002\n\u0002\u0010\u000f\n\u0000\n\u0002\u0010\u0012\n\u0000\n\u0002\u0010\u0000\n\u0002\b\u0003\n\u0002\u0010\b\n\u0002\b\u0007\n\u0002\u0010\u000b\n\u0002\b\u0002\n\u0002\u0010\u0005\n\u0002\b\u0003\n\u0002\u0010\u0002\n\u0002\b\u0005\n\u0002\u0010\u000e\n\u0002\b\u0003\u0018\u0000  2\b\u0012\u0004\u0012\u00020\u00000\u0001:\u0001 B\u001b\b\u0002\u0012\u0006\u0010\u0002\u001a\u00020\u0003\u0012\b\u0010\u0004\u001a\u0004\u0018\u00010\u0005¢\u0006\u0004\b\u0006\u0010\u0007B%\b\u0016\u0012\u0006\u0010\u0002\u001a\u00020\u0003\u0012\b\b\u0002\u0010\b\u001a\u00020\t\u0012\b\b\u0002\u0010\n\u001a\u00020\t¢\u0006\u0004\b\u0006\u0010\u000bJ\u0013\u0010\u0010\u001a\u00020\u00112\b\u0010\u0012\u001a\u0004\u0018\u00010\u0005H\u0002J\b\u0010\f\u001a\u00020\tH\u0016J\u0011\u0010\u0013\u001a\u00020\u00142\u0006\u0010\u0015\u001a\u00020\tH\u0002J\u001a\u0010\u0016\u001a\u00020\u00032\b\b\u0002\u0010\b\u001a\u00020\t2\b\b\u0002\u0010\n\u001a\u00020\tJ,\u0010\u0017\u001a\u00020\u00182\u0006\u0010\u0019\u001a\u00020\u00032\b\b\u0002\u0010\u001a\u001a\u00020\t2\b\b\u0002\u0010\b\u001a\u00020\t2\b\b\u0002\u0010\n\u001a\u00020\tJ\u0018\u0010\u001b\u001a\u00020\u00002\u0006\u0010\b\u001a\u00020\t2\b\b\u0002\u0010\n\u001a\u00020\tJ\u0011\u0010\u001c\u001a\u00020\t2\u0006\u0010\u0012\u001a\u00020\u0000H\u0002J\b\u0010\u001d\u001a\u00020\u001eH\u0016J\b\u0010\u001f\u001a\u00020\u0003H\u0001R\u000e\u0010\u0002\u001a\u00020\u0003X\u0004¢\u0006\u0002\n\u0000R\u0012\u0010\f\u001a\u00020\t8\u0002@\u0002X\u000e¢\u0006\u0002\n\u0000R\u0011\u0010\r\u001a\u00020\t8F¢\u0006\u0006\u001a\u0004\b\u000e\u0010\u000f¨\u0006!"
+              ],
+              "d2",
+              [
+                "Lkotlinx/io/bytestring/ByteString;",
+                "",
+                "data",
+                "",
+                "dummy",
+                "",
+                "<init>",
+                "([BLjava/lang/Object;)V",
+                "startIndex",
+                "",
+                "endIndex",
+                "([BII)V",
+                "hashCode",
+                "size",
+                "getSize",
+                "()I",
+                "equals",
+                "",
+                "other",
+                "get",
+                "",
+                "index",
+                "toByteArray",
+                "copyInto",
+                "",
+                "destination",
+                "destinationOffset",
+                "substring",
+                "compareTo",
+                "toString",
+                "",
+                "getBackingArrayReference",
+                "Companion",
+                "kotlinx-io-bytestring"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lkotlin/jvm/internal/SourceDebugExtension;",
+            "vals": [
+              "value",
+              [
+                "SMAP\nByteString.kt\nKotlin\n*S Kotlin\n*F\n+ 1 ByteString.kt\nkotlinx/io/bytestring/ByteString\n+ 2 fake.kt\nkotlin/jvm/internal/FakeKt\n*L\n1#1,550:1\n1#2:551\n*E\n"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/io/bytestring/Base64Kt.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/io/bytestring/Base64Kt",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "encodeToByteArray",
+            "acc": 25,
+            "dsc": "(Lkotlin/io/encoding/Base64;Lkotlinx/io/bytestring/ByteString;II)[B",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "encodeToByteArray$default",
+            "acc": 4105,
+            "dsc": "(Lkotlin/io/encoding/Base64;Lkotlinx/io/bytestring/ByteString;IIILjava/lang/Object;)[B"
+          },
+          {
+            "nme": "encodeIntoByteArray",
+            "acc": 25,
+            "dsc": "(Lkotlin/io/encoding/Base64;Lkotlinx/io/bytestring/ByteString;[BIII)I"
+          },
+          {
+            "nme": "encodeIntoByteArray$default",
+            "acc": 4105,
+            "dsc": "(Lkotlin/io/encoding/Base64;Lkotlinx/io/bytestring/ByteString;[BIIIILjava/lang/Object;)I"
+          },
+          {
+            "nme": "encode",
+            "acc": 25,
+            "dsc": "(Lkotlin/io/encoding/Base64;Lkotlinx/io/bytestring/ByteString;II)Ljava/lang/String;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "encode$default",
+            "acc": 4105,
+            "dsc": "(Lkotlin/io/encoding/Base64;Lkotlinx/io/bytestring/ByteString;IIILjava/lang/Object;)Ljava/lang/String;"
+          },
+          {
+            "nme": "encodeToAppendable",
+            "acc": 25,
+            "dsc": "(Lkotlin/io/encoding/Base64;Lkotlinx/io/bytestring/ByteString;Ljava/lang/Appendable;II)Ljava/lang/Appendable;",
+            "sig": "<A::Ljava/lang/Appendable;>(Lkotlin/io/encoding/Base64;Lkotlinx/io/bytestring/ByteString;TA;II)TA;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "encodeToAppendable$default",
+            "acc": 4105,
+            "dsc": "(Lkotlin/io/encoding/Base64;Lkotlinx/io/bytestring/ByteString;Ljava/lang/Appendable;IIILjava/lang/Object;)Ljava/lang/Appendable;"
+          },
+          {
+            "nme": "decode",
+            "acc": 25,
+            "dsc": "(Lkotlin/io/encoding/Base64;Lkotlinx/io/bytestring/ByteString;II)[B",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "decode$default",
+            "acc": 4105,
+            "dsc": "(Lkotlin/io/encoding/Base64;Lkotlinx/io/bytestring/ByteString;IIILjava/lang/Object;)[B"
+          },
+          {
+            "nme": "decodeToByteString",
+            "acc": 25,
+            "dsc": "(Lkotlin/io/encoding/Base64;Ljava/lang/CharSequence;II)Lkotlinx/io/bytestring/ByteString;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "decodeToByteString$default",
+            "acc": 4105,
+            "dsc": "(Lkotlin/io/encoding/Base64;Ljava/lang/CharSequence;IIILjava/lang/Object;)Lkotlinx/io/bytestring/ByteString;"
+          },
+          {
+            "nme": "decodeIntoByteArray",
+            "acc": 25,
+            "dsc": "(Lkotlin/io/encoding/Base64;Lkotlinx/io/bytestring/ByteString;[BIII)I"
+          },
+          {
+            "nme": "decodeIntoByteArray$default",
+            "acc": 4105,
+            "dsc": "(Lkotlin/io/encoding/Base64;Lkotlinx/io/bytestring/ByteString;[BIIIILjava/lang/Object;)I"
+          },
+          {
+            "nme": "decodeToByteString",
+            "acc": 25,
+            "dsc": "(Lkotlin/io/encoding/Base64;[BII)Lkotlinx/io/bytestring/ByteString;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "decodeToByteString$default",
+            "acc": 4105,
+            "dsc": "(Lkotlin/io/encoding/Base64;[BIIILjava/lang/Object;)Lkotlinx/io/bytestring/ByteString;"
+          },
+          {
+            "nme": "decodeToByteString",
+            "acc": 25,
+            "dsc": "(Lkotlin/io/encoding/Base64;Lkotlinx/io/bytestring/ByteString;II)Lkotlinx/io/bytestring/ByteString;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "decodeToByteString$default",
+            "acc": 4105,
+            "dsc": "(Lkotlin/io/encoding/Base64;Lkotlinx/io/bytestring/ByteString;IIILjava/lang/Object;)Lkotlinx/io/bytestring/ByteString;"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              2,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u00006\n\u0000\n\u0002\u0010\u0012\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0000\n\u0002\u0010\b\n\u0002\b\u0005\n\u0002\u0010\u000e\n\u0002\b\u0002\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\b\u0003\n\u0002\u0010\r\n\u0002\b\u0002\u001a&\u0010\u0000\u001a\u00020\u0001*\u00020\u00022\u0006\u0010\u0003\u001a\u00020\u00042\b\b\u0002\u0010\u0005\u001a\u00020\u00062\b\b\u0002\u0010\u0007\u001a\u00020\u0006\u001a8\u0010\b\u001a\u00020\u0006*\u00020\u00022\u0006\u0010\u0003\u001a\u00020\u00042\u0006\u0010\t\u001a\u00020\u00012\b\b\u0002\u0010\n\u001a\u00020\u00062\b\b\u0002\u0010\u0005\u001a\u00020\u00062\b\b\u0002\u0010\u0007\u001a\u00020\u0006\u001a&\u0010\u000b\u001a\u00020\f*\u00020\u00022\u0006\u0010\u0003\u001a\u00020\u00042\b\b\u0002\u0010\u0005\u001a\u00020\u00062\b\b\u0002\u0010\u0007\u001a\u00020\u0006\u001aA\u0010\r\u001a\u0002H\u000e\"\f\b\u0000\u0010\u000e*\u00060\u000fj\u0002`\u0010*\u00020\u00022\u0006\u0010\u0003\u001a\u00020\u00042\u0006\u0010\t\u001a\u0002H\u000e2\b\b\u0002\u0010\u0005\u001a\u00020\u00062\b\b\u0002\u0010\u0007\u001a\u00020\u0006¢\u0006\u0002\u0010\u0011\u001a&\u0010\u0012\u001a\u00020\u0001*\u00020\u00022\u0006\u0010\u0003\u001a\u00020\u00042\b\b\u0002\u0010\u0005\u001a\u00020\u00062\b\b\u0002\u0010\u0007\u001a\u00020\u0006\u001a&\u0010\u0013\u001a\u00020\u0004*\u00020\u00022\u0006\u0010\u0003\u001a\u00020\u00142\b\b\u0002\u0010\u0005\u001a\u00020\u00062\b\b\u0002\u0010\u0007\u001a\u00020\u0006\u001a8\u0010\u0015\u001a\u00020\u0006*\u00020\u00022\u0006\u0010\u0003\u001a\u00020\u00042\u0006\u0010\t\u001a\u00020\u00012\b\b\u0002\u0010\n\u001a\u00020\u00062\b\b\u0002\u0010\u0005\u001a\u00020\u00062\b\b\u0002\u0010\u0007\u001a\u00020\u0006\u001a&\u0010\u0013\u001a\u00020\u0004*\u00020\u00022\u0006\u0010\u0003\u001a\u00020\u00012\b\b\u0002\u0010\u0005\u001a\u00020\u00062\b\b\u0002\u0010\u0007\u001a\u00020\u0006\u001a&\u0010\u0013\u001a\u00020\u0004*\u00020\u00022\u0006\u0010\u0003\u001a\u00020\u00042\b\b\u0002\u0010\u0005\u001a\u00020\u00062\b\b\u0002\u0010\u0007\u001a\u00020\u0006¨\u0006\u0016"
+              ],
+              "d2",
+              [
+                "encodeToByteArray",
+                "",
+                "Lkotlin/io/encoding/Base64;",
+                "source",
+                "Lkotlinx/io/bytestring/ByteString;",
+                "startIndex",
+                "",
+                "endIndex",
+                "encodeIntoByteArray",
+                "destination",
+                "destinationOffset",
+                "encode",
+                "",
+                "encodeToAppendable",
+                "A",
+                "Ljava/lang/Appendable;",
+                "Lkotlin/text/Appendable;",
+                "(Lkotlin/io/encoding/Base64;Lkotlinx/io/bytestring/ByteString;Ljava/lang/Appendable;II)Ljava/lang/Appendable;",
+                "decode",
+                "decodeToByteString",
+                "",
+                "decodeIntoByteArray",
+                "kotlinx-io-bytestring"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/io/bytestring/ByteStringBuilderKt.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/io/bytestring/ByteStringBuilderKt",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "append-EK-6454",
+            "acc": 25,
+            "dsc": "(Lkotlinx/io/bytestring/ByteStringBuilder;B)V"
+          },
+          {
+            "nme": "append",
+            "acc": 25,
+            "dsc": "(Lkotlinx/io/bytestring/ByteStringBuilder;Lkotlinx/io/bytestring/ByteString;)V"
+          },
+          {
+            "nme": "append",
+            "acc": 153,
+            "dsc": "(Lkotlinx/io/bytestring/ByteStringBuilder;[B)V"
+          },
+          {
+            "nme": "buildByteString",
+            "acc": 25,
+            "dsc": "(ILkotlin/jvm/functions/Function1;)Lkotlinx/io/bytestring/ByteString;",
+            "sig": "(ILkotlin/jvm/functions/Function1<-Lkotlinx/io/bytestring/ByteStringBuilder;Lkotlin/Unit;>;)Lkotlinx/io/bytestring/ByteString;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "buildByteString$default",
+            "acc": 4105,
+            "dsc": "(ILkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lkotlinx/io/bytestring/ByteString;"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              2,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u00006\n\u0000\n\u0002\u0010\u0002\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0003\n\u0002\u0018\u0002\n\u0000\n\u0002\u0010\u0012\n\u0002\u0010\u0005\n\u0002\b\u0002\n\u0002\u0010\b\n\u0000\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0000\u001a\u0019\u0010\u0000\u001a\u00020\u0001*\u00020\u00022\u0006\u0010\u0003\u001a\u00020\u0004¢\u0006\u0004\b\u0005\u0010\u0006\u001a\u0012\u0010\u0000\u001a\u00020\u0001*\u00020\u00022\u0006\u0010\u0007\u001a\u00020\b\u001a\u0016\u0010\u0000\u001a\u00020\u0001*\u00020\u00022\n\u0010\t\u001a\u00020\n\"\u00020\u000b\u001a/\u0010\f\u001a\u00020\b2\b\b\u0002\u0010\r\u001a\u00020\u000e2\u0017\u0010\u000f\u001a\u0013\u0012\u0004\u0012\u00020\u0002\u0012\u0004\u0012\u00020\u00010\u0010¢\u0006\u0002\b\u0011H\bø\u0001\u0000\u0002\u0007\n\u0005\b20\u0001¨\u0006\u0012"
+              ],
+              "d2",
+              [
+                "append",
+                "",
+                "Lkotlinx/io/bytestring/ByteStringBuilder;",
+                "byte",
+                "Lkotlin/UByte;",
+                "append-EK-6454",
+                "(Lkotlinx/io/bytestring/ByteStringBuilder;B)V",
+                "byteString",
+                "Lkotlinx/io/bytestring/ByteString;",
+                "bytes",
+                "",
+                "",
+                "buildByteString",
+                "capacity",
+                "",
+                "builderAction",
+                "Lkotlin/Function1;",
+                "Lkotlin/ExtensionFunctionType;",
+                "kotlinx-io-bytestring"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/io/bytestring/HexKt.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/io/bytestring/HexKt",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "toHexString",
+            "acc": 25,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;Lkotlin/text/HexFormat;)Ljava/lang/String;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "toHexString$default",
+            "acc": 4105,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;Lkotlin/text/HexFormat;ILjava/lang/Object;)Ljava/lang/String;"
+          },
+          {
+            "nme": "toHexString",
+            "acc": 25,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;IILkotlin/text/HexFormat;)Ljava/lang/String;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "toHexString$default",
+            "acc": 4105,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;IILkotlin/text/HexFormat;ILjava/lang/Object;)Ljava/lang/String;"
+          },
+          {
+            "nme": "hexToByteString",
+            "acc": 25,
+            "dsc": "(Ljava/lang/String;Lkotlin/text/HexFormat;)Lkotlinx/io/bytestring/ByteString;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "hexToByteString$default",
+            "acc": 4105,
+            "dsc": "(Ljava/lang/String;Lkotlin/text/HexFormat;ILjava/lang/Object;)Lkotlinx/io/bytestring/ByteString;"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              2,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\u001a\n\u0000\n\u0002\u0010\u000e\n\u0002\u0018\u0002\n\u0000\n\u0002\u0018\u0002\n\u0000\n\u0002\u0010\b\n\u0002\b\u0003\u001a\u0014\u0010\u0000\u001a\u00020\u0001*\u00020\u00022\b\b\u0002\u0010\u0003\u001a\u00020\u0004\u001a(\u0010\u0000\u001a\u00020\u0001*\u00020\u00022\b\b\u0002\u0010\u0005\u001a\u00020\u00062\b\b\u0002\u0010\u0007\u001a\u00020\u00062\b\b\u0002\u0010\u0003\u001a\u00020\u0004\u001a\u0014\u0010\b\u001a\u00020\u0002*\u00020\u00012\b\b\u0002\u0010\u0003\u001a\u00020\u0004¨\u0006\t"
+              ],
+              "d2",
+              [
+                "toHexString",
+                "",
+                "Lkotlinx/io/bytestring/ByteString;",
+                "format",
+                "Lkotlin/text/HexFormat;",
+                "startIndex",
+                "",
+                "endIndex",
+                "hexToByteString",
+                "kotlinx-io-bytestring"
+              ]
+            ]
+          }
+        ]
+      },
+      "META-INF/versions/9/module-info.class": {
+        "ver": 53,
+        "acc": 32768,
+        "nme": "module-info",
+        "mthds": [],
+        "flds": []
+      },
+      "kotlinx/io/bytestring/BenignDataRace.class": {
+        "ver": 52,
+        "acc": 9729,
+        "nme": "kotlinx/io/bytestring/BenignDataRace",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/annotation/Target;",
+            "vals": [
+              "allowedTargets",
+              [
+                [
+                  "Lkotlin/annotation/AnnotationTarget;",
+                  "FIELD"
+                ]
+              ]
+            ]
+          },
+          {
+            "dsc": "Ljava/lang/annotation/Retention;",
+            "vals": [
+              "value",
+              [
+                "Ljava/lang/annotation/RetentionPolicy;",
+                "RUNTIME"
+              ]
+            ]
+          },
+          {
+            "dsc": "Ljava/lang/annotation/Target;",
+            "vals": [
+              "value",
+              [
+                [
+                  "Ljava/lang/annotation/ElementType;",
+                  "FIELD"
+                ]
+              ]
+            ]
+          },
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\n\n\u0002\u0018\u0002\n\u0002\u0010\u001b\n\u0000\b\u0002\u0018\u00002\u00020\u0001B\u0000¨\u0006\u0002"
+              ],
+              "d2",
+              [
+                "Lkotlinx/io/bytestring/BenignDataRace;",
+                "",
+                "kotlinx-io-bytestring"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/io/bytestring/unsafe/UnsafeByteStringApi.class": {
+        "ver": 52,
+        "acc": 9729,
+        "nme": "kotlinx/io/bytestring/unsafe/UnsafeByteStringApi",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/annotation/MustBeDocumented;"
+          },
+          {
+            "dsc": "Lkotlin/annotation/Retention;",
+            "vals": [
+              "value",
+              [
+                "Lkotlin/annotation/AnnotationRetention;",
+                "BINARY"
+              ]
+            ]
+          },
+          {
+            "dsc": "Ljava/lang/annotation/Documented;"
+          },
+          {
+            "dsc": "Ljava/lang/annotation/Retention;",
+            "vals": [
+              "value",
+              [
+                "Ljava/lang/annotation/RetentionPolicy;",
+                "CLASS"
+              ]
+            ]
+          },
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              1,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000\n\n\u0002\u0018\u0002\n\u0002\u0010\u001b\n\u0000\b\u0002\u0018\u00002\u00020\u0001B\u0000¨\u0006\u0002"
+              ],
+              "d2",
+              [
+                "Lkotlinx/io/bytestring/unsafe/UnsafeByteStringApi;",
+                "",
+                "kotlinx-io-bytestring"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lkotlin/RequiresOptIn;",
+            "vals": [
+              "message",
+              "This is a unsafe API and its use may corrupt the data stored in a byte string. Make sure you fully read and understand documentation of the declaration that is marked as an unsafe API.",
+              "level",
+              [
+                "Lkotlin/RequiresOptIn$Level;",
+                "ERROR"
+              ]
+            ]
+          }
+        ]
+      },
+      "kotlinx/io/bytestring/ByteStringKt.class": {
+        "ver": 52,
+        "acc": 49,
+        "nme": "kotlinx/io/bytestring/ByteStringKt",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "ByteString",
+            "acc": 153,
+            "dsc": "([B)Lkotlinx/io/bytestring/ByteString;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "ByteString-GBYM_sE",
+            "acc": 153,
+            "dsc": "([B)Lkotlinx/io/bytestring/ByteString;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "ByteString",
+            "acc": 25,
+            "dsc": "()Lkotlinx/io/bytestring/ByteString;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "getIndices",
+            "acc": 25,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;)Lkotlin/ranges/IntRange;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "indexOf",
+            "acc": 25,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;BI)I"
+          },
+          {
+            "nme": "indexOf$default",
+            "acc": 4105,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;BIILjava/lang/Object;)I"
+          },
+          {
+            "nme": "indexOf",
+            "acc": 25,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;Lkotlinx/io/bytestring/ByteString;I)I"
+          },
+          {
+            "nme": "indexOf$default",
+            "acc": 4105,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;Lkotlinx/io/bytestring/ByteString;IILjava/lang/Object;)I"
+          },
+          {
+            "nme": "indexOf",
+            "acc": 25,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;[BI)I"
+          },
+          {
+            "nme": "indexOf$default",
+            "acc": 4105,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;[BIILjava/lang/Object;)I"
+          },
+          {
+            "nme": "lastIndexOf",
+            "acc": 25,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;BI)I"
+          },
+          {
+            "nme": "lastIndexOf$default",
+            "acc": 4105,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;BIILjava/lang/Object;)I"
+          },
+          {
+            "nme": "lastIndexOf",
+            "acc": 25,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;Lkotlinx/io/bytestring/ByteString;I)I"
+          },
+          {
+            "nme": "lastIndexOf$default",
+            "acc": 4105,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;Lkotlinx/io/bytestring/ByteString;IILjava/lang/Object;)I"
+          },
+          {
+            "nme": "lastIndexOf",
+            "acc": 25,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;[BI)I"
+          },
+          {
+            "nme": "lastIndexOf$default",
+            "acc": 4105,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;[BIILjava/lang/Object;)I"
+          },
+          {
+            "nme": "startsWith",
+            "acc": 25,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;[B)Z"
+          },
+          {
+            "nme": "startsWith",
+            "acc": 25,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;Lkotlinx/io/bytestring/ByteString;)Z"
+          },
+          {
+            "nme": "endsWith",
+            "acc": 25,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;[B)Z"
+          },
+          {
+            "nme": "endsWith",
+            "acc": 25,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;Lkotlinx/io/bytestring/ByteString;)Z"
+          },
+          {
+            "nme": "rangeEquals",
+            "acc": 26,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;ILkotlinx/io/bytestring/ByteString;II)Z"
+          },
+          {
+            "nme": "rangeEquals$default",
+            "acc": 4104,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;ILkotlinx/io/bytestring/ByteString;IIILjava/lang/Object;)Z"
+          },
+          {
+            "nme": "rangeEquals",
+            "acc": 26,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;I[BII)Z"
+          },
+          {
+            "nme": "rangeEquals$default",
+            "acc": 4104,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;I[BIIILjava/lang/Object;)Z"
+          },
+          {
+            "nme": "isEmpty",
+            "acc": 25,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;)Z"
+          },
+          {
+            "nme": "isNotEmpty",
+            "acc": 25,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;)Z"
+          },
+          {
+            "nme": "decodeToString",
+            "acc": 25,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;)Ljava/lang/String;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "encodeToByteString",
+            "acc": 25,
+            "dsc": "(Ljava/lang/String;)Lkotlinx/io/bytestring/ByteString;",
+            "invanns": [
+              {
+                "dsc": "Lorg/jetbrains/annotations/NotNull;"
+              }
+            ]
+          },
+          {
+            "nme": "contentEquals",
+            "acc": 25,
+            "dsc": "(Lkotlinx/io/bytestring/ByteString;[B)Z"
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lkotlin/Metadata;",
+            "vals": [
+              "mv",
+              [
+                2,
+                2,
+                0
+              ],
+              "k",
+              2,
+              "xi",
+              48,
+              "d1",
+              [
+                "\u0000<\n\u0000\n\u0002\u0018\u0002\n\u0000\n\u0002\u0010\u0012\n\u0002\u0010\u0005\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\b\u0003\n\u0002\u0018\u0002\n\u0002\b\u0003\n\u0002\u0010\b\n\u0002\b\u0006\n\u0002\u0010\u000b\n\u0002\b\t\n\u0002\u0010\u000e\n\u0002\b\u0004\u001a\u0012\u0010\u0000\u001a\u00020\u00012\n\u0010\u0002\u001a\u00020\u0003\"\u00020\u0004\u001a\u0019\u0010\u0000\u001a\u00020\u00012\n\u0010\u0002\u001a\u00020\u0005\"\u00020\u0006¢\u0006\u0004\b\u0007\u0010\b\u001a\b\u0010\u0000\u001a\u00020\u0001H\u0007\u001a\u001c\u0010\r\u001a\u00020\u000e*\u00020\u00012\u0006\u0010\u000f\u001a\u00020\u00042\b\b\u0002\u0010\u0010\u001a\u00020\u000e\u001a\u001c\u0010\r\u001a\u00020\u000e*\u00020\u00012\u0006\u0010\u0011\u001a\u00020\u00012\b\b\u0002\u0010\u0010\u001a\u00020\u000e\u001a\u001c\u0010\r\u001a\u00020\u000e*\u00020\u00012\u0006\u0010\u0012\u001a\u00020\u00032\b\b\u0002\u0010\u0010\u001a\u00020\u000e\u001a\u001c\u0010\u0013\u001a\u00020\u000e*\u00020\u00012\u0006\u0010\u000f\u001a\u00020\u00042\b\b\u0002\u0010\u0010\u001a\u00020\u000e\u001a\u001c\u0010\u0013\u001a\u00020\u000e*\u00020\u00012\u0006\u0010\u0011\u001a\u00020\u00012\b\b\u0002\u0010\u0010\u001a\u00020\u000e\u001a\u001c\u0010\u0013\u001a\u00020\u000e*\u00020\u00012\u0006\u0010\u0012\u001a\u00020\u00032\b\b\u0002\u0010\u0010\u001a\u00020\u000e\u001a\u0012\u0010\u0014\u001a\u00020\u0015*\u00020\u00012\u0006\u0010\u0012\u001a\u00020\u0003\u001a\u0012\u0010\u0014\u001a\u00020\u0015*\u00020\u00012\u0006\u0010\u0011\u001a\u00020\u0001\u001a\u0012\u0010\u0016\u001a\u00020\u0015*\u00020\u00012\u0006\u0010\u0012\u001a\u00020\u0003\u001a\u0012\u0010\u0016\u001a\u00020\u0015*\u00020\u00012\u0006\u0010\u0011\u001a\u00020\u0001\u001a0\u0010\u0017\u001a\u00020\u0015*\u00020\u00012\u0006\u0010\u0018\u001a\u00020\u000e2\u0006\u0010\u0019\u001a\u00020\u00012\b\b\u0002\u0010\u001a\u001a\u00020\u000e2\b\b\u0002\u0010\u001b\u001a\u00020\u000eH\u0002\u001a0\u0010\u0017\u001a\u00020\u0015*\u00020\u00012\u0006\u0010\u0018\u001a\u00020\u000e2\u0006\u0010\u0019\u001a\u00020\u00032\b\b\u0002\u0010\u001a\u001a\u00020\u000e2\b\b\u0002\u0010\u001b\u001a\u00020\u000eH\u0002\u001a\n\u0010\u001c\u001a\u00020\u0015*\u00020\u0001\u001a\n\u0010\u001d\u001a\u00020\u0015*\u00020\u0001\u001a\n\u0010\u001e\u001a\u00020\u001f*\u00020\u0001\u001a\n\u0010 \u001a\u00020\u0001*\u00020\u001f\u001a\u0012\u0010!\u001a\u00020\u0015*\u00020\u00012\u0006\u0010\"\u001a\u00020\u0003\"\u0015\u0010\t\u001a\u00020\n*\u00020\u00018F¢\u0006\u0006\u001a\u0004\b\u000b\u0010\f¨\u0006#"
+              ],
+              "d2",
+              [
+                "ByteString",
+                "Lkotlinx/io/bytestring/ByteString;",
+                "bytes",
+                "",
+                "",
+                "Lkotlin/UByteArray;",
+                "Lkotlin/UByte;",
+                "ByteString-GBYM_sE",
+                "([B)Lkotlinx/io/bytestring/ByteString;",
+                "indices",
+                "Lkotlin/ranges/IntRange;",
+                "getIndices",
+                "(Lkotlinx/io/bytestring/ByteString;)Lkotlin/ranges/IntRange;",
+                "indexOf",
+                "",
+                "byte",
+                "startIndex",
+                "byteString",
+                "byteArray",
+                "lastIndexOf",
+                "startsWith",
+                "",
+                "endsWith",
+                "rangeEquals",
+                "offset",
+                "other",
+                "otherOffset",
+                "byteCount",
+                "isEmpty",
+                "isNotEmpty",
+                "decodeToString",
+                "",
+                "encodeToByteString",
+                "contentEquals",
+                "array",
+                "kotlinx-io-bytestring"
+              ]
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

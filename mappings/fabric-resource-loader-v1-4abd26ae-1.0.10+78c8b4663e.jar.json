@@ -1,0 +1,4620 @@
+{
+  "md5": "46d26a71f2b74cbf5a5ab5ab1820536c",
+  "sha2": "b4c8563db8a69e04ed92a59016ff9d5c5bd4df46",
+  "sha256": "47b4635e3cdbf89cc8370b57246e94c9a6838d1295b27714b9ca983a71fdd862",
+  "contents": {
+    "classes": {
+      "net/fabricmc/fabric/impl/resource/ResourceReloaderPhaseData$AfterVanilla.class": {
+        "ver": 65,
+        "acc": 32,
+        "nme": "net/fabricmc/fabric/impl/resource/ResourceReloaderPhaseData$AfterVanilla",
+        "super": "net/fabricmc/fabric/impl/resource/ResourceReloaderPhaseData",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Lnet/minecraft/resources/Identifier;)V"
+          },
+          {
+            "nme": "markBefore",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "markAfter",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "addPreviousNode",
+            "acc": 4164,
+            "dsc": "(Lnet/fabricmc/fabric/impl/base/toposort/SortableNode;)V"
+          },
+          {
+            "nme": "addSubsequentNode",
+            "acc": 4164,
+            "dsc": "(Lnet/fabricmc/fabric/impl/base/toposort/SortableNode;)V"
+          }
+        ],
+        "flds": []
+      },
+      "net/fabricmc/fabric/impl/resource/pack/ModPackResourcesUtil$Order.class": {
+        "ver": 65,
+        "acc": 16433,
+        "nme": "net/fabricmc/fabric/impl/resource/pack/ModPackResourcesUtil$Order",
+        "super": "java/lang/Enum",
+        "mthds": [
+          {
+            "nme": "values",
+            "acc": 9,
+            "dsc": "()[Lnet/fabricmc/fabric/impl/resource/pack/ModPackResourcesUtil$Order;"
+          },
+          {
+            "nme": "valueOf",
+            "acc": 9,
+            "dsc": "(Ljava/lang/String;)Lnet/fabricmc/fabric/impl/resource/pack/ModPackResourcesUtil$Order;"
+          },
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "(Ljava/lang/String;ILjava/lang/String;)V",
+            "sig": "(Ljava/lang/String;)V"
+          },
+          {
+            "nme": "$values",
+            "acc": 4106,
+            "dsc": "()[Lnet/fabricmc/fabric/impl/resource/pack/ModPackResourcesUtil$Order;"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 16409,
+            "nme": "BEFORE",
+            "dsc": "Lnet/fabricmc/fabric/impl/resource/pack/ModPackResourcesUtil$Order;"
+          },
+          {
+            "acc": 16409,
+            "nme": "AFTER",
+            "dsc": "Lnet/fabricmc/fabric/impl/resource/pack/ModPackResourcesUtil$Order;"
+          },
+          {
+            "acc": 18,
+            "nme": "jsonKey",
+            "dsc": "Ljava/lang/String;"
+          },
+          {
+            "acc": 4122,
+            "nme": "$VALUES",
+            "dsc": "[Lnet/fabricmc/fabric/impl/resource/pack/ModPackResourcesUtil$Order;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/resource/pack/ModPackResourcesSorter.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/impl/resource/pack/ModPackResourcesSorter",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "()V"
+          },
+          {
+            "nme": "getPacks",
+            "acc": 1,
+            "dsc": "()Ljava/util/List;",
+            "sig": "()Ljava/util/List<Lnet/fabricmc/fabric/api/resource/v1/pack/ModPackResources;>;"
+          },
+          {
+            "nme": "addPack",
+            "acc": 1,
+            "dsc": "(Lnet/fabricmc/fabric/api/resource/v1/pack/ModPackResources;)V"
+          },
+          {
+            "nme": "getOrCreatePhase",
+            "acc": 2,
+            "dsc": "(Ljava/lang/String;Z)Lnet/fabricmc/fabric/impl/resource/pack/ModPackResourcesSorter$LoadPhaseData;"
+          },
+          {
+            "nme": "rebuildPackList",
+            "acc": 2,
+            "dsc": "(I)V"
+          },
+          {
+            "nme": "addLoadOrdering",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;Ljava/lang/String;Lnet/fabricmc/fabric/impl/resource/pack/ModPackResourcesUtil$Order;)V"
+          },
+          {
+            "nme": "lambda$addLoadOrdering$1",
+            "acc": 4106,
+            "dsc": "(Lnet/fabricmc/fabric/impl/resource/pack/ModPackResourcesSorter$LoadPhaseData;)Ljava/lang/String;"
+          },
+          {
+            "nme": "lambda$getOrCreatePhase$0",
+            "acc": 4106,
+            "dsc": "(Lnet/fabricmc/fabric/impl/resource/pack/ModPackResourcesSorter$LoadPhaseData;)Ljava/lang/String;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "lock",
+            "dsc": "Ljava/lang/Object;"
+          },
+          {
+            "acc": 2,
+            "nme": "packs",
+            "dsc": "[Lnet/fabricmc/fabric/api/resource/v1/pack/ModPackResources;"
+          },
+          {
+            "acc": 18,
+            "nme": "phases",
+            "dsc": "Ljava/util/Map;",
+            "sig": "Ljava/util/Map<Ljava/lang/String;Lnet/fabricmc/fabric/impl/resource/pack/ModPackResourcesSorter$LoadPhaseData;>;"
+          },
+          {
+            "acc": 18,
+            "nme": "sortedPhases",
+            "dsc": "Ljava/util/List;",
+            "sig": "Ljava/util/List<Lnet/fabricmc/fabric/impl/resource/pack/ModPackResourcesSorter$LoadPhaseData;>;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/resource/pack/ModPackResourcesSorter$1.class": {
+        "ver": 65,
+        "acc": 4128,
+        "nme": "net/fabricmc/fabric/impl/resource/pack/ModPackResourcesSorter$1",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 4120,
+            "nme": "$SwitchMap$net$fabricmc$fabric$impl$resource$pack$ModPackResourcesUtil$Order",
+            "dsc": "[I"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/api/resource/v1/DataResourceLoader.class": {
+        "ver": 65,
+        "acc": 1537,
+        "nme": "net/fabricmc/fabric/api/resource/v1/DataResourceLoader",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "get",
+            "acc": 9,
+            "dsc": "()Lnet/fabricmc/fabric/api/resource/v1/DataResourceLoader;"
+          },
+          {
+            "nme": "registerReloader",
+            "acc": 1025,
+            "dsc": "(Lnet/minecraft/resources/Identifier;Ljava/util/function/Function;)V",
+            "sig": "(Lnet/minecraft/resources/Identifier;Ljava/util/function/Function<Lnet/minecraft/core/HolderLookup$Provider;Lnet/minecraft/server/packs/resources/PreparableReloadListener;>;)V"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "RECIPE_MANAGER_KEY",
+            "dsc": "Lnet/minecraft/server/packs/resources/PreparableReloadListener$StateKey;",
+            "sig": "Lnet/minecraft/server/packs/resources/PreparableReloadListener$StateKey<Lnet/minecraft/world/item/crafting/RecipeManager;>;"
+          },
+          {
+            "acc": 25,
+            "nme": "ADVANCEMENT_LOADER_KEY",
+            "dsc": "Lnet/minecraft/server/packs/resources/PreparableReloadListener$StateKey;",
+            "sig": "Lnet/minecraft/server/packs/resources/PreparableReloadListener$StateKey<Lnet/minecraft/server/ServerAdvancementManager;>;"
+          },
+          {
+            "acc": 25,
+            "nme": "DATA_RESOURCE_STORE_KEY",
+            "dsc": "Lnet/minecraft/server/packs/resources/PreparableReloadListener$StateKey;",
+            "sig": "Lnet/minecraft/server/packs/resources/PreparableReloadListener$StateKey<Lnet/fabricmc/fabric/api/resource/v1/DataResourceStore$Mutable;>;"
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/jetbrains/annotations/ApiStatus$NonExtendable;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/resource/DataResourceLoaderImpl.class": {
+        "ver": 65,
+        "acc": 49,
+        "nme": "net/fabricmc/fabric/impl/resource/DataResourceLoaderImpl",
+        "super": "net/fabricmc/fabric/impl/resource/ResourceLoaderImpl",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "()V"
+          },
+          {
+            "nme": "hasResourceReloader",
+            "acc": 4,
+            "dsc": "(Lnet/minecraft/resources/Identifier;)Z"
+          },
+          {
+            "nme": "registerReloader",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/resources/Identifier;Ljava/util/function/Function;)V",
+            "sig": "(Lnet/minecraft/resources/Identifier;Ljava/util/function/Function<Lnet/minecraft/core/HolderLookup$Provider;Lnet/minecraft/server/packs/resources/PreparableReloadListener;>;)V"
+          },
+          {
+            "nme": "collectReloadersToAdd",
+            "acc": 4,
+            "dsc": "(Lnet/fabricmc/fabric/impl/resource/SetupMarkerResourceReloader;)Ljava/util/Set;",
+            "sig": "(Lnet/fabricmc/fabric/impl/resource/SetupMarkerResourceReloader;)Ljava/util/Set<Ljava/util/Map$Entry<Lnet/minecraft/resources/Identifier;Lnet/minecraft/server/packs/resources/PreparableReloadListener;>;>;"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "INSTANCE",
+            "dsc": "Lnet/fabricmc/fabric/impl/resource/DataResourceLoaderImpl;"
+          },
+          {
+            "acc": 18,
+            "nme": "addedReloaderFactories",
+            "dsc": "Ljava/util/Map;",
+            "sig": "Ljava/util/Map<Lnet/minecraft/resources/Identifier;Ljava/util/function/Function<Lnet/minecraft/core/HolderLookup$Provider;Lnet/minecraft/server/packs/resources/PreparableReloadListener;>;>;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/api/resource/v1/package-info.class": {
+        "ver": 65,
+        "acc": 5632,
+        "nme": "net/fabricmc/fabric/api/resource/v1/package-info",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lorg/jspecify/annotations/NullMarked;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/resource/ResourceLoaderImpl$1.class": {
+        "ver": 65,
+        "acc": 32,
+        "nme": "net/fabricmc/fabric/impl/resource/ResourceLoaderImpl$1",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Lnet/fabricmc/fabric/impl/resource/pack/ModNioPackResources;)V",
+            "sig": "()V"
+          },
+          {
+            "nme": "openPrimary",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/server/packs/PackLocationInfo;)Lnet/minecraft/server/packs/PackResources;"
+          },
+          {
+            "nme": "openFull",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/server/packs/PackLocationInfo;Lnet/minecraft/server/packs/repository/Pack$Metadata;)Lnet/minecraft/server/packs/PackResources;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 4112,
+            "nme": "val$pack",
+            "dsc": "Lnet/fabricmc/fabric/impl/resource/pack/ModNioPackResources;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/api/resource/v1/FabricResource.class": {
+        "ver": 65,
+        "acc": 1537,
+        "nme": "net/fabricmc/fabric/api/resource/v1/FabricResource",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "getFabricPackSource",
+            "acc": 1,
+            "dsc": "()Lnet/minecraft/server/packs/repository/PackSource;"
+          }
+        ],
+        "flds": []
+      },
+      "net/fabricmc/fabric/mixin/resource/client/KnownPacksManagerMixin.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/mixin/resource/client/KnownPacksManagerMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "createClientManager",
+            "acc": 1,
+            "dsc": "()Lnet/minecraft/server/packs/repository/PackRepository;",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Redirect;",
+                "vals": [
+                  "method",
+                  [
+                    "<init>"
+                  ],
+                  "at",
+                  {
+                    "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                    "values": [
+                      "value",
+                      "INVOKE",
+                      "target",
+                      "Lnet/minecraft/server/packs/repository/ServerPacksSource;createVanillaTrustedRepository()Lnet/minecraft/server/packs/repository/PackRepository;"
+                    ],
+                    "api": 589824
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "getCommonKnownPacksReturn",
+            "acc": 0,
+            "dsc": "(Ljava/util/List;)Ljava/util/List;",
+            "sig": "(Ljava/util/List<Lnet/minecraft/server/packs/repository/KnownPack;>;)Ljava/util/List<Lnet/minecraft/server/packs/repository/KnownPack;>;",
+            "vanns": [
+              {
+                "dsc": "Lcom/llamalad7/mixinextras/injector/ModifyReturnValue;",
+                "vals": [
+                  "method",
+                  [
+                    "trySelectingPacks"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "RETURN"
+                      ],
+                      "api": 589824
+                    }
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 26,
+            "nme": "LOGGER",
+            "dsc": "Lorg/slf4j/Logger;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/client/multiplayer/KnownPacksManager"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/resource/ReloadableServerResourcesMixin.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/mixin/resource/ReloadableServerResourcesMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "onSetupDataReloaders",
+            "acc": 10,
+            "dsc": "(Ljava/util/List;Lnet/minecraft/server/ReloadableServerRegistries$LoadResult;Lnet/minecraft/world/flag/FeatureFlagSet;Lnet/minecraft/server/ReloadableServerResources;)Ljava/util/List;",
+            "sig": "(Ljava/util/List<Lnet/minecraft/server/packs/resources/PreparableReloadListener;>;Lnet/minecraft/server/ReloadableServerRegistries$LoadResult;Lnet/minecraft/world/flag/FeatureFlagSet;Lnet/minecraft/server/ReloadableServerResources;)Ljava/util/List<Lnet/minecraft/server/packs/resources/PreparableReloadListener;>;",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/ModifyArg;",
+                "vals": [
+                  "method",
+                  [
+                    "method_58296"
+                  ],
+                  "at",
+                  {
+                    "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                    "values": [
+                      "value",
+                      "INVOKE",
+                      "target",
+                      "Lnet/minecraft/server/packs/resources/SimpleReloadInstance;create(Lnet/minecraft/server/packs/resources/ResourceManager;Ljava/util/List;Ljava/util/concurrent/Executor;Ljava/util/concurrent/Executor;Ljava/util/concurrent/CompletableFuture;Z)Lnet/minecraft/server/packs/resources/ReloadInstance;"
+                    ],
+                    "api": 589824
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "fabric$getDataResourceStore",
+            "acc": 1,
+            "dsc": "()Lnet/fabricmc/fabric/api/resource/v1/DataResourceStore$Mutable;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "dataResourceStore",
+            "dsc": "Lnet/fabricmc/fabric/api/resource/v1/DataResourceStore$Mutable;"
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/server/ReloadableServerResources"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/resource/FabricResourceReloader.class": {
+        "ver": 65,
+        "acc": 1537,
+        "nme": "net/fabricmc/fabric/impl/resource/FabricResourceReloader",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "fabric$getId",
+            "acc": 1025,
+            "dsc": "()Lnet/minecraft/resources/Identifier;"
+          },
+          {
+            "nme": "getName",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;"
+          }
+        ],
+        "flds": []
+      },
+      "net/fabricmc/fabric/impl/resource/ResourceLoaderImpl.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/impl/resource/ResourceLoaderImpl",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "get",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/server/packs/PackType;)Lnet/fabricmc/fabric/impl/resource/ResourceLoaderImpl;"
+          },
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Lnet/minecraft/server/packs/PackType;)V"
+          },
+          {
+            "nme": "hasResourceReloader",
+            "acc": 4,
+            "dsc": "(Lnet/minecraft/resources/Identifier;)Z"
+          },
+          {
+            "nme": "checkUniqueResourceReloader",
+            "acc": 20,
+            "dsc": "(Lnet/minecraft/resources/Identifier;)V"
+          },
+          {
+            "nme": "registerReloader",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/resources/Identifier;Lnet/minecraft/server/packs/resources/PreparableReloadListener;)V"
+          },
+          {
+            "nme": "addReloaderOrdering",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/resources/Identifier;Lnet/minecraft/resources/Identifier;)V"
+          },
+          {
+            "nme": "getResourceReloaderIdForSorting",
+            "acc": 2,
+            "dsc": "(Lnet/minecraft/server/packs/resources/PreparableReloadListener;)Lnet/minecraft/resources/Identifier;"
+          },
+          {
+            "nme": "sort",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/server/packs/PackType;Ljava/util/List;)Ljava/util/List;",
+            "sig": "(Lnet/minecraft/server/packs/PackType;Ljava/util/List<Lnet/minecraft/server/packs/resources/PreparableReloadListener;>;)Ljava/util/List<Lnet/minecraft/server/packs/resources/PreparableReloadListener;>;"
+          },
+          {
+            "nme": "collectReloadersToAdd",
+            "acc": 4,
+            "dsc": "(Lnet/fabricmc/fabric/impl/resource/SetupMarkerResourceReloader;)Ljava/util/Set;",
+            "sig": "(Lnet/fabricmc/fabric/impl/resource/SetupMarkerResourceReloader;)Ljava/util/Set<Ljava/util/Map$Entry<Lnet/minecraft/resources/Identifier;Lnet/minecraft/server/packs/resources/PreparableReloadListener;>;>;"
+          },
+          {
+            "nme": "sort",
+            "acc": 2,
+            "dsc": "(Ljava/util/List;)V",
+            "sig": "(Ljava/util/List<Lnet/minecraft/server/packs/resources/PreparableReloadListener;>;)V"
+          },
+          {
+            "nme": "extractSetupMarker",
+            "acc": 2,
+            "dsc": "(Ljava/util/List;)Lnet/fabricmc/fabric/impl/resource/SetupMarkerResourceReloader;",
+            "sig": "(Ljava/util/List<Lnet/minecraft/server/packs/resources/PreparableReloadListener;>;)Lnet/fabricmc/fabric/impl/resource/SetupMarkerResourceReloader;"
+          },
+          {
+            "nme": "registerBuiltinPack",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/resources/Identifier;Ljava/lang/String;Lnet/fabricmc/loader/api/ModContainer;Lnet/minecraft/network/chat/Component;Lnet/fabricmc/fabric/api/resource/v1/pack/PackActivationType;)Z"
+          },
+          {
+            "nme": "registerBuiltinPack",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/resources/Identifier;Ljava/lang/String;Lnet/fabricmc/loader/api/ModContainer;Lnet/fabricmc/fabric/api/resource/v1/pack/PackActivationType;)Z"
+          },
+          {
+            "nme": "registerBuiltinResourcePacks",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/server/packs/PackType;Ljava/util/function/Consumer;)V",
+            "sig": "(Lnet/minecraft/server/packs/PackType;Ljava/util/function/Consumer<Lnet/minecraft/server/packs/repository/Pack;>;)V"
+          },
+          {
+            "nme": "lambda$sort$2",
+            "acc": 4106,
+            "dsc": "(Lnet/fabricmc/fabric/impl/resource/ResourceReloaderPhaseData;)Ljava/lang/String;"
+          },
+          {
+            "nme": "lambda$sort$1",
+            "acc": 4106,
+            "dsc": "(Lnet/fabricmc/fabric/impl/resource/ResourceReloaderPhaseData;)Lnet/minecraft/resources/Identifier;"
+          },
+          {
+            "nme": "lambda$get$0",
+            "acc": 4106,
+            "dsc": "(Lnet/minecraft/server/packs/PackType;Lnet/minecraft/server/packs/PackType;)Lnet/fabricmc/fabric/impl/resource/ResourceLoaderImpl;"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 26,
+            "nme": "LOGGER",
+            "dsc": "Lorg/slf4j/Logger;"
+          },
+          {
+            "acc": 26,
+            "nme": "IMPL_MAP",
+            "dsc": "Ljava/util/Map;",
+            "sig": "Ljava/util/Map<Lnet/minecraft/server/packs/PackType;Lnet/fabricmc/fabric/impl/resource/ResourceLoaderImpl;>;"
+          },
+          {
+            "acc": 26,
+            "nme": "BUILTIN_PACK_RESOURCES",
+            "dsc": "Ljava/util/Set;",
+            "sig": "Ljava/util/Set<Lnet/fabricmc/fabric/impl/resource/ResourceLoaderImpl$BuiltinPackResourcesEntry;>;"
+          },
+          {
+            "acc": 26,
+            "nme": "DEBUG_RELOADERS_IDENTITY",
+            "dsc": "Z"
+          },
+          {
+            "acc": 25,
+            "nme": "DEBUG_PROFILE_RESOURCE_RELOADERS",
+            "dsc": "Z"
+          },
+          {
+            "acc": 26,
+            "nme": "DEBUG_RELOADERS_ORDER",
+            "dsc": "Z"
+          },
+          {
+            "acc": 18,
+            "nme": "addedReloaders",
+            "dsc": "Ljava/util/Map;",
+            "sig": "Ljava/util/Map<Lnet/minecraft/resources/Identifier;Lnet/minecraft/server/packs/resources/PreparableReloadListener;>;"
+          },
+          {
+            "acc": 18,
+            "nme": "reloadersOrdering",
+            "dsc": "Ljava/util/Set;",
+            "sig": "Ljava/util/Set<Lnet/fabricmc/fabric/impl/resource/ResourceLoaderImpl$ReloaderOrder;>;"
+          },
+          {
+            "acc": 18,
+            "nme": "type",
+            "dsc": "Lnet/minecraft/server/packs/PackType;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/api/resource/v1/DataResourceStore$Mutable.class": {
+        "ver": 65,
+        "acc": 1537,
+        "nme": "net/fabricmc/fabric/api/resource/v1/DataResourceStore$Mutable",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "put",
+            "acc": 1025,
+            "dsc": "(Lnet/fabricmc/fabric/api/resource/v1/DataResourceStore$Key;Ljava/lang/Object;)V",
+            "sig": "<T:Ljava/lang/Object;>(Lnet/fabricmc/fabric/api/resource/v1/DataResourceStore$Key<TT;>;TT;)V"
+          }
+        ],
+        "flds": []
+      },
+      "net/fabricmc/fabric/mixin/resource/DataPackCommandMixin.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/mixin/resource/DataPackCommandMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "filterEnabledPackSuggestions",
+            "acc": 10,
+            "dsc": "(Lnet/minecraft/server/packs/repository/PackRepository;)Ljava/util/Collection;",
+            "sig": "(Lnet/minecraft/server/packs/repository/PackRepository;)Ljava/util/Collection<Ljava/lang/String;>;",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Redirect;",
+                "vals": [
+                  "method",
+                  [
+                    "method_13136"
+                  ],
+                  "at",
+                  {
+                    "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                    "values": [
+                      "value",
+                      "INVOKE",
+                      "target",
+                      "Lnet/minecraft/server/packs/repository/PackRepository;getSelectedIds()Ljava/util/Collection;"
+                    ],
+                    "api": 589824
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "filterDisabledPackSuggestions",
+            "acc": 10,
+            "dsc": "(Ljava/util/stream/Stream;Ljava/util/function/Predicate;Lcom/llamalad7/mixinextras/injector/wrapoperation/Operation;)Ljava/util/stream/Stream;",
+            "sig": "(Ljava/util/stream/Stream<Lnet/minecraft/server/packs/repository/Pack;>;Ljava/util/function/Predicate<-Lnet/minecraft/server/packs/repository/Pack;>;Lcom/llamalad7/mixinextras/injector/wrapoperation/Operation<Ljava/util/stream/Stream<Lnet/minecraft/server/packs/repository/Pack;>;>;)Ljava/util/stream/Stream<Lnet/minecraft/server/packs/repository/Pack;>;",
+            "vanns": [
+              {
+                "dsc": "Lcom/llamalad7/mixinextras/injector/wrapoperation/WrapOperation;",
+                "vals": [
+                  "method",
+                  [
+                    "method_13120"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "INVOKE",
+                        "target",
+                        "Ljava/util/stream/Stream;filter(Ljava/util/function/Predicate;)Ljava/util/stream/Stream;",
+                        "ordinal",
+                        0
+                      ],
+                      "api": 589824
+                    }
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "errorOnInternalPack",
+            "acc": 10,
+            "dsc": "(Lcom/mojang/brigadier/context/CommandContext;Ljava/lang/String;ZLorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable;Lnet/minecraft/server/packs/repository/Pack;)V",
+            "sig": "(Lcom/mojang/brigadier/context/CommandContext<Lnet/minecraft/commands/CommandSourceStack;>;Ljava/lang/String;ZLorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable<Lnet/minecraft/server/packs/repository/Pack;>;Lnet/minecraft/server/packs/repository/Pack;)V",
+            "exs": [
+              "com/mojang/brigadier/exceptions/CommandSyntaxException"
+            ],
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Inject;",
+                "vals": [
+                  "method",
+                  [
+                    "getPack"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "INVOKE",
+                        "target",
+                        "Ljava/util/Collection;contains(Ljava/lang/Object;)Z",
+                        "shift",
+                        [
+                          "Lorg/spongepowered/asm/mixin/injection/At$Shift;",
+                          "BEFORE"
+                        ]
+                      ],
+                      "api": 589824
+                    }
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "lambda$filterDisabledPackSuggestions$2",
+            "acc": 4106,
+            "dsc": "(Lnet/minecraft/server/packs/repository/Pack;)Z"
+          },
+          {
+            "nme": "lambda$filterEnabledPackSuggestions$1",
+            "acc": 4106,
+            "dsc": "(Lnet/minecraft/server/packs/repository/Pack;)Z"
+          },
+          {
+            "nme": "lambda$static$0",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/Object;)Lcom/mojang/brigadier/Message;"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 26,
+            "nme": "INTERNAL_PACK_EXCEPTION",
+            "dsc": "Lcom/mojang/brigadier/exceptions/DynamicCommandExceptionType;"
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/server/commands/DataPackCommand"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/api/resource/v1/pack/PackActivationType.class": {
+        "ver": 65,
+        "acc": 16433,
+        "nme": "net/fabricmc/fabric/api/resource/v1/pack/PackActivationType",
+        "super": "java/lang/Enum",
+        "mthds": [
+          {
+            "nme": "values",
+            "acc": 9,
+            "dsc": "()[Lnet/fabricmc/fabric/api/resource/v1/pack/PackActivationType;"
+          },
+          {
+            "nme": "valueOf",
+            "acc": 9,
+            "dsc": "(Ljava/lang/String;)Lnet/fabricmc/fabric/api/resource/v1/pack/PackActivationType;"
+          },
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "(Ljava/lang/String;I)V",
+            "sig": "()V"
+          },
+          {
+            "nme": "isEnabledByDefault",
+            "acc": 1,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "$values",
+            "acc": 4106,
+            "dsc": "()[Lnet/fabricmc/fabric/api/resource/v1/pack/PackActivationType;"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 16409,
+            "nme": "NORMAL",
+            "dsc": "Lnet/fabricmc/fabric/api/resource/v1/pack/PackActivationType;"
+          },
+          {
+            "acc": 16409,
+            "nme": "DEFAULT_ENABLED",
+            "dsc": "Lnet/fabricmc/fabric/api/resource/v1/pack/PackActivationType;"
+          },
+          {
+            "acc": 16409,
+            "nme": "ALWAYS_ENABLED",
+            "dsc": "Lnet/fabricmc/fabric/api/resource/v1/pack/PackActivationType;"
+          },
+          {
+            "acc": 4122,
+            "nme": "$VALUES",
+            "dsc": "[Lnet/fabricmc/fabric/api/resource/v1/pack/PackActivationType;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/resource/ResourceReloaderPhaseData$VanillaStatus.class": {
+        "ver": 65,
+        "acc": 16432,
+        "nme": "net/fabricmc/fabric/impl/resource/ResourceReloaderPhaseData$VanillaStatus",
+        "super": "java/lang/Enum",
+        "mthds": [
+          {
+            "nme": "values",
+            "acc": 9,
+            "dsc": "()[Lnet/fabricmc/fabric/impl/resource/ResourceReloaderPhaseData$VanillaStatus;"
+          },
+          {
+            "nme": "valueOf",
+            "acc": 9,
+            "dsc": "(Ljava/lang/String;)Lnet/fabricmc/fabric/impl/resource/ResourceReloaderPhaseData$VanillaStatus;"
+          },
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "(Ljava/lang/String;I)V",
+            "sig": "()V"
+          },
+          {
+            "nme": "$values",
+            "acc": 4106,
+            "dsc": "()[Lnet/fabricmc/fabric/impl/resource/ResourceReloaderPhaseData$VanillaStatus;"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 16409,
+            "nme": "NONE",
+            "dsc": "Lnet/fabricmc/fabric/impl/resource/ResourceReloaderPhaseData$VanillaStatus;"
+          },
+          {
+            "acc": 16409,
+            "nme": "AFTER",
+            "dsc": "Lnet/fabricmc/fabric/impl/resource/ResourceReloaderPhaseData$VanillaStatus;"
+          },
+          {
+            "acc": 16409,
+            "nme": "BEFORE",
+            "dsc": "Lnet/fabricmc/fabric/impl/resource/ResourceReloaderPhaseData$VanillaStatus;"
+          },
+          {
+            "acc": 16409,
+            "nme": "VANILLA",
+            "dsc": "Lnet/fabricmc/fabric/impl/resource/ResourceReloaderPhaseData$VanillaStatus;"
+          },
+          {
+            "acc": 4122,
+            "nme": "$VALUES",
+            "dsc": "[Lnet/fabricmc/fabric/impl/resource/ResourceReloaderPhaseData$VanillaStatus;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/resource/client/PackSelectionModelMixin.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/mixin/resource/client/PackSelectionModelMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "removeHiddenPacksInit",
+            "acc": 2,
+            "dsc": "(Ljava/util/function/Consumer;Ljava/util/function/Function;Lnet/minecraft/server/packs/repository/PackRepository;Ljava/util/function/Consumer;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V",
+            "sig": "(Ljava/util/function/Consumer<Lnet/minecraft/client/gui/screens/packs/PackSelectionModel$EntryBase;>;Ljava/util/function/Function;Lnet/minecraft/server/packs/repository/PackRepository;Ljava/util/function/Consumer;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Inject;",
+                "vals": [
+                  "method",
+                  [
+                    "<init>"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "TAIL"
+                      ],
+                      "api": 589824
+                    }
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "removeHiddenPacksRefresh",
+            "acc": 2,
+            "dsc": "(Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Inject;",
+                "vals": [
+                  "method",
+                  [
+                    "findNewPacks"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "TAIL"
+                      ],
+                      "api": 589824
+                    }
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "lambda$removeHiddenPacksRefresh$3",
+            "acc": 4106,
+            "dsc": "(Lnet/minecraft/server/packs/repository/Pack;)Z"
+          },
+          {
+            "nme": "lambda$removeHiddenPacksRefresh$2",
+            "acc": 4106,
+            "dsc": "(Lnet/minecraft/server/packs/repository/Pack;)Z"
+          },
+          {
+            "nme": "lambda$removeHiddenPacksInit$1",
+            "acc": 4106,
+            "dsc": "(Lnet/minecraft/server/packs/repository/Pack;)Z"
+          },
+          {
+            "nme": "lambda$removeHiddenPacksInit$0",
+            "acc": 4106,
+            "dsc": "(Lnet/minecraft/server/packs/repository/Pack;)Z"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 0,
+            "nme": "selected",
+            "dsc": "Ljava/util/List;",
+            "sig": "Ljava/util/List<Lnet/minecraft/server/packs/repository/Pack;>;"
+          },
+          {
+            "acc": 0,
+            "nme": "unselected",
+            "dsc": "Ljava/util/List;",
+            "sig": "Ljava/util/List<Lnet/minecraft/server/packs/repository/Pack;>;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/client/gui/screens/packs/PackSelectionModel"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/resource/ResourceLoaderImpl$BuiltinPackResourcesEntry.class": {
+        "ver": 65,
+        "acc": 65584,
+        "nme": "net/fabricmc/fabric/impl/resource/ResourceLoaderImpl$BuiltinPackResourcesEntry",
+        "super": "java/lang/Record",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "(Lnet/minecraft/network/chat/Component;Lnet/fabricmc/fabric/impl/resource/pack/ModNioPackResources;)V"
+          },
+          {
+            "nme": "toString",
+            "acc": 17,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "hashCode",
+            "acc": 17,
+            "dsc": "()I"
+          },
+          {
+            "nme": "equals",
+            "acc": 17,
+            "dsc": "(Ljava/lang/Object;)Z"
+          },
+          {
+            "nme": "displayName",
+            "acc": 1,
+            "dsc": "()Lnet/minecraft/network/chat/Component;"
+          },
+          {
+            "nme": "packResources",
+            "acc": 1,
+            "dsc": "()Lnet/fabricmc/fabric/impl/resource/pack/ModNioPackResources;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "displayName",
+            "dsc": "Lnet/minecraft/network/chat/Component;"
+          },
+          {
+            "acc": 18,
+            "nme": "packResources",
+            "dsc": "Lnet/fabricmc/fabric/impl/resource/pack/ModNioPackResources;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/resource/client/package-info.class": {
+        "ver": 65,
+        "acc": 5632,
+        "nme": "net/fabricmc/fabric/impl/resource/client/package-info",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lorg/jspecify/annotations/NullMarked;"
+          },
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/api/resource/v1/reloader/ResourceReloaderKeys$Client.class": {
+        "ver": 65,
+        "acc": 49,
+        "nme": "net/fabricmc/fabric/api/resource/v1/reloader/ResourceReloaderKeys$Client",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "()V"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "BLOCK_ENTITY_RENDERERS",
+            "dsc": "Lnet/minecraft/resources/Identifier;"
+          },
+          {
+            "acc": 25,
+            "nme": "BLOCK_RENDER_MANAGER",
+            "dsc": "Lnet/minecraft/resources/Identifier;"
+          },
+          {
+            "acc": 25,
+            "nme": "CLOUD_CELLS",
+            "dsc": "Lnet/minecraft/resources/Identifier;"
+          },
+          {
+            "acc": 25,
+            "nme": "EQUIPMENT_MODELS",
+            "dsc": "Lnet/minecraft/resources/Identifier;"
+          },
+          {
+            "acc": 25,
+            "nme": "ENTITY_RENDERERS",
+            "dsc": "Lnet/minecraft/resources/Identifier;"
+          },
+          {
+            "acc": 25,
+            "nme": "DRY_FOLIAGE_COLORMAP",
+            "dsc": "Lnet/minecraft/resources/Identifier;"
+          },
+          {
+            "acc": 25,
+            "nme": "FOLIAGE_COLORMAP",
+            "dsc": "Lnet/minecraft/resources/Identifier;"
+          },
+          {
+            "acc": 25,
+            "nme": "FONTS",
+            "dsc": "Lnet/minecraft/resources/Identifier;"
+          },
+          {
+            "acc": 25,
+            "nme": "GRASS_COLORMAP",
+            "dsc": "Lnet/minecraft/resources/Identifier;"
+          },
+          {
+            "acc": 25,
+            "nme": "ATLAS",
+            "dsc": "Lnet/minecraft/resources/Identifier;"
+          },
+          {
+            "acc": 25,
+            "nme": "LANGUAGES",
+            "dsc": "Lnet/minecraft/resources/Identifier;"
+          },
+          {
+            "acc": 25,
+            "nme": "MODELS",
+            "dsc": "Lnet/minecraft/resources/Identifier;"
+          },
+          {
+            "acc": 25,
+            "nme": "PARTICLES",
+            "dsc": "Lnet/minecraft/resources/Identifier;"
+          },
+          {
+            "acc": 25,
+            "nme": "SHADERS",
+            "dsc": "Lnet/minecraft/resources/Identifier;"
+          },
+          {
+            "acc": 25,
+            "nme": "SOUNDS",
+            "dsc": "Lnet/minecraft/resources/Identifier;"
+          },
+          {
+            "acc": 25,
+            "nme": "SPLASH_TEXTS",
+            "dsc": "Lnet/minecraft/resources/Identifier;"
+          },
+          {
+            "acc": 25,
+            "nme": "TEXTURES",
+            "dsc": "Lnet/minecraft/resources/Identifier;"
+          },
+          {
+            "acc": 25,
+            "nme": "WAYPOINT_STYLE_ASSETS",
+            "dsc": "Lnet/minecraft/resources/Identifier;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/api/resource/v1/reloader/package-info.class": {
+        "ver": 65,
+        "acc": 5632,
+        "nme": "net/fabricmc/fabric/api/resource/v1/reloader/package-info",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lorg/jspecify/annotations/NullMarked;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/resource/pack/FabricOriginalKnownPacksGetter.class": {
+        "ver": 65,
+        "acc": 1537,
+        "nme": "net/fabricmc/fabric/impl/resource/pack/FabricOriginalKnownPacksGetter",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "fabric$getOriginalKnownPacks",
+            "acc": 1025,
+            "dsc": "()Ljava/util/List;",
+            "sig": "()Ljava/util/List<Lnet/minecraft/server/packs/repository/KnownPack;>;"
+          }
+        ],
+        "flds": []
+      },
+      "net/fabricmc/fabric/api/resource/v1/pack/ModPackResources.class": {
+        "ver": 65,
+        "acc": 1537,
+        "nme": "net/fabricmc/fabric/api/resource/v1/pack/ModPackResources",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "getFabricModMetadata",
+            "acc": 1025,
+            "dsc": "()Lnet/fabricmc/loader/api/metadata/ModMetadata;"
+          },
+          {
+            "nme": "createOverlay",
+            "acc": 1025,
+            "dsc": "(Ljava/lang/String;)Lnet/fabricmc/fabric/api/resource/v1/pack/ModPackResources;"
+          }
+        ],
+        "flds": []
+      },
+      "net/fabricmc/fabric/impl/resource/DataResourceStoreImpl.class": {
+        "ver": 65,
+        "acc": 49,
+        "nme": "net/fabricmc/fabric/impl/resource/DataResourceStoreImpl",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "put",
+            "acc": 1,
+            "dsc": "(Lnet/fabricmc/fabric/api/resource/v1/DataResourceStore$Key;Ljava/lang/Object;)V",
+            "sig": "<T:Ljava/lang/Object;>(Lnet/fabricmc/fabric/api/resource/v1/DataResourceStore$Key<TT;>;TT;)V"
+          },
+          {
+            "nme": "getOrThrow",
+            "acc": 1,
+            "dsc": "(Lnet/fabricmc/fabric/api/resource/v1/DataResourceStore$Key;)Ljava/lang/Object;",
+            "sig": "<T:Ljava/lang/Object;>(Lnet/fabricmc/fabric/api/resource/v1/DataResourceStore$Key<TT;>;)TT;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "store",
+            "dsc": "Ljava/util/Map;",
+            "sig": "Ljava/util/Map<Lnet/fabricmc/fabric/api/resource/v1/DataResourceStore$Key<*>;Ljava/lang/Object;>;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/resource/client/KeyedClientResourceReloadListenerMixin.class": {
+        "ver": 65,
+        "acc": 1057,
+        "nme": "net/fabricmc/fabric/mixin/resource/client/KeyedClientResourceReloadListenerMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "fabric$getId",
+            "acc": 1,
+            "dsc": "()Lnet/minecraft/resources/Identifier;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 2,
+            "nme": "fabric$id",
+            "dsc": "Lnet/minecraft/resources/Identifier;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/client/resources/model/AtlasManager"
+                },
+                {
+                  "itrlNme": "net/minecraft/client/resources/model/ModelManager"
+                },
+                {
+                  "itrlNme": "net/minecraft/client/renderer/blockentity/BlockEntityRenderDispatcher"
+                },
+                {
+                  "itrlNme": "net/minecraft/client/renderer/block/BlockRenderDispatcher"
+                },
+                {
+                  "itrlNme": "net/minecraft/client/renderer/CloudRenderer"
+                },
+                {
+                  "itrlNme": "net/minecraft/client/resources/model/EquipmentAssetManager"
+                },
+                {
+                  "itrlNme": "net/minecraft/client/renderer/entity/EntityRenderDispatcher"
+                },
+                {
+                  "itrlNme": "net/minecraft/client/resources/DryFoliageColorReloadListener"
+                },
+                {
+                  "itrlNme": "net/minecraft/client/resources/FoliageColorReloadListener"
+                },
+                {
+                  "itrlNme": "net/minecraft/client/gui/font/FontManager"
+                },
+                {
+                  "itrlNme": "net/minecraft/client/resources/GrassColorReloadListener"
+                },
+                {
+                  "itrlNme": "net/minecraft/client/resources/language/LanguageManager"
+                },
+                {
+                  "itrlNme": "net/minecraft/client/particle/ParticleResources"
+                },
+                {
+                  "itrlNme": "net/minecraft/client/renderer/ShaderManager"
+                },
+                {
+                  "itrlNme": "net/minecraft/client/resources/SplashManager"
+                },
+                {
+                  "itrlNme": "net/minecraft/client/sounds/SoundManager"
+                },
+                {
+                  "itrlNme": "net/minecraft/client/renderer/texture/TextureManager"
+                },
+                {
+                  "itrlNme": "net/minecraft/client/resources/WaypointStyleManager"
+                },
+                {
+                  "itrlNme": "net/minecraft/client/renderer/LevelRenderer"
+                },
+                {
+                  "itrlNme": "net/minecraft/client/renderer/GpuWarnlistManager"
+                },
+                {
+                  "itrlNme": "net/minecraft/client/PeriodicNotificationManager"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/resource/pack/FabricPack.class": {
+        "ver": 65,
+        "acc": 1537,
+        "nme": "net/fabricmc/fabric/impl/resource/pack/FabricPack",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "fabric$isHidden",
+            "acc": 1,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "fabric$parentsEnabled",
+            "acc": 1,
+            "dsc": "(Ljava/util/Set;)Z",
+            "sig": "(Ljava/util/Set<Ljava/lang/String;>;)Z"
+          },
+          {
+            "nme": "fabric$setParentsPredicate",
+            "acc": 1,
+            "dsc": "(Ljava/util/function/Predicate;)V",
+            "sig": "(Ljava/util/function/Predicate<Ljava/util/Set<Ljava/lang/String;>;>;)V"
+          }
+        ],
+        "flds": []
+      },
+      "net/fabricmc/fabric/impl/resource/pack/ModPackResourcesSorter$LoadPhaseData.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/impl/resource/pack/ModPackResourcesSorter$LoadPhaseData",
+        "super": "net/fabricmc/fabric/impl/base/toposort/SortableNode",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Ljava/lang/String;)V"
+          },
+          {
+            "nme": "addPack",
+            "acc": 0,
+            "dsc": "(Lnet/fabricmc/fabric/api/resource/v1/pack/ModPackResources;)V"
+          },
+          {
+            "nme": "getDescription",
+            "acc": 4,
+            "dsc": "()Ljava/lang/String;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 16,
+            "nme": "modId",
+            "dsc": "Ljava/lang/String;"
+          },
+          {
+            "acc": 0,
+            "nme": "packs",
+            "dsc": "[Lnet/fabricmc/fabric/api/resource/v1/pack/ModPackResources;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/resource/ServerConfigurationPacketListenerImplMixin.class": {
+        "ver": 65,
+        "acc": 1057,
+        "nme": "net/fabricmc/fabric/mixin/resource/ServerConfigurationPacketListenerImplMixin",
+        "super": "net/minecraft/server/network/ServerCommonPacketListenerImpl",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/server/MinecraftServer;Lnet/minecraft/network/Connection;Lnet/minecraft/server/network/CommonListenerCookie;)V"
+          },
+          {
+            "nme": "filterKnownPacks",
+            "acc": 1,
+            "dsc": "(Ljava/util/List;)Ljava/util/List;",
+            "sig": "(Ljava/util/List<Lnet/minecraft/server/packs/repository/KnownPack;>;)Ljava/util/List<Lnet/minecraft/server/packs/repository/KnownPack;>;",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/ModifyArg;",
+                "vals": [
+                  "method",
+                  [
+                    "startConfiguration"
+                  ],
+                  "at",
+                  {
+                    "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                    "values": [
+                      "value",
+                      "INVOKE",
+                      "target",
+                      "Lnet/minecraft/server/network/config/SynchronizeRegistriesTask;<init>(Ljava/util/List;Lnet/minecraft/core/LayeredRegistryAccess;)V",
+                      "ordinal",
+                      0
+                    ],
+                    "api": 589824
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "flds": [],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/server/network/ServerConfigurationPacketListenerImpl"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/resource/SimpleReloadInstanceMixin.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/mixin/resource/SimpleReloadInstanceMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "sortSimple",
+            "acc": 10,
+            "dsc": "(Ljava/util/List;Lnet/minecraft/server/packs/resources/ResourceManager;)Ljava/util/List;",
+            "sig": "(Ljava/util/List<Lnet/minecraft/server/packs/resources/PreparableReloadListener;>;Lnet/minecraft/server/packs/resources/ResourceManager;)Ljava/util/List<Lnet/minecraft/server/packs/resources/PreparableReloadListener;>;",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/ModifyArg;",
+                "vals": [
+                  "method",
+                  [
+                    "create"
+                  ],
+                  "at",
+                  {
+                    "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                    "values": [
+                      "value",
+                      "INVOKE",
+                      "target",
+                      "Lnet/minecraft/server/packs/resources/SimpleReloadInstance;of(Lnet/minecraft/server/packs/resources/ResourceManager;Ljava/util/List;Ljava/util/concurrent/Executor;Ljava/util/concurrent/Executor;Ljava/util/concurrent/CompletableFuture;)Lnet/minecraft/server/packs/resources/ReloadInstance;"
+                    ],
+                    "api": 589824
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "sortProfiled",
+            "acc": 10,
+            "dsc": "(Ljava/util/List;Lnet/minecraft/server/packs/resources/ResourceManager;)Ljava/util/List;",
+            "sig": "(Ljava/util/List<Lnet/minecraft/server/packs/resources/PreparableReloadListener;>;Lnet/minecraft/server/packs/resources/ResourceManager;)Ljava/util/List<Lnet/minecraft/server/packs/resources/PreparableReloadListener;>;",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/ModifyArg;",
+                "vals": [
+                  "method",
+                  [
+                    "create"
+                  ],
+                  "at",
+                  {
+                    "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                    "values": [
+                      "value",
+                      "INVOKE",
+                      "target",
+                      "Lnet/minecraft/server/packs/resources/ProfiledReloadInstance;of(Lnet/minecraft/server/packs/resources/ResourceManager;Ljava/util/List;Ljava/util/concurrent/Executor;Ljava/util/concurrent/Executor;Ljava/util/concurrent/CompletableFuture;)Lnet/minecraft/server/packs/resources/ReloadInstance;"
+                    ],
+                    "api": 589824
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "adjustProfiledCheck",
+            "acc": 10,
+            "dsc": "(Z)Z",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/ModifyVariable;",
+                "vals": [
+                  "method",
+                  [
+                    "create"
+                  ],
+                  "at",
+                  {
+                    "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                    "values": [
+                      "value",
+                      "LOAD",
+                      "ordinal",
+                      0
+                    ],
+                    "api": 589824
+                  },
+                  "argsOnly",
+                  true
+                ]
+              }
+            ]
+          }
+        ],
+        "flds": [],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/server/packs/resources/SimpleReloadInstance"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/resource/GameTestServerMixin.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/mixin/resource/GameTestServerMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "replaceDefaultDataPackSettings",
+            "acc": 10,
+            "dsc": "(Ljava/util/List;Ljava/util/List;)Lnet/minecraft/world/level/DataPackConfig;",
+            "sig": "(Ljava/util/List<Ljava/lang/String;>;Ljava/util/List<Ljava/lang/String;>;)Lnet/minecraft/world/level/DataPackConfig;",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Redirect;",
+                "vals": [
+                  "method",
+                  [
+                    "create"
+                  ],
+                  "at",
+                  {
+                    "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                    "values": [
+                      "value",
+                      "NEW",
+                      "target",
+                      "(Ljava/util/List;Ljava/util/List;)Lnet/minecraft/world/level/DataPackConfig;"
+                    ],
+                    "api": 589824
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "flds": [],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/gametest/framework/GameTestServer"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/resource/client/ClientTooltipComponentMixin.class": {
+        "ver": 65,
+        "acc": 1537,
+        "nme": "net/fabricmc/fabric/mixin/resource/client/ClientTooltipComponentMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "onCreate",
+            "acc": 10,
+            "dsc": "(Lnet/minecraft/world/inventory/tooltip/TooltipComponent;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable;)V",
+            "sig": "(Lnet/minecraft/world/inventory/tooltip/TooltipComponent;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable<Lnet/minecraft/client/gui/screens/inventory/tooltip/ClientTooltipComponent;>;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Inject;",
+                "vals": [
+                  "method",
+                  [
+                    "create(Lnet/minecraft/world/inventory/tooltip/TooltipComponent;)Lnet/minecraft/client/gui/screens/inventory/tooltip/ClientTooltipComponent;"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "HEAD"
+                      ],
+                      "api": 589824
+                    }
+                  ],
+                  "cancellable",
+                  true
+                ]
+              }
+            ]
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/client/gui/screens/inventory/tooltip/ClientTooltipComponent"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/resource/MinecraftServerMixin.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/mixin/resource/MinecraftServerMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "getOrThrow",
+            "acc": 1,
+            "dsc": "(Lnet/fabricmc/fabric/api/resource/v1/DataResourceStore$Key;)Ljava/lang/Object;",
+            "sig": "<T:Ljava/lang/Object;>(Lnet/fabricmc/fabric/api/resource/v1/DataResourceStore$Key<TT;>;)TT;"
+          },
+          {
+            "nme": "init",
+            "acc": 2,
+            "dsc": "(Ljava/lang/Thread;Lnet/minecraft/world/level/storage/LevelStorageSource$LevelStorageAccess;Lnet/minecraft/server/packs/repository/PackRepository;Lnet/minecraft/server/WorldStem;Ljava/net/Proxy;Lcom/mojang/datafixers/DataFixer;Lnet/minecraft/server/Services;Lnet/minecraft/server/level/progress/LevelLoadListener;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Inject;",
+                "vals": [
+                  "method",
+                  [
+                    "<init>"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "TAIL"
+                      ],
+                      "api": 589824
+                    }
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "onCheckDisabled",
+            "acc": 10,
+            "dsc": "(Ljava/util/List;Ljava/lang/Object;Lnet/minecraft/server/packs/repository/PackRepository;)Z",
+            "sig": "(Ljava/util/List<Ljava/lang/String;>;Ljava/lang/Object;Lnet/minecraft/server/packs/repository/PackRepository;)Z",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Redirect;",
+                "vals": [
+                  "method",
+                  [
+                    "configurePackRepository"
+                  ],
+                  "at",
+                  {
+                    "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                    "values": [
+                      "value",
+                      "INVOKE",
+                      "target",
+                      "Ljava/util/List;contains(Ljava/lang/Object;)Z"
+                    ],
+                    "api": 589824
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "fabric$getOriginalKnownPacks",
+            "acc": 1,
+            "dsc": "()Ljava/util/List;",
+            "sig": "()Ljava/util/List<Lnet/minecraft/server/packs/repository/KnownPack;>;"
+          },
+          {
+            "nme": "lambda$init$0",
+            "acc": 4106,
+            "dsc": "(Lnet/minecraft/server/packs/PackResources;)Ljava/util/stream/Stream;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 2,
+            "nme": "originalKnownPacks",
+            "dsc": "Ljava/util/List;",
+            "sig": "Ljava/util/List<Lnet/minecraft/server/packs/repository/KnownPack;>;"
+          },
+          {
+            "acc": 2,
+            "nme": "resources",
+            "dsc": "Lnet/minecraft/server/MinecraftServer$ReloadableResources;"
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/server/MinecraftServer"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/resource/pack/ModNioPackResources.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/impl/resource/pack/ModNioPackResources",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "create",
+            "acc": 9,
+            "dsc": "(Ljava/lang/String;Lnet/fabricmc/loader/api/ModContainer;Ljava/lang/String;Lnet/minecraft/server/packs/PackType;Lnet/fabricmc/fabric/api/resource/v1/pack/PackActivationType;Z)Lnet/fabricmc/fabric/impl/resource/pack/ModNioPackResources;"
+          },
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "(Ljava/lang/String;Lnet/fabricmc/loader/api/ModContainer;Ljava/util/List;Lnet/minecraft/server/packs/PackType;Lnet/fabricmc/fabric/api/resource/v1/pack/PackActivationType;ZLnet/minecraft/server/packs/PackLocationInfo;)V",
+            "sig": "(Ljava/lang/String;Lnet/fabricmc/loader/api/ModContainer;Ljava/util/List<Ljava/nio/file/Path;>;Lnet/minecraft/server/packs/PackType;Lnet/fabricmc/fabric/api/resource/v1/pack/PackActivationType;ZLnet/minecraft/server/packs/PackLocationInfo;)V"
+          },
+          {
+            "nme": "createOverlay",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;)Lnet/fabricmc/fabric/impl/resource/pack/ModNioPackResources;"
+          },
+          {
+            "nme": "readNamespaces",
+            "acc": 9,
+            "dsc": "(Ljava/util/List;Ljava/lang/String;)Ljava/util/Map;",
+            "sig": "(Ljava/util/List<Ljava/nio/file/Path;>;Ljava/lang/String;)Ljava/util/Map<Lnet/minecraft/server/packs/PackType;Ljava/util/Set<Ljava/lang/String;>;>;"
+          },
+          {
+            "nme": "getPath",
+            "acc": 2,
+            "dsc": "(Ljava/lang/String;)Ljava/nio/file/Path;"
+          },
+          {
+            "nme": "hasAbsentNs",
+            "acc": 2,
+            "dsc": "(Ljava/lang/String;)Z"
+          },
+          {
+            "nme": "openFile",
+            "acc": 2,
+            "dsc": "(Ljava/lang/String;)Lnet/minecraft/server/packs/resources/IoSupplier;",
+            "sig": "(Ljava/lang/String;)Lnet/minecraft/server/packs/resources/IoSupplier<Ljava/io/InputStream;>;"
+          },
+          {
+            "nme": "getRootResource",
+            "acc": 129,
+            "dsc": "([Ljava/lang/String;)Lnet/minecraft/server/packs/resources/IoSupplier;",
+            "sig": "([Ljava/lang/String;)Lnet/minecraft/server/packs/resources/IoSupplier<Ljava/io/InputStream;>;"
+          },
+          {
+            "nme": "getResource",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/server/packs/PackType;Lnet/minecraft/resources/Identifier;)Lnet/minecraft/server/packs/resources/IoSupplier;",
+            "sig": "(Lnet/minecraft/server/packs/PackType;Lnet/minecraft/resources/Identifier;)Lnet/minecraft/server/packs/resources/IoSupplier<Ljava/io/InputStream;>;"
+          },
+          {
+            "nme": "listResources",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/server/packs/PackType;Ljava/lang/String;Ljava/lang/String;Lnet/minecraft/server/packs/PackResources$ResourceOutput;)V"
+          },
+          {
+            "nme": "getNamespaces",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/server/packs/PackType;)Ljava/util/Set;",
+            "sig": "(Lnet/minecraft/server/packs/PackType;)Ljava/util/Set<Ljava/lang/String;>;"
+          },
+          {
+            "nme": "getMetadataSection",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/server/packs/metadata/MetadataSectionType;)Ljava/lang/Object;",
+            "sig": "<T:Ljava/lang/Object;>(Lnet/minecraft/server/packs/metadata/MetadataSectionType<TT;>;)TT;",
+            "exs": [
+              "java/io/IOException"
+            ]
+          },
+          {
+            "nme": "location",
+            "acc": 1,
+            "dsc": "()Lnet/minecraft/server/packs/PackLocationInfo;"
+          },
+          {
+            "nme": "close",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "getFabricModMetadata",
+            "acc": 1,
+            "dsc": "()Lnet/fabricmc/loader/api/metadata/ModMetadata;"
+          },
+          {
+            "nme": "getActivationType",
+            "acc": 1,
+            "dsc": "()Lnet/fabricmc/fabric/api/resource/v1/pack/PackActivationType;"
+          },
+          {
+            "nme": "packId",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "exists",
+            "acc": 10,
+            "dsc": "(Ljava/nio/file/Path;)Z"
+          },
+          {
+            "nme": "getFilename",
+            "acc": 10,
+            "dsc": "(Lnet/minecraft/server/packs/PackType;Lnet/minecraft/resources/Identifier;)Ljava/lang/String;"
+          },
+          {
+            "nme": "createOverlay",
+            "acc": 4161,
+            "dsc": "(Ljava/lang/String;)Lnet/fabricmc/fabric/api/resource/v1/pack/ModPackResources;"
+          },
+          {
+            "nme": "lambda$openFile$2",
+            "acc": 4098,
+            "dsc": "(Ljava/lang/String;)Ljava/io/InputStream;",
+            "exs": [
+              "java/io/IOException"
+            ]
+          },
+          {
+            "nme": "lambda$openFile$1",
+            "acc": 4106,
+            "dsc": "(Ljava/nio/file/Path;)Ljava/io/InputStream;",
+            "exs": [
+              "java/io/IOException"
+            ]
+          },
+          {
+            "nme": "lambda$createOverlay$0",
+            "acc": 4106,
+            "dsc": "(Ljava/lang/String;Ljava/nio/file/Path;)Ljava/nio/file/Path;"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 26,
+            "nme": "LOGGER",
+            "dsc": "Lorg/slf4j/Logger;"
+          },
+          {
+            "acc": 26,
+            "nme": "RESOURCE_PACK_PATH",
+            "dsc": "Ljava/util/regex/Pattern;"
+          },
+          {
+            "acc": 26,
+            "nme": "DEFAULT_FS",
+            "dsc": "Ljava/nio/file/FileSystem;"
+          },
+          {
+            "acc": 18,
+            "nme": "id",
+            "dsc": "Ljava/lang/String;"
+          },
+          {
+            "acc": 18,
+            "nme": "mod",
+            "dsc": "Lnet/fabricmc/loader/api/ModContainer;"
+          },
+          {
+            "acc": 18,
+            "nme": "basePaths",
+            "dsc": "Ljava/util/List;",
+            "sig": "Ljava/util/List<Ljava/nio/file/Path;>;"
+          },
+          {
+            "acc": 18,
+            "nme": "type",
+            "dsc": "Lnet/minecraft/server/packs/PackType;"
+          },
+          {
+            "acc": 18,
+            "nme": "activationType",
+            "dsc": "Lnet/fabricmc/fabric/api/resource/v1/pack/PackActivationType;"
+          },
+          {
+            "acc": 18,
+            "nme": "namespaces",
+            "dsc": "Ljava/util/Map;",
+            "sig": "Ljava/util/Map<Lnet/minecraft/server/packs/PackType;Ljava/util/Set<Ljava/lang/String;>;>;"
+          },
+          {
+            "acc": 18,
+            "nme": "metadata",
+            "dsc": "Lnet/minecraft/server/packs/PackLocationInfo;"
+          },
+          {
+            "acc": 18,
+            "nme": "modBundled",
+            "dsc": "Z"
+          },
+          {
+            "acc": 26,
+            "nme": "resPrefix",
+            "dsc": "Ljava/lang/String;"
+          },
+          {
+            "acc": 26,
+            "nme": "dataPrefix",
+            "dsc": "Ljava/lang/String;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/resource/KeyedResourceReloaderMixin.class": {
+        "ver": 65,
+        "acc": 1057,
+        "nme": "net/fabricmc/fabric/mixin/resource/KeyedResourceReloaderMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "fabric$getId",
+            "acc": 1,
+            "dsc": "()Lnet/minecraft/resources/Identifier;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 2,
+            "nme": "id",
+            "dsc": "Lnet/minecraft/resources/Identifier;"
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/world/item/crafting/RecipeManager"
+                },
+                {
+                  "itrlNme": "net/minecraft/server/ServerAdvancementManager"
+                },
+                {
+                  "itrlNme": "net/minecraft/server/ServerFunctionLibrary"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/resource/ServerLanguageUtil.class": {
+        "ver": 65,
+        "acc": 49,
+        "nme": "net/fabricmc/fabric/impl/resource/ServerLanguageUtil",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "()V"
+          },
+          {
+            "nme": "getModLanguageFiles",
+            "acc": 9,
+            "dsc": "()Ljava/util/Collection;",
+            "sig": "()Ljava/util/Collection<Ljava/nio/file/Path;>;"
+          },
+          {
+            "nme": "lambda$getModLanguageFiles$0",
+            "acc": 4106,
+            "dsc": "(Ljava/nio/file/Path;)Z"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 26,
+            "nme": "ASSETS_PREFIX",
+            "dsc": "Ljava/lang/String;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/resource/SetupMarkerResourceReloader.class": {
+        "ver": 65,
+        "acc": 65585,
+        "nme": "net/fabricmc/fabric/impl/resource/SetupMarkerResourceReloader",
+        "super": "java/lang/Record",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/server/ReloadableServerResources;Lnet/minecraft/core/HolderLookup$Provider;Lnet/minecraft/world/flag/FeatureFlagSet;)V"
+          },
+          {
+            "nme": "prepareSharedState",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/server/packs/resources/PreparableReloadListener$SharedState;)V"
+          },
+          {
+            "nme": "onResourceManagerReload",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/server/packs/resources/ResourceManager;)V"
+          },
+          {
+            "nme": "toString",
+            "acc": 17,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "hashCode",
+            "acc": 17,
+            "dsc": "()I"
+          },
+          {
+            "nme": "equals",
+            "acc": 17,
+            "dsc": "(Ljava/lang/Object;)Z"
+          },
+          {
+            "nme": "dataPackContents",
+            "acc": 1,
+            "dsc": "()Lnet/minecraft/server/ReloadableServerResources;"
+          },
+          {
+            "nme": "registries",
+            "acc": 1,
+            "dsc": "()Lnet/minecraft/core/HolderLookup$Provider;"
+          },
+          {
+            "nme": "featureSet",
+            "acc": 1,
+            "dsc": "()Lnet/minecraft/world/flag/FeatureFlagSet;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "dataPackContents",
+            "dsc": "Lnet/minecraft/server/ReloadableServerResources;"
+          },
+          {
+            "acc": 18,
+            "nme": "registries",
+            "dsc": "Lnet/minecraft/core/HolderLookup$Provider;"
+          },
+          {
+            "acc": 18,
+            "nme": "featureSet",
+            "dsc": "Lnet/minecraft/world/flag/FeatureFlagSet;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/resource/pack/ModNioPackResources$1.class": {
+        "ver": 65,
+        "acc": 32,
+        "nme": "net/fabricmc/fabric/impl/resource/pack/ModNioPackResources$1",
+        "super": "java/nio/file/SimpleFileVisitor",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Lnet/fabricmc/fabric/impl/resource/pack/ModNioPackResources;Ljava/nio/file/Path;Ljava/lang/String;Ljava/lang/String;Lnet/minecraft/server/packs/PackResources$ResourceOutput;)V"
+          },
+          {
+            "nme": "visitFile",
+            "acc": 1,
+            "dsc": "(Ljava/nio/file/Path;Ljava/nio/file/attribute/BasicFileAttributes;)Ljava/nio/file/FileVisitResult;"
+          },
+          {
+            "nme": "visitFile",
+            "acc": 4161,
+            "dsc": "(Ljava/lang/Object;Ljava/nio/file/attribute/BasicFileAttributes;)Ljava/nio/file/FileVisitResult;",
+            "exs": [
+              "java/io/IOException"
+            ]
+          }
+        ],
+        "flds": [
+          {
+            "acc": 4112,
+            "nme": "val$nsPath",
+            "dsc": "Ljava/nio/file/Path;"
+          },
+          {
+            "acc": 4112,
+            "nme": "val$separator",
+            "dsc": "Ljava/lang/String;"
+          },
+          {
+            "acc": 4112,
+            "nme": "val$namespace",
+            "dsc": "Ljava/lang/String;"
+          },
+          {
+            "acc": 4112,
+            "nme": "val$visitor",
+            "dsc": "Lnet/minecraft/server/packs/PackResources$ResourceOutput;"
+          },
+          {
+            "acc": 4112,
+            "nme": "this$0",
+            "dsc": "Lnet/fabricmc/fabric/impl/resource/pack/ModNioPackResources;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/api/resource/v1/reloader/SimpleResourceReloader.class": {
+        "ver": 65,
+        "acc": 1057,
+        "nme": "net/fabricmc/fabric/api/resource/v1/reloader/SimpleResourceReloader",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "reload",
+            "acc": 17,
+            "dsc": "(Lnet/minecraft/server/packs/resources/PreparableReloadListener$SharedState;Ljava/util/concurrent/Executor;Lnet/minecraft/server/packs/resources/PreparableReloadListener$PreparationBarrier;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;",
+            "sig": "(Lnet/minecraft/server/packs/resources/PreparableReloadListener$SharedState;Ljava/util/concurrent/Executor;Lnet/minecraft/server/packs/resources/PreparableReloadListener$PreparationBarrier;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture<Ljava/lang/Void;>;"
+          },
+          {
+            "nme": "prepare",
+            "acc": 1028,
+            "dsc": "(Lnet/minecraft/server/packs/resources/PreparableReloadListener$SharedState;)Ljava/lang/Object;",
+            "sig": "(Lnet/minecraft/server/packs/resources/PreparableReloadListener$SharedState;)TT;"
+          },
+          {
+            "nme": "apply",
+            "acc": 1028,
+            "dsc": "(Ljava/lang/Object;Lnet/minecraft/server/packs/resources/PreparableReloadListener$SharedState;)V",
+            "sig": "(TT;Lnet/minecraft/server/packs/resources/PreparableReloadListener$SharedState;)V"
+          },
+          {
+            "nme": "lambda$reload$1",
+            "acc": 4098,
+            "dsc": "(Lnet/minecraft/server/packs/resources/PreparableReloadListener$SharedState;Ljava/lang/Object;)V"
+          },
+          {
+            "nme": "lambda$reload$0",
+            "acc": 4098,
+            "dsc": "(Lnet/minecraft/server/packs/resources/PreparableReloadListener$SharedState;)Ljava/lang/Object;"
+          }
+        ],
+        "flds": []
+      },
+      "net/fabricmc/fabric/impl/resource/pack/package-info.class": {
+        "ver": 65,
+        "acc": 5632,
+        "nme": "net/fabricmc/fabric/impl/resource/pack/package-info",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lorg/jspecify/annotations/NullMarked;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/api/resource/v1/reloader/ResourceReloaderKeys.class": {
+        "ver": 65,
+        "acc": 49,
+        "nme": "net/fabricmc/fabric/api/resource/v1/reloader/ResourceReloaderKeys",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "()V"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "BEFORE_VANILLA",
+            "dsc": "Lnet/minecraft/resources/Identifier;"
+          },
+          {
+            "acc": 25,
+            "nme": "AFTER_VANILLA",
+            "dsc": "Lnet/minecraft/resources/Identifier;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/resource/server/LanguageMixin.class": {
+        "ver": 65,
+        "acc": 32,
+        "nme": "net/fabricmc/fabric/mixin/resource/server/LanguageMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "()V"
+          },
+          {
+            "nme": "create",
+            "acc": 10,
+            "dsc": "(Ljava/util/Map;)Ljava/util/Map;",
+            "sig": "(Ljava/util/Map<Ljava/lang/String;Ljava/lang/String;>;)Ljava/util/Map<Ljava/lang/String;Ljava/lang/String;>;",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Redirect;",
+                "vals": [
+                  "method",
+                  [
+                    "loadDefault"
+                  ],
+                  "at",
+                  {
+                    "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                    "values": [
+                      "value",
+                      "INVOKE",
+                      "target",
+                      "Ljava/util/Map;copyOf(Ljava/util/Map;)Ljava/util/Map;"
+                    ],
+                    "api": 589824
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "readCorrectVanillaResource",
+            "acc": 10,
+            "dsc": "(Ljava/lang/Class;Ljava/lang/String;)Ljava/io/InputStream;",
+            "exs": [
+              "java/io/IOException"
+            ],
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Redirect;",
+                "vals": [
+                  "method",
+                  [
+                    "parseTranslations"
+                  ],
+                  "at",
+                  {
+                    "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                    "values": [
+                      "value",
+                      "INVOKE",
+                      "target",
+                      "Ljava/lang/Class;getResourceAsStream(Ljava/lang/String;)Ljava/io/InputStream;"
+                    ],
+                    "api": 589824
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "loadFromPath",
+            "acc": 10,
+            "dsc": "(Ljava/nio/file/Path;Ljava/util/function/BiConsumer;)V",
+            "sig": "(Ljava/nio/file/Path;Ljava/util/function/BiConsumer<Ljava/lang/String;Ljava/lang/String;>;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/Unique;"
+              }
+            ]
+          },
+          {
+            "nme": "loadFromJson",
+            "acc": 9,
+            "dsc": "(Ljava/io/InputStream;Ljava/util/function/BiConsumer;)V",
+            "sig": "(Ljava/io/InputStream;Ljava/util/function/BiConsumer<Ljava/lang/String;Ljava/lang/String;>;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/Shadow;"
+              }
+            ]
+          }
+        ],
+        "flds": [
+          {
+            "acc": 10,
+            "nme": "LOGGER",
+            "dsc": "Lorg/slf4j/Logger;"
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/locale/Language"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/resource/pack/ModPackResourcesUtil$1.class": {
+        "ver": 65,
+        "acc": 4128,
+        "nme": "net/fabricmc/fabric/impl/resource/pack/ModPackResourcesUtil$1",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 4120,
+            "nme": "$SwitchMap$net$fabricmc$loader$api$metadata$CustomValue$CvType",
+            "dsc": "[I"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/resource/ServerboundSelectKnownPacksMixin.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/mixin/resource/ServerboundSelectKnownPacksMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "setMaxKnownPacks",
+            "acc": 10,
+            "dsc": "(I)I",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/ModifyArg;",
+                "vals": [
+                  "method",
+                  [
+                    "<clinit>"
+                  ],
+                  "at",
+                  {
+                    "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                    "values": [
+                      "value",
+                      "INVOKE",
+                      "target",
+                      "Lnet/minecraft/network/codec/ByteBufCodecs;list(I)Lnet/minecraft/network/codec/StreamCodec$CodecOperation;"
+                    ],
+                    "api": 589824
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "flds": [],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/network/protocol/configuration/ServerboundSelectKnownPacks"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/resource/ResourceMixin.class": {
+        "ver": 65,
+        "acc": 32,
+        "nme": "net/fabricmc/fabric/mixin/resource/ResourceMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "()V"
+          },
+          {
+            "nme": "getFabricPackSource",
+            "acc": 1,
+            "dsc": "()Lnet/minecraft/server/packs/repository/PackSource;"
+          }
+        ],
+        "flds": [],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/server/packs/resources/Resource"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/resource/pack/ModPackResourcesUtil.class": {
+        "ver": 65,
+        "acc": 49,
+        "nme": "net/fabricmc/fabric/impl/resource/pack/ModPackResourcesUtil",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "()V"
+          },
+          {
+            "nme": "getModResourcePacks",
+            "acc": 9,
+            "dsc": "(Lnet/fabricmc/loader/api/FabricLoader;Lnet/minecraft/server/packs/PackType;Ljava/lang/String;)Ljava/util/List;",
+            "sig": "(Lnet/fabricmc/loader/api/FabricLoader;Lnet/minecraft/server/packs/PackType;Ljava/lang/String;)Ljava/util/List<Lnet/fabricmc/fabric/api/resource/v1/pack/ModPackResources;>;"
+          },
+          {
+            "nme": "addLoadOrdering",
+            "acc": 9,
+            "dsc": "(Lnet/fabricmc/loader/api/metadata/CustomValue$CvObject;Ljava/util/List;Lnet/fabricmc/fabric/impl/resource/pack/ModPackResourcesSorter;Lnet/fabricmc/fabric/impl/resource/pack/ModPackResourcesUtil$Order;Ljava/lang/String;)V",
+            "sig": "(Lnet/fabricmc/loader/api/metadata/CustomValue$CvObject;Ljava/util/List<Ljava/lang/String;>;Lnet/fabricmc/fabric/impl/resource/pack/ModPackResourcesSorter;Lnet/fabricmc/fabric/impl/resource/pack/ModPackResourcesUtil$Order;Ljava/lang/String;)V"
+          },
+          {
+            "nme": "refreshAutoEnabledPacks",
+            "acc": 9,
+            "dsc": "(Ljava/util/List;Ljava/util/Map;)V",
+            "sig": "(Ljava/util/List<Lnet/minecraft/server/packs/repository/Pack;>;Ljava/util/Map<Ljava/lang/String;Lnet/minecraft/server/packs/repository/Pack;>;)V"
+          },
+          {
+            "nme": "containsDefault",
+            "acc": 9,
+            "dsc": "(Ljava/lang/String;Z)Z"
+          },
+          {
+            "nme": "getDefaultIcon",
+            "acc": 9,
+            "dsc": "()Ljava/io/InputStream;",
+            "exs": [
+              "java/io/IOException"
+            ]
+          },
+          {
+            "nme": "openDefault",
+            "acc": 9,
+            "dsc": "(Lnet/fabricmc/loader/api/ModContainer;Lnet/minecraft/server/packs/PackType;Ljava/lang/String;)Ljava/io/InputStream;",
+            "exs": [
+              "java/io/IOException"
+            ]
+          },
+          {
+            "nme": "getMetadataPack",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/server/packs/metadata/pack/PackFormat;Lnet/minecraft/network/chat/Component;)Lnet/minecraft/server/packs/metadata/pack/PackMetadataSection;"
+          },
+          {
+            "nme": "getMetadataPackJson",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/server/packs/metadata/pack/PackFormat;Lnet/minecraft/network/chat/Component;Lnet/minecraft/server/packs/PackType;)Lcom/google/gson/JsonObject;"
+          },
+          {
+            "nme": "serializeMetadata",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/server/packs/metadata/pack/PackFormat;Ljava/lang/String;Lnet/minecraft/server/packs/PackType;)Ljava/lang/String;"
+          },
+          {
+            "nme": "getName",
+            "acc": 9,
+            "dsc": "(Lnet/fabricmc/loader/api/metadata/ModMetadata;)Lnet/minecraft/network/chat/Component;"
+          },
+          {
+            "nme": "createDefaultDataConfiguration",
+            "acc": 9,
+            "dsc": "()Lnet/minecraft/world/level/WorldDataConfiguration;"
+          },
+          {
+            "nme": "createTestServerSettings",
+            "acc": 9,
+            "dsc": "(Ljava/util/List;Ljava/util/List;)Lnet/minecraft/world/level/DataPackConfig;",
+            "sig": "(Ljava/util/List<Ljava/lang/String;>;Ljava/util/List<Ljava/lang/String;>;)Lnet/minecraft/world/level/DataPackConfig;"
+          },
+          {
+            "nme": "createClientManager",
+            "acc": 9,
+            "dsc": "()Lnet/minecraft/server/packs/repository/PackRepository;"
+          },
+          {
+            "nme": "lambda$createClientManager$4",
+            "acc": 4106,
+            "dsc": "(Ljava/nio/file/Path;)Z"
+          },
+          {
+            "nme": "lambda$createTestServerSettings$3",
+            "acc": 4106,
+            "dsc": "(Ljava/util/HashSet;Lnet/minecraft/server/packs/repository/Pack;)V"
+          },
+          {
+            "nme": "lambda$getDefaultIcon$2",
+            "acc": 4106,
+            "dsc": "(Lnet/fabricmc/loader/api/ModContainer;)Ljava/util/Optional;"
+          },
+          {
+            "nme": "lambda$refreshAutoEnabledPacks$1",
+            "acc": 4106,
+            "dsc": "(Lnet/minecraft/server/packs/repository/Pack;)Z"
+          },
+          {
+            "nme": "lambda$addLoadOrdering$0",
+            "acc": 4106,
+            "dsc": "(Lnet/fabricmc/fabric/impl/resource/pack/ModPackResourcesSorter;Ljava/lang/String;Lnet/fabricmc/fabric/impl/resource/pack/ModPackResourcesUtil$Order;Ljava/lang/String;)V"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "GSON",
+            "dsc": "Lcom/google/gson/Gson;"
+          },
+          {
+            "acc": 26,
+            "nme": "LOGGER",
+            "dsc": "Lorg/slf4j/Logger;"
+          },
+          {
+            "acc": 26,
+            "nme": "LOAD_ORDER_KEY",
+            "dsc": "Ljava/lang/String;",
+            "val": "fabric:resource_load_order"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/resource/client/CreateWorldScreenMixin.class": {
+        "ver": 65,
+        "acc": 1057,
+        "nme": "net/fabricmc/fabric/mixin/resource/client/CreateWorldScreenMixin",
+        "super": "net/minecraft/client/gui/screens/Screen",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "()V"
+          },
+          {
+            "nme": "onCreateResManagerInit",
+            "acc": 10,
+            "dsc": "(Lnet/minecraft/server/packs/repository/PackRepository;)Lnet/minecraft/server/packs/repository/PackRepository;",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/ModifyVariable;",
+                "vals": [
+                  "method",
+                  [
+                    "openCreateWorldScreen"
+                  ],
+                  "at",
+                  {
+                    "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                    "values": [
+                      "value",
+                      "INVOKE",
+                      "target",
+                      "Lnet/minecraft/client/gui/screens/worldselection/CreateWorldScreen;createDefaultLoadConfig(Lnet/minecraft/server/packs/repository/PackRepository;Lnet/minecraft/world/level/WorldDataConfiguration;)Lnet/minecraft/server/WorldLoader$InitConfig;"
+                    ],
+                    "api": 589824
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "replaceDefaultSettings",
+            "acc": 10,
+            "dsc": "()Lnet/minecraft/world/level/WorldDataConfiguration;",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Redirect;",
+                "vals": [
+                  "method",
+                  [
+                    "openCreateWorldScreen"
+                  ],
+                  "at",
+                  {
+                    "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                    "values": [
+                      "value",
+                      "FIELD",
+                      "target",
+                      "Lnet/minecraft/world/level/WorldDataConfiguration;DEFAULT:Lnet/minecraft/world/level/WorldDataConfiguration;",
+                      "ordinal",
+                      0
+                    ],
+                    "api": 589824
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "onScanPacks",
+            "acc": 2,
+            "dsc": "(Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable;)V",
+            "sig": "(Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable<Lcom/mojang/datafixers/util/Pair<Ljava/io/File;Lnet/minecraft/server/packs/repository/PackRepository;>;>;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Inject;",
+                "vals": [
+                  "method",
+                  [
+                    "getDataPackSelectionSettings"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "INVOKE",
+                        "target",
+                        "Lnet/minecraft/server/packs/repository/PackRepository;reload()V",
+                        "shift",
+                        [
+                          "Lorg/spongepowered/asm/mixin/injection/At$Shift;",
+                          "BEFORE"
+                        ]
+                      ],
+                      "api": 589824
+                    }
+                  ]
+                ]
+              }
+            ]
+          }
+        ],
+        "flds": [
+          {
+            "acc": 2,
+            "nme": "tempDataPackRepository",
+            "dsc": "Lnet/minecraft/server/packs/repository/PackRepository;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/client/gui/screens/worldselection/CreateWorldScreen"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/resource/FabricLifecycledResourceManager.class": {
+        "ver": 65,
+        "acc": 1537,
+        "nme": "net/fabricmc/fabric/impl/resource/FabricLifecycledResourceManager",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "fabric$getResourceType",
+            "acc": 1025,
+            "dsc": "()Lnet/minecraft/server/packs/PackType;"
+          }
+        ],
+        "flds": []
+      },
+      "net/fabricmc/fabric/mixin/resource/client/OptionsMixin.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/mixin/resource/client/OptionsMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "onLoad",
+            "acc": 2,
+            "dsc": "(Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Inject;",
+                "vals": [
+                  "method",
+                  [
+                    "load"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "RETURN"
+                      ],
+                      "api": 589824
+                    }
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "excludeInternalResourcePacksFromRefreshCheck",
+            "acc": 2,
+            "dsc": "(Lnet/minecraft/server/packs/repository/Pack;Lcom/llamalad7/mixinextras/injector/wrapoperation/Operation;)Z",
+            "sig": "(Lnet/minecraft/server/packs/repository/Pack;Lcom/llamalad7/mixinextras/injector/wrapoperation/Operation<Ljava/lang/Boolean;>;)Z",
+            "vanns": [
+              {
+                "dsc": "Lcom/llamalad7/mixinextras/injector/wrapoperation/WrapOperation;",
+                "vals": [
+                  "method",
+                  [
+                    "updateResourcePacks"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "INVOKE",
+                        "target",
+                        "Lnet/minecraft/server/packs/repository/Pack;isFixedPosition()Z"
+                      ],
+                      "api": 589824
+                    }
+                  ]
+                ]
+              }
+            ]
+          }
+        ],
+        "flds": [
+          {
+            "acc": 1,
+            "nme": "resourcePacks",
+            "dsc": "Ljava/util/List;",
+            "sig": "Ljava/util/List<Ljava/lang/String;>;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/client/Options"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/resource/pack/ModPackResourcesFactory.class": {
+        "ver": 65,
+        "acc": 65585,
+        "nme": "net/fabricmc/fabric/impl/resource/pack/ModPackResourcesFactory",
+        "super": "java/lang/Record",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Lnet/fabricmc/fabric/api/resource/v1/pack/ModPackResources;)V"
+          },
+          {
+            "nme": "openPrimary",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/server/packs/PackLocationInfo;)Lnet/minecraft/server/packs/PackResources;"
+          },
+          {
+            "nme": "openFull",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/server/packs/PackLocationInfo;Lnet/minecraft/server/packs/repository/Pack$Metadata;)Lnet/minecraft/server/packs/PackResources;"
+          },
+          {
+            "nme": "toString",
+            "acc": 17,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "hashCode",
+            "acc": 17,
+            "dsc": "()I"
+          },
+          {
+            "nme": "equals",
+            "acc": 17,
+            "dsc": "(Ljava/lang/Object;)Z"
+          },
+          {
+            "nme": "pack",
+            "acc": 1,
+            "dsc": "()Lnet/fabricmc/fabric/api/resource/v1/pack/ModPackResources;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "pack",
+            "dsc": "Lnet/fabricmc/fabric/api/resource/v1/pack/ModPackResources;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/api/resource/v1/pack/package-info.class": {
+        "ver": 65,
+        "acc": 5632,
+        "nme": "net/fabricmc/fabric/api/resource/v1/pack/package-info",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lorg/jspecify/annotations/NullMarked;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/api/resource/v1/DataResourceStore$Key.class": {
+        "ver": 65,
+        "acc": 49,
+        "nme": "net/fabricmc/fabric/api/resource/v1/DataResourceStore$Key",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          }
+        ],
+        "flds": []
+      },
+      "net/fabricmc/fabric/impl/resource/pack/ModResourcePackCreator.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/impl/resource/pack/ModResourcePackCreator",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/server/packs/PackType;)V"
+          },
+          {
+            "nme": "<init>",
+            "acc": 4,
+            "dsc": "(Lnet/minecraft/server/packs/PackType;Z)V"
+          },
+          {
+            "nme": "loadPacks",
+            "acc": 1,
+            "dsc": "(Ljava/util/function/Consumer;)V",
+            "sig": "(Ljava/util/function/Consumer<Lnet/minecraft/server/packs/repository/Pack;>;)V"
+          },
+          {
+            "nme": "registerModPack",
+            "acc": 2,
+            "dsc": "(Ljava/util/function/Consumer;Ljava/lang/String;Ljava/util/function/Predicate;)V",
+            "sig": "(Ljava/util/function/Consumer<Lnet/minecraft/server/packs/repository/Pack;>;Ljava/lang/String;Ljava/util/function/Predicate<Ljava/util/Set<Ljava/lang/String;>;>;)V"
+          },
+          {
+            "nme": "lambda$static$2",
+            "acc": 4106,
+            "dsc": "(Ljava/util/Set;)Z"
+          },
+          {
+            "nme": "lambda$static$1",
+            "acc": 4106,
+            "dsc": "(Ljava/util/Set;)Z"
+          },
+          {
+            "nme": "lambda$static$0",
+            "acc": 4106,
+            "dsc": "(Ljava/util/Set;)Z"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "VANILLA",
+            "dsc": "Ljava/lang/String;",
+            "val": "vanilla"
+          },
+          {
+            "acc": 26,
+            "nme": "PROGRAMMER_ART",
+            "dsc": "Ljava/lang/String;",
+            "val": "programmer_art"
+          },
+          {
+            "acc": 26,
+            "nme": "HIGH_CONTRAST",
+            "dsc": "Ljava/lang/String;",
+            "val": "high_contrast"
+          },
+          {
+            "acc": 25,
+            "nme": "POST_CHANGE_HANDLE_REQUIRED",
+            "dsc": "Ljava/util/Set;",
+            "sig": "Ljava/util/Set<Ljava/lang/String;>;"
+          },
+          {
+            "acc": 25,
+            "nme": "BASE_PARENT",
+            "dsc": "Ljava/util/function/Predicate;",
+            "sig": "Ljava/util/function/Predicate<Ljava/util/Set<Ljava/lang/String;>;>;"
+          },
+          {
+            "acc": 25,
+            "nme": "PROGRAMMER_ART_PARENT",
+            "dsc": "Ljava/util/function/Predicate;",
+            "sig": "Ljava/util/function/Predicate<Ljava/util/Set<Ljava/lang/String;>;>;"
+          },
+          {
+            "acc": 25,
+            "nme": "HIGH_CONTRAST_PARENT",
+            "dsc": "Ljava/util/function/Predicate;",
+            "sig": "Ljava/util/function/Predicate<Ljava/util/Set<Ljava/lang/String;>;>;"
+          },
+          {
+            "acc": 25,
+            "nme": "RESOURCE_PACK_SOURCE",
+            "dsc": "Lnet/minecraft/server/packs/repository/PackSource;"
+          },
+          {
+            "acc": 25,
+            "nme": "CLIENT_RESOURCE_PACK_PROVIDER",
+            "dsc": "Lnet/fabricmc/fabric/impl/resource/pack/ModResourcePackCreator;"
+          },
+          {
+            "acc": 25,
+            "nme": "MAX_KNOWN_PACKS",
+            "dsc": "I"
+          },
+          {
+            "acc": 18,
+            "nme": "type",
+            "dsc": "Lnet/minecraft/server/packs/PackType;"
+          },
+          {
+            "acc": 18,
+            "nme": "activationInfo",
+            "dsc": "Lnet/minecraft/server/packs/PackSelectionConfig;"
+          },
+          {
+            "acc": 18,
+            "nme": "forClientDataPackManager",
+            "dsc": "Z"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/api/resource/v1/DataResourceStore.class": {
+        "ver": 65,
+        "acc": 1537,
+        "nme": "net/fabricmc/fabric/api/resource/v1/DataResourceStore",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "getOrThrow",
+            "acc": 1025,
+            "dsc": "(Lnet/fabricmc/fabric/api/resource/v1/DataResourceStore$Key;)Ljava/lang/Object;",
+            "sig": "<T:Ljava/lang/Object;>(Lnet/fabricmc/fabric/api/resource/v1/DataResourceStore$Key<TT;>;)TT;"
+          }
+        ],
+        "flds": []
+      },
+      "net/fabricmc/fabric/impl/resource/pack/BuiltinModResourcePackSource.class": {
+        "ver": 65,
+        "acc": 65585,
+        "nme": "net/fabricmc/fabric/impl/resource/pack/BuiltinModResourcePackSource",
+        "super": "java/lang/Record",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Ljava/lang/String;)V"
+          },
+          {
+            "nme": "shouldAddAutomatically",
+            "acc": 1,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "decorate",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/network/chat/Component;)Lnet/minecraft/network/chat/Component;"
+          },
+          {
+            "nme": "toString",
+            "acc": 17,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "hashCode",
+            "acc": 17,
+            "dsc": "()I"
+          },
+          {
+            "nme": "equals",
+            "acc": 17,
+            "dsc": "(Ljava/lang/Object;)Z"
+          },
+          {
+            "nme": "modId",
+            "acc": 1,
+            "dsc": "()Ljava/lang/String;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "modId",
+            "dsc": "Ljava/lang/String;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/resource/ResourceLoaderImpl$ReloaderOrder.class": {
+        "ver": 65,
+        "acc": 65584,
+        "nme": "net/fabricmc/fabric/impl/resource/ResourceLoaderImpl$ReloaderOrder",
+        "super": "java/lang/Record",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "(Lnet/minecraft/resources/Identifier;Lnet/minecraft/resources/Identifier;)V"
+          },
+          {
+            "nme": "toString",
+            "acc": 17,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "hashCode",
+            "acc": 17,
+            "dsc": "()I"
+          },
+          {
+            "nme": "equals",
+            "acc": 17,
+            "dsc": "(Ljava/lang/Object;)Z"
+          },
+          {
+            "nme": "first",
+            "acc": 1,
+            "dsc": "()Lnet/minecraft/resources/Identifier;"
+          },
+          {
+            "nme": "second",
+            "acc": 1,
+            "dsc": "()Lnet/minecraft/resources/Identifier;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "first",
+            "dsc": "Lnet/minecraft/resources/Identifier;"
+          },
+          {
+            "acc": 18,
+            "nme": "second",
+            "dsc": "Lnet/minecraft/resources/Identifier;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/resource/package-info.class": {
+        "ver": 65,
+        "acc": 5632,
+        "nme": "net/fabricmc/fabric/mixin/resource/package-info",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lorg/jspecify/annotations/NullMarked;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/resource/pack/ModResourcePackCreator$1.class": {
+        "ver": 65,
+        "acc": 32,
+        "nme": "net/fabricmc/fabric/impl/resource/pack/ModResourcePackCreator$1",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "()V"
+          },
+          {
+            "nme": "decorate",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/network/chat/Component;)Lnet/minecraft/network/chat/Component;"
+          },
+          {
+            "nme": "shouldAddAutomatically",
+            "acc": 1,
+            "dsc": "()Z"
+          }
+        ],
+        "flds": []
+      },
+      "net/fabricmc/fabric/impl/resource/FabricDataResourceStoreHolder.class": {
+        "ver": 65,
+        "acc": 1537,
+        "nme": "net/fabricmc/fabric/impl/resource/FabricDataResourceStoreHolder",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "fabric$getDataResourceStore",
+            "acc": 1025,
+            "dsc": "()Lnet/fabricmc/fabric/api/resource/v1/DataResourceStore$Mutable;"
+          }
+        ],
+        "flds": []
+      },
+      "net/fabricmc/fabric/impl/resource/package-info.class": {
+        "ver": 65,
+        "acc": 5632,
+        "nme": "net/fabricmc/fabric/impl/resource/package-info",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lorg/jspecify/annotations/NullMarked;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/api/resource/v1/ResourceLoader.class": {
+        "ver": 65,
+        "acc": 1537,
+        "nme": "net/fabricmc/fabric/api/resource/v1/ResourceLoader",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "get",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/server/packs/PackType;)Lnet/fabricmc/fabric/api/resource/v1/ResourceLoader;"
+          },
+          {
+            "nme": "registerReloader",
+            "acc": 1025,
+            "dsc": "(Lnet/minecraft/resources/Identifier;Lnet/minecraft/server/packs/resources/PreparableReloadListener;)V"
+          },
+          {
+            "nme": "addReloaderOrdering",
+            "acc": 1025,
+            "dsc": "(Lnet/minecraft/resources/Identifier;Lnet/minecraft/resources/Identifier;)V"
+          },
+          {
+            "nme": "registerBuiltinPack",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/resources/Identifier;Lnet/fabricmc/loader/api/ModContainer;Lnet/fabricmc/fabric/api/resource/v1/pack/PackActivationType;)Z"
+          },
+          {
+            "nme": "registerBuiltinPack",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/resources/Identifier;Lnet/fabricmc/loader/api/ModContainer;Lnet/minecraft/network/chat/Component;Lnet/fabricmc/fabric/api/resource/v1/pack/PackActivationType;)Z"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "RELOADER_REGISTRY_LOOKUP_KEY",
+            "dsc": "Lnet/minecraft/server/packs/resources/PreparableReloadListener$StateKey;",
+            "sig": "Lnet/minecraft/server/packs/resources/PreparableReloadListener$StateKey<Lnet/minecraft/core/HolderLookup$Provider;>;"
+          },
+          {
+            "acc": 25,
+            "nme": "RELOADER_FEATURE_SET_KEY",
+            "dsc": "Lnet/minecraft/server/packs/resources/PreparableReloadListener$StateKey;",
+            "sig": "Lnet/minecraft/server/packs/resources/PreparableReloadListener$StateKey<Lnet/minecraft/world/flag/FeatureFlagSet;>;"
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/jetbrains/annotations/ApiStatus$NonExtendable;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/resource/MultiPackResourceManagerMixin.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/mixin/resource/MultiPackResourceManagerMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "init",
+            "acc": 2,
+            "dsc": "(Lnet/minecraft/server/packs/PackType;Ljava/util/List;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V",
+            "sig": "(Lnet/minecraft/server/packs/PackType;Ljava/util/List<Lnet/minecraft/server/packs/PackResources;>;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Inject;",
+                "vals": [
+                  "method",
+                  [
+                    "<init>"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "TAIL"
+                      ],
+                      "api": 589824
+                    }
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "fabric$getResourceType",
+            "acc": 1,
+            "dsc": "()Lnet/minecraft/server/packs/PackType;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 2,
+            "nme": "resourceType",
+            "dsc": "Lnet/minecraft/server/packs/PackType;"
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/server/packs/resources/MultiPackResourceManager"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/api/resource/v1/reloader/ResourceReloaderKeys$Server.class": {
+        "ver": 65,
+        "acc": 49,
+        "nme": "net/fabricmc/fabric/api/resource/v1/reloader/ResourceReloaderKeys$Server",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 2,
+            "dsc": "()V"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 25,
+            "nme": "ADVANCEMENTS",
+            "dsc": "Lnet/minecraft/resources/Identifier;"
+          },
+          {
+            "acc": 25,
+            "nme": "FUNCTIONS",
+            "dsc": "Lnet/minecraft/resources/Identifier;"
+          },
+          {
+            "acc": 25,
+            "nme": "RECIPES",
+            "dsc": "Lnet/minecraft/resources/Identifier;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/resource/client/TransferableSelectionListPackEntryMixin.class": {
+        "ver": 65,
+        "acc": 32,
+        "nme": "net/fabricmc/fabric/mixin/resource/client/TransferableSelectionListPackEntryMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "()V"
+          },
+          {
+            "nme": "onRenderContent",
+            "acc": 2,
+            "dsc": "(Lnet/minecraft/client/gui/GuiGraphics;IIZFLorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Inject;",
+                "vals": [
+                  "method",
+                  [
+                    "renderContent"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "RETURN"
+                      ],
+                      "api": 589824
+                    }
+                  ]
+                ]
+              }
+            ]
+          }
+        ],
+        "flds": [
+          {
+            "acc": 10,
+            "nme": "MAX_DESCRIPTION_WIDTH_PIXELS",
+            "dsc": "I"
+          },
+          {
+            "acc": 4,
+            "nme": "minecraft",
+            "dsc": "Lnet/minecraft/client/Minecraft;"
+          },
+          {
+            "acc": 2,
+            "nme": "nameWidget",
+            "dsc": "Lnet/minecraft/client/gui/components/StringWidget;"
+          },
+          {
+            "acc": 2,
+            "nme": "descriptionWidget",
+            "dsc": "Lnet/minecraft/client/gui/components/MultiLineTextWidget;"
+          },
+          {
+            "acc": 0,
+            "nme": "field_62184",
+            "dsc": "Lnet/minecraft/client/gui/screens/packs/TransferableSelectionList;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/client/gui/screens/packs/TransferableSelectionList$PackEntry"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/resource/SynchronizeRegistriesTaskMixin.class": {
+        "ver": 65,
+        "acc": 1057,
+        "nme": "net/fabricmc/fabric/mixin/resource/SynchronizeRegistriesTaskMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "sendRegistries",
+            "acc": 1028,
+            "dsc": "(Ljava/util/function/Consumer;Ljava/util/Set;)V",
+            "sig": "(Ljava/util/function/Consumer<Lnet/minecraft/network/protocol/Packet<*>;>;Ljava/util/Set<Lnet/minecraft/server/packs/repository/KnownPack;>;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/Shadow;"
+              }
+            ]
+          },
+          {
+            "nme": "onSelectKnownPacks",
+            "acc": 1,
+            "dsc": "(Ljava/util/List;Ljava/util/function/Consumer;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V",
+            "sig": "(Ljava/util/List<Lnet/minecraft/server/packs/repository/KnownPack;>;Ljava/util/function/Consumer<Lnet/minecraft/network/protocol/Packet<*>;>;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Inject;",
+                "vals": [
+                  "method",
+                  [
+                    "handleResponse"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "HEAD"
+                      ],
+                      "api": 589824
+                    }
+                  ],
+                  "cancellable",
+                  true
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "syncRegistryAndTags",
+            "acc": 1,
+            "dsc": "(Ljava/util/function/Consumer;Ljava/util/Set;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V",
+            "sig": "(Ljava/util/function/Consumer<Lnet/minecraft/network/protocol/Packet<*>;>;Ljava/util/Set<Lnet/minecraft/server/packs/repository/KnownPack;>;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Inject;",
+                "vals": [
+                  "method",
+                  [
+                    "sendRegistries"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "HEAD"
+                      ],
+                      "api": 589824
+                    }
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "sendPacket",
+            "acc": 2,
+            "dsc": "(Ljava/util/function/Consumer;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V",
+            "sig": "(Ljava/util/function/Consumer<Lnet/minecraft/network/protocol/Packet<*>;>;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Inject;",
+                "vals": [
+                  "method",
+                  [
+                    "start"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "HEAD"
+                      ],
+                      "api": 589824
+                    }
+                  ],
+                  "cancellable",
+                  true
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 26,
+            "nme": "LOGGER",
+            "dsc": "Lorg/slf4j/Logger;"
+          },
+          {
+            "acc": 2,
+            "nme": "requestedPacks",
+            "dsc": "Ljava/util/List;",
+            "sig": "Ljava/util/List<Lnet/minecraft/server/packs/repository/KnownPack;>;"
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/server/network/config/SynchronizeRegistriesTask"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/resource/ResourceReloaderPhaseData.class": {
+        "ver": 65,
+        "acc": 32,
+        "nme": "net/fabricmc/fabric/impl/resource/ResourceReloaderPhaseData",
+        "super": "net/fabricmc/fabric/impl/base/toposort/SortableNode",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "(Lnet/minecraft/resources/Identifier;Lnet/minecraft/server/packs/resources/PreparableReloadListener;)V"
+          },
+          {
+            "nme": "markBefore",
+            "acc": 0,
+            "dsc": "()V"
+          },
+          {
+            "nme": "markAfter",
+            "acc": 0,
+            "dsc": "()V"
+          },
+          {
+            "nme": "setVanillaStatus",
+            "acc": 0,
+            "dsc": "(Lnet/fabricmc/fabric/impl/resource/ResourceReloaderPhaseData$VanillaStatus;)V"
+          },
+          {
+            "nme": "getDescription",
+            "acc": 4,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "addSubsequentNode",
+            "acc": 4,
+            "dsc": "(Lnet/fabricmc/fabric/impl/resource/ResourceReloaderPhaseData;)V"
+          },
+          {
+            "nme": "addPreviousNode",
+            "acc": 4,
+            "dsc": "(Lnet/fabricmc/fabric/impl/resource/ResourceReloaderPhaseData;)V"
+          },
+          {
+            "nme": "addPreviousNode",
+            "acc": 4164,
+            "dsc": "(Lnet/fabricmc/fabric/impl/base/toposort/SortableNode;)V"
+          },
+          {
+            "nme": "addSubsequentNode",
+            "acc": 4164,
+            "dsc": "(Lnet/fabricmc/fabric/impl/base/toposort/SortableNode;)V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 16,
+            "nme": "id",
+            "dsc": "Lnet/minecraft/resources/Identifier;"
+          },
+          {
+            "acc": 0,
+            "nme": "resourceReloader",
+            "dsc": "Lnet/minecraft/server/packs/resources/PreparableReloadListener;"
+          },
+          {
+            "acc": 0,
+            "nme": "vanillaStatus",
+            "dsc": "Lnet/fabricmc/fabric/impl/resource/ResourceReloaderPhaseData$VanillaStatus;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/resource/client/BuiltInPackSourceMixin.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/mixin/resource/client/BuiltInPackSourceMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "addBuiltinResourcePacks",
+            "acc": 2,
+            "dsc": "(Ljava/util/function/Consumer;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V",
+            "sig": "(Ljava/util/function/Consumer<Lnet/minecraft/server/packs/repository/Pack;>;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Inject;",
+                "vals": [
+                  "method",
+                  [
+                    "loadPacks"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "RETURN"
+                      ],
+                      "api": 589824
+                    }
+                  ]
+                ]
+              }
+            ]
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/server/packs/repository/BuiltInPackSource"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/resource/DedicatedServerPropertiesMixin.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/mixin/resource/DedicatedServerPropertiesMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "replaceDefaultDataConfiguration",
+            "acc": 2,
+            "dsc": "()Lnet/minecraft/world/level/WorldDataConfiguration;",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Redirect;",
+                "vals": [
+                  "method",
+                  [
+                    "<init>"
+                  ],
+                  "at",
+                  {
+                    "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                    "values": [
+                      "value",
+                      "FIELD",
+                      "target",
+                      "Lnet/minecraft/world/level/WorldDataConfiguration;DEFAULT:Lnet/minecraft/world/level/WorldDataConfiguration;"
+                    ],
+                    "api": 589824
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "flds": [],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/server/dedicated/DedicatedServerProperties"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/resource/server/package-info.class": {
+        "ver": 65,
+        "acc": 5632,
+        "nme": "net/fabricmc/fabric/mixin/resource/server/package-info",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lorg/jspecify/annotations/NullMarked;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/resource/PackRepositoryMixin.class": {
+        "ver": 65,
+        "acc": 1057,
+        "nme": "net/fabricmc/fabric/mixin/resource/PackRepositoryMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "construct",
+            "acc": 1,
+            "dsc": "([Lnet/minecraft/server/packs/repository/RepositorySource;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Inject;",
+                "vals": [
+                  "method",
+                  [
+                    "<init>"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "RETURN"
+                      ],
+                      "api": 589824
+                    }
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "handleAutoEnableDisable",
+            "acc": 2,
+            "dsc": "(Ljava/util/Collection;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable;Ljava/util/List;)V",
+            "sig": "(Ljava/util/Collection<Ljava/lang/String;>;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable<Ljava/util/List<Lnet/minecraft/server/packs/repository/Pack;>;>;Ljava/util/List<Lnet/minecraft/server/packs/repository/Pack;>;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Inject;",
+                "vals": [
+                  "method",
+                  [
+                    "rebuildSelected"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "INVOKE",
+                        "target",
+                        "Lcom/google/common/collect/ImmutableList;copyOf(Ljava/util/Collection;)Lcom/google/common/collect/ImmutableList;",
+                        "shift",
+                        [
+                          "Lorg/spongepowered/asm/mixin/injection/At$Shift;",
+                          "BEFORE"
+                        ]
+                      ],
+                      "api": 589824
+                    }
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "handleAutoEnable",
+            "acc": 2,
+            "dsc": "(Ljava/lang/String;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable;Ljava/util/List;)V",
+            "sig": "(Ljava/lang/String;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable<Ljava/lang/Boolean;>;Ljava/util/List<Lnet/minecraft/server/packs/repository/Pack;>;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Inject;",
+                "vals": [
+                  "method",
+                  [
+                    "addPack"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "INVOKE",
+                        "target",
+                        "Ljava/util/List;add(Ljava/lang/Object;)Z",
+                        "shift",
+                        [
+                          "Lorg/spongepowered/asm/mixin/injection/At$Shift;",
+                          "AFTER"
+                        ]
+                      ],
+                      "api": 589824
+                    }
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "handleAutoDisable",
+            "acc": 2,
+            "dsc": "(Ljava/lang/String;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable;Ljava/util/List;)V",
+            "sig": "(Ljava/lang/String;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable<Ljava/lang/Boolean;>;Ljava/util/List<Lnet/minecraft/server/packs/repository/Pack;>;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Inject;",
+                "vals": [
+                  "method",
+                  [
+                    "removePack"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "INVOKE",
+                        "target",
+                        "Ljava/util/List;remove(Ljava/lang/Object;)Z"
+                      ],
+                      "api": 589824
+                    }
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "lambda$handleAutoDisable$0",
+            "acc": 4106,
+            "dsc": "(Ljava/util/Set;Lnet/minecraft/server/packs/repository/Pack;)Z"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 26,
+            "nme": "LOGGER",
+            "dsc": "Lorg/slf4j/Logger;"
+          },
+          {
+            "acc": 1,
+            "nme": "sources",
+            "dsc": "Ljava/util/Set;",
+            "sig": "Ljava/util/Set<Lnet/minecraft/server/packs/repository/RepositorySource;>;"
+          },
+          {
+            "acc": 2,
+            "nme": "available",
+            "dsc": "Ljava/util/Map;",
+            "sig": "Ljava/util/Map<Ljava/lang/String;Lnet/minecraft/server/packs/repository/Pack;>;"
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/server/packs/repository/PackRepository"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/resource/PackSourceTracker.class": {
+        "ver": 65,
+        "acc": 49,
+        "nme": "net/fabricmc/fabric/impl/resource/PackSourceTracker",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "getSource",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/server/packs/PackResources;)Lnet/minecraft/server/packs/repository/PackSource;"
+          },
+          {
+            "nme": "setSource",
+            "acc": 9,
+            "dsc": "(Lnet/minecraft/server/packs/PackResources;Lnet/minecraft/server/packs/repository/PackSource;)V"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 26,
+            "nme": "SOURCES",
+            "dsc": "Ljava/util/WeakHashMap;",
+            "sig": "Ljava/util/WeakHashMap<Lnet/minecraft/server/packs/PackResources;Lnet/minecraft/server/packs/repository/PackSource;>;"
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/resource/client/package-info.class": {
+        "ver": 65,
+        "acc": 5632,
+        "nme": "net/fabricmc/fabric/mixin/resource/client/package-info",
+        "super": "java/lang/Object",
+        "mthds": [],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lorg/jspecify/annotations/NullMarked;"
+          },
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/resource/client/GameOptionsWriteVisitorMixin.class": {
+        "ver": 65,
+        "acc": 33,
+        "nme": "net/fabricmc/fabric/mixin/resource/client/GameOptionsWriteVisitorMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "toPackListString",
+            "acc": 10,
+            "dsc": "(Ljava/util/List;)Ljava/util/List;",
+            "sig": "(Ljava/util/List<Ljava/lang/String;>;)Ljava/util/List<Ljava/lang/String;>;",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/Unique;"
+              }
+            ]
+          },
+          {
+            "nme": "skipHiddenPacks",
+            "acc": 2,
+            "dsc": "(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/Object;",
+            "sig": "<T:Ljava/lang/Object;>(TT;Ljava/lang/String;)TT;",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/ModifyArg;",
+                "vals": [
+                  "method",
+                  [
+                    "process(Ljava/lang/String;Ljava/lang/Object;Ljava/util/function/Function;Ljava/util/function/Function;)Ljava/lang/Object;"
+                  ],
+                  "at",
+                  {
+                    "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                    "values": [
+                      "value",
+                      "INVOKE",
+                      "target",
+                      "Ljava/util/function/Function;apply(Ljava/lang/Object;)Ljava/lang/Object;"
+                    ],
+                    "api": 589824
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "flds": [],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "targets",
+              [
+                "net/minecraft/client/Options$3"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/resource/client/PackTooltipComponent.class": {
+        "ver": 65,
+        "acc": 65585,
+        "nme": "net/fabricmc/fabric/impl/resource/client/PackTooltipComponent",
+        "super": "java/lang/Record",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "(Ljava/util/Optional;Ljava/util/Optional;)V",
+            "sig": "(Ljava/util/Optional<Lnet/minecraft/network/chat/Component;>;Ljava/util/Optional<Ljava/util/List<Lnet/minecraft/util/FormattedCharSequence;>;>;)V"
+          },
+          {
+            "nme": "getHeight",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/client/gui/Font;)I"
+          },
+          {
+            "nme": "getWidth",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/client/gui/Font;)I"
+          },
+          {
+            "nme": "renderText",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/client/gui/GuiGraphics;Lnet/minecraft/client/gui/Font;II)V"
+          },
+          {
+            "nme": "renderImage",
+            "acc": 1,
+            "dsc": "(Lnet/minecraft/client/gui/Font;IIIILnet/minecraft/client/gui/GuiGraphics;)V"
+          },
+          {
+            "nme": "toString",
+            "acc": 17,
+            "dsc": "()Ljava/lang/String;"
+          },
+          {
+            "nme": "hashCode",
+            "acc": 17,
+            "dsc": "()I"
+          },
+          {
+            "nme": "equals",
+            "acc": 17,
+            "dsc": "(Ljava/lang/Object;)Z"
+          },
+          {
+            "nme": "name",
+            "acc": 1,
+            "dsc": "()Ljava/util/Optional;",
+            "sig": "()Ljava/util/Optional<Lnet/minecraft/network/chat/Component;>;"
+          },
+          {
+            "nme": "description",
+            "acc": 1,
+            "dsc": "()Ljava/util/Optional;",
+            "sig": "()Ljava/util/Optional<Ljava/util/List<Lnet/minecraft/util/FormattedCharSequence;>;>;"
+          },
+          {
+            "nme": "lambda$getWidth$0",
+            "acc": 4106,
+            "dsc": "(Lnet/minecraft/client/gui/Font;Ljava/util/List;)Ljava/lang/Integer;"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 18,
+            "nme": "name",
+            "dsc": "Ljava/util/Optional;",
+            "sig": "Ljava/util/Optional<Lnet/minecraft/network/chat/Component;>;"
+          },
+          {
+            "acc": 18,
+            "nme": "description",
+            "dsc": "Ljava/util/Optional;",
+            "sig": "Ljava/util/Optional<Ljava/util/List<Lnet/minecraft/util/FormattedCharSequence;>;>;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/mixin/resource/PackMixin.class": {
+        "ver": 65,
+        "acc": 1056,
+        "nme": "net/fabricmc/fabric/mixin/resource/PackMixin",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 0,
+            "dsc": "()V"
+          },
+          {
+            "nme": "location",
+            "acc": 1025,
+            "dsc": "()Lnet/minecraft/server/packs/PackLocationInfo;",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/Shadow;"
+              }
+            ]
+          },
+          {
+            "nme": "onCreateResourcePack",
+            "acc": 2,
+            "dsc": "(Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable;)V",
+            "sig": "(Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable<Lnet/minecraft/server/packs/PackResources;>;)V",
+            "vanns": [
+              {
+                "dsc": "Lorg/spongepowered/asm/mixin/injection/Inject;",
+                "vals": [
+                  "method",
+                  [
+                    "open"
+                  ],
+                  "at",
+                  [
+                    {
+                      "desc": "Lorg/spongepowered/asm/mixin/injection/At;",
+                      "values": [
+                        "value",
+                        "RETURN"
+                      ],
+                      "api": 589824
+                    }
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "nme": "fabric$isHidden",
+            "acc": 1,
+            "dsc": "()Z"
+          },
+          {
+            "nme": "fabric$parentsEnabled",
+            "acc": 1,
+            "dsc": "(Ljava/util/Set;)Z",
+            "sig": "(Ljava/util/Set<Ljava/lang/String;>;)Z"
+          },
+          {
+            "nme": "fabric$setParentsPredicate",
+            "acc": 1,
+            "dsc": "(Ljava/util/function/Predicate;)V",
+            "sig": "(Ljava/util/function/Predicate<Ljava/util/Set<Ljava/lang/String;>;>;)V"
+          },
+          {
+            "nme": "lambda$static$0",
+            "acc": 4106,
+            "dsc": "(Ljava/util/Set;)Z"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 26,
+            "nme": "DEFAULT_PARENT_PREDICATE",
+            "dsc": "Ljava/util/function/Predicate;",
+            "sig": "Ljava/util/function/Predicate<Ljava/util/Set<Ljava/lang/String;>;>;"
+          },
+          {
+            "acc": 2,
+            "nme": "parentsPredicate",
+            "dsc": "Ljava/util/function/Predicate;",
+            "sig": "Ljava/util/function/Predicate<Ljava/util/Set<Ljava/lang/String;>;>;"
+          }
+        ],
+        "invanns": [
+          {
+            "dsc": "Lorg/spongepowered/asm/mixin/Mixin;",
+            "vals": [
+              "value",
+              [
+                {
+                  "itrlNme": "net/minecraft/server/packs/repository/Pack"
+                }
+              ]
+            ]
+          }
+        ]
+      },
+      "net/fabricmc/fabric/impl/resource/client/DefaultResourcePackStorage.class": {
+        "ver": 65,
+        "acc": 49,
+        "nme": "net/fabricmc/fabric/impl/resource/client/DefaultResourcePackStorage",
+        "super": "java/lang/Object",
+        "mthds": [
+          {
+            "nme": "<init>",
+            "acc": 1,
+            "dsc": "()V"
+          },
+          {
+            "nme": "process",
+            "acc": 9,
+            "dsc": "(Ljava/util/Collection;)Ljava/util/List;",
+            "sig": "(Ljava/util/Collection<Ljava/lang/String;>;)Ljava/util/List<Ljava/lang/String;>;"
+          },
+          {
+            "nme": "read",
+            "acc": 10,
+            "dsc": "()Ljava/util/Set;",
+            "sig": "()Ljava/util/Set<Ljava/lang/String;>;"
+          },
+          {
+            "nme": "write",
+            "acc": 10,
+            "dsc": "(Ljava/util/Set;)V",
+            "sig": "(Ljava/util/Set<Ljava/lang/String;>;)V"
+          },
+          {
+            "nme": "lambda$static$0",
+            "acc": 4106,
+            "dsc": "(Lcom/mojang/serialization/codecs/RecordCodecBuilder$Instance;)Lcom/mojang/datafixers/kinds/App;"
+          },
+          {
+            "nme": "<clinit>",
+            "acc": 8,
+            "dsc": "()V"
+          }
+        ],
+        "flds": [
+          {
+            "acc": 26,
+            "nme": "LOGGER",
+            "dsc": "Lorg/slf4j/Logger;"
+          },
+          {
+            "acc": 26,
+            "nme": "DATA_DIR",
+            "dsc": "Ljava/nio/file/Path;"
+          },
+          {
+            "acc": 26,
+            "nme": "TRACKER_FILE_PATH",
+            "dsc": "Ljava/nio/file/Path;"
+          },
+          {
+            "acc": 26,
+            "nme": "OLD_TRACKER_FILE_PATH",
+            "dsc": "Ljava/nio/file/Path;"
+          },
+          {
+            "acc": 26,
+            "nme": "CODEC",
+            "dsc": "Lcom/mojang/serialization/Codec;",
+            "sig": "Lcom/mojang/serialization/Codec<Ljava/util/Set<Ljava/lang/String;>;>;"
+          }
+        ],
+        "vanns": [
+          {
+            "dsc": "Lnet/fabricmc/api/Environment;",
+            "vals": [
+              "value",
+              [
+                "Lnet/fabricmc/api/EnvType;",
+                "CLIENT"
+              ]
+            ]
+          }
+        ]
+      }
+    }
+  }
+}
