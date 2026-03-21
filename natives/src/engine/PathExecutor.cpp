@@ -95,6 +95,8 @@ PathCommand PathExecutor::tick(const WorldAccessor& world,
             rotation_.setPath(activePath_, 0);
             stuck_.reset();
             status_ = PathStatus::EXECUTING;
+        } else if (!planner_.isRunning()) {
+            startPlan(world, px, py, pz);
         }
         return {false,false,false,false,false,yaw,pitch,PathStatus::PLANNING,ActionType::WALK,distToWaypoint(px,pz)};
 

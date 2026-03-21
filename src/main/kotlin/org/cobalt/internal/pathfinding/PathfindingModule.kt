@@ -25,6 +25,7 @@ import org.cobalt.api.util.ui.NVGRenderer
 object PathfindingModule : Module("Pathfinding") {
 
   private val mc: Minecraft = Minecraft.getInstance()
+  private var moduleOwnsPath = false
 
   val enabled = CheckboxSetting(
     "Enabled",
@@ -190,20 +191,15 @@ object PathfindingModule : Module("Pathfinding") {
   @SubscribeEvent
   fun onTick(@Suppress("UNUSED_PARAMETER") event: TickEvent.Start) {
     org.cobalt.internal.pathfinding.DebugLog.debugFileEnabled = debugFileLogging.value
-    if (!enabled.value) {
-      if (nativeActive()) {
-        org.cobalt.api.pathfinder.jni.NativePathfinder.stop()
-        MovementManager.setMovementLock(false)
-        MovementManager.setLookLock(false)
-      }
-      return
-    }
+    // PathfindingModule only drives NativePathfinder when the user explicitly
+    // started a path via the UI (startFromSettings / startTo). Macros tick it themselves.
+    if (!enabled.value || !moduleOwnsPath) return
     val cmd = org.cobalt.api.pathfinder.jni.NativePathfinder.tick()
     if (cmd != null) {
       cmd.applyToPlayer()
     } else {
+      moduleOwnsPath = false
       MovementManager.setMovementLock(false)
-      MovementManager.setLookLock(false)
     }
   }
 
@@ -228,6 +224,7 @@ object PathfindingModule : Module("Pathfinding") {
     val z = parseCoordinate(targetZ.value) ?: return invalidTarget("Z", targetZ.value)
 
     org.cobalt.api.pathfinder.jni.NativePathfinder.setTarget(x, y, z)
+    moduleOwnsPath = true
   }
 
   fun setTargetOnly(x: Double, y: Double, z: Double) {
@@ -241,10 +238,12 @@ object PathfindingModule : Module("Pathfinding") {
       ensureEnabledForAutomation("pathfinding")
     }
     org.cobalt.api.pathfinder.jni.NativePathfinder.setTarget(x, y, z)
+    moduleOwnsPath = true
   }
 
   fun stopPath() {
     org.cobalt.api.pathfinder.jni.NativePathfinder.stop()
+    moduleOwnsPath = false
     MovementManager.setMovementLock(false)
   }
 

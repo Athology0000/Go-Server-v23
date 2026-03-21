@@ -88,6 +88,15 @@ object NativePathfinder {
         //          [9]=distanceToTarget (float bits)
         val statusOrdinal = r[7]
         val actionOrdinal = r[8]
+        val parsedStatus = PathStatus.entries.getOrElse(statusOrdinal) { PathStatus.FAILED }
+
+        // Don't lock movement/rotation when the engine isn't actively navigating
+        if (parsedStatus == PathStatus.IDLE ||
+            parsedStatus == PathStatus.PLANNING ||
+            parsedStatus == PathStatus.ARRIVED ||
+            parsedStatus == PathStatus.FAILED) {
+            return null
+        }
 
         return PathCommand(
             forward  = r[0] != 0,
@@ -97,7 +106,7 @@ object NativePathfinder {
             sprint   = r[4] != 0,
             targetYaw   = java.lang.Float.intBitsToFloat(r[5]),
             targetPitch = java.lang.Float.intBitsToFloat(r[6]),
-            status      = PathStatus.entries.getOrElse(statusOrdinal) { PathStatus.FAILED },
+            status      = parsedStatus,
             activeAction = ActionType.entries.getOrElse(actionOrdinal) { ActionType.WALK },
             distanceToTarget = java.lang.Float.intBitsToFloat(r[9])
         )

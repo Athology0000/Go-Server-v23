@@ -75,20 +75,20 @@ java {
   }
 }
 
-// ── Native DLL build (Windows, requires VS2022 + CMake) ───────────────────────
+// ── Native DLL build (Windows, requires VS2026 + CMake) ───────────────────────
 val nativesDir = file("natives")
 val dllReleasePath = file("natives/build/Release/cobalt_pathfinder.dll")
 val dllResourceDest = file("src/main/resources/natives/windows")
 
 tasks.register<Exec>("buildNative") {
   group = "build"
-  description = "Compiles cobalt_pathfinder.dll via CMake (requires VS2022 + CMake installed)."
+  description = "Compiles cobalt_pathfinder.dll via CMake."
   workingDir = nativesDir
   commandLine(
     "cmd", "/c",
-    "cmake -B build -G \"Visual Studio 17 2022\" -A x64 && cmake --build build --config Release"
+    "cmake --build build --config Release"
   )
-  onlyIf { !dllReleasePath.exists() }
+  onlyIf { nativesDir.resolve("build").exists() }
 }
 
 tasks.register<Copy>("copyNativeDll") {
@@ -102,6 +102,20 @@ tasks.register<Copy>("copyNativeDll") {
 
 tasks.named("processResources") {
   dependsOn("copyNativeDll")
+}
+
+// ── Deploy JAR to Prism mods folder ──────────────────────────────────────────
+val modsDir = file("C:/Users/aeare/AppData/Roaming/PrismLauncher/instances/1.21.11(1)/minecraft/mods")
+
+tasks.register<Copy>("deployMod") {
+  group = "build"
+  description = "Copies the built JAR to the Prism Launcher mods folder."
+  dependsOn("build")
+  from(layout.buildDirectory.dir("libs")) {
+    include("${modName}-${version}.jar")
+  }
+  into(modsDir)
+  duplicatesStrategy = DuplicatesStrategy.INCLUDE
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
