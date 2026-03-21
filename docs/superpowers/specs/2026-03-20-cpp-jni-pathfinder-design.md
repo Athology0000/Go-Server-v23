@@ -50,14 +50,17 @@ Replace all per-macro pathfinding logic with a single shared C++ pathfinding eng
 
 ---
 
-## 3. World Access — Hybrid Buffer + Callback
+## 3. World Access — Buffer Snapshot
 
-C++ accesses Minecraft block data via two mechanisms:
+Java serializes a 64×32×64 region of blocks centred on the player into a `byte[]` every tick before calling `update()`. C++ reads exclusively from this snapshot — there are no JNI callbacks from the C++ side. This eliminates cross-thread JVM calls and Minecraft's non-thread-safe `ClientLevel` access from the async planner thread.
 
-- **Buffer (fast path):** Java serializes a region of blocks (e.g. 64×32×64) centred on the player into a `byte[]` before calling `update()`. C++ reads from this buffer for the majority of queries (~95% hit rate).
-- **JNI callback (fallback):** For blocks outside the buffer (unusual terrain, long paths), C++ calls back into the JVM via a registered callback. Slower but guarantees correctness on all terrain shapes.
+**Buffer layout:**
+- Size: 64 × 32 × 64 = 131,072 bytes
+- Origin: `(bx, by, bz)` = player block pos minus `(32, 16, 32)`
+- Index: `(x - bx) + (z - bz) * 64 + (y - by) * 64 * 64`
+- Byte values: `0` = air/passable, `1` = solid, `2` = water, `3` = lava, `4` = ladder
 
-This hybrid ensures the pathfinder never goes blind on weird terrain (ravines, multi-floor structures, irregular tunnels) while keeping per-tick overhead low.
+If the path extends beyond the buffer (rare for Skyblock's bounded indoor geometry), the planner treats out-of-range blocks as `SOLID` and replans when the buffer region advances. This is safe because Skyblock areas are compact enough that a 64-block radius covers all active pathfinding in practice.
 
 ---
 
@@ -132,15 +135,15 @@ Three layers applied every tick by `RotationController`:
 **Layer 1 — Path-aware look-ahead**
 Controller targets node+2 or node+3 rather than the immediate next node. Head begins turning before the body arrives at a corner.
 
-**Layer 2 — Bezier curve + GCD correction**
-Rotation moves along a bezier curve (fast start, eased finish). GCD correction applied so fractional angles don't form detectable patterns.
+**Layer 2 — Bezier curve**
+Rotation moves along a bezier curve (fast start, eased finish). C++ outputs raw target angles. GCD correction is applied once by the existing `RotationExecutor` on the Kotlin side — it must NOT be applied in C++ to avoid double-quantisation.
 
 **Layer 3 — Micro-variation**
 Every 8–15 ticks (randomised), ±0.08°–0.25° noise added to yaw and pitch. During `RECOVERING`, a short head-scan is performed (natural "looking around" behaviour).
 
-**COMBAT profile override:** Faster tracking curve that leads mob movement direction rather than following it.
+**COMBAT profile override:** Faster tracking curve. The macro calls `setTarget(mob.pos)` every tick with the mob's current position; the look-ahead targeting (node+2) naturally leads the mob rather than lagging behind. No mob velocity data is required in `PathCommand`.
 
-Output per tick: `targetYaw: Float, targetPitch: Float` — fed into the existing `RotationExecutor`.
+Output per tick: raw `targetYaw: Float, targetPitch: Float` — fed into the existing `RotationExecutor` which applies GCD correction before writing to the player.
 
 ---
 
@@ -151,7 +154,7 @@ Output per tick: `targetYaw: Float, targetPitch: Float` — fed into the existin
 object NativePathfinder {
     fun setRoute(waypoints: List<Vec3>, loop: Boolean = false,
                  profile: MovementProfile = MovementProfile.DEFAULT)
-    fun setTarget(pos: Vec3)   // single-destination shortcut
+    fun setTarget(pos: Vec3, arrivalRadius: Double = 1.8)  // single-destination with configurable arrival threshold
     fun stop()
     val status: PathStatus
     fun tick(): PathCommand?   // call once per TickEvent.Start
@@ -163,10 +166,11 @@ data class PathCommand(
     val jump: Boolean,
     val sneak: Boolean,
     val sprint: Boolean,
-    val targetYaw: Float,
-    val targetPitch: Float,
+    val targetYaw: Float,       // raw angle — RotationExecutor applies GCD
+    val targetPitch: Float,     // raw angle
     val status: PathStatus,
-    val activeAction: ActionType
+    val activeAction: ActionType,
+    val distanceToTarget: Float // horizontal distance to current waypoint target
 )
 ```
 
@@ -194,13 +198,23 @@ public class NativePathfinderBridge {
     public static native void  setRoute(long handle, double[] waypoints,
                                          boolean loop, int profile);
     public static native void  setTarget(long handle, double x, double y, double z);
+    // Returns int[10] — see "Command Encoding" section
     public static native int[] update(long handle, byte[] worldBuffer,
                                        int bx, int by, int bz,
                                        double px, double py, double pz,
                                        float yaw, float pitch, boolean onGround);
+    public static native void  setArrivalRadius(long handle, double radius);
     public static native void  stop(long handle);
     public static native int   getStatus(long handle);
 }
+
+// int[10] command encoding:
+// [0] forward  [1] back  [2] jump  [3] sneak  [4] sprint
+// [5] targetYaw   (Float.intBitsToFloat)
+// [6] targetPitch (Float.intBitsToFloat)
+// [7] PathStatus ordinal
+// [8] ActionType ordinal
+// [9] distanceToTarget (Float.intBitsToFloat)
 ```
 
 ---
@@ -231,7 +245,7 @@ natives/
 
 **Gradle task** builds the DLL and copies it into `src/main/resources/natives/windows/`. `processResources` depends on `buildNative`. The DLL ships embedded in the JAR — single file, no separate install.
 
-**DLL extraction at runtime:** `NativeLoader.java` extracts `cobalt_pathfinder.dll` from the JAR to `%TEMP%\cobalt\` on first run, skipped on subsequent runs if checksum matches.
+**DLL extraction at runtime:** `NativeLoader.java` extracts `cobalt_pathfinder.dll` from the JAR to `%TEMP%\cobalt\` on first run. Re-extraction is skipped if the destination file size matches the JAR resource size. A `FileChannel` exclusive lock on a `.lock` file guards concurrent extraction (two game instances starting simultaneously).
 
 ---
 
@@ -242,7 +256,8 @@ natives/
 | 1 | Infrastructure: `natives/`, `NativePathfinderBridge.java`, `NativeLoader.java`, `NativePathfinder.kt`, `PathCommand.kt`, `MovementProfile.kt`, `PathStatus.kt`, `build.gradle.kts` | DLL loads, engine creates/destroys cleanly |
 | 2 | `RoutesModule.kt` | Waypoint routes in tunnels, stuck recovery |
 | 3 | `MiningMacroModule.kt`, `CommissionMacroModule.kt` | MINING profile, tunnel nav |
-| 4 | `GardenMacroModule.kt`, `FarmingMacroModule.kt` | GROUND_ONLY profile, loop patrol |
-| 5 | `PigMacroModule.kt` | Dynamic target, orb approach |
-| 6 | `CombatMacroModule.kt` | COMBAT profile, AOTV/Etherwarp edges |
-| 7 | Delete `DuskPathfinder.kt`, `AStarPathfinder.kt`, `NodeProcessor.kt`, `PathPlanProfiles.kt` | All macros validated |
+| 4 | `PigMacroModule.kt` | Dynamic target (`setTarget` each tick), `distanceToTarget` for interaction range, orb approach |
+| 5 | `CombatMacroModule.kt` | COMBAT profile, `setTarget(mob.pos)` each tick, AOTV/Etherwarp edges |
+| 6 | Delete `DuskPathfinder.kt`, `PathExecutor.kt` (API), `PathPlanProfiles.kt`, `PathPlanProfile.kt` | All macros validated |
+
+**Note:** `GardenMacroModule` and `FarmingMacroModule` do not call `DuskPathfinder` — they use Taunahi scripts and `MovementManager` key presses respectively. No migration needed for these; add `NativePathfinder.stop()` to their `onDisable()` for cleanliness only.
