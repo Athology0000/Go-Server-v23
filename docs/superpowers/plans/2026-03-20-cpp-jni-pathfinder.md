@@ -28,13 +28,14 @@
 - `src/main/java/org/cobalt/pathfinder/NativePathfinderBridge.java` — `native` method declarations + DLL loading
 - `src/main/java/org/cobalt/pathfinder/NativeLoader.java` — extracts DLL from JAR to `%TEMP%\cobalt\`
 
-**New — Kotlin**
-- `src/main/kotlin/org/cobalt/api/pathfinder/native/PathStatus.kt`
-- `src/main/kotlin/org/cobalt/api/pathfinder/native/ActionType.kt`
-- `src/main/kotlin/org/cobalt/api/pathfinder/native/MovementProfile.kt`
-- `src/main/kotlin/org/cobalt/api/pathfinder/native/PathCommand.kt`
-- `src/main/kotlin/org/cobalt/api/pathfinder/native/NativePathfinder.kt` — singleton all macros call
-- `src/main/kotlin/org/cobalt/api/pathfinder/native/WorldBufferSerializer.kt` — serializes nearby MC blocks to `byte[]`
+**New — Kotlin** (package `org.cobalt.api.pathfinder.jni` — `native` is a Kotlin keyword)
+- `src/main/kotlin/org/cobalt/api/pathfinder/jni/PathStatus.kt`
+- `src/main/kotlin/org/cobalt/api/pathfinder/jni/ActionType.kt`
+- `src/main/kotlin/org/cobalt/api/pathfinder/jni/MovementProfile.kt`
+- `src/main/kotlin/org/cobalt/api/pathfinder/jni/PathCommand.kt`
+- `src/main/kotlin/org/cobalt/api/pathfinder/jni/PathfinderRotationStrategy.kt` — pass-through strategy (C++ already smoothed)
+- `src/main/kotlin/org/cobalt/api/pathfinder/jni/NativePathfinder.kt` — singleton all macros call
+- `src/main/kotlin/org/cobalt/api/pathfinder/jni/WorldBufferSerializer.kt` — serializes nearby MC blocks to `byte[]`
 
 **Modified**
 - `build.gradle.kts` — add `buildNative` task, `processResources` depends on it
@@ -48,6 +49,7 @@
 
 **Deleted (Phase 7)**
 - `src/main/kotlin/org/cobalt/internal/pathfinding/DuskPathfinder.kt`
+- `src/main/kotlin/org/cobalt/internal/pathfinding/PathOverlayRenderer.kt` (dead code after migration)
 - `src/main/kotlin/org/cobalt/api/pathfinder/PathExecutor.kt`
 - `src/main/kotlin/org/cobalt/internal/pathfinding/PathPlanProfiles.kt`
 - `src/main/kotlin/org/cobalt/internal/pathfinding/PathPlanProfile.kt`
@@ -118,6 +120,8 @@ struct PathCommand {
 // World buffer constants
 static constexpr int BUF_W = 64, BUF_H = 32, BUF_D = 64;
 static constexpr int BUF_SIZE = BUF_W * BUF_H * BUF_D;
+static constexpr int BUF_STRIDE_Z = BUF_W;           // z-stride: skip one row of X
+static constexpr int BUF_STRIDE_Y = BUF_W * BUF_D;  // y-stride: skip one XZ plane
 
 // Block type bytes
 static constexpr uint8_t BT_AIR    = 0;
@@ -244,6 +248,12 @@ public:
     bool isWater(int x, int y, int z) const;
     bool isLava(int x, int y, int z) const;
 
+    // Accessors for buffer snapshot (used by AStarPlanner to copy buffer before threading)
+    const uint8_t* bufferData() const { return buffer_; }
+    int originX() const { return bx_; }
+    int originY() const { return by_; }
+    int originZ() const { return bz_; }
+
 private:
     const uint8_t* buffer_ = nullptr;
     int bx_ = 0, by_ = 0, bz_ = 0;
@@ -278,13 +288,15 @@ bool WorldAccessor::inBuffer(int x, int y, int z) const {
 }
 
 uint8_t WorldAccessor::bufferAt(int x, int y, int z) const {
-    int idx = (x - bx_) + (z - bz_) * BUF_W + (y - by_) * BUF_W * BUF_D;
+    // Use named strides — do not inline BUF_W*BUF_D directly (W==D is not guaranteed)
+    int idx = (x - bx_) + (z - bz_) * BUF_STRIDE_Z + (y - by_) * BUF_STRIDE_Y;
     return buffer_[idx];
 }
 
-uint8_t WorldAccessor::callbackBlock(int x, int y, int z) const {
-    if (!env_ || !cbObj_ || !cbMethod_) return BT_SOLID; // safe fallback
-    return (uint8_t)env_->CallIntMethod(cbObj_, cbMethod_, x, y, z);
+uint8_t WorldAccessor::callbackBlock(int, int, int) const {
+    // JNI callbacks from background threads require AttachCurrentThread — not implemented.
+    // Buffer is sized to cover all Skyblock pathfinding; treat out-of-range as SOLID.
+    return BT_SOLID;
 }
 
 uint8_t WorldAccessor::getBlock(int x, int y, int z) const {
@@ -557,11 +569,11 @@ Runs A* on a background `std::thread`. Thread-safe result handoff via `std::atom
 #pragma once
 #include "Types.h"
 #include "MovementExpander.h"
+#include "WorldAccessor.h"
 #include <vector>
 #include <thread>
 #include <mutex>
 #include <atomic>
-#include <functional>
 
 struct AStarResult {
     bool found = false;
@@ -572,9 +584,10 @@ class AStarPlanner {
 public:
     ~AStarPlanner();
 
-    // Start async search. Calls onComplete on background thread — check isComplete() from main thread.
+    // Snapshots the world buffer into the thread closure — no shared reference to WorldAccessor.
+    // Safe to call while WorldAccessor is being updated on the main thread.
     void startAsync(Vec3i start, Vec3i goal,
-                    const WorldAccessor& world,
+                    const WorldAccessor& world,   // snapshot taken immediately, not stored
                     MovementProfile profile);
 
     bool isComplete() const { return complete_.load(); }
@@ -660,8 +673,19 @@ void AStarPlanner::startAsync(Vec3i start, Vec3i goal,
 
     MovementCosts costs = costsForProfile(profile);
 
-    thread_ = std::thread([this, start, goal, &world, costs]() {
-        MovementExpander expander(world, costs);
+    // Snapshot the entire buffer into the thread closure to avoid data races.
+    // WorldAccessor on the main thread may be updated (setBuffer) while this thread runs.
+    std::vector<uint8_t> bufSnapshot(world.bufferData(),
+                                      world.bufferData() + BUF_SIZE);
+    int snapBx = world.originX(), snapBy = world.originY(), snapBz = world.originZ();
+
+    thread_ = std::thread([this, start, goal, costs,
+                           bufSnapshot = std::move(bufSnapshot),
+                           snapBx, snapBy, snapBz]() mutable {
+        // Thread-local WorldAccessor — no shared state with main thread
+        WorldAccessor localWorld;
+        localWorld.setBuffer(bufSnapshot.data(), snapBx, snapBy, snapBz);
+        MovementExpander expander(localWorld, costs);
 
         using Map = std::unordered_map<Vec3i, float,    Vec3iHash, Vec3iEq>;
         using PMap= std::unordered_map<Vec3i, Vec3i,    Vec3iHash, Vec3iEq>;
@@ -760,7 +784,7 @@ private:
     int stuckTickLimit_;
     double movementEps_;
     std::deque<Vec3d> history_;
-    int stuckTicks_ = 0;
+    bool stuck_ = false;
 };
 ```
 
@@ -777,16 +801,17 @@ void StuckDetector::update(double px, double py, double pz) {
     history_.push_back({px, py, pz});
     if ((int)history_.size() > stuckTickLimit_) history_.pop_front();
 
-    if ((int)history_.size() < stuckTickLimit_) { stuckTicks_ = 0; return; }
+    if ((int)history_.size() < stuckTickLimit_) { stuck_ = false; return; }
 
     const auto& oldest = history_.front();
     double dx = px - oldest.x, dz = pz - oldest.z;
     double moved = std::sqrt(dx*dx + dz*dz);
-    stuckTicks_ = (moved < movementEps_) ? stuckTicks_ + 1 : 0;
+    // isStuck triggers as soon as the full window shows no movement
+    stuck_ = (moved < movementEps_);
 }
 
-bool StuckDetector::isStuck() const { return stuckTicks_ >= stuckTickLimit_; }
-void StuckDetector::reset() { history_.clear(); stuckTicks_ = 0; }
+bool StuckDetector::isStuck() const { return stuck_; }
+void StuckDetector::reset() { history_.clear(); stuck_ = false; }
 ```
 
 - [ ] **Step 3: Build + Commit**
@@ -1334,8 +1359,8 @@ public class NativeLoader {
             try (InputStream in = NativeLoader.class.getResourceAsStream("/" + resourcePath)) {
                 if (in == null) throw new IOException("Native resource not found: " + resourcePath);
                 byte[] bytes = in.readAllBytes();
-                // Skip re-extract if file size matches (fast check, sufficient for versioned JARs)
-                if (Files.exists(dest) && Files.size(dest) == bytes.length) {
+                // CRC32 comparison — size alone is insufficient across recompilations of same-size DLLs
+                if (Files.exists(dest) && crc32(Files.readAllBytes(dest)) == crc32(bytes)) {
                     return dest.toAbsolutePath().toString();
                 }
                 Files.write(dest, bytes,
@@ -1343,6 +1368,12 @@ public class NativeLoader {
             }
         }
         return dest.toAbsolutePath().toString();
+    }
+
+    private static long crc32(byte[] data) {
+        java.util.zip.CRC32 crc = new java.util.zip.CRC32();
+        crc.update(data);
+        return crc.getValue();
     }
 }
 ```
@@ -1398,28 +1429,44 @@ git commit -m "feat: add NativePathfinderBridge and NativeLoader (Java JNI bridg
 
 `PathStatus.kt`:
 ```kotlin
-package org.cobalt.api.pathfinder.native
+package org.cobalt.api.pathfinder.jni
 enum class PathStatus { IDLE, PLANNING, EXECUTING, RECOVERING, REPLANNING, ARRIVED, FAILED }
 ```
 
 `ActionType.kt`:
 ```kotlin
-package org.cobalt.api.pathfinder.native
+package org.cobalt.api.pathfinder.jni
 enum class ActionType { WALK, SPRINT, JUMP, SPRINT_JUMP, FALL, LADDER, WATER_SWIM, AOTV, ETHERWARP }
 ```
 
 `MovementProfile.kt`:
 ```kotlin
-package org.cobalt.api.pathfinder.native
+package org.cobalt.api.pathfinder.jni
 enum class MovementProfile { DEFAULT, MINING, COMBAT, GROUND_ONLY }
+```
+
+`PathfinderRotationStrategy.kt` — pass-through: C++ already smoothed the angle, just let RotationExecutor apply GCD:
+```kotlin
+package org.cobalt.api.pathfinder.jni
+
+import net.minecraft.client.player.LocalPlayer
+import org.cobalt.api.rotation.IRotationStrategy
+import org.cobalt.api.util.helper.Rotation
+
+object PathfinderRotationStrategy : IRotationStrategy {
+    override fun onRotate(player: LocalPlayer, targetYaw: Float, targetPitch: Float): Rotation =
+        Rotation(targetYaw, targetPitch)  // return exact target — RotationExecutor applies GCD once
+}
 ```
 
 - [ ] **Step 2: Create `PathCommand.kt`**
 
 ```kotlin
-package org.cobalt.api.pathfinder.native
+package org.cobalt.api.pathfinder.jni
 
 import net.minecraft.client.Minecraft
+import org.cobalt.api.rotation.RotationExecutor
+import org.cobalt.api.util.helper.Rotation
 import org.cobalt.api.util.player.MovementManager
 
 data class PathCommand(
@@ -1435,15 +1482,15 @@ data class PathCommand(
     val distanceToTarget: Float,   // horizontal dist to current waypoint — use for interaction range checks
 ) {
     fun applyToPlayer() {
-        val player = Minecraft.getInstance().player ?: return
-        MovementManager.forward = forward
-        MovementManager.back    = back
-        MovementManager.jump    = jump
-        MovementManager.sneak   = sneak
-        MovementManager.sprint  = sprint
-        // Feed raw angles to RotationExecutor — it applies GCD correction
-        player.yRot   = targetYaw
-        player.xRot   = targetPitch
+        // Movement: use setMovementLock + setForcedMovement so Mixin gates work correctly
+        MovementManager.setMovementLock(true)
+        MovementManager.setForcedMovement(
+            forward, back,
+            left = false, right = false,
+            jump, sneak, sprint
+        )
+        // Rotation: feed raw angles to RotationExecutor — it applies GCD once via PathfinderRotationStrategy
+        RotationExecutor.rotateTo(Rotation(targetYaw, targetPitch), PathfinderRotationStrategy)
     }
 }
 ```
@@ -1453,7 +1500,7 @@ data class PathCommand(
 Serializes a 64×32×64 region of MC blocks centered on the player.
 
 ```kotlin
-package org.cobalt.api.pathfinder.native
+package org.cobalt.api.pathfinder.jni
 
 import net.minecraft.client.Minecraft
 import net.minecraft.core.BlockPos
@@ -1496,7 +1543,7 @@ object WorldBufferSerializer {
 - [ ] **Step 4: Create `NativePathfinder.kt`**
 
 ```kotlin
-package org.cobalt.api.pathfinder.native
+package org.cobalt.api.pathfinder.jni
 
 import net.minecraft.client.Minecraft
 import net.minecraft.world.phys.Vec3
