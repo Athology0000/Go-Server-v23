@@ -38,6 +38,11 @@ import org.cobalt.internal.visual.HotbarOverlayModule
 import org.cobalt.internal.visual.OrbitFreecamModule
 import org.cobalt.internal.visual.PetDisplayModule
 import org.cobalt.internal.visual.TitleScreenRenderer
+import org.cobalt.internal.garden.GardenMacroModule
+import org.cobalt.internal.farming.FarmingMacroModule
+import org.cobalt.internal.pig.PigMacroModule
+import org.cobalt.internal.spotify.SpotifyModule
+import org.cobalt.internal.chat.ChatFilterModule
 
 @Suppress("UNUSED")
 object Cobalt : ClientModInitializer {
@@ -71,7 +76,12 @@ object Cobalt : ClientModInitializer {
         QolModule,
         RotationsModule,
         HotbarOverlayModule,
-        PetDisplayModule
+        PetDisplayModule,
+        GardenMacroModule,
+        FarmingMacroModule,
+        PigMacroModule,
+        SpotifyModule,
+        ChatFilterModule
       )
     )
 

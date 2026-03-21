@@ -83,6 +83,7 @@ object NVGRenderer {
   private var vg = -1L
   private var prevFramebuffer = 0
   private val prevViewport = IntArray(4)
+  private var prevSampler0 = 0
 
   init {
     vg = nvgCreate(NVG_ANTIALIAS or NVG_STENCIL_STROKES)
@@ -104,6 +105,7 @@ object NVGRenderer {
     GlStateManager._viewport(0, 0, framebuffer.width, framebuffer.height)
     GlStateManager._activeTexture(GL30.GL_TEXTURE0)
 
+    prevSampler0 = GL33C.glGetInteger(GL33C.GL_SAMPLER_BINDING)
     GL33C.glBindSampler(0, 0)
     nvgBeginFrame(vg, width, height, 1f)
     nvgTextAlign(vg, NVG_ALIGN_LEFT or NVG_ALIGN_TOP)
@@ -114,6 +116,20 @@ object NVGRenderer {
     check(drawing) { "[NVGRenderer] Not drawing, but called endFrame" }
 
     nvgEndFrame(vg)
+
+    // NanoVG (NVG_STENCIL_STROKES) leaves GL_STENCIL_TEST enabled and writes stencil
+    // values into the buffer. If not cleaned up, Minecraft's next-frame text/GUI
+    // rendering will fail the leftover stencil test → corrupted text in chat/inventory.
+    GL33C.glDisable(GL33C.GL_STENCIL_TEST)
+    GL33C.glStencilMask(0xFF)
+    GL33C.glClear(GL33C.GL_STENCIL_BUFFER_BIT)
+
+    // NanoVG binds its own VAO; unbind so Minecraft's VAO management is unaffected.
+    GL33C.glBindVertexArray(0)
+
+    // Restore sampler binding for texture unit 0 that was cleared in beginFrame.
+    GL33C.glBindSampler(0, prevSampler0)
+
     GlStateManager._disableCull()
     GlStateManager._disableDepthTest()
     GlStateManager._enableBlend()

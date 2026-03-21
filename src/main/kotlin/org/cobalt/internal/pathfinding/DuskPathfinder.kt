@@ -30,32 +30,32 @@ import org.cobalt.internal.etherwarp.EtherwarpLogic
 
 object DuskPathfinder {
 private const val MAX_REPATH_DISTANCE = 6.0
-private const val WAYPOINT_DISTANCE = 0.35
+private const val WAYPOINT_DISTANCE = 1.0
 private const val CHECKPOINT_STEP = 2
-private const val CHECKPOINT_REACHED_DISTANCE = 1.2
-private const val FINAL_ARRIVE_DISTANCE = 1.8
+private const val CHECKPOINT_REACHED_DISTANCE = 2.0
+private const val FINAL_ARRIVE_DISTANCE = 2.5
 private const val AUTO_STEER_MAX_DEGREES = 45.0
 private const val AUTO_STEER_STRENGTH = 0.35
 private const val HUMANIZE_MOVEMENT = true
 private const val SMOOTH_ROTATE = true
-private const val RANDOM_PAUSES = false
-private const val PAUSE_CHANCE = 0.02f
+private const val RANDOM_PAUSES = true
+private const val PAUSE_CHANCE = 0.008f
 private const val PAUSE_TICKS_MIN = 4
 private const val PAUSE_TICKS_MAX = 10
 private const val RANDOM_YAW_JITTER = false
-private const val JITTER_DEGREES = 2.0
+private const val JITTER_DEGREES = 1.2
 private const val DEBUG_HUD = false
 private const val DEBUG_LOG = false
 private const val DEBUG_CHAT = false
 private const val DEBUG_TICK_CHAT = false
 private const val DEBUG_TICK_FILE = false
 private const val DEBUG_LOG_INTERVAL_TICKS = 20
-private const val OVERLAY_UPDATE_INTERVAL_TICKS = 5
+private const val OVERLAY_UPDATE_INTERVAL_TICKS = 1
 private const val STRAFE_DEADZONE = 0.15f
-private const val ROTATE_ONLY_YAW_DEGREES = 100.0
-private const val ROTATE_TARGET_RESPONSE = 8.0
-private const val RENDER_ROTATE_RESPONSE = 18.0
-private const val RENDER_PITCH_RESPONSE = 14.0
+private const val ROTATE_ONLY_YAW_DEGREES = 125.0
+private const val ROTATE_TARGET_RESPONSE = 7.0
+private const val RENDER_ROTATE_RESPONSE = 20.0
+private const val RENDER_PITCH_RESPONSE = 7.0
 private const val PITCH_FLATTEN_DY = 1
 private const val PITCH_MAX_DEGREES = 45.0
 private const val WATER_ESCAPE_RADIUS = 6
@@ -67,7 +67,7 @@ private const val NAVMESH_SCAN_RADIUS = 4
 private const val NAVMESH_SCAN_VERTICAL = 2
 private const val NAVMESH_REPATH_TICKS = 10
 private const val PATH_TAG = "pathfinding"
-private const val STUCK_TICKS_LIMIT = 8
+private const val STUCK_TICKS_LIMIT = 20
 private const val STUCK_MOVEMENT_EPS = 5.0e-5
 private const val REPATH_INTERVAL_TICKS = 60
 private const val MIN_SOFT_REPATH_ATTEMPT_TICKS = 20L
@@ -76,18 +76,18 @@ private const val MIN_PLAN_ATTEMPT_TICKS = 8L
 private const val PASSED_DOT_RATIO = 0.1
 private const val PASSED_DISTANCE_EPS = 0.5
 private const val SPLINE_ADVANCE_EPS = 0.25
-private const val BEHIND_YAW_DEGREES = 120.0
-private const val BEHIND_TICKS_LIMIT = 6
+private const val BEHIND_YAW_DEGREES = 145.0
+private const val BEHIND_TICKS_LIMIT = 10
 private const val BEHIND_DIST_EPS = 0.05
 private const val NO_PROGRESS_TICKS_LIMIT = 20
 private const val NO_PROGRESS_EPS = 0.02
 private const val FORCE_DIRECT_TICKS = 30
 private const val SPLINE_FOLLOW_EPS = 0.9
-private const val SPLINE_LOOKAHEAD = 1.15
-private const val SPLINE_MIN_LOOKAHEAD = 0.35
+private const val SPLINE_LOOKAHEAD = 2.2
+private const val SPLINE_MIN_LOOKAHEAD = 0.6
 private const val SPLINE_LEDGE_BLEND_T = 0.92
 private const val SPLINE_STRAFE_MIN_SCALE = 0.22f
-private const val SPLINE_SEGMENT_SEARCH = 3
+private const val SPLINE_SEGMENT_SEARCH = 6
 private const val STRAFE_ASSIST_MIN_DESIRED = 0.18f
 private const val STRAFE_ASSIST_STRENGTH = 0.62f
 private const val STRAFE_ASSIST_SPLINE_STRENGTH = 0.78f
@@ -99,6 +99,7 @@ private const val BELOW_TICKS_LIMIT = 20
 private const val NEARBY_REPATH_RADIUS = 2
 private const val BLOCKED_REPATH_COOLDOWN_TICKS = 20
 private const val BLOCKED_REPATH_FAIL_LIMIT = 2
+private const val ASYNC_PLAN_TIMEOUT_TICKS = 200L
 private const val JUMP_HOLD_TICKS = 4
 private const val JUMP_COOLDOWN_TICKS = 2
 private const val EARLY_JUMP_DISTANCE = 3.8
@@ -109,7 +110,7 @@ private const val WALL_AVOID_FORWARD = 0.3f
 private const val PATH_CACHE_TTL_TICKS = 60
 private const val PATH_CACHE_MAX = 512
 private const val AVOID_STUCK_TTL_TICKS = 800L
-private const val AVOID_STUCK_RADIUS = 2
+private const val AVOID_STUCK_RADIUS = 1
 private const val ETHERWARP_COOLDOWN_TICKS = 40L
 private const val ETHERWARP_ALIGN_TICKS = 6
 private const val ETHERWARP_SNEAK_TICKS = 2
@@ -118,14 +119,15 @@ private const val ETHERWARP_OPPORTUNITY_INTERVAL = 60L
 private const val ETHERWARP_OPPORTUNITY_CHANCE = 0.35
 private const val ETHERWARP_MIN_GAIN_SQ = 64.0
 private const val ETHERWARP_MIN_DISTANCE_SQ = 100.0
-private const val DEBUG_ETHERWARP = false
+private const val DIRECT_ETHERWARP_MIN_DISTANCE_SQ = 22.0 * 22.0
+private const val DEBUG_ETHERWARP = true
 private const val ETHERWARP_RENDER_TAG = "etherwarp"
-private const val ETHERWARP_CLIMB_THRESHOLD = 7
+private const val ETHERWARP_CLIMB_THRESHOLD = 3
 private const val REMOTE_STEP_DISTANCE = 32.0
 private const val REMOTE_STEP_MIN = 10.0
 private const val REMOTE_STEP_SCAN_RADIUS = 6
 private const val REMOTE_STEP_SCAN_VERTICAL = 3
-private const val ROLLING_PATH_NODE_AHEAD = 5
+private const val ROLLING_PATH_NODE_AHEAD = 24
 private const val ROLLING_SEGMENT_DISTANCE = 16.0
 private const val COMBAT_MIN_PLAN_ATTEMPT_TICKS = 2L
 private const val COMBAT_STRAFE_LOOK_MODE = true
@@ -211,8 +213,23 @@ private var etherwarpAutoSlot = -1
 private var etherwarpAutoActive = false
 private val rng = kotlin.random.Random.Default
 private var remoteGoal: BlockPos? = null
+// When true, the path was provided directly (recorded route) — suppress A* shortcut/checkpoint repaths.
+private var directMode = false
 private var inputBoolFields: Map<String, Field> = emptyMap()
 private var inputFloatFields: Map<String, Field> = emptyMap()
+
+private val cacheLock = Any()
+private val pathExecutor: java.util.concurrent.ExecutorService =
+	java.util.concurrent.Executors.newSingleThreadExecutor { r ->
+		Thread(r, "dusk-pathfinder").also { it.isDaemon = true }
+	}
+private data class AsyncPlan(
+	val future: java.util.concurrent.CompletableFuture<List<BlockPos>>,
+	val goal: BlockPos,
+	val reason: String,
+	val scheduledTick: Long = 0L
+)
+@Volatile private var asyncPlan: AsyncPlan? = null
 
 private val logger = LogManager.getLogger("dutt-client")
 
@@ -300,20 +317,81 @@ fun start(client: Minecraft, rawTarget: BlockPos, profileId: String): Boolean {
 
 	currentProfileId = profile.id
 	lastPlanAttemptTick = nowTick
-	val newPath = planRollingPath(level, start, resolvedTarget, profile)
-	if (newPath.isEmpty()) {
-		notify(client, "No path found.")
-		DebugLog.status(client, "Path", "Failed: no path found.")
-		return false
-	}
-	DebugLog.startSession(client, "Path")
+	// Schedule A* on the background thread — never block the game thread.
+	asyncPlan?.future?.cancel(false)
+	asyncPlan = null
+	val planFrom = start
+	val planGoal = resolvedTarget
+	val planProfileId = profile.id
+	val future = java.util.concurrent.CompletableFuture.supplyAsync({
+		try { planRollingPath(level, planFrom, planGoal, resolveProfile(planProfileId)) }
+		catch (_: Exception) { emptyList() }
+	}, pathExecutor)
+	asyncPlan = AsyncPlan(future, planGoal, "start", nowTick)
+	val previousTarget = target
 	target = resolvedTarget
 	remoteGoal = null
-	path = newPath.toMutableList()
-	pathIndex = 0
+	// Clear the path when switching targets so tick() waits for the new async result.
+	// Keep the existing path only when re-planning toward the same target.
+	if (previousTarget != resolvedTarget || path.isEmpty()) {
+		path.clear()
+		pathIndex = 0
+		checkpoints = emptyList()
+		checkpointIndex = 0
+	}
+	active = true
+	directMode = false
+	recovering = false
+	recoveryGoal = null
+	recoveryTargetIndex = -1
+	mainPath = path.toList()
+	mainPathIndex = 0
+	resetStuck()
+	etherwarpAutoSlot = -1
+	etherwarpAutoActive = false
+	OverlayRenderEngine.setEnabled(true)
+	DebugLog.startSession(client, "Path")
+	notify(client, "Pathing to ${resolvedTarget.x} ${resolvedTarget.y} ${resolvedTarget.z}.")
+	DebugLog.status(client, "Path", "Scheduled -> ${resolvedTarget.x} ${resolvedTarget.y} ${resolvedTarget.z} from ${planFrom.x} ${planFrom.y} ${planFrom.z}")
+	return true
+}
+
+/**
+ * Loads [waypoints] directly as the navigation path, bypassing A*.
+ * Use this when following a recorded route where the path geometry is already known —
+ * it prevents the pathfinder from deviating to its own A*-computed shortcuts.
+ */
+fun startDirect(client: Minecraft, waypoints: List<BlockPos>, startFromBeginning: Boolean = false): Boolean {
+	if (waypoints.isEmpty()) return false
+	val level = client.level ?: return false
+	// Cancel any in-flight async plan so it cannot overwrite the direct path.
+	asyncPlan?.future?.cancel(false)
+	asyncPlan = null
+	val resolvedTarget = waypoints.last()
+	currentProfileId = defaultProfileId
+	lastPlanAttemptTick = level.gameTime
+	target = resolvedTarget
+	remoteGoal = null
+	path = waypoints.toMutableList()
+	// When following a forward route always start from the beginning so walls/corners
+	// between the start and any spatially-near later node are not skipped.
+	// In walkback/resume mode, snap to the nearest recorded node instead.
+	pathIndex = if (startFromBeginning) {
+		0
+	} else {
+		val initPlayer = client.player
+		if (initPlayer != null) {
+			path.indices.minByOrNull { i ->
+				val dx = initPlayer.x - (path[i].x + 0.5)
+				val dz = initPlayer.z - (path[i].z + 0.5)
+				dx * dx + dz * dz
+			} ?: 0
+		} else 0
+	}
 	checkpoints = buildCheckpoints(path)
 	checkpointIndex = 0
 	active = true
+	directMode = true
 	mainPath = path.toList()
 	mainPathIndex = 0
 	recoveryTargetIndex = -1
@@ -323,11 +401,11 @@ fun start(client: Minecraft, rawTarget: BlockPos, profileId: String): Boolean {
 	etherwarpAutoSlot = -1
 	etherwarpAutoActive = false
 	OverlayRenderEngine.setEnabled(true)
-	notify(client, "Pathing to ${resolvedTarget.x} ${resolvedTarget.y} ${resolvedTarget.z}.")
+	notify(client, "Following route to ${resolvedTarget.x} ${resolvedTarget.y} ${resolvedTarget.z}.")
 	DebugLog.status(
 		client,
 		"Path",
-		"Started -> ${resolvedTarget.x} ${resolvedTarget.y} ${resolvedTarget.z} from ${start.x} ${start.y} ${start.z} (segment nodes=${path.size})"
+		"Direct route started -> ${resolvedTarget.x} ${resolvedTarget.y} ${resolvedTarget.z} (nodes=${path.size})"
 	)
 	return true
 }
@@ -336,7 +414,10 @@ fun start(client: Minecraft, rawTarget: BlockPos, profileId: String): Boolean {
 		if (!active) {
 			return
 		}
+	asyncPlan?.future?.cancel(false)
+	asyncPlan = null
 	active = false
+	directMode = false
 	target = null
 	path.clear()
 	pathIndex = 0
@@ -349,6 +430,7 @@ fun start(client: Minecraft, rawTarget: BlockPos, profileId: String): Boolean {
 	recoveryTargetIndex = -1
 	OverlayRenderEngine.clearTag(PATH_TAG)
 	OverlayRenderEngine.clearTag(ETHERWARP_RENDER_TAG)
+	PathOverlayRenderer.reset()
 	resetStuck()
 	restoreEtherwarpHotbar(client)
 	resetInput(client)
@@ -373,6 +455,39 @@ fun start(client: Minecraft, rawTarget: BlockPos, profileId: String): Boolean {
 		val player = client.player ?: return
 		val level = client.level ?: return
 		val currentTarget = target ?: return
+
+		// Apply completed async path plan without blocking.
+		// In directMode the recorded route is authoritative — discard any plan that finished
+		// (e.g. a cancel(false) that was already running when startDirect was called).
+		asyncPlan?.let { pending ->
+			if (!pending.future.isDone && pending.scheduledTick > 0L &&
+				level.gameTime - pending.scheduledTick > ASYNC_PLAN_TIMEOUT_TICKS) {
+				pending.future.cancel(true)
+				asyncPlan = null
+				DebugLog.status(client, "Path", "Async plan timed out (${pending.reason}), cancelled.")
+				return@let
+			}
+			if (pending.future.isDone) {
+				asyncPlan = null
+				if (!directMode) {
+					runCatching { pending.future.get() }.getOrNull()?.let { result ->
+						if (result.isNotEmpty() && pending.goal == target && !isSamePath(result)) {
+							path = result.toMutableList()
+							pathIndex = 0
+							checkpoints = buildCheckpoints(path)
+							checkpointIndex = 0
+							resetProgress()
+							recovering = false
+							recoveryGoal = null
+							recoveryTargetIndex = -1
+							mainPath = path.toList()
+							mainPathIndex = 0
+							DebugLog.status(client, "Path", "Async repath ${pending.reason}: applied (nodes=${path.size}).")
+						}
+					}
+				}
+			}
+		}
 		if (forceDirectTicks > 0) {
 			forceDirectTicks--
 		}
@@ -388,6 +503,17 @@ fun start(client: Minecraft, rawTarget: BlockPos, profileId: String): Boolean {
 		if (allowBackwardTicks > 0) {
 			allowBackwardTicks--
 		}
+
+	// Detect teleports: if the player moved > 10 blocks in one tick, the path is stale.
+	if (hasLastPos) {
+		val tpDx = player.x - lastPosX
+		val tpDy = player.y - lastPosY
+		val tpDz = player.z - lastPosZ
+		if (tpDx * tpDx + tpDy * tpDy + tpDz * tpDz > 100.0) {
+			stop(client, "Teleported.")
+			return
+		}
+	}
 
 	if (client.screen != null) {
 		resetInput(client)
@@ -437,7 +563,16 @@ fun start(client: Minecraft, rawTarget: BlockPos, profileId: String): Boolean {
 				return
 			}
 			if (!isAtTarget(player, finalTarget, FINAL_ARRIVE_DISTANCE)) {
-				attemptRepath(client, level, player, "resume", finalTarget, hard = true)
+				val pending = asyncPlan
+				if (pending == null || pending.future.isDone) {
+					if (directMode) {
+						// Recorded path exhausted but destination not reached — exit direct mode
+						// so the A* repath can navigate around any obstacle.
+						directMode = false
+					}
+					scheduleRepathAsync(level, player, "resume", finalTarget)
+				}
+				if (path.isNotEmpty()) pathIndex = path.lastIndex
 				updateLastPos(player)
 				return
 			}
@@ -480,9 +615,37 @@ fun start(client: Minecraft, rawTarget: BlockPos, profileId: String): Boolean {
 			updateLastPos(player)
 			return
 		}
-		val spline = if (forceDirectTicks > 0) null else resolveSplineTarget(player)
-		if (!recovering && spline != null && spline.segmentIndex > pathIndex) {
-			pathIndex = spline.segmentIndex.coerceIn(0, path.lastIndex)
+		// In directMode, if the current waypoint is >22 blocks away but has clear line-of-sight,
+		// etherwarp to it instead of running — preserves route order unlike opportunistic warping.
+		if (directMode && !recovering && !etherwarpActive) {
+			val wdx = waypoint.x + 0.5 - player.x
+			val wdy = waypoint.y + 0.5 - player.y
+			val wdz = waypoint.z + 0.5 - player.z
+			val distSq = wdx * wdx + wdy * wdy + wdz * wdz
+			if (distSq > DIRECT_ETHERWARP_MIN_DISTANCE_SQ) {
+				val candidate = candidateWarpBlock(level, waypoint)
+				if (candidate == null) {
+					etherwarpLog(client, "direct-waypoint skip: no candidate for waypoint ${waypoint.x} ${waypoint.y} ${waypoint.z}")
+				} else {
+					val range = EtherwarpLogic.getEtherwarpRange().toDouble()
+					val eye = player.getEyePosition(1.0f)
+					if (canSeeWarpBlock(level, player, eye, candidate, range)) {
+						if (attemptEtherwarp(client, level, player, waypoint, "direct-waypoint", candidate)) {
+							updateLastPos(player)
+							return
+						}
+					}
+				}
+			}
+		}
+		// In directMode, skip the spline entirely — it uses spatial proximity to find the nearest
+	// path segment, which can point at a later segment that passes through a wall or floor.
+	// Waypoints must be reached in strict recorded order; the spline would defeat that.
+	val spline = if (forceDirectTicks > 0 || directMode) null else resolveSplineTarget(player)
+		if (!recovering && !directMode && spline != null && spline.segmentIndex > pathIndex) {
+			// Advance by at most one node — the simplified path only contains turn points,
+		// so jumping directly to spline.segmentIndex skips unnavigated corners.
+		pathIndex = (pathIndex + 1).coerceIn(0, path.lastIndex)
 		}
 		var targetX = spline?.x ?: (waypoint.x + 0.5)
 		var targetY = spline?.y ?: (waypoint.y + 0.5)
@@ -511,8 +674,10 @@ fun start(client: Minecraft, rawTarget: BlockPos, profileId: String): Boolean {
 		val waypointY = waypoint.y + 0.5
 		val waypointZ = waypoint.z + 0.5
 		val eyeY = player.getEyePosition(1.0f).y
-		val (targetYaw, targetPitch) = computeYawPitch(player.x, eyeY, player.z, waypointX, eyeY, waypointZ)
-		val (lookYaw, lookPitch) = computeYawPitch(player.x, eyeY, player.z, targetX, eyeY, targetZ)
+		// In directMode look 2 nodes ahead to smooth head oscillation from waypoint-to-waypoint yaw changes.
+		val lookAheadNode = if (directMode && path.isNotEmpty()) path[minOf(pathIndex + 2, path.lastIndex)] else waypoint
+		val (targetYaw, targetPitch) = computeYawPitch(player.x, eyeY, player.z, lookAheadNode.x + 0.5, lookAheadNode.y + 0.5 + 0.62, lookAheadNode.z + 0.5)
+		val (lookYaw, lookPitch) = computeYawPitch(player.x, eyeY, player.z, targetX, targetY + 0.62, targetZ)
 		val splineYaw = if (spline != null) lookYaw else targetYaw
 		debugTargetYaw = targetYaw
 		debugTargetPitch = targetPitch
@@ -524,7 +689,8 @@ fun start(client: Minecraft, rawTarget: BlockPos, profileId: String): Boolean {
 		debugPitchError = lookPitch - player.xRot.toDouble()
 
 		val gameTime = level.gameTime
-		if (!recovering && gameTime % REPATH_INTERVAL_TICKS == 0L) {
+		// Skip shortcut repath in direct mode — the recorded path is intentional.
+		if (!recovering && !directMode && gameTime % REPATH_INTERVAL_TICKS == 0L) {
 			val currentEstimate = heuristic(player.blockPosition(), currentTarget)
 			val pathEstimate = heuristic(waypoint, currentTarget)
 			if (currentEstimate + 10 < pathEstimate) {
@@ -532,7 +698,9 @@ fun start(client: Minecraft, rawTarget: BlockPos, profileId: String): Boolean {
 			}
 		}
 		var blockedRepathTriggered = false
-		if (!recovering && !MinecraftPathingRules.isWalkable(level, waypoint)) {
+		// In directMode the recorded path is authoritative — don't A*-repath just because a
+		// waypoint isn't perfectly walkable (mid-jump positions, slabs, crypt floor blocks, etc.).
+		if (!recovering && !directMode && !MinecraftPathingRules.isWalkable(level, waypoint)) {
 			if (nowTick >= blockedRepathUntilTick) {
 				val changed = attemptRepath(client, level, player, "blocked", currentTarget, hard = false, allowSame = false)
 				blockedRepathTriggered = changed
@@ -543,6 +711,8 @@ fun start(client: Minecraft, rawTarget: BlockPos, profileId: String): Boolean {
 					blockedRepathFails++
 					if (blockedRepathFails >= BLOCKED_REPATH_FAIL_LIMIT) {
 						blockedRepathFails = 0
+						// Soft repath failed repeatedly — escalate to a hard (full) A* repath.
+						attemptRepath(client, level, player, "blocked-hard", currentTarget, hard = true)
 					}
 				}
 			}
@@ -554,7 +724,13 @@ fun start(client: Minecraft, rawTarget: BlockPos, profileId: String): Boolean {
 		val waypointDz = waypoint.z + 0.5 - player.z
 		val waypointDist2 = waypointDx * waypointDx + waypointDz * waypointDz
 		val reachedHorizontal = waypointDist2 < WAYPOINT_DISTANCE * WAYPOINT_DISTANCE
-		val reachedVertical = if (dy > 0) player.blockY >= waypoint.y else abs(dy) <= 1
+		val reachedVertical = if (dy > 0) {
+			player.blockY >= waypoint.y
+		} else if (directMode) {
+			abs(dy) <= 1
+		} else {
+			abs(dy) <= 1
+		}
 
 	if (reachedHorizontal && reachedVertical) {
 		pathIndex++
@@ -567,7 +743,15 @@ fun start(client: Minecraft, rawTarget: BlockPos, profileId: String): Boolean {
 				return
 			}
 			if (finalTarget != null && !isAtTarget(player, finalTarget, FINAL_ARRIVE_DISTANCE)) {
-				attemptRepath(client, level, player, "resume", finalTarget, hard = true)
+				val pending = asyncPlan
+				if (pending == null || pending.future.isDone) {
+					if (directMode) {
+						// All recorded waypoints consumed but destination not reached — exit direct
+						// mode so A* can navigate around any remaining obstacle.
+						directMode = false
+					}
+					scheduleRepathAsync(level, player, "resume", finalTarget)
+				}
 				updateLastPos(player)
 				return
 			}
@@ -586,7 +770,8 @@ fun start(client: Minecraft, rawTarget: BlockPos, profileId: String): Boolean {
 
 	val dist = sqrt(max(waypointDist2, 0.0001))
 	if (dist > MAX_REPATH_DISTANCE) {
-		if (!recovering) {
+		if (!recovering && !directMode) {
+			// In directMode, recorded waypoints may be far apart — just keep navigating toward them.
 			attemptRepath(client, level, player, "distance", currentTarget, hard = true)
 			updateLastPos(player)
 			return
@@ -754,13 +939,13 @@ fun start(client: Minecraft, rawTarget: BlockPos, profileId: String): Boolean {
 	private fun planPath(level: Level, start: BlockPos, goal: BlockPos, profile: PathPlanProfile): List<BlockPos> {
 		val dimension = level.dimension().toString()
 		val cacheKey = PathCacheKey(dimension, profile.id, start.asLong(), goal.asLong())
-		val cached = pathCache[cacheKey]
+		val cached = synchronized(cacheLock) { pathCache[cacheKey] }
 		if (cached != null) {
 			val age = level.gameTime - cached.createdAtTick
 			if (age <= PATH_CACHE_TTL_TICKS && cached.path.none { AvoidanceCache.isAvoided(level, it) }) {
 				return cached.path
 			}
-			pathCache.remove(cacheKey)
+			synchronized(cacheLock) { pathCache.remove(cacheKey) }
 		}
 		val config = profile.buildConfiguration()
 		val pathfinder = profile.pathfinderFactory(config)
@@ -790,7 +975,7 @@ fun start(client: Minecraft, rawTarget: BlockPos, profileId: String): Boolean {
 		}
 		val nodes = positions.map { BlockPos(it.flooredX, it.flooredY, it.flooredZ) }
 		val simplified = simplifyPath(nodes)
-		pathCache[cacheKey] = PathCacheEntry(simplified, level.gameTime)
+		synchronized(cacheLock) { pathCache[cacheKey] = PathCacheEntry(simplified, level.gameTime) }
 		return simplified
 	}
 
@@ -900,11 +1085,24 @@ private fun advanceCheckpoint(client: Minecraft, level: Level, player: net.minec
 	}
 	checkpointIndex++
 	resetProgress()
+	// In direct mode the path IS the recorded route — skip A* repaths on checkpoint advance.
+	if (directMode) return
 	val finalTarget = target
 	if (!recovering && finalTarget != null) {
 		if (debugRepathTick == 0L || level.gameTime - debugRepathTick >= REPATH_INTERVAL_TICKS) {
 			attemptRepath(client, level, player, "checkpoint", finalTarget, hard = false)
 		}
+	}
+}
+
+/** In direct mode, advances pathIndex by exactly one step.
+ *  Never jumps ahead multiple nodes — recorded routes through narrow corridors or
+ *  behind walls must be walked in order; nearest-node search can skip the entrance. */
+private fun advanceToNearestPathNode(player: net.minecraft.client.player.LocalPlayer) {
+	if (path.isEmpty()) return
+	if (pathIndex < path.lastIndex) {
+		pathIndex++
+		mainPathIndex = pathIndex
 	}
 }
 
@@ -917,6 +1115,12 @@ private fun distanceSq(player: net.minecraft.client.player.LocalPlayer, pos: Blo
 
 private fun checkFinalArrival(client: Minecraft, player: net.minecraft.client.player.LocalPlayer): Boolean {
 	if (recovering) {
+		return false
+	}
+	// In directMode the route must be followed in order — don't declare arrival just because
+	// the final target is spatially close (e.g. directly below through a floor) before the
+	// player has actually walked through all the waypoints.
+	if (directMode && pathIndex < path.lastIndex) {
 		return false
 	}
 	val finalTarget = target
@@ -1120,6 +1324,11 @@ private fun checkPassedCheckpointRepath(
 		return false
 	}
 
+	// In directMode the normal reachedHorizontal/reachedVertical check handles advancement.
+	// Firing advanceToNearestPathNode here every tick (while "past" a checkpoint) would skip nodes.
+	if (directMode) {
+		return false
+	}
 	return attemptRepath(client, level, player, "passed", goal, hard = false)
 }
 
@@ -1134,8 +1343,10 @@ private fun checkPassedCheckpointRepath(
 		val useForward: Float
 		val useStrafe: Float
 		if (HUMANIZE_MOVEMENT) {
-			smoothedForward = approach(smoothedForward, targetForward, 0.2f, 0.3f)
-			smoothedStrafe = approach(smoothedStrafe, targetStrafe, 0.2f, 0.3f)
+			// Faster ramp at high speed (direct/route mode) — 0.55 step vs 0.35 otherwise
+			val rampStep = if (directMode) 0.55f else 0.35f
+			smoothedForward = approach(smoothedForward, targetForward, 0.2f, rampStep)
+			smoothedStrafe = approach(smoothedStrafe, targetStrafe, 0.2f, rampStep)
 			useForward = smoothedForward
 			useStrafe = smoothedStrafe
 		} else {
@@ -1398,11 +1609,19 @@ private fun isJumpEdge(level: Level, pos: BlockPos, dir: Direction, waypoint: Bl
 		val pos = player.blockPosition()
 		val front = pos.relative(dir)
 		val frontClear = MinecraftPathingRules.isPassable(level, front) && MinecraftPathingRules.isPassable(level, front.above())
-		if (frontClear) {
-			return strafe to forward
-		}
 		val leftDir = dir.counterClockWise
 		val rightDir = dir.clockWise
+		if (frontClear) {
+			// Cardinal front is open, but check diagonal corners — a player walking into the
+			// seam between two blocks can get hitbox-caught even when the direct front is air.
+			val diagLeft = front.relative(leftDir)
+			val diagRight = front.relative(rightDir)
+			val diagLeftBlocked = !MinecraftPathingRules.isPassable(level, diagLeft) || !MinecraftPathingRules.isPassable(level, diagLeft.above())
+			val diagRightBlocked = !MinecraftPathingRules.isPassable(level, diagRight) || !MinecraftPathingRules.isPassable(level, diagRight.above())
+			if (diagLeftBlocked && !diagRightBlocked) return WALL_AVOID_STRAFE to forward
+			if (diagRightBlocked && !diagLeftBlocked) return -WALL_AVOID_STRAFE to forward
+			return strafe to forward
+		}
 		val left = pos.relative(leftDir)
 		val right = pos.relative(rightDir)
 		val leftClear = MinecraftPathingRules.isPassable(level, left) && MinecraftPathingRules.isPassable(level, left.above())
@@ -1639,6 +1858,19 @@ private fun handleStuck(
 			return true
 		}
 		val finalTarget = target
+		// In direct mode, switch to A* toward the final destination instead of just skipping to
+		// the next recorded node — lets the pathfinder navigate around the obstacle properly.
+		if (directMode) {
+			val dest = finalTarget
+			if (dest != null) {
+				directMode = false
+				scheduleRepathAsync(level, player, "stuck", dest)
+			} else {
+				advanceToNearestPathNode(player)
+			}
+			stuckTicks = 0
+			return true
+		}
 		if (!recovering && finalTarget != null) {
 			if (attemptRepath(client, level, player, "stuck", finalTarget, hard = false, allowSame = false)) {
 				stuckTicks = 0
@@ -1727,7 +1959,6 @@ private fun attemptRecoveryPath(
 	pathIndex = 0
 	checkpoints = buildCheckpoints(path)
 	checkpointIndex = 0
-	smoothedTargetYaw = null
 	resetProgress()
 	recovering = true
 	recoveryGoal = recovery
@@ -1791,7 +2022,6 @@ private fun attemptNearbyRepath(
 		pathIndex = 0
 		checkpoints = buildCheckpoints(path)
 		checkpointIndex = 0
-		smoothedTargetYaw = null
 		resetProgress()
 		recovering = false
 		recoveryGoal = null
@@ -1863,7 +2093,6 @@ private fun attemptEscapeRepath(
 		pathIndex = 0
 		checkpoints = buildCheckpoints(path)
 		checkpointIndex = 0
-		smoothedTargetYaw = null
 		resetProgress()
 		recovering = false
 		recoveryGoal = null
@@ -1933,9 +2162,10 @@ private fun handleBelowRecovery(
 	DebugLog.status(
 		client,
 		"Path",
-		"Stuck: below path at ${player.blockX} ${player.blockY} ${player.blockZ} (waiting for stuck recovery)."
+		"Stuck: below path at ${player.blockX} ${player.blockY} ${player.blockZ}, forcing jump."
 	)
-	return false
+	jumpHoldTicks = JUMP_HOLD_TICKS
+	return true
 }
 
 private fun handleNavMeshRecovery(
@@ -1982,7 +2212,6 @@ private fun handleNavMeshRecovery(
 	pathIndex = 0
 	checkpoints = buildCheckpoints(path)
 	checkpointIndex = 0
-	smoothedTargetYaw = null
 	resetProgress()
 	recovering = true
 	recoveryGoal = anchor
@@ -2034,7 +2263,7 @@ private fun handleWaterEscape(
 		if (waterEscapeActive) {
 			waterEscapeActive = false
 			waterEscapeTarget = null
-			if (!recovering) {
+			if (!recovering && !directMode) {
 				attemptRepath(client, level, player, "water-exit", finalTarget, hard = false)
 			}
 		}
@@ -2072,7 +2301,7 @@ private fun handleEtherwarp(
 	finalTarget: BlockPos
 ): Boolean {
 	val now = level.gameTime
-	if (etherwarpRepathTick != 0L && now >= etherwarpRepathTick && !etherwarpActive) {
+	if (!directMode && etherwarpRepathTick != 0L && now >= etherwarpRepathTick && !etherwarpActive) {
 		etherwarpRepathTick = 0L
 		attemptRepath(client, level, player, "etherwarp", finalTarget, hard = true, allowSame = false)
 	}
@@ -2104,27 +2333,25 @@ private fun handleEtherwarp(
 	)
 	debugLookPitch = pitch
 	debugDy = targetPos.y - player.blockY
-	if (SMOOTH_ROTATE) {
-		smoothRotate(player, yaw.toFloat())
-	} else {
-		player.yRot = yaw.toFloat()
-		player.xRot = pitch.toFloat()
-	}
-	val yawError = kotlin.math.abs(wrapDegrees(yaw - player.yRot.toDouble()))
-	val ready = yawError <= 6.0 || etherwarpStageTicks >= ETHERWARP_ALIGN_TICKS
+	// Etherwarp requires precise aim — snap yaw/pitch instantly regardless of smooth-rotate
+	// settings. The slow humanized response rate used for walking is far too sluggish here
+	// and causes the use-key to fire before the crosshair reaches the target block.
+	player.yRot = yaw.toFloat()
+	player.xRot = pitch.toFloat()
+	desiredYaw = yaw
+	desiredPitch = pitch
+	smoothedTargetYaw = yaw
+	smoothedTargetPitch = pitch
+	// Reset movement smoothing so the player stops immediately, not after a ramp-down.
+	smoothedForward = 0f
+	smoothedStrafe = 0f
 	applyMovement(client, player.input, 0f, 0f, false, false, false)
 	etherwarpTick(
 		client,
 		level,
-		"stage=$etherwarpStage ready=$ready yawErr=${"%.2f".format(yawError)} " +
-			"target=${targetPos.x} ${targetPos.y} ${targetPos.z} " +
+		"stage=$etherwarpStage target=${targetPos.x} ${targetPos.y} ${targetPos.z} " +
 			"player=${player.blockX} ${player.blockY} ${player.blockZ}"
 	)
-
-	if (!ready) {
-		etherwarpStageTicks++
-		return true
-	}
 	when (etherwarpStage) {
 		0 -> {
 			client.options.keyShift.setDown(true)
@@ -2152,8 +2379,17 @@ private fun handleEtherwarp(
 				etherwarpTarget = null
 				etherwarpStage = 0
 				etherwarpStageTicks = 0
-				etherwarpRepathTick = now + 2
-				etherwarpLog(client, "stage 2 -> done (repath queued).")
+				if (directMode) {
+					// In direct mode, advance to next recorded waypoint instead of A* repath.
+					if (pathIndex < path.lastIndex) {
+						pathIndex++
+						mainPathIndex = pathIndex
+					}
+					etherwarpLog(client, "stage 2 -> done (direct mode, advanced to node $pathIndex).")
+				} else {
+					etherwarpRepathTick = now + 2
+					etherwarpLog(client, "stage 2 -> done (repath queued).")
+				}
 			} else {
 				etherwarpStageTicks++
 			}
@@ -2592,6 +2828,17 @@ private fun shouldSprint(player: net.minecraft.client.player.LocalPlayer, forwar
 	return true
 }
 
+private fun cardinalToward(from: BlockPos, to: BlockPos): Direction? {
+	val dx = to.x - from.x
+	val dz = to.z - from.z
+	if (dx == 0 && dz == 0) return null
+	return if (abs(dx) >= abs(dz)) {
+		if (dx > 0) Direction.EAST else Direction.WEST
+	} else {
+		if (dz > 0) Direction.SOUTH else Direction.NORTH
+	}
+}
+
 private fun shouldPrioritizeEscape(
 	client: Minecraft,
 	level: Level,
@@ -2605,6 +2852,15 @@ private fun shouldPrioritizeEscape(
 		return false
 	}
 	val pos = player.blockPosition()
+	// If the direction toward the waypoint is passable the player is navigating
+	// a narrow passage (e.g. crypt corridor/staircase) — don't try to escape.
+	val towardDir = cardinalToward(pos, waypoint)
+	if (towardDir != null) {
+		val step = pos.relative(towardDir)
+		if (MinecraftPathingRules.isPassable(level, step) && MinecraftPathingRules.isPassable(level, step.above())) {
+			return false
+		}
+	}
 	var solidSides = 0
 	for (dir in Direction.Plane.HORIZONTAL) {
 		if (!MinecraftPathingRules.isPassable(level, pos.relative(dir))) {
@@ -2648,6 +2904,12 @@ private fun handleBehindRepath(
 	if (behindTicks >= BEHIND_TICKS_LIMIT) {
 		behindTicks = 0
 		DebugLog.status(client, "Path", "Stuck: target behind, repath.")
+		if (directMode) {
+			// In directMode, don't skip waypoints just because they appear "behind" —
+			// the recorded route may loop back or approach from a non-forward direction.
+			// handleStuck handles genuine blockage once the player stops moving.
+			return false
+		}
 		return attemptRepath(client, level, player, "behind", goal, hard = false)
 	}
 	return false
@@ -2692,6 +2954,12 @@ private fun handleNoProgress(
 		return false
 	}
 	DebugLog.status(client, "Path", "Stuck: no progress, repath.")
+	if (directMode) {
+		// In directMode, don't skip waypoints on "no progress" — the recorded path may lead
+		// through terrain that temporarily looks like a dead end (staircase entrance, floor gap).
+		// Let handleStuck deal with genuine blockage after the player stops moving entirely.
+		return false
+	}
 	val changed = attemptRepath(client, level, player, "progress", goal, hard = false, allowSame = false)
 	if (!changed) {
 		forceDirectTicks = FORCE_DIRECT_TICKS
@@ -2747,7 +3015,8 @@ private fun resetProgress() {
 		val baseTarget = targetYaw.toDouble()
 		var basePitch = debugLookPitch
 		if (kotlin.math.abs(debugDy) <= PITCH_FLATTEN_DY) {
-			basePitch = 0.0
+			// Flat terrain — look slightly downward like a real player, not perfectly horizontal.
+			basePitch = -9.0
 		} else {
 			basePitch = basePitch.coerceIn(-PITCH_MAX_DEGREES, PITCH_MAX_DEGREES)
 		}
@@ -2770,6 +3039,22 @@ private fun resetProgress() {
 		smoothedTargetPitch = smoothedPitch
 		desiredYaw = smoothed
 		desiredPitch = smoothedPitch
+	}
+
+	private fun scheduleRepathAsync(level: Level, player: net.minecraft.client.player.LocalPlayer, reason: String, goal: BlockPos) {
+		if (asyncPlan?.future?.isDone == false) return // plan already in flight
+		val profileId = currentProfileId
+		val start = resolveRepathStart(level, player.blockPosition(), goal) ?: return
+		val levelRef = level
+		val future = java.util.concurrent.CompletableFuture.supplyAsync({
+			try {
+				planRollingPath(levelRef, start, goal, resolveProfile(profileId))
+			} catch (_: Exception) {
+				emptyList()
+			}
+		}, pathExecutor)
+		asyncPlan = AsyncPlan(future, goal, reason, level.gameTime)
+		setRepath(reason, level)
 	}
 
 	private fun attemptRepath(
@@ -2798,56 +3083,40 @@ private fun resetProgress() {
 			"Path",
 			"Repath $reason: front=$forwardId @ ${forwardPos.x} ${forwardPos.y} ${forwardPos.z}"
 		)
-		setRepath(reason, level)
 		val finalGoal = target ?: goal
+
+		if (!hard) {
+			// Soft repathing: schedule async so the game thread is never blocked
+			scheduleRepathAsync(level, player, reason, finalGoal)
+			return false
+		}
+
+		// Hard repath: schedule async (same executor) so the game thread is never blocked.
+		// Cancel any pending plan so only one is in flight at a time.
+		asyncPlan?.future?.cancel(false)
+		asyncPlan = null
+		setRepath(reason, level)
 		val repathStart = resolveRepathStart(level, player.blockPosition(), finalGoal)
 		if (repathStart == null) {
 			DebugLog.status(client, "Path", "Repath $reason: no valid start.")
-			if (hard) {
-				if (attemptEtherwarp(client, level, player, finalGoal, "repath-start")) {
-					return true
-				}
-				DebugLog.status(client, "Path", "Failed: repath ($reason) found no valid start.")
-				stop(client, "Lost path.")
+			if (attemptEtherwarp(client, level, player, finalGoal, "repath-start")) {
 				return true
 			}
-			return false
-		}
-		lastPlanAttemptTick = nowTick
-		val newPath = planRollingPath(level, repathStart, finalGoal, resolveProfile(currentProfileId))
-		if (newPath.isNotEmpty()) {
-			val changed = !isSamePath(newPath)
-			if (!changed && !allowSame) {
-				DebugLog.status(client, "Path", "Repath $reason: no change.")
-				return false
-			}
-			path = newPath.toMutableList()
-			pathIndex = 0
-			checkpoints = buildCheckpoints(path)
-			checkpointIndex = 0
-			smoothedTargetYaw = null
-			resetProgress()
-			if (reason.startsWith("stuck") || reason == "behind" || reason.startsWith("recover")) {
-				allowBackwardTicks = BACKWARD_ALLOW_TICKS
-			}
-			recovering = false
-			recoveryGoal = null
-			recoveryTargetIndex = -1
-			mainPath = path.toList()
-			mainPathIndex = 0
-			DebugLog.status(client, "Path", "Repath $reason: ok (nodes=${path.size}).")
-			return true
-		}
-		DebugLog.status(client, "Path", "Repath $reason: no path.")
-		if (hard) {
-			if (attemptEtherwarp(client, level, player, finalGoal, "repath")) {
-				return true
-			}
-			DebugLog.status(client, "Path", "Failed: repath ($reason) found no path.")
+			DebugLog.status(client, "Path", "Failed: repath ($reason) found no valid start.")
 			stop(client, "Lost path.")
 			return true
 		}
-		return false
+		lastPlanAttemptTick = nowTick
+		val profileId = currentProfileId
+		val allowBackward = reason.startsWith("stuck") || reason == "behind" || reason.startsWith("recover")
+		val future = java.util.concurrent.CompletableFuture.supplyAsync({
+			try { planRollingPath(level, repathStart, finalGoal, resolveProfile(profileId)) }
+			catch (_: Exception) { emptyList() }
+		}, pathExecutor)
+		asyncPlan = AsyncPlan(future, finalGoal, reason, nowTick)
+		if (allowBackward) allowBackwardTicks = BACKWARD_ALLOW_TICKS
+		DebugLog.status(client, "Path", "Repath $reason: scheduled async.")
+		return true
 	}
 
 	private fun resolveRepathStart(level: Level, origin: BlockPos, hintTarget: BlockPos): BlockPos? {

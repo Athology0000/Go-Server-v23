@@ -35,8 +35,8 @@ object GardenConfig {
 
     // Equipment (bracelet, cloak, belt, necklace slots)
     @Volatile var autoEquipment: Boolean = true
-    @Volatile var farmingEquipment: String = ""
-    @Volatile var pestEquipment: String = ""
+    @Volatile var farmingEquipment: String = "lotus, blossom"
+    @Volatile var pestEquipment: String = "pesthunter, pest vest"
     @Volatile var visitorEquipment: String = ""
     @Volatile var swapDelayMs: Long = 300L
 
@@ -82,7 +82,7 @@ object GardenConfig {
     @Volatile var rotationTimeMs: Long = 500L
     @Volatile var guiClickDelayMs: Long = 500L
     @Volatile var additionalRandomDelayMs: Long = 0L
-    @Volatile var gardenWarpDelayMs: Long = 1000L
+    @Volatile var gardenWarpDelayMs: Long = 3000L
     @Volatile var unflyMode: String = "DOUBLE_TAP_SPACE"
 
     // Pet tracking

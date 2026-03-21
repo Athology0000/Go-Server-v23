@@ -74,3 +74,11 @@ java {
     languageVersion.set(JavaLanguageVersion.of(21))
   }
 }
+
+tasks.register<Copy>("collectObfLibs") {
+  group = "build"
+  description = "Copies compile classpath jars to build/obf-libs for Skidfuscator -li."
+  from(configurations["compileClasspath"].resolvedConfiguration.resolvedArtifacts.map { it.file })
+  into(layout.buildDirectory.dir("obf-libs"))
+  duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}

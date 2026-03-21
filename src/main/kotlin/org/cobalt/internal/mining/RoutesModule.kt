@@ -78,6 +78,7 @@ object RoutesModule : Module("Routes") {
   private var routeRunning = false
   private var awaitingArrival = false
   private var walkCompletePointOnArrival = true
+  private var walkRetryCount = 0
   private var lastTarget: BlockPos? = null
   private var lastResolvedTarget: BlockPos? = null
   private var action = RouteAction.NONE
@@ -190,6 +191,12 @@ object RoutesModule : Module("Routes") {
     "Loop Route",
     "Restart from the first point when the route reaches the end.",
     true
+  )
+
+  private val startFromNearest = CheckboxSetting(
+    "Start From Nearest",
+    "When starting a route, begin at the checkpoint closest to your current position.",
+    false
   )
 
   private val pointType = ModeSetting(
@@ -308,6 +315,7 @@ object RoutesModule : Module("Routes") {
       renderRoute,
       recordOnRightClick,
       loopRoute,
+      startFromNearest,
       pointType,
       veinOccupancyRadius,
       openPickerAction,
@@ -324,6 +332,8 @@ object RoutesModule : Module("Routes") {
 
     EventBus.register(this)
     EventBus.register(org.cobalt.internal.ui.hud.RoutePointPopup)
+    org.cobalt.internal.helper.WalkbackBridge.startWalkback = ::loadAndStartWalkback
+    org.cobalt.internal.helper.WalkbackBridge.isRunning = { routeRunning }
   }
 
   @SubscribeEvent
@@ -391,9 +401,21 @@ object RoutesModule : Module("Routes") {
               lastTarget = null
               lastResolvedTarget = null
               walkCompletePointOnArrival = true
+              walkRetryCount = 0
               return
             }
-            stopRoute("Route failed: no visible route etherwarp recovery target.")
+            // Before giving up, retry with an A* repath from current position
+            val retryDest = lastResolvedTarget ?: lastTarget?.let { resolveApproxTarget(it) }
+            if (retryDest != null && walkRetryCount < MAX_WALK_RETRIES) {
+              val started = DuskPathfinder.start(mc, retryDest)
+              if (started) {
+                walkRetryCount++
+                lastResolvedTarget = retryDest
+                return
+              }
+            }
+            walkRetryCount = 0
+            stopRoute("Route failed: could not reach point ${routeIndex + 1}.")
           } else {
             action = RouteAction.NONE
             awaitingArrival = false
@@ -521,6 +543,15 @@ object RoutesModule : Module("Routes") {
     }
   }
 
+  val isRunning: Boolean get() = routeRunning
+
+  private fun findNearestPointIndex(): Int {
+    val origin = mc.player?.blockPosition() ?: return 0
+    return routePoints.indices.minByOrNull { i ->
+      routePoints[i].pos.distSqr(origin).toDouble()
+    } ?: 0
+  }
+
   private fun startRoute() {
     if (routePoints.isEmpty()) {
       ChatUtils.sendMessage("Route has no points.")
@@ -538,19 +569,81 @@ object RoutesModule : Module("Routes") {
       mc.setScreen(null)
     }
     PathfindingModule.ensureEnabledForAutomation("routes")
-    routeIndex = 0
+    routeIndex = if (startFromNearest.value) findNearestPointIndex() else 0
     routeRunning = true
     resetRuntimeState()
     detectMiningLoop()
     updateStatus()
+    val startMsg = if (startFromNearest.value) "from checkpoint ${routeIndex + 1}" else ""
     if (loopStartIndex >= 0) {
       ChatUtils.sendMessage(
-        "Route started. Mining loop detected: travel points 0-${loopStartIndex}, " +
-          "loop points ${loopStartIndex}-${loopEndIndex}."
+        "Route started${ if (startMsg.isNotEmpty()) " $startMsg" else "" }. Mining loop: " +
+          "travel 0-${loopStartIndex}, loop ${loopStartIndex}-${loopEndIndex}."
       )
     } else {
-      ChatUtils.sendMessage("Route started.")
+      ChatUtils.sendMessage("Route started${ if (startMsg.isNotEmpty()) " $startMsg" else "" }.")
     }
+  }
+
+  /**
+   * Loads route [name] from disk and starts it.
+   * If [fromEndOffset] > 0, starts that many checkpoints before the last point.
+   * Otherwise starts at the checkpoint nearest to the player.
+   * Returns true if the route was loaded and started successfully.
+   */
+  fun loadAndStartWalkback(name: String, fromEndOffset: Int = 0): Boolean {
+    // Don't restart if a walkback is already in progress.
+    if (routeRunning) return false
+    val trimmedName = name.trim()
+    if (trimmedName.isEmpty() || !isValidRouteName(trimmedName)) return false
+    val routeFile = routeFileForName(trimmedName)
+    val loaded = when {
+      routeFile.exists() -> readRouteFile(routeFile)
+      else -> readLegacyRoute(trimmedName)
+    } ?: return false
+    if (loaded.isEmpty()) return false
+
+    routePoints.clear()
+    routePoints.addAll(loaded)
+    routeIndex = if (fromEndOffset > 0) {
+      (loaded.size - fromEndOffset).coerceIn(0, loaded.size - 1)
+    } else {
+      findNearestPointIndex()
+    }
+    loopRoute.value = false  // walkback runs once — don't loop
+    routeRunning = true
+    resetRuntimeState()
+    detectMiningLoop()
+    if (!enabled.value) enabled.value = true
+    PathfindingModule.ensureEnabledForAutomation("routes")
+
+    // If all remaining points are NORMAL, feed them directly to bypass A* entirely.
+    // This makes the pathfinder follow the recorded path geometry rather than
+    // computing its own route between waypoints.
+    val remaining = routePoints.subList(routeIndex, routePoints.size)
+    if (remaining.isNotEmpty() && remaining.all { it.type == RoutePointType.NORMAL }) {
+      val waypoints = remaining.map { it.pos }
+      // startFromBeginning=true: findNearestPointIndex() already identified the correct
+      // starting waypoint via 3D distance — don't let startDirect re-search by XZ and
+      // jump ahead to a later node that may be through a wall (e.g. the crypt exit).
+      val started = DuskPathfinder.startDirect(mc, waypoints, startFromBeginning = true)
+      if (started) {
+        action = RouteAction.WALK
+        awaitingArrival = true
+        walkCompletePointOnArrival = true
+        lastTarget = routePoints.last().pos
+        lastResolvedTarget = lastTarget
+        activePoint = null
+        routeIndex = routePoints.lastIndex  // completePoint will push past end → stopRoute
+        updateStatus()
+        ChatUtils.sendMessage("Walkback \"$trimmedName\" started (direct, ${waypoints.size} nodes).")
+        return true
+      }
+    }
+
+    updateStatus()
+    ChatUtils.sendMessage("Walkback \"$trimmedName\" started at checkpoint ${routeIndex + 1}/${loaded.size}.")
+    return true
   }
 
   private fun pathToClosestVein() {
@@ -982,6 +1075,25 @@ object RoutesModule : Module("Routes") {
         startMine(level, point)
       }
       else -> {
+        // Batch all consecutive NORMAL points (including single ones) into startDirect so
+        // the pathfinder follows recorded route geometry instead of A* shortcuts through walls.
+        var batchEnd = routeIndex
+        while (batchEnd + 1 < routePoints.size && routePoints[batchEnd + 1].type == RoutePointType.NORMAL) {
+          batchEnd++
+        }
+        val waypoints = routePoints.subList(routeIndex, batchEnd + 1).map { it.pos }
+        val started = DuskPathfinder.startDirect(mc, waypoints, startFromBeginning = true)
+        if (started) {
+          action = RouteAction.WALK
+          awaitingArrival = true
+          walkCompletePointOnArrival = true
+          lastTarget = waypoints.last()
+          lastResolvedTarget = lastTarget
+          activePoint = null
+          routeIndex = batchEnd  // completePoint() → routeIndex++ → next non-NORMAL
+          updateStatus()
+          return
+        }
         startWalk(point.pos)
       }
     }
@@ -1176,6 +1288,7 @@ object RoutesModule : Module("Routes") {
     lastTarget = null
     lastResolvedTarget = null
     activePoint = null
+    walkRetryCount = 0
     routeIndex++
     if (chainedMineEndIndex != -1 && routeIndex >= chainedMineEndIndex) {
       chainedMineEndIndex = -1
@@ -1261,6 +1374,7 @@ object RoutesModule : Module("Routes") {
     lastTarget = null
     lastResolvedTarget = null
     activePoint = null
+    walkRetryCount = 0
     chainedMineEndIndex = -1
     loopStartIndex = -1
     loopEndIndex = -1
@@ -2099,6 +2213,7 @@ object RoutesModule : Module("Routes") {
     return routePoints[routeIndex].type == RoutePointType.WARP
   }
 
+  private const val MAX_WALK_RETRIES = 3
   private const val ARRIVAL_DISTANCE_SQ = 6.0 * 6.0
   private const val APPROX_SCAN_RADIUS = 6
   private const val APPROX_SCAN_VERTICAL = 4

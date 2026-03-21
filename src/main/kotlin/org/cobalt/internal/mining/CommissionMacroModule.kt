@@ -256,7 +256,10 @@ object CommissionMacroModule : Module("Commission Macro") {
       return
     }
 
-    if (stateTick < 3) return  // wait a tick for slots to populate
+    if (stateTick < 5) return  // wait for slots to populate
+
+    // Only check every 5 ticks to give the server time to send all slot data
+    if (stateTick % 5 != 0L) return
 
     // Look for any commission book that is already complete → claim it first
     val claimSlot = findClaimSlot(screen)
@@ -279,7 +282,7 @@ object CommissionMacroModule : Module("Commission Macro") {
     }
 
     readAttempts++
-    if (readAttempts >= 8) {
+    if (readAttempts >= 30) {
       mc.player?.closeContainer()
       ChatUtils.sendMessage("Commission Macro: Could not read any commission from Royal Pigeon GUI. Disabling.")
       enabled.value = false
@@ -439,8 +442,7 @@ object CommissionMacroModule : Module("Commission Macro") {
 
   private fun pressHotbarSlot(slot: Int) {
     if (slot !in 0..8) return
-    mc.options.keyHotbarSlots[slot].setDown(true)
-    mc.options.keyHotbarSlots[slot].setDown(false)
+    mc.player?.inventory?.selectedSlot = slot
   }
 
   /** Parse the first active (incomplete) commission from all book items in the open GUI. */

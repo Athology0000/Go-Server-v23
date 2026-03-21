@@ -11,6 +11,7 @@ import net.minecraft.ChatFormatting
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 import net.minecraft.client.multiplayer.ClientLevel
+import net.minecraft.world.scores.DisplaySlot
 import net.minecraft.core.BlockPos
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.decoration.ArmorStand
@@ -18,6 +19,7 @@ import net.minecraft.world.entity.player.Player
 import net.minecraft.client.player.LocalPlayer
 import org.cobalt.api.event.EventBus
 import org.cobalt.api.event.annotation.SubscribeEvent
+import org.cobalt.api.event.impl.client.ChatEvent
 import org.cobalt.api.event.impl.client.TickEvent
 import org.cobalt.api.event.impl.render.WorldRenderEvent
 import org.cobalt.api.module.Module
@@ -25,6 +27,7 @@ import org.cobalt.api.module.setting.inGroup
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.InfoSetting
 import org.cobalt.api.module.setting.impl.InfoType
+import org.cobalt.api.module.setting.impl.ModeSetting
 import org.cobalt.api.module.setting.impl.SliderSetting
 import org.cobalt.api.module.setting.impl.TextSetting
 import org.cobalt.api.rotation.RotationExecutor
@@ -40,6 +43,7 @@ import org.cobalt.internal.helper.Config
 import org.cobalt.internal.pathfinding.DuskPathfinder
 import org.cobalt.internal.pathfinding.PathPlanProfiles
 import org.cobalt.internal.pathfinding.PathfindingModule
+import org.cobalt.internal.helper.WalkbackBridge
 import org.cobalt.internal.rotation.RotationsModule
 
 object CombatMacroModule : Module("Combat Macro") {
@@ -147,6 +151,41 @@ object CombatMacroModule : Module("Combat Macro") {
     "Off"
   )
 
+  private val slayerType = ModeSetting(
+    "Slayer Type",
+    "Which slayer quest type to run.",
+    0,
+    arrayOf("Zombie", "Wolf", "Spider", "Enderman", "Vampire", "Blaze")
+  )
+
+  private val slayerTier = SliderSetting(
+    "Slayer Tier",
+    "Quest tier to buy (1 = cheapest, 5 = hardest).",
+    1.0,
+    1.0,
+    5.0,
+    step = 1.0
+  )
+
+  private val slayerAutoWarp = CheckboxSetting(
+    "Auto Warp",
+    "Warp to the farming area after buying a new quest.",
+    true
+  )
+
+  private val slayerLocation = ModeSetting(
+    "Location",
+    "Farming location for zombie slayer.",
+    0,
+    arrayOf("Zombie Graveyard", "Zombie Crypt")
+  )
+
+  private val slayerWalkbackRoute = TextSetting(
+    "Walkback Route",
+    "Route name to follow back to farming area after boss kill (if Auto Warp is off). Leave blank to skip.",
+    ""
+  )
+
   private val searchRange = SliderSetting(
     "Search Range",
     "Max distance to search for targets.",
@@ -228,6 +267,12 @@ object CombatMacroModule : Module("Combat Macro") {
   private val autoRagnarok = CheckboxSetting(
     "Ragnarok",
     "Use Ragnarok when the Slayer boss spawns. Auto-enables when the item is detected in hotbar.",
+    false
+  )
+
+  private val oneTapMode = CheckboxSetting(
+    "One Tap Mode",
+    "Keep moving through mobs — don't stop at each kill. Switch immediately when target dies.",
     false
   )
 
@@ -335,7 +380,21 @@ object CombatMacroModule : Module("Combat Macro") {
         return activeTargetName
       }
       if (cryptZombieSlayer.value) {
-        return if (slayerBossActive) "Slayer Boss" else "Zombie / Ghoul"
+        if (slayerBossActive) return "Slayer Boss"
+        val activeName = resolveCurrentTargetName()
+        if (!activeName.isNullOrBlank()) {
+          val norm = normalizeNameForMatch(activeName)
+          if (isSlayerPriorityMobName(norm)) return "⭐ $activeName"
+        }
+        return when (slayerType.value) {
+          0 -> "Zombie / Ghoul"
+          1 -> "Wolf"
+          2 -> "Spider"
+          3 -> "Voidling"
+          4 -> "Vampire"
+          5 -> "Blaze"
+          else -> "Mob"
+        }
       }
       val filter = targetName.value.trim()
       return if (filter.isNotEmpty()) filter else "Nearest Mob"
@@ -363,6 +422,7 @@ object CombatMacroModule : Module("Combat Macro") {
     enabled.value = false
   }
 
+  private var cryptPatrolIndex = -1  // -1 = uninitialized, resolved to nearest on first use
   private var lastTargetPos: BlockPos? = null
   private var lastMoveX = 0.0
   private var lastMoveY = 0.0
@@ -394,11 +454,26 @@ object CombatMacroModule : Module("Combat Macro") {
   private var slayerLastTabScanTick = -1L
   private var slayerTabCache: List<String> = emptyList()
   private var slayerNeedsQuestRestart = false
+  private var slayerQuestReady = false
+  private var slayerRagnarokUsedPreBoss = false
+  private var slayerAutoDetected = false
+  private var slayerDetectStartTick = -1L
+  private var slayerNeedsQuestClaim = false
+  private var slayerNeedsWalkback = false
+  private var slayerWalkbackJustFarm = false  // true = walkback is a walk-IN after quest buy, not post-boss
+  private var slayerWalkInDelayUntilTick = -1L  // wait for warp to finish before starting walkin route
+  private var slayerBossLastPos: net.minecraft.world.phys.Vec3? = null
+  private var slayerClaimStartTick = -1L
+  private var slayerClaimLastClickTick = -1L
   private var slayerLastBatphoneAttemptTick = -1L
   private var slayerLastBatphoneUseTick = -1L
   private var slayerLastGuiActionTick = -1L
   private var slayerWarnNoBatphoneTick = -1L
   private var slayerModeEnabled = false
+  /** True once the player has physically been confirmed inside the crypt since the last warp-hub.
+   *  The outside-crypt recovery check only fires when this is true, preventing the startup spam
+   *  loop where the player warps to hub and the check immediately re-triggers before they arrive. */
+  private var slayerEnteredCrypt = false
   private var wandWasInHotbar = false
   private var zombieSwordWasInHotbar = false
   private var overfluxWasInHotbar = false
@@ -413,6 +488,11 @@ object CombatMacroModule : Module("Combat Macro") {
       targetName,
       cryptZombieSlayer,
       slayerStatus,
+      slayerType,
+      slayerTier,
+      slayerAutoWarp,
+      slayerLocation,
+      slayerWalkbackRoute,
       searchRange,
       minCps,
       maxCps,
@@ -420,6 +500,7 @@ object CombatMacroModule : Module("Combat Macro") {
       chaseStopBuffer,
       stayNearStart,
       startAreaRadius,
+      oneTapMode,
       autoHeal,
       autoWandOfAtonement,
       autoZombieSword,
@@ -465,7 +546,14 @@ object CombatMacroModule : Module("Combat Macro") {
 
     cryptZombieSlayer.inGroup(TAB_SLAYER_GROUP)
     slayerStatus.inGroup(TAB_SLAYER_GROUP)
+    slayerType.inGroup(TAB_SLAYER_GROUP)
+    slayerTier.inGroup(TAB_SLAYER_GROUP)
+    slayerAutoWarp.inGroup(TAB_SLAYER_GROUP)
 
+    slayerLocation.inGroup(TAB_SLAYER_SETTINGS_GROUP)
+    slayerWalkbackRoute.inGroup(TAB_SLAYER_SETTINGS_GROUP)
+
+    oneTapMode.inGroup(TAB_COMBAT_GROUP)
     autoHeal.inGroup(TAB_AUTO_ITEMS_GROUP)
     autoWandOfAtonement.inGroup(TAB_AUTO_ITEMS_GROUP)
     autoZombieSword.inGroup(TAB_AUTO_ITEMS_GROUP)
@@ -483,8 +571,7 @@ object CombatMacroModule : Module("Combat Macro") {
       pendingHealRelease = false
     }
     if (pendingHealRestoreSlot >= 0) {
-      mc.options.keyHotbarSlots[pendingHealRestoreSlot].setDown(true)
-      mc.options.keyHotbarSlots[pendingHealRestoreSlot].setDown(false)
+      InventoryUtils.holdHotbarSlot(pendingHealRestoreSlot)
       pendingHealRestoreSlot = -1
     }
 
@@ -497,10 +584,32 @@ object CombatMacroModule : Module("Combat Macro") {
     syncLearnedWhitelistFromSetting()
     if (cryptZombieSlayer.value && !slayerModeEnabled) {
       slayerModeEnabled = true
-      slayerNeedsQuestRestart = true
+      slayerNeedsQuestRestart = false  // detection will set this if no quest found
+      slayerQuestReady = false
+      slayerRagnarokUsedPreBoss = false
+      slayerAutoDetected = false
+      slayerEnteredCrypt = false
+      slayerDetectStartTick = mc.level?.gameTime ?: -1L
       slayerLastBatphoneAttemptTick = -1L
       slayerLastBatphoneUseTick = -1L
       slayerLastGuiActionTick = -1L
+      // If enabling at hub (not already in the crypt), walk in immediately.
+      if (slayerLocation.value == 1) {
+        val initPos = mc.player?.blockPosition()
+        val alreadyInCrypt = initPos != null && CRYPT_PATROL_WAYPOINTS.any { wp ->
+          val dx = wp.x - initPos.x; val dz = wp.z - initPos.z
+          dx * dx + dz * dz < CRYPT_PROXIMITY_RANGE_SQ
+        }
+        if (!alreadyInCrypt) {
+          // Warp hub first so the walkback route starts from the correct origin
+          DuskPathfinder.stop(mc, null)
+          mc.player?.connection?.sendCommand("warp hub")
+          slayerEnteredCrypt = false
+          slayerWalkInDelayUntilTick = (mc.level?.gameTime ?: 0L) + SLAYER_WALKIN_WARP_DELAY_TICKS
+        } else {
+          slayerEnteredCrypt = true
+        }
+      }
     }
     if (!cryptZombieSlayer.value) {
       slayerModeEnabled = false
@@ -520,12 +629,53 @@ object CombatMacroModule : Module("Combat Macro") {
     PathfindingModule.ensureEnabledForAutomation("combat macro")
     updateKillTracking(level)
     if (cryptZombieSlayer.value) {
+      if (!slayerAutoDetected) tryAutoDetectSlayerQuest(level)
       updateSlayerBossState(level.gameTime)
+      if (slayerNeedsQuestClaim) {
+        if (handleClaimSlayerQuest(player, level)) return
+      }
+      // Crypt walk-in: after quest purchase, warp hub then walk the cryptwalkback route in.
+      if (slayerWalkInDelayUntilTick >= 0L) {
+        if (level.gameTime < slayerWalkInDelayUntilTick) {
+          slayerStatus.value = "Warping to Hub..."
+          return
+        }
+        slayerWalkInDelayUntilTick = -1L
+        val started = WalkbackBridge.startWalkback?.invoke(CRYPT_WALKBACK_ROUTE_NAME, 0) ?: false
+        if (started) {
+          slayerNeedsWalkback = true
+          slayerWalkbackJustFarm = true
+        }
+      }
+      if (slayerNeedsWalkback) {
+        if (WalkbackBridge.isRunning?.invoke() == true) {
+          slayerStatus.value = if (slayerWalkbackJustFarm) "Walking to Crypt..." else "Walking Back..."
+          return
+        } else {
+          slayerNeedsWalkback = false
+          startAreaOrigin = null
+          if (slayerWalkbackJustFarm) {
+            slayerWalkbackJustFarm = false
+            cryptPatrolIndex = -1  // farm immediately from nearest patrol point
+          } else {
+            slayerNeedsQuestRestart = true
+          }
+        }
+      }
       if (handleMaddoxGui(level.gameTime)) {
         return
       }
       if (tryRestartSlayerQuest(player, level.gameTime)) {
         return
+      }
+      // Use Ragnarok pre-emptively when quest is ready (boss spawns on next kill)
+      if (slayerQuestReady && !slayerBossActive && !slayerRagnarokUsedPreBoss && autoRagnarok.value
+        && level.gameTime - slayerLastRagnarokUseTick >= SLAYER_RAGNAROK_COOLDOWN_TICKS) {
+        if (useHotbarUtilityItem(player, SLAYER_RAGNAROK_KEYWORDS)) {
+          slayerRagnarokUsedPreBoss = true
+          slayerRagnarokUsedThisBoss = true
+          slayerLastRagnarokUseTick = level.gameTime
+        }
       }
     } else {
       slayerStatus.value = "Off"
@@ -539,16 +689,90 @@ object CombatMacroModule : Module("Combat Macro") {
     }
 
     if (stayNearStart.value && startAreaOrigin == null) {
-      startAreaOrigin = player.blockPosition()
+      val pos = player.blockPosition()
+      // For crypt location, only anchor the start area when the player is actually
+      // inside the crypt — prevents hub spawn from being used as the anchor point
+      // which would block the walk-in route.
+      val shouldAnchor = !(cryptZombieSlayer.value && slayerLocation.value == 1) ||
+        CRYPT_PATROL_WAYPOINTS.any { wp ->
+          val dx = wp.x - pos.x; val dz = wp.z - pos.z
+          dx * dx + dz * dz < CRYPT_PROXIMITY_RANGE_SQ
+        }
+      if (shouldAnchor) startAreaOrigin = pos
     }
 
     tryAutoHeal(player, level.gameTime)
-    if (enforceStartArea(player, level)) {
+    // For crypt slayer: track when the player is confirmed inside the crypt, and recover
+    // (warp hub + walk-in) only if they previously entered and then unexpectedly left.
+    // The slayerEnteredCrypt guard prevents the startup spam loop where the player warps to
+    // hub and the outside-crypt check immediately re-fires before they have walked back in.
+    if (cryptZombieSlayer.value && slayerLocation.value == 1 && !slayerBossActive
+      && slayerWalkInDelayUntilTick < 0L && !slayerNeedsWalkback) {
+      val inCrypt = CRYPT_PATROL_WAYPOINTS.any { wp ->
+        val dx = wp.x - player.x; val dz = wp.z - player.z
+        dx * dx + dz * dz < CRYPT_PROXIMITY_RANGE_SQ
+      }
+      if (inCrypt) {
+        slayerEnteredCrypt = true   // confirmed inside — enable recovery trigger
+      } else if (slayerEnteredCrypt) {
+        // Was inside the crypt but now isn't — recover via hub warp
+        DuskPathfinder.stop(mc, null)
+        (player as? net.minecraft.client.player.LocalPlayer)?.connection?.sendCommand("warp hub")
+        ChatUtils.sendMessage("Combat macro: outside crypt, warping hub for walkback.")
+        startAreaOrigin = null
+        slayerEnteredCrypt = false
+        slayerWalkInDelayUntilTick = level.gameTime + SLAYER_WALKIN_WARP_DELAY_TICKS
+        return
+      }
+      // If !inCrypt && !slayerEnteredCrypt: still making initial walk-in, do nothing here
+    }
+    // Don't enforce start area when the slayer boss is active — chase it wherever it goes
+    if (!(cryptZombieSlayer.value && slayerBossActive) && enforceStartArea(player, level)) {
       return
     }
 
     val target = if (cryptZombieSlayer.value) resolveSlayerTarget(player, level) else resolveTarget(player)
     if (target == null) {
+      // Boss is active but not yet visible — walk toward its last known position so we can find it.
+      if (cryptZombieSlayer.value && slayerBossActive) {
+        val bossPos = slayerBossLastPos
+        if (bossPos != null) {
+          val bossBlockPos = BlockPos(bossPos.x.toInt(), bossPos.y.toInt(), bossPos.z.toInt())
+          if (!DuskPathfinder.isActive() || lastTargetPos != bossBlockPos) {
+            if (level.gameTime - lastPathStartTick >= MIN_PATH_START_INTERVAL_TICKS) {
+              lastPathStartTick = level.gameTime
+              val started = DuskPathfinder.start(mc, bossBlockPos, PathPlanProfiles.COMBAT_ID)
+              if (started) {
+                lastTargetPos = bossBlockPos
+                startedPath = true
+              }
+            }
+          }
+          currentTargetId = null
+          return
+        }
+      }
+      // Crypt patrol: sweep waypoints in order to find ghouls when none are nearby.
+      if (cryptZombieSlayer.value && slayerLocation.value == 1 && !slayerNeedsQuestRestart) {
+        if (cryptPatrolIndex < 0) cryptPatrolIndex = findNearestCryptPatrolIndex()
+        val dest = CRYPT_PATROL_WAYPOINTS[cryptPatrolIndex]
+        val dx = dest.x - player.x
+        val dy = dest.y - player.y
+        val dz = dest.z - player.z
+        if (dx * dx + dy * dy + dz * dz < 9.0) {
+          cryptPatrolIndex = (cryptPatrolIndex + 1) % CRYPT_PATROL_WAYPOINTS.size
+        }
+        if (!DuskPathfinder.isActive() || lastTargetPos != dest) {
+          if (level.gameTime - lastPathStartTick >= MIN_PATH_START_INTERVAL_TICKS) {
+            lastPathStartTick = level.gameTime
+            val started = DuskPathfinder.start(mc, dest, PathPlanProfiles.COMBAT_ID)
+            if (started) { lastTargetPos = dest; startedPath = true }
+          }
+        }
+        currentTargetId = null
+        return
+      }
+
       if (startedPath && DuskPathfinder.isActive()) {
         DuskPathfinder.stop(mc, "No target found.")
       }
@@ -564,22 +788,27 @@ object CombatMacroModule : Module("Combat Macro") {
 
     ensurePreferredWeapon(player, target, level.gameTime)
     if (cryptZombieSlayer.value) {
+      ensureSlayerWeapon(player)
       tryUseSlayerSupportItems(player, target, level.gameTime)
     }
 
     if (inCloseChaseRange) {
-      val rotation = AngleUtils.getRotation(target)
-      RotationExecutor.rotateTo(rotation, rotationStrategy)
-    } else {
+      // Always update the rotation target so the camera smoothly tracks a moving mob.
+      // BezierTrackingRotationStrategy + snapThreshold handle natural deceleration near target.
+      RotationExecutor.rotateTo(AngleUtils.getRotation(target), rotationStrategy)
+    } else if (dist > attackRange.value + chaseStopBuffer.value + ROTATION_STOP_HYSTERESIS) {
+      // Only stop rotating once clearly out of range — prevents rapid start/stop at the boundary.
       RotationExecutor.stopRotating()
     }
 
     if (inAttackRange) {
-      if (startedPath && DuskPathfinder.isActive()) {
+      if (!oneTapMode.value && startedPath && DuskPathfinder.isActive()) {
         DuskPathfinder.stop(mc, "Target in range.")
       }
-      startedPath = false
-      lastTargetPos = null
+      if (!oneTapMode.value) {
+        startedPath = false
+        lastTargetPos = null
+      }
       stuckRepathCount = 0
       attemptAttack(player, target)
     } else {
@@ -669,6 +898,8 @@ object CombatMacroModule : Module("Combat Macro") {
     val searchRangeSq = searchRange.value * searchRange.value
     var bestBoss: LivingEntity? = null
     var bestBossDist = Double.POSITIVE_INFINITY
+    var bestPriorityMob: LivingEntity? = null
+    var bestPriorityMobDist = Double.POSITIVE_INFINITY
     var bestFarmMob: LivingEntity? = null
     var bestFarmMobDist = Double.POSITIVE_INFINITY
 
@@ -678,10 +909,12 @@ object CombatMacroModule : Module("Combat Macro") {
 
       val name = normalizeNameForMatch(living.name.string)
       val isBoss = isSlayerBossName(name)
+      val isPriority = isSlayerPriorityMobName(name)
       val isFarmMob = isSlayerFarmMobName(name)
-      if (!isBoss && !isFarmMob) continue
+      if (!isBoss && !isPriority && !isFarmMob) continue
 
-      if (startOrigin != null) {
+      if (startOrigin != null && !isBoss) {
+        // Boss ignores start area — chase it wherever it goes
         val ox = living.x - (startOrigin.x + 0.5)
         val oz = living.z - (startOrigin.z + 0.5)
         if (ox * ox + oz * oz > startAreaRangeSq) continue
@@ -691,11 +924,15 @@ object CombatMacroModule : Module("Combat Macro") {
       val dy = living.y - player.y
       val dz = living.z - player.z
       val distSq = dx * dx + dy * dy + dz * dz
-      if (distSq > searchRangeSq) continue
+      if (!isBoss && distSq > searchRangeSq) continue // boss ignores search range
 
       if (isBoss && distSq < bestBossDist) {
         bestBoss = living
         bestBossDist = distSq
+      }
+      if (isPriority && distSq < bestPriorityMobDist) {
+        bestPriorityMob = living
+        bestPriorityMobDist = distSq
       }
       if (isFarmMob && distSq < bestFarmMobDist) {
         bestFarmMob = living
@@ -705,11 +942,14 @@ object CombatMacroModule : Module("Combat Macro") {
 
     if (bestBoss != null) {
       onSlayerBossDetected(level.gameTime)
+      slayerBossLastPos = bestBoss.position()
     } else if (slayerBossActive && level.gameTime - slayerBossLastSeenTick > SLAYER_BOSS_ENTITY_LOST_TICKS) {
       clearSlayerBossState()
     }
 
-    val selected = if (slayerBossActive) bestBoss else bestBoss ?: bestFarmMob
+    // Priority: boss > priority farm mob (rare/bonus) > regular farm mob
+    val selected = if (slayerBossActive) bestBoss
+      else bestBoss ?: bestPriorityMob ?: bestFarmMob
     if (selected != null) {
       currentTargetId = selected.uuid
     }
@@ -720,11 +960,15 @@ object CombatMacroModule : Module("Combat Macro") {
     val tabLines = readTabListLines(nowTick)
     val hasBossTabLine = tabLines.any { line -> SLAYER_BOSS_TAB_KEYWORDS.any { keyword -> line.contains(keyword) } }
     val hasClearTabLine = tabLines.any { line -> SLAYER_BOSS_CLEAR_KEYWORDS.any { keyword -> line.contains(keyword) } }
-    val hasQuestTabLine = tabLines.any { line -> SLAYER_QUEST_TAB_KEYWORDS.any { keyword -> line.contains(keyword) } }
+    val hasQuestTabLine = tabLines.any { line ->
+      SLAYER_QUEST_TAB_KEYWORDS.any { keyword -> line.contains(keyword) }
+        || SLAYER_GENERIC_QUEST_KEYWORDS.any { keyword -> line.contains(keyword) }
+    }
 
     if (hasBossTabLine) {
       onSlayerBossDetected(nowTick)
       slayerNeedsQuestRestart = false
+      slayerQuestReady = false
     } else {
       if (hasClearTabLine) {
         if (slayerBossActive) {
@@ -742,8 +986,10 @@ object CombatMacroModule : Module("Combat Macro") {
     slayerStatus.value =
       when {
         slayerBossActive -> "Boss Active"
+        slayerNeedsQuestClaim -> "Claiming Loot"
+        slayerQuestReady -> "Quest Ready!"
         slayerNeedsQuestRestart -> "Restarting Quest"
-        else -> "Farming Zombies"
+        else -> "Farming ${when (slayerType.value) { 0 -> "Zombies"; 1 -> "Wolves"; 2 -> "Spiders"; 3 -> "Voidlings"; 4 -> "Vampires"; 5 -> "Blazes"; else -> "Mobs" }}"
       }
   }
 
@@ -768,7 +1014,10 @@ object CombatMacroModule : Module("Combat Macro") {
     slayerBossLastSeenTick = 0L
     slayerOverfluxUsedThisBoss = false
     slayerRagnarokUsedThisBoss = false
+    slayerRagnarokUsedPreBoss = false
+    slayerQuestReady = false
     slayerLastBadHealthUseTick = -1L
+    slayerBossLastPos = null
   }
 
   private fun tryUseSlayerSupportItems(player: Player, target: LivingEntity, nowTick: Long) {
@@ -801,6 +1050,8 @@ object CombatMacroModule : Module("Combat Macro") {
 
   private fun tryRestartSlayerQuest(player: Player, nowTick: Long): Boolean {
     if (!slayerNeedsQuestRestart || slayerBossActive) return false
+    // Don't fire the batphone until quest detection has settled
+    if (!slayerAutoDetected) return true
     if (isLikelyMaddoxScreen(nowTick)) return true
     if (mc.screen is AbstractContainerScreen<*>) return false
     if (pendingHealRelease || pendingHealRestoreSlot >= 0) return true
@@ -845,11 +1096,38 @@ object CombatMacroModule : Module("Combat Macro") {
 
     val player = mc.player ?: return true
     val menu = player.containerMenu
-    val actionSlot = findMaddoxMenuActionSlot(menu.slots)
+    val (actionSlot, isFinalPurchase) = findMaddoxMenuActionSlot(menu.slots)
     if (actionSlot >= 0) {
       InventoryUtils.clickSlot(actionSlot)
       slayerLastGuiActionTick = nowTick
       slayerLastBatphoneAttemptTick = nowTick
+      if (isFinalPurchase) {
+        player.closeContainer()
+        slayerNeedsQuestRestart = false
+        slayerQuestReady = false
+        slayerRagnarokUsedPreBoss = false
+        slayerAutoDetected = true
+        startAreaOrigin = null
+        if (cryptZombieSlayer.value && slayerLocation.value == 1) {
+          // Crypt: check if already inside the farming area — if so skip the warp and walk-in.
+          val alreadyInCrypt = CRYPT_PATROL_WAYPOINTS.any { wp ->
+            val dx = wp.x - player.x; val dz = wp.z - player.z
+            dx * dx + dz * dz < CRYPT_PROXIMITY_RANGE_SQ
+          }
+          if (alreadyInCrypt) {
+            cryptPatrolIndex = -1  // already in crypt, resume patrol from nearest
+            slayerEnteredCrypt = true
+          } else {
+            DuskPathfinder.stop(mc, null)
+            player.connection?.sendCommand("warp hub")
+            slayerEnteredCrypt = false
+            slayerWalkInDelayUntilTick = nowTick + SLAYER_WALKIN_WARP_DELAY_TICKS
+          }
+        } else if (slayerAutoWarp.value) {
+          val warp = slayerWarpCommand
+          if (warp.isNotEmpty()) player.connection?.sendCommand(warp)
+        }
+      }
       slayerStatus.value = "Restarting Slayer..."
       return true
     }
@@ -864,11 +1142,224 @@ object CombatMacroModule : Module("Combat Macro") {
     return true
   }
 
+  /** Called when the loot claim step finishes (success or timeout). Starts the walkback route
+   *  or proceeds directly to quest restart. */
+  private fun finishSlayerClaim() {
+    slayerNeedsQuestClaim = false
+    slayerBossLastPos = null
+    // Crypt: use the configured walkback route to walk out and back to hub for quest restart.
+    if (slayerLocation.value == 1 && cryptZombieSlayer.value) {
+      val routeName = slayerWalkbackRoute.value.trim()
+      if (!slayerAutoWarp.value && routeName.isNotBlank()) {
+        val started = WalkbackBridge.startWalkback?.invoke(routeName, 5) ?: false
+        if (started) {
+          slayerNeedsWalkback = true
+          return
+        }
+      }
+      cryptPatrolIndex = -1
+      slayerNeedsQuestRestart = true
+      return
+    }
+    // Graveyard: use configured walkback route if auto-warp is off.
+    val routeName = slayerWalkbackRoute.value.trim()
+    if (!slayerAutoWarp.value && routeName.isNotBlank()) {
+      val started = WalkbackBridge.startWalkback?.invoke(routeName, 5) ?: false
+      if (started) {
+        slayerNeedsWalkback = true
+        return
+      }
+    }
+    slayerNeedsQuestRestart = true
+  }
+
+  /**
+   * Walks to the boss death position, right-clicks the loot bag entity, then transitions
+   * to quest restart. Returns true while the claim step is still in progress.
+   */
+  private fun handleClaimSlayerQuest(player: LocalPlayer, level: ClientLevel): Boolean {
+    val nowTick = level.gameTime
+
+    // Timeout — give up and restart the quest anyway
+    if (slayerClaimStartTick >= 0L && nowTick - slayerClaimStartTick > SLAYER_CLAIM_TIMEOUT_TICKS) {
+      finishSlayerClaim()
+      return false
+    }
+
+    val deathPos = slayerBossLastPos
+    if (deathPos == null) {
+      // No tracked position — skip straight to restart
+      finishSlayerClaim()
+      return false
+    }
+
+    // Search for a loot bag ArmorStand near the death position
+    val lootEntity = level.entitiesForRendering()
+      .filterIsInstance<ArmorStand>()
+      .filter { entity ->
+        val dx = entity.x - deathPos.x
+        val dy = entity.y - deathPos.y
+        val dz = entity.z - deathPos.z
+        dx * dx + dy * dy + dz * dz < SLAYER_LOOT_SEARCH_RADIUS_SQ
+      }
+      .filter { entity ->
+        val name = normalizeNameForMatch(entity.name.string)
+        SLAYER_LOOT_KEYWORDS.any { name.contains(it) }
+      }
+      .minByOrNull { entity ->
+        val dx = entity.x - player.x
+        val dy = entity.y - player.y
+        val dz = entity.z - player.z
+        dx * dx + dy * dy + dz * dz
+      }
+
+    if (lootEntity == null) {
+      // No loot bag found yet — walk to death pos and keep waiting
+      val targetPos = BlockPos(deathPos.x.toInt(), deathPos.y.toInt(), deathPos.z.toInt())
+      if (!DuskPathfinder.isActive() || lastTargetPos != targetPos) {
+        if (nowTick - lastPathStartTick >= MIN_PATH_START_INTERVAL_TICKS) {
+          lastPathStartTick = nowTick
+          val started = DuskPathfinder.start(mc, targetPos, PathPlanProfiles.COMBAT_ID)
+          if (started) {
+            lastTargetPos = targetPos
+            startedPath = true
+          }
+        }
+      }
+      return true
+    }
+
+    // Loot entity found — stop pathing, look at it and right-click
+    if (startedPath && DuskPathfinder.isActive()) {
+      DuskPathfinder.stop(mc, "Loot bag found.")
+      startedPath = false
+    }
+
+    val dx = lootEntity.x - player.x
+    val dy = lootEntity.y - player.y
+    val dz = lootEntity.z - player.z
+    val distSq = dx * dx + dy * dy + dz * dz
+
+    if (distSq > SLAYER_LOOT_CLAIM_RANGE_SQ) {
+      val targetPos = lootEntity.blockPosition()
+      if (!DuskPathfinder.isActive()) {
+        if (nowTick - lastPathStartTick >= MIN_PATH_START_INTERVAL_TICKS) {
+          lastPathStartTick = nowTick
+          DuskPathfinder.start(mc, targetPos, PathPlanProfiles.COMBAT_ID)
+          lastTargetPos = targetPos
+          startedPath = true
+        }
+      }
+      return true
+    }
+
+    val rotation = AngleUtils.getRotation(lootEntity)
+    RotationExecutor.rotateTo(rotation, rotationStrategy)
+
+    if (nowTick - slayerClaimLastClickTick >= SLAYER_CLAIM_CLICK_INTERVAL_TICKS) {
+      slayerClaimLastClickTick = nowTick
+      MouseUtils.rightClick()
+    }
+
+    // After a short dwell at the loot bag, assume claimed and move on
+    if (nowTick - slayerClaimStartTick > SLAYER_CLAIM_DWELL_TICKS) {
+      finishSlayerClaim()
+    }
+
+    return true
+  }
+
   private fun isLikelyMaddoxScreen(nowTick: Long): Boolean {
     val screen = mc.screen as? AbstractContainerScreen<*> ?: return false
     val title = normalizeNameForMatch(screen.title.string)
     if (SLAYER_MADDOX_SCREEN_KEYWORDS.any { keyword -> title.contains(keyword) }) return true
     return slayerLastBatphoneUseTick >= 0L && nowTick - slayerLastBatphoneUseTick <= SLAYER_MADDOX_GUI_TIMEOUT_TICKS
+  }
+
+  @SubscribeEvent
+  fun onChatReceive(event: ChatEvent.Receive) {
+    if (!cryptZombieSlayer.value) return
+    val raw = event.message ?: return
+    val msg = ChatFormatting.stripFormatting(raw)?.lowercase(Locale.ROOT)?.trim() ?: return
+
+    if (SLAYER_QUEST_READY_CHAT_KEYWORDS.any { msg.contains(it) }) {
+      slayerQuestReady = true
+      slayerNeedsQuestRestart = false
+      ChatUtils.sendMessage("Combat macro: Quest ready — Ragnarok prepped for boss spawn.")
+    }
+
+    if (SLAYER_BOSS_SPAWNED_CHAT_KEYWORDS.any { msg.contains(it) }) {
+      val level = mc.level ?: return
+      onSlayerBossDetected(level.gameTime)
+      slayerQuestReady = false
+    }
+
+    if (SLAYER_BOSS_KILLED_CHAT_KEYWORDS.any { msg.contains(it) }) {
+      clearSlayerBossState(false)
+      slayerNeedsQuestClaim = true
+      slayerClaimStartTick = mc.level?.gameTime ?: -1L
+    }
+  }
+
+  private fun tryAutoDetectSlayerQuest(level: ClientLevel) {
+    val nowTick = level.gameTime
+
+    // Scan scoreboard sidebar
+    val scoreboard = level.scoreboard
+    val objective = scoreboard.getDisplayObjective(DisplaySlot.SIDEBAR)
+    if (objective != null) {
+      for (score in scoreboard.listPlayerScores(objective)) {
+        val ownerName = score.owner()
+        val team = scoreboard.getPlayersTeam(ownerName)
+        val raw = if (team != null) team.playerPrefix.string + ownerName + team.playerSuffix.string else ownerName
+        val line = ChatFormatting.stripFormatting(raw)?.lowercase(Locale.ROOT)?.trim() ?: continue
+        if (applyQuestDetection(line, "scoreboard")) return
+      }
+    }
+
+    // Scan tab list
+    val tabLines = readTabListLines(nowTick)
+    for (line in tabLines) {
+      if (applyQuestDetection(line, "tab")) return
+    }
+
+    // Nothing found yet — only conclude "no quest" after the detection window expires
+    if (slayerDetectStartTick >= 0L && nowTick - slayerDetectStartTick >= SLAYER_DETECT_WINDOW_TICKS) {
+      slayerAutoDetected = true
+      slayerNeedsQuestRestart = true // no quest found in window → buy one
+    }
+    // else: still within window — farming continues normally, detection runs next tick
+  }
+
+  /** Returns true and updates state if the line matches any active slayer quest. */
+  private fun applyQuestDetection(line: String, source: String): Boolean {
+    var typeIdx = -1
+    when {
+      line.contains("zombie slayer") || (line.contains("revenant") && line.contains("slayer")) -> typeIdx = 0
+      line.contains("wolf slayer") || (line.contains("sven") && line.contains("slayer")) -> typeIdx = 1
+      line.contains("spider slayer") || (line.contains("tarantula") && line.contains("slayer")) -> typeIdx = 2
+      line.contains("enderman slayer") || (line.contains("voidgloom") && line.contains("slayer")) -> typeIdx = 3
+      line.contains("vampire slayer") || (line.contains("riftstalker") && line.contains("slayer")) -> typeIdx = 4
+      line.contains("blaze slayer") || (line.contains("inferno") && line.contains("slayer")) -> typeIdx = 5
+    }
+    if (typeIdx < 0) return false
+
+    val tier = when {
+      line.contains(" v") && !line.contains(" vi") -> 5
+      line.contains(" iv") -> 4
+      line.contains(" iii") -> 3
+      line.contains(" ii") -> 2
+      line.contains(" i") -> 1
+      else -> -1
+    }
+    if (slayerType.value != typeIdx) {
+      slayerType.value = typeIdx
+      ChatUtils.sendMessage("Combat macro: Detected ${slayerType.options[typeIdx]} Slayer from $source.")
+    }
+    if (tier in 1..5) slayerTier.value = tier.toDouble()
+    slayerNeedsQuestRestart = false
+    slayerAutoDetected = true
+    return true
   }
 
   private fun moveBatphoneToHotbar(player: Player): Boolean {
@@ -904,7 +1395,12 @@ object CombatMacroModule : Module("Combat Macro") {
     return inventory.selectedSlot.coerceIn(0, 8)
   }
 
-  private fun findMaddoxMenuActionSlot(slots: List<net.minecraft.world.inventory.Slot>): Int {
+  /**
+   * Returns (slotIndex, isFinalPurchase).
+   * isFinalPurchase = true  → slot is "Start Quest" / "Restart" / "Confirm" — quest will be bought.
+   * isFinalPurchase = false → slot is just the revenant-icon navigation step.
+   */
+  private fun findMaddoxMenuActionSlot(slots: List<net.minecraft.world.inventory.Slot>): Pair<Int, Boolean> {
     var revenantSlot = -1
     var restartSlot = -1
     var confirmSlot = -1
@@ -920,25 +1416,19 @@ object CombatMacroModule : Module("Combat Macro") {
       val hasRestartKeyword = SLAYER_MADDOX_RESTART_KEYWORDS.any { keyword -> text.contains(keyword) }
       val hasConfirmKeyword = SLAYER_MADDOX_CONFIRM_KEYWORDS.any { keyword -> text.contains(keyword) }
 
-      if (hasConfirmKeyword && hasRevenantKeyword) return slot.index
-      if (hasRestartKeyword && hasRevenantKeyword) return slot.index
+      if (hasConfirmKeyword && hasRevenantKeyword) return Pair(slot.index, true)
+      if (hasRestartKeyword && hasRevenantKeyword) return Pair(slot.index, true)
 
-      if (hasRevenantKeyword && revenantSlot == -1) {
-        revenantSlot = slot.index
-      }
-      if (hasRestartKeyword && restartSlot == -1) {
-        restartSlot = slot.index
-      }
-      if (hasConfirmKeyword && confirmSlot == -1) {
-        confirmSlot = slot.index
-      }
+      if (hasRevenantKeyword && revenantSlot == -1) revenantSlot = slot.index
+      if (hasRestartKeyword && restartSlot == -1) restartSlot = slot.index
+      if (hasConfirmKeyword && confirmSlot == -1) confirmSlot = slot.index
     }
 
     return when {
-      confirmSlot >= 0 -> confirmSlot
-      restartSlot >= 0 -> restartSlot
-      revenantSlot >= 0 -> revenantSlot
-      else -> -1
+      confirmSlot >= 0 -> Pair(confirmSlot, true)
+      restartSlot >= 0 -> Pair(restartSlot, true)
+      revenantSlot >= 0 -> Pair(revenantSlot, false) // navigation only, not yet purchased
+      else -> Pair(-1, false)
     }
   }
 
@@ -948,8 +1438,7 @@ object CombatMacroModule : Module("Combat Macro") {
 
     val previousSlot = player.inventory.selectedSlot
     if (previousSlot != slot) {
-      mc.options.keyHotbarSlots[slot].setDown(true)
-      mc.options.keyHotbarSlots[slot].setDown(false)
+      InventoryUtils.holdHotbarSlot(slot)
     }
 
     mc.options.keyUse?.setDown(true)
@@ -973,6 +1462,10 @@ object CombatMacroModule : Module("Combat Macro") {
 
   private fun isSlayerBossName(normalizedName: String): Boolean {
     return SLAYER_BOSS_ENTITY_KEYWORDS.any { keyword -> normalizedName.contains(keyword) }
+  }
+
+  private fun isSlayerPriorityMobName(normalizedName: String): Boolean {
+    return SLAYER_PRIORITY_MOB_KEYWORDS.any { keyword -> normalizedName.contains(keyword) }
   }
 
   private fun isSlayerFarmMobName(normalizedName: String): Boolean {
@@ -1127,6 +1620,7 @@ object CombatMacroModule : Module("Combat Macro") {
     if (candidate == null) {
       if (level.gameTime - killCandidateAttackTick >= KILL_DISAPPEAR_CONFIRM_TICKS) {
         applyLearnedKillTarget(killCandidateName ?: "")
+        if (oneTapMode.value) currentTargetId = null
         clearKillCandidate()
       }
       return
@@ -1136,6 +1630,7 @@ object CombatMacroModule : Module("Combat Macro") {
     }
 
     applyLearnedKillTarget(killCandidateName ?: candidate.name.string)
+    if (oneTapMode.value) currentTargetId = null
     clearKillCandidate()
   }
 
@@ -1305,6 +1800,24 @@ object CombatMacroModule : Module("Combat Macro") {
     }
   }
 
+  /** Ensures a weapon is selected when in slayer mode. Switches away from utility items
+   *  (batphone, overflux, etc.) to the nearest sword/weapon in the hotbar. */
+  private fun ensureSlayerWeapon(player: Player) {
+    if (pendingHealRelease || pendingHealRestoreSlot >= 0) return
+    val currentSlot = player.inventory.selectedSlot
+    val current = player.inventory.getItem(currentSlot)
+    if (!current.isEmpty) {
+      val name = normalizeNameForMatch(current.hoverName?.string.orEmpty())
+      val isUtility = SLAYER_NON_WEAPON_KEYWORDS.any { name.contains(it) }
+      if (!isUtility) return // already holding a weapon
+    }
+    // Current item is a utility item or empty — find a weapon
+    val weaponSlot = findHotbarSlotByKeywords(player, SLAYER_WEAPON_KEYWORDS)
+    if (weaponSlot in 0..8 && weaponSlot != currentSlot) {
+      InventoryUtils.holdHotbarSlot(weaponSlot)
+    }
+  }
+
   private fun tryAutoHeal(player: Player, nowTick: Long) {
     if (!autoHeal.value) return
     val effectiveHealth = player.health + player.absorptionAmount
@@ -1318,8 +1831,7 @@ object CombatMacroModule : Module("Combat Macro") {
     val previousSlot = player.inventory.selectedSlot
 
     if (previousSlot != healSlot) {
-      mc.options.keyHotbarSlots[healSlot].setDown(true)
-      mc.options.keyHotbarSlots[healSlot].setDown(false)
+      InventoryUtils.holdHotbarSlot(healSlot)
     }
 
     mc.options.keyUse?.setDown(true)
@@ -1427,9 +1939,19 @@ object CombatMacroModule : Module("Combat Macro") {
 
     stuckRepathCount = 0
     if (warpOnStuck.value) {
+      DuskPathfinder.stop(mc, null)
       (player as? LocalPlayer)?.connection?.sendCommand("warp hub")
-      ChatUtils.sendMessage("Combat macro stuck. Warping to hub.")
-      stopMacro()
+      if (cryptZombieSlayer.value && slayerLocation.value == 1) {
+        // Crypt slayer: warp hub then walkback instead of stopping the macro
+        ChatUtils.sendMessage("Combat macro stuck. Warping hub for walkback.")
+        startAreaOrigin = null
+        stuckTicks = 0
+        slayerEnteredCrypt = false
+        slayerWalkInDelayUntilTick = level.gameTime + SLAYER_WALKIN_WARP_DELAY_TICKS
+      } else {
+        ChatUtils.sendMessage("Combat macro stuck. Warping to hub.")
+        stopMacro()
+      }
     }
   }
 
@@ -1493,6 +2015,7 @@ object CombatMacroModule : Module("Combat Macro") {
     stuckTicks = 0
     nextAttackNs = 0L
     startedPath = false
+    cryptPatrolIndex = -1
     currentTargetId = null
     lastPathStartTick = 0L
     clearKillCandidate()
@@ -1510,15 +2033,28 @@ object CombatMacroModule : Module("Combat Macro") {
     slayerLastTabScanTick = -1L
     slayerTabCache = emptyList()
     slayerNeedsQuestRestart = false
+    slayerQuestReady = false
+    slayerRagnarokUsedPreBoss = false
+    slayerAutoDetected = false
+    slayerDetectStartTick = -1L
+    slayerNeedsQuestClaim = false
+    slayerNeedsWalkback = false
+    slayerWalkbackJustFarm = false
+    slayerWalkInDelayUntilTick = -1L
+    slayerBossLastPos = null
+    slayerClaimStartTick = -1L
+    slayerClaimLastClickTick = -1L
     slayerLastBatphoneAttemptTick = -1L
     slayerLastBatphoneUseTick = -1L
     slayerLastGuiActionTick = -1L
     slayerWarnNoBatphoneTick = -1L
     slayerModeEnabled = false
+    slayerEnteredCrypt = false
   }
 
   private const val TAB_COMBAT_GROUP = "Combat Macro"
   private const val TAB_SLAYER_GROUP = "Slayer Macro"
+  private const val TAB_SLAYER_SETTINGS_GROUP = "Slayer Settings"
   private const val TAB_AUTO_ITEMS_GROUP = "Auto Items"
   private const val KILL_CANDIDATE_TTL_TICKS = 80L
   private const val KILL_DISAPPEAR_CONFIRM_TICKS = 2L
@@ -1530,28 +2066,82 @@ object CombatMacroModule : Module("Combat Macro") {
   private const val SLAYER_OVERFLUX_COOLDOWN_TICKS = 600L
   private const val SLAYER_RAGNAROK_COOLDOWN_TICKS = 400L
   private const val SLAYER_BAD_HEALTH_REUSE_TICKS = 80L
-  private const val SLAYER_BATPHONE_RETRY_TICKS = 30L
-  private const val SLAYER_MADDOX_GUI_TIMEOUT_TICKS = 60L
+  private const val SLAYER_BATPHONE_RETRY_TICKS = 80L
+  private const val SLAYER_MADDOX_GUI_TIMEOUT_TICKS = 80L
   private const val SLAYER_GUI_ACTION_COOLDOWN_TICKS = 5L
   private const val SLAYER_NO_BATPHONE_WARN_TICKS = 200L
+  private const val SLAYER_DETECT_WINDOW_TICKS = 100L  // 5 s to scan before assuming no quest
   private const val PLAYER_HOTBAR_MENU_SLOT_START = 36
   private const val PLAYER_HOTBAR_MENU_SLOT_END = 44
   private const val DEFAULT_WHITELIST_ENTRY = "ice walker"
-  private const val MIN_PATH_START_INTERVAL_TICKS = 1L
-  private const val TARGET_REPATH_DISTANCE_SQ = 2.25
+  private const val MIN_PATH_START_INTERVAL_TICKS = 20L
+  private const val TARGET_REPATH_DISTANCE_SQ = 16.0  // repath when mob moves 4+ blocks
   private const val COMBAT_ROTATION_STEP_SCALE = 0.62
-  private const val PATH_JITTER_RANGE = 2   // blocks of random XZ offset per path start
+  private const val PATH_JITTER_RANGE = 2              // slight offset so paths vary naturally
+  private const val ROTATION_STOP_HYSTERESIS = 2.5     // don't stop rotating until clearly out of range
+  private const val CRYPT_WALKBACK_ROUTE_NAME = "cryptwalkback"
+  private const val SLAYER_WALKIN_WARP_DELAY_TICKS = 40L  // ticks to wait after warp hub before starting walkin route
+  private const val CRYPT_PROXIMITY_RANGE_SQ = 1600.0    // 40-block radius — if within this of any patrol point, already in crypt
   private const val CHASE_RESOLVE_RADIUS = 3
   private const val CHASE_RESOLVE_VERTICAL = 2
   private const val START_AREA_RETURN_BUFFER = 2.0
   private const val TARGET_BOX_CYCLE_MS = 4000L
   private const val TARGET_BOX_ALPHA = 170
   private const val TARGET_BOX_INFLATE = 0.08
-  private val SLAYER_BOSS_ENTITY_KEYWORDS = arrayOf("revenant horror", "atoned horror", "deformed revenant")
-  private val SLAYER_FARM_MOB_KEYWORDS = arrayOf("zombie", "crypt ghoul", "golden ghoul")
-  private val SLAYER_BOSS_TAB_KEYWORDS = arrayOf("slay the boss", "revenant horror", "atoned horror")
+  private val SLAYER_BOSS_ENTITY_KEYWORDS get() = when (slayerType.value) {
+    0 -> arrayOf("revenant horror")
+    1 -> arrayOf("sven packmaster")
+    2 -> arrayOf("tarantula broodfather")
+    3 -> arrayOf("voidgloom seraph")
+    4 -> arrayOf("riftstalker bloodfiend")
+    5 -> arrayOf("inferno demonlord")
+    else -> arrayOf()
+  }
+  // Priority mobs: rare/high-XP mobs that should be targeted over regular farm mobs.
+  // Only applies at the relevant tier (zombie: tier 3+).
+  private val SLAYER_PRIORITY_MOB_KEYWORDS get() = when {
+    slayerType.value == 0 && slayerTier.value >= 3 -> arrayOf(
+      "atoned horror", "atoned revenant", "atoned champion", "revenant champion",
+      "revenant sycophant", "deformed revenant"
+    )
+    else -> arrayOf()
+  }
+  private val SLAYER_FARM_MOB_KEYWORDS get() = when (slayerType.value) {
+    0 -> when (slayerLocation.value) {
+      0 -> arrayOf("zombie") // Zombie Graveyard: regular zombies only
+      1 -> arrayOf("crypt ghoul", "golden ghoul") // Zombie Crypt
+      else -> arrayOf("zombie", "crypt ghoul", "golden ghoul")
+    }
+    1 -> arrayOf("pack wolf", "old wolf", "pit wolf", "zombie wolf", "wolf")
+    2 -> arrayOf("dasher spider", "voracious spider", "weaver spider", "spider")
+    3 -> arrayOf("voidling extremist", "voidling radical", "voidling fanatic", "enderman")
+    4 -> arrayOf("bat", "vampiric bat", "bloodfiend")
+    5 -> arrayOf("blaze", "smoldering blaze", "emerald slime")
+    else -> arrayOf()
+  }
+  // Only "slay the boss" reliably signals the boss is active.
+  // Boss entity names (e.g. "revenant horror") also appear in the quest PROGRESS tab line
+  // ("Kill Revenant Horror 50/200"), which would incorrectly set slayerBossActive = true.
+  private val SLAYER_BOSS_TAB_KEYWORDS = arrayOf("slay the boss")
   private val SLAYER_BOSS_CLEAR_KEYWORDS = arrayOf("boss slain", "slayer quest complete")
-  private val SLAYER_QUEST_TAB_KEYWORDS = arrayOf("slayer quest", "zombie slayer", "revenant horror")
+  private val SLAYER_QUEST_TAB_KEYWORDS get() = when (slayerType.value) {
+    0 -> arrayOf("slayer quest", "zombie slayer", "revenant horror")
+    1 -> arrayOf("slayer quest", "wolf slayer", "sven packmaster")
+    2 -> arrayOf("slayer quest", "spider slayer", "tarantula broodfather")
+    3 -> arrayOf("slayer quest", "enderman slayer", "voidgloom seraph")
+    4 -> arrayOf("slayer quest", "vampire slayer", "riftstalker bloodfiend")
+    5 -> arrayOf("slayer quest", "blaze slayer", "inferno demonlord")
+    else -> arrayOf("slayer quest")
+  }
+  // Items that are NOT weapons — switch away from these when preparing to attack
+  private val SLAYER_NON_WEAPON_KEYWORDS = arrayOf(
+    "batphone", "overflux", "ragnarok", "ragnorak", "wand of atonement",
+    "sword of bad health", "drill", "pickaxe", "gauntlet"
+  )
+  // Items that ARE weapons — prefer these for attacking
+  private val SLAYER_WEAPON_KEYWORDS = arrayOf(
+    "sword", "blade", "scythe", "katana", "saber", "cleaver", "axe", "rapier", "claymore"
+  )
   private val SLAYER_WAND_OF_ATONEMENT_KEYWORDS = arrayOf("wand of atonement")
   private val SLAYER_ZOMBIE_SWORD_KEYWORDS = arrayOf("zombie sword")
   private val SLAYER_OVERFLUX_KEYWORDS = arrayOf("overflux")
@@ -1559,9 +2149,89 @@ object CombatMacroModule : Module("Combat Macro") {
   private val SLAYER_BAD_HEALTH_KEYWORDS = arrayOf("sword of bad health")
   private val SLAYER_BATPHONE_KEYWORDS = arrayOf("maddox batphone", "batphone")
   private val SLAYER_MADDOX_SCREEN_KEYWORDS = arrayOf("maddox", "slayer")
-  private val SLAYER_MADDOX_REVENANT_KEYWORDS = arrayOf("revenant horror", "zombie slayer", "revenant")
-  private val SLAYER_MADDOX_RESTART_KEYWORDS = arrayOf("restart", "start quest", "begin quest", "start slayer")
-  private val SLAYER_MADDOX_CONFIRM_KEYWORDS = arrayOf("confirm", "click to confirm")
+  // Generic tab keywords that indicate ANY active slayer quest, regardless of type
+  private val SLAYER_GENERIC_QUEST_KEYWORDS = arrayOf("slayer quest", "zombie slayer", "wolf slayer",
+    "spider slayer", "enderman slayer", "vampire slayer", "blaze slayer")
+  private val SLAYER_MADDOX_REVENANT_KEYWORDS get() = when (slayerType.value) {
+    0 -> arrayOf("revenant horror", "zombie slayer", "revenant")
+    1 -> arrayOf("sven packmaster", "wolf slayer", "sven")
+    2 -> arrayOf("tarantula broodfather", "spider slayer", "tarantula")
+    3 -> arrayOf("voidgloom seraph", "enderman slayer", "voidgloom")
+    4 -> arrayOf("riftstalker bloodfiend", "vampire slayer", "vampire")
+    5 -> arrayOf("inferno demonlord", "blaze slayer", "inferno")
+    else -> arrayOf()
+  }
+  private val SLAYER_MADDOX_RESTART_KEYWORDS = arrayOf("restart", "start quest", "begin quest", "start slayer", "slayer quest", "new quest")
+  private val SLAYER_MADDOX_CONFIRM_KEYWORDS = arrayOf("confirm", "click to confirm", "accept", "purchase")
+  private val SLAYER_QUEST_READY_CHAT_KEYWORDS = arrayOf(
+    "ready to spawn your boss",
+    "spawn your boss",
+    "right-click to summon",
+    "slayer quest is ready",
+    "kill a mob to spawn the boss",
+    "boss will spawn"
+  )
+  private val SLAYER_BOSS_SPAWNED_CHAT_KEYWORDS get() = when (slayerType.value) {
+    0 -> arrayOf("revenant horror has spawned", "your revenant horror spawned")
+    1 -> arrayOf("sven packmaster has spawned", "your sven packmaster spawned")
+    2 -> arrayOf("tarantula broodfather has spawned")
+    3 -> arrayOf("voidgloom seraph has spawned")
+    4 -> arrayOf("riftstalker bloodfiend has spawned")
+    5 -> arrayOf("inferno demonlord has spawned")
+    else -> arrayOf()
+  }
+  private val SLAYER_BOSS_KILLED_CHAT_KEYWORDS = arrayOf(
+    "you have slain the boss",
+    "your slayer quest has been completed",
+    "slayer quest complete",
+    "boss slain"
+  )
+  private val SLAYER_LOOT_KEYWORDS = arrayOf("loot", "bag", "drops")
+  private const val SLAYER_LOOT_SEARCH_RADIUS_SQ = 36.0  // 6 block radius
+  private const val SLAYER_LOOT_CLAIM_RANGE_SQ = 9.0     // 3 block range to right-click
+  private const val SLAYER_CLAIM_TIMEOUT_TICKS = 200L    // 10 s before giving up
+  private const val SLAYER_CLAIM_DWELL_TICKS = 60L       // 3 s at loot bag before moving on
+  private const val SLAYER_CLAIM_CLICK_INTERVAL_TICKS = 5L
+  private val slayerWarpCommand get() = when (slayerType.value) {
+    0 -> when (slayerLocation.value) {
+      0 -> "warp crypts"  // Zombie Graveyard
+      else -> ""             // Zombie Crypt: walkback route handles return
+    }
+    1 -> "warp hub"
+    2 -> "warp spiders_den"
+    3 -> "warp end"
+    4 -> "warp rift"
+    5 -> "warp blazing_fortress"
+    else -> ""
+  }
+  // Hardcoded crypt patrol loop — 26 waypoints covering all ghoul spawn zones.
+  // Visited in order (looping), starting from whichever point is nearest the player.
+  private val CRYPT_PATROL_WAYPOINTS = listOf(
+    BlockPos(-152, 57, -102), BlockPos(-133, 50, -101), BlockPos(-132, 45, -121),
+    BlockPos(-129, 41, -134), BlockPos(-129, 41, -143), BlockPos(-119, 41, -136),
+    BlockPos(-106, 46, -129), BlockPos(-102, 48, -119), BlockPos(-89, 46, -104),
+    BlockPos(-77, 46, -105),  BlockPos(-65, 50, -120),  BlockPos(-48, 55, -136),
+    BlockPos(-48, 57, -141),  BlockPos(-46, 55, -136),  BlockPos(-80, 46, -101),
+    BlockPos(-88, 42, -88),   BlockPos(-96, 38, -86),   BlockPos(-106, 38, -87),
+    BlockPos(-114, 43, -89),  BlockPos(-133, 50, -105), BlockPos(-147, 56, -100),
+    BlockPos(-145, 57, -114), BlockPos(-136, 58, -127), BlockPos(-121, 55, -126),
+    BlockPos(-109, 50, -119), BlockPos(-102, 48, -119),
+  )
+
+  private fun findNearestCryptPatrolIndex(): Int {
+    val player = mc.player ?: return 0
+    var best = 0
+    var bestDist = Double.MAX_VALUE
+    for ((i, pos) in CRYPT_PATROL_WAYPOINTS.withIndex()) {
+      val dx = pos.x - player.x
+      val dy = pos.y - player.y
+      val dz = pos.z - player.z
+      val d = dx * dx + dy * dy + dz * dz
+      if (d < bestDist) { bestDist = d; best = i }
+    }
+    return best
+  }
+
   private val CYAN_COLOR = Color(0, 255, 255)
   private val PINK_COLOR = Color(255, 105, 180)
 }

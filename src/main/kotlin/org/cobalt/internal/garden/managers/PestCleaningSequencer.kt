@@ -8,56 +8,111 @@ import org.cobalt.internal.garden.ScriptBridge
 object PestCleaningSequencer {
 
     @Volatile var isRunning = false
+    @Volatile private var awaitingFinishChat = false
+    @Volatile private var finishQueued = false
+    @Volatile private var onComplete: (() -> Unit)? = null
 
-    fun reset() { isRunning = false }
+    fun reset() {
+        isRunning = false
+        awaitingFinishChat = false
+        finishQueued = false
+        onComplete = null
+    }
 
     fun startSequence(onComplete: () -> Unit) {
         if (isRunning) return
         isRunning = true
+        awaitingFinishChat = false
+        finishQueued = false
+        this.onComplete = onComplete
         GardenWorkerThread.submit("pest-clean") {
             val mc = Minecraft.getInstance()
+            var waitingForChat = false
             try {
                 mc.execute { ScriptBridge.stopScript() }
-                Thread.sleep(500)
+                Thread.sleep((20L..40L).random() + 300L)
                 mc.execute { ScriptBridge.setSpawn() }
-                Thread.sleep(300)
+                Thread.sleep((10L..30L).random() + 200L)
 
-                if (GardenConfig.autoWardrobeEnabled && GardenConfig.autoWardrobePest) {
+                // Equip pest gear for cleaning.
+                // If prep-swap already equipped it, just continue. Otherwise equip now.
+                if ((GardenConfig.autoWardrobeEnabled || GardenConfig.autoEquipment) &&
+                    !PestPrepSwapManager.swapDone) {
                     GearManager.swapForPest()
-                    Thread.sleep(2000)
+                    PestPrepSwapManager.markDone()   // mark so post-clean knows to swap back
+                    Thread.sleep((10L..30L).random() + 1500L)
                 }
 
                 if (GardenConfig.aotvEnabled) {
                     PestAotvManager.teleportToRoof()
-                    Thread.sleep(1500)
+                    Thread.sleep((10L..30L).random() + 1200L)
                 }
 
+                Thread.sleep((10L..40L).random())
+                awaitingFinishChat = true
+                waitingForChat = true
                 mc.execute { ScriptBridge.startPestScript(GardenConfig.pestScript) }
-
-                // Wait for pests to actually clear before returning to farming
-                val deadline = System.currentTimeMillis() + 180_000L
-                while (System.currentTimeMillis() < deadline) {
-                    Thread.sleep(2000)
-                    val alive = PestTabListParser.parse().alivePests
-                    if (alive < GardenConfig.pestThreshold) break
-                }
-
-                // Swap back to farming gear
-                if (GardenConfig.autoWardrobeEnabled && GardenConfig.autoWardrobePest) {
-                    GearManager.swapForFarming()
-                    Thread.sleep(1500)
-                }
-
-                // Give Taunahi a moment to stop its script
-                Thread.sleep(GardenConfig.gardenWarpDelayMs.coerceAtLeast(500L))
-
             } catch (_: InterruptedException) {
                 Thread.currentThread().interrupt()
             } finally {
-                isRunning = false
-                PestManager.startCooldown(10_000L)
-                mc.execute { onComplete() }
+                if (!waitingForChat) {
+                    finishSequence(warpToGarden = false)
+                }
             }
+        }
+    }
+
+    fun onChatMessage(message: String) {
+        if (finishQueued) return
+
+        val lower = message.replace(Regex("§[0-9a-fk-or]"), "").lowercase()
+        val isPestCleanerDone = lower.contains("pest cleaner") &&
+            (lower.contains("script stopped") || lower.contains("finished"))
+        if (!isPestCleanerDone) return
+
+        finishQueued = true
+        awaitingFinishChat = false
+
+        // Warp immediately — don't wait for the worker queue
+        val mc = Minecraft.getInstance()
+        mc.execute { ScriptBridge.warpGarden() }
+
+        GardenWorkerThread.submit("pest-clean-finish") {
+            try {
+                // Minimum 3 s so the warp fully completes before any gear swap or script start
+                Thread.sleep(GardenConfig.gardenWarpDelayMs.coerceAtLeast(3000L))
+
+                // Swap back to farming gear now that cleaning is done
+                if ((GardenConfig.autoWardrobeEnabled || GardenConfig.autoEquipment) &&
+                    PestPrepSwapManager.swapDone) {
+                    GearManager.swapForFarming()
+                    PestPrepSwapManager.reset()
+                    Thread.sleep((10L..30L).random() + 500L)
+                }
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+            } finally {
+                finishSequence(warpToGarden = true)
+            }
+        }
+    }
+
+    private fun finishSequence(warpToGarden: Boolean) {
+        val callback = onComplete
+        onComplete = null
+        awaitingFinishChat = false
+        finishQueued = false
+        if (warpToGarden) {
+            PestManager.startCooldown(10_000L)
+        }
+
+        val mc = Minecraft.getInstance()
+        // Set isRunning = false and invoke the callback atomically on the game thread.
+        // This prevents the CLEANING safety handler from seeing isRunning=false while state
+        // is still CLEANING, which would cause a duplicate startFarming call.
+        mc.execute {
+            isRunning = false
+            callback?.invoke()
         }
     }
 }

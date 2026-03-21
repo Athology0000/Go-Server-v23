@@ -1,5 +1,6 @@
 package org.cobalt.internal.mining
 
+import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import java.io.File
@@ -38,12 +39,7 @@ object VeinDirectionModule : Module("Vein Direction Setter") {
   private val mc = Minecraft.getInstance()
   private val configFile = File(mc.gameDirectory, "config/cobalt/vein_directions.json")
   private val textFile = File(mc.gameDirectory, "config/cobalt/vein_directions.txt")
-
-  /**
-   * One primary flow per vein type. Keyed by veinType name (e.g. "Mithril (Gray)").
-   * Recording a new pair for a type replaces the previous entry for that type.
-   */
-  private val flowsByType = LinkedHashMap<String, VeinFlow>()
+  private val flowsByType = LinkedHashMap<String, MutableList<VeinFlow>>()
 
   private var pendingStart: BlockPos? = null
 
@@ -51,13 +47,13 @@ object VeinDirectionModule : Module("Vein Direction Setter") {
 
   private val info = InfoSetting(
     "Vein Flow",
-    "Record mining direction per vein type: right-click start block, then end block.",
+    "Record many mining directions per vein type: right-click start block, then end block.",
     InfoType.INFO
   )
 
   private val recordOnRightClick = CheckboxSetting(
     "Right Click Vein Directions",
-    "When enabled, right-click two blocks to record a direction for that vein type.",
+    "When enabled, right-click two blocks to add a saved direction for that vein type.",
     false
   )
 
@@ -80,7 +76,7 @@ object VeinDirectionModule : Module("Vein Direction Setter") {
       .map { type ->
         type to TextSetting(
           type,
-          "Flow direction for $type. Shows 'start -> end' when configured.",
+          "Saved flow directions for $type.",
           "Not set"
         )
       }
@@ -118,16 +114,16 @@ object VeinDirectionModule : Module("Vein Direction Setter") {
 
   // -- Public API (used by MiningMacroModule) --
 
-  fun getFlows(): List<VeinFlow> = flowsByType.values.toList()
+  fun getFlows(): List<VeinFlow> = flowsByType.values.flatten()
 
   fun getFlowsForVein(blockId: String): List<VeinFlow> {
     val type = MiningBlockRegistry.BLOCK_ID_TO_TYPE[blockId]
     if (!type.isNullOrBlank()) {
-      val flow = flowsByType[type]
-      if (flow != null) return listOf(flow)
+      val flows = flowsByType[type]
+      if (!flows.isNullOrEmpty()) return flows.toList()
     }
     // Fallback: return all configured flows
-    return flowsByType.values.toList()
+    return getFlows()
   }
 
   // -- Event handlers --
@@ -162,16 +158,22 @@ object VeinDirectionModule : Module("Vein Direction Setter") {
 
     val detected = detectVein(start, clicked)
     val flow = VeinFlow(start, clicked, detected.type, detected.blockId)
-
-    val existed = flowsByType.containsKey(detected.type)
-    flowsByType[detected.type] = flow
+    val flows = flowsByType.getOrPut(detected.type) { mutableListOf() }
+    val existingIdx = flows.indexOfFirst { it.start == flow.start && it.end == flow.end && it.blockId == flow.blockId }
+    val action =
+      if (existingIdx >= 0) {
+        flows[existingIdx] = flow
+        "updated"
+      } else {
+        flows += flow
+        "added"
+      }
     pendingStart = null
     saveFlows()
     updateTexts()
 
-    val action = if (existed) "replaced" else "added"
     ChatUtils.sendMessage(
-      "Vein flow $action for ${detected.type}: ${coord(start)} -> ${coord(clicked)}."
+      "Vein flow $action for ${detected.type} (#${flows.size}): ${coord(start)} -> ${coord(clicked)}."
     )
   }
 
@@ -180,7 +182,7 @@ object VeinDirectionModule : Module("Vein Direction Setter") {
     if (!renderFlows.value) return
     if (flowsByType.isEmpty()) return
 
-    val typeList = flowsByType.values.toList()
+    val typeList = getFlows()
     val segmentCount = (typeList.size - 1).coerceAtLeast(1)
     typeList.forEachIndexed { index, flow ->
       val t = index.toDouble() / segmentCount.toDouble()
@@ -209,8 +211,16 @@ object VeinDirectionModule : Module("Vein Direction Setter") {
   private fun updateTexts() {
     pendingText.value = pendingStart?.let { coord(it) } ?: "-"
     veinTypeSlots.forEach { (type, setting) ->
-      val flow = flowsByType[type]
-      setting.value = if (flow != null) "${coord(flow.start)} -> ${coord(flow.end)}" else "Not set"
+      val flows = flowsByType[type].orEmpty()
+      setting.value =
+        when {
+          flows.isEmpty() -> "Not set"
+          flows.size == 1 -> "1 saved | ${coord(flows[0].start)} -> ${coord(flows[0].end)}"
+          else -> {
+            val last = flows.last()
+            "${flows.size} saved | last ${coord(last.start)} -> ${coord(last.end)}"
+          }
+        }
     }
     saveFlowsText()
   }
@@ -224,15 +234,18 @@ object VeinDirectionModule : Module("Vein Direction Setter") {
 
     flowsByType.clear()
     for ((type, element) in flowsObj.entrySet()) {
-      val obj = runCatching { element.asJsonObject }.getOrNull() ?: continue
-      val sx = obj.get("sx")?.asInt ?: continue
-      val sy = obj.get("sy")?.asInt ?: continue
-      val sz = obj.get("sz")?.asInt ?: continue
-      val ex = obj.get("ex")?.asInt ?: continue
-      val ey = obj.get("ey")?.asInt ?: continue
-      val ez = obj.get("ez")?.asInt ?: continue
-      val blockId = obj.get("blockId")?.asString.orEmpty()
-      flowsByType[type] = VeinFlow(BlockPos(sx, sy, sz), BlockPos(ex, ey, ez), type, blockId)
+      val loaded =
+        when {
+          element.isJsonArray ->
+            element.asJsonArray
+              .mapNotNull { parseFlowEntry(type, runCatching { it.asJsonObject }.getOrNull()) }
+          element.isJsonObject ->
+            listOfNotNull(parseFlowEntry(type, runCatching { element.asJsonObject }.getOrNull()))
+          else -> emptyList()
+        }
+      if (loaded.isNotEmpty()) {
+        flowsByType[type] = loaded.toMutableList()
+      }
     }
   }
 
@@ -240,16 +253,20 @@ object VeinDirectionModule : Module("Vein Direction Setter") {
     if (!configFile.parentFile.exists()) configFile.parentFile.mkdirs()
     val root = JsonObject()
     val flowsObj = JsonObject()
-    flowsByType.forEach { (type, flow) ->
-      val obj = JsonObject()
-      obj.addProperty("sx", flow.start.x)
-      obj.addProperty("sy", flow.start.y)
-      obj.addProperty("sz", flow.start.z)
-      obj.addProperty("ex", flow.end.x)
-      obj.addProperty("ey", flow.end.y)
-      obj.addProperty("ez", flow.end.z)
-      obj.addProperty("blockId", flow.blockId)
-      flowsObj.add(type, obj)
+    flowsByType.forEach { (type, flows) ->
+      val array = JsonArray()
+      flows.forEach { flow ->
+        val obj = JsonObject()
+        obj.addProperty("sx", flow.start.x)
+        obj.addProperty("sy", flow.start.y)
+        obj.addProperty("sz", flow.start.z)
+        obj.addProperty("ex", flow.end.x)
+        obj.addProperty("ey", flow.end.y)
+        obj.addProperty("ez", flow.end.z)
+        obj.addProperty("blockId", flow.blockId)
+        array.add(obj)
+      }
+      flowsObj.add(type, array)
     }
     root.add("flowsByType", flowsObj)
     runCatching { configFile.writeText(root.toString()) }
@@ -263,12 +280,36 @@ object VeinDirectionModule : Module("Vein Direction Setter") {
       if (flowsByType.isEmpty()) {
         appendLine("EMPTY")
       } else {
-        flowsByType.forEach { (type, flow) ->
-          appendLine("$type: ${coord(flow.start)} -> ${coord(flow.end)}")
+        flowsByType.forEach { (type, flows) ->
+          appendLine("$type (${flows.size})")
+          flows.forEachIndexed { index, flow ->
+            appendLine("  ${index + 1}. ${coord(flow.start)} -> ${coord(flow.end)} [${flow.blockId}]")
+          }
         }
       }
     }
     runCatching { textFile.writeText(content) }
+  }
+
+  private fun parseFlowEntry(type: String, obj: JsonObject?): VeinFlow? {
+    obj ?: return null
+    val sx = obj.get("sx")?.asInt ?: return null
+    val sy = obj.get("sy")?.asInt ?: return null
+    val sz = obj.get("sz")?.asInt ?: return null
+    val ex = obj.get("ex")?.asInt ?: return null
+    val ey = obj.get("ey")?.asInt ?: return null
+    val ez = obj.get("ez")?.asInt ?: return null
+    val blockId =
+      obj.get("blockId")?.takeIf { it.isJsonPrimitive }?.asString
+        ?: MiningBlockRegistry.TYPE_TO_BLOCK_IDS[type]?.firstOrNull()
+        ?: ""
+
+    return VeinFlow(
+      BlockPos(sx, sy, sz),
+      BlockPos(ex, ey, ez),
+      type,
+      blockId
+    )
   }
 
   private data class DetectedVein(val type: String, val blockId: String)

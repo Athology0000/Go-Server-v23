@@ -304,7 +304,7 @@ object MiningMacroModule : Module("Mining Macro") {
       return
     }
 
-    if (warpStage > 0) {
+    if (warpTarget != null) {
       handleWarp(player, level)
       return
     }
@@ -1232,5 +1232,6 @@ object MiningMacroModule : Module("Mining Macro") {
     lastPathTarget = null
     lanternPlacedForVein = false
     scanActive = false
+    skippedSeeds.clear()
   }
 }

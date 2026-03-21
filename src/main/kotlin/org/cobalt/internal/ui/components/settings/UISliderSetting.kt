@@ -19,7 +19,12 @@ internal class UISliderSetting(private val setting: SliderSetting) : UIComponent
   private fun getValueFromX(mouseX: Double): Double {
     val relativeX = (mouseX - (x + width - 220F)).coerceIn(0.0, 200.0)
     val percentage = relativeX / 200F
-    return setting.min + (percentage * (setting.max - setting.min))
+    val raw = setting.min + (percentage * (setting.max - setting.min))
+    return if (setting.step > 0.0) {
+      (Math.round(raw / setting.step) * setting.step).coerceIn(setting.min, setting.max)
+    } else {
+      raw
+    }
   }
 
   private fun getThumbX(): Float {
@@ -50,7 +55,11 @@ internal class UISliderSetting(private val setting: SliderSetting) : UIComponent
     val sliderX = x + width - 220F
     val sliderY = y + (height / 2F) - 2F
     val thumbX = getThumbX()
-    val text = String.format("%.2f", setting.value)
+    val text = if (setting.step >= 1.0 && setting.step % 1.0 == 0.0) {
+      String.format("%.0f", setting.value)
+    } else {
+      String.format("%.2f", setting.value)
+    }
     val textWidth = NVGRenderer.textWidth(text, 13F)
 
     NVGRenderer.rect(sliderX, sliderY, 200F, 4F, ThemeManager.currentTheme.sliderTrack, 2F)

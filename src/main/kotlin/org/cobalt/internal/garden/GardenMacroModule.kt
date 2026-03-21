@@ -44,9 +44,11 @@ object GardenMacroModule : Module("Garden Macro") {
     @Volatile var sessionStartTime = System.currentTimeMillis()
     @Volatile var autosellingManager: String? = null
     @Volatile private var wasConnected = true
+    /** System.currentTimeMillis() deadline before which tickFarming skips all automated triggers. */
+    @Volatile private var startupGraceUntilMs = 0L
 
     fun setState(newState: GardenState) {
-        mc.execute { state = newState }
+        state = newState  // @Volatile — safe from any thread, no mc.execute needed
     }
 
     // ── Settings ──────────────────────────────────────────────────────────────
@@ -89,8 +91,8 @@ object GardenMacroModule : Module("Garden Macro") {
 
     // Equipment (Skyblock equipment slots: bracelet, cloak, belt, necklace)
     private val autoEquipmentSetting    = CheckboxSetting("Auto Equipment",     "Automatically swap Skyblock equipment items.", true).inGroup("Equipment")
-    private val farmingEquipmentSetting = TextSetting("Farming Equipment", "Equipment preset name for farming.",  "").inGroup("Equipment")
-    private val pestEquipmentSetting    = TextSetting("Pest Equipment",    "Equipment preset name for pest.",     "").inGroup("Equipment")
+    private val farmingEquipmentSetting = TextSetting("Farming Equipment", "Comma-separated equipment keywords for farming.",  "lotus, blossom").inGroup("Equipment")
+    private val pestEquipmentSetting    = TextSetting("Pest Equipment",    "Comma-separated equipment keywords for pest.",     "pesthunter, pest vest").inGroup("Equipment")
     private val visitorEquipmentSetting = TextSetting("Visitor Equipment", "Equipment preset name for visitors.", "").inGroup("Equipment")
     private val swapDelaySetting        = SliderSetting("Swap Delay",      "Ms between equipment swaps.",         300.0, 0.0, 2000.0).inGroup("Equipment")
 
@@ -137,7 +139,7 @@ object GardenMacroModule : Module("Garden Macro") {
     private val rotationTimeSetting               = SliderSetting("Rotation Time",              "Ms for camera rotation movements.",    500.0, 50.0, 2000.0).inGroup("Advanced")
     private val guiClickDelaySetting              = SliderSetting("GUI Click Delay",            "Ms to wait between GUI clicks.",       500.0, 50.0, 2000.0).inGroup("Advanced")
     private val additionalRandomDelaySetting      = SliderSetting("Additional Random Delay",    "Extra random ms added to GUI actions.", 0.0, 0.0, 1000.0).inGroup("Advanced")
-    private val gardenWarpDelaySetting            = SliderSetting("Garden Warp Delay",          "Ms to wait after warping to garden.",  1000.0, 0.0, 5000.0).inGroup("Advanced")
+    private val gardenWarpDelaySetting            = SliderSetting("Garden Warp Delay",          "Ms to wait after warping to garden.",  3000.0, 0.0, 10000.0).inGroup("Advanced")
     private val unflyModeSetting                  = TextSetting("Unfly Mode",                   "DOUBLE_TAP_SPACE or SNEAK.",            "DOUBLE_TAP_SPACE").inGroup("Advanced")
     private val petTrackerListSetting             = TextSetting("Pet Tracker List",             "Pets to track (ID:Name:Level:Rarity).", "PET_ROSE_DRAGON:Rose Dragon:200:LEGENDARY").inGroup("Advanced")
 
@@ -343,6 +345,13 @@ object GardenMacroModule : Module("Garden Macro") {
         when (state) {
             GardenState.FARMING -> tickFarming()
             GardenState.RESTING -> { /* DynamicRestManager manages the timer */ }
+            GardenState.CLEANING -> {
+                // Safety: if sequencer is no longer running but state is stuck, recover
+                if (!PestCleaningSequencer.isRunning) {
+                    setState(GardenState.FARMING)
+                    ScriptBridge.startFarming(GardenConfig.farmScript)
+                }
+            }
             else -> { /* Other states managed by their worker tasks */ }
         }
     }
@@ -361,12 +370,16 @@ object GardenMacroModule : Module("Garden Macro") {
         }
 
         CropFeverManager.onChatMessage(msg)
+        PestCleaningSequencer.onChatMessage(msg)
         RestartManager.onChatMessage(msg) { stopMacro() }
         ProfitManager.onChatMessage(msg)
         VisitorManager.onChatMessage(msg)
     }
 
     private fun tickFarming() {
+        // Startup grace: let the farming script get going before any automated triggers fire
+        if (System.currentTimeMillis() < startupGraceUntilMs) return
+
         // Rest check
         if (DynamicRestManager.shouldRest()) {
             setState(GardenState.RESTING)
@@ -410,20 +423,42 @@ object GardenMacroModule : Module("Garden Macro") {
             }
         }
 
-        // Pest prep-swap check
-        if (prepSwapSetting.value && !PestPrepSwapManager.swapDone) {
-            val count = PestManager.lastAliveCount
-            if (PestPrepSwapManager.shouldPrepSwap(count, GardenConfig.pestThreshold)) {
+        // Refresh pest tab-list data now so lastCooldownSeconds is current when the
+        // prep-swap check runs below (previously update() was called after the check,
+        // causing it to always read one-tick-stale cooldown data and miss the window).
+        val pestShouldClean = PestManager.update(GardenConfig.pestThreshold)
+
+        // Once the post-clean grace has expired, let PestPrepSwapManager start its
+        // fallback timer in case the tab list cooldown regex never matches.
+        if (System.currentTimeMillis() >= PestManager.cleaningCooldownUntil) {
+            PestPrepSwapManager.markActive()
+        }
+
+        // Pest prep-swap check — triggers at cooldown ≤ 60s before pests spawn,
+        // or after 30 s if the cooldown was never parsed from the tab list.
+        if (prepSwapSetting.value && !PestPrepSwapManager.swapDone &&
+            System.currentTimeMillis() >= PestManager.cleaningCooldownUntil) {
+            if (PestPrepSwapManager.shouldPrepSwap(PestManager.lastCooldownSeconds)) {
                 PestPrepSwapManager.markDone()
-                GardenWorkerThread.submit("prep-swap") { GearManager.swapForPest() }
+                GardenWorkerThread.submit("prep-swap") {
+                    // Stop farming script before opening /eq so Taunahi doesn't cancel it
+                    mc.execute { ScriptBridge.stopScript() }
+                    Thread.sleep((20L..40L).random() + 300L)
+                    GearManager.swapForPest()
+                    // Resume farming after swap
+                    mc.execute { ScriptBridge.startFarming(GardenConfig.farmScript) }
+                }
             }
         }
 
         // Pest cleaning trigger
         val cropFeverDelay = GardenConfig.delayPestForCropFever && CropFeverManager.shouldDelay()
-        if (!cropFeverDelay && PestManager.update(GardenConfig.pestThreshold)) {
+        if (!cropFeverDelay && pestShouldClean) {
             setState(GardenState.CLEANING)
-            PestCleaningSequencer.startSequence { setState(GardenState.FARMING) }
+            PestCleaningSequencer.startSequence {
+                setState(GardenState.FARMING)
+                ScriptBridge.startFarming(GardenConfig.farmScript)
+            }
         }
     }
 
@@ -433,6 +468,8 @@ object GardenMacroModule : Module("Garden Macro") {
             sessionStartTime = System.currentTimeMillis()
         }
         state = GardenState.FARMING
+        // 5-second grace period before automated triggers (pest/visitor/economy) can fire
+        startupGraceUntilMs = System.currentTimeMillis() + 5_000L
         // Reset all managers
         listOf<() -> Unit>(
             PestManager::reset, PestCleaningSequencer::reset, PestAotvManager::reset,
@@ -445,7 +482,12 @@ object GardenMacroModule : Module("Garden Macro") {
         ).forEach { it() }
         autosellingManager = null
         wasConnected = true
-        ScriptBridge.startFarming(GardenConfig.farmScript)
+        // Stop any running script first, then start farming after a small delay
+        GardenWorkerThread.submit("macro-start") {
+            mc.execute { ScriptBridge.stopScript() }
+            Thread.sleep((20L..40L).random() + 300L)
+            mc.execute { ScriptBridge.startFarming(GardenConfig.farmScript) }
+        }
     }
 
     private fun stopMacro() {

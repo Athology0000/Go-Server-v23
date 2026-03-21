@@ -16,6 +16,8 @@ class SliderSetting(
   defaultValue: Double,
   val min: Double,
   val max: Double,
+  /** If > 0, value snaps to multiples of this step. Use 1.0 for integer-only sliders. */
+  val step: Double = 0.0,
 ) : Setting<Double>(name, description, defaultValue) {
 
   override val defaultValue: Double = defaultValue

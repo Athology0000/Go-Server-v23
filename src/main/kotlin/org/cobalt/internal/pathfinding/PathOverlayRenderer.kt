@@ -7,6 +7,19 @@ object PathOverlayRenderer {
 	private const val MARKER_INSET = 0.08
 	private const val MARKER_HEIGHT = 0.08
 	private const val FINAL_HEIGHT = 0.16
+	private const val ENTRY_DURATION_TICKS = 80
+
+	private var lastCheckpoints: List<BlockPos> = emptyList()
+	private var lastCheckpointIndex: Int = -1
+	private var lastActive: Boolean = false
+	private var lastTag: String = ""
+
+	fun reset() {
+		lastCheckpoints = emptyList()
+		lastCheckpointIndex = -1
+		lastActive = false
+		lastTag = ""
+	}
 
 	fun updateOverlays(
 		level: Level,
@@ -16,15 +29,24 @@ object PathOverlayRenderer {
 		active: Boolean,
 		pathTag: String
 	) {
+		val stateChanged = active != lastActive
+			|| checkpointIndex != lastCheckpointIndex
+			|| checkpoints !== lastCheckpoints
+			|| pathTag != lastTag
+
+		if (!stateChanged) return
+
+		lastActive = active
+		lastCheckpointIndex = checkpointIndex
+		lastCheckpoints = checkpoints
+		lastTag = pathTag
+
 		OverlayRenderEngine.clearTag(pathTag)
-		if (!active) {
-			return
-		}
+		if (!active) return
+
 		val startIndex = checkpointIndex.coerceAtLeast(0)
 		val endIndex = minOf(checkpoints.size, startIndex + MARKER_RENDER_COUNT)
-		if (startIndex >= endIndex) {
-			return
-		}
+		if (startIndex >= endIndex) return
 
 		val lineColor = OverlayRenderEngine.Color(0xB4, 0x63, 0xFF, 0xCC)
 		val fillColor = OverlayRenderEngine.Color(0x7A, 0x3B, 0xC4, 0x55)
@@ -53,7 +75,7 @@ object PathOverlayRenderer {
 				centerZ,
 				if (isFinal) finalLineColor else lineColor,
 				lineWidth = if (isFinal) 2.2f else 1.6f,
-				durationTicks = 2,
+				durationTicks = ENTRY_DURATION_TICKS,
 				tag = pathTag
 			)
 			prevX = centerX
@@ -72,7 +94,7 @@ object PathOverlayRenderer {
 				if (isFinal) finalFillColor else fillColor,
 				if (isFinal) finalEdgeColor else edgeColor,
 				lineWidth = if (isFinal) 2.2f else 1.6f,
-				durationTicks = 2,
+				durationTicks = ENTRY_DURATION_TICKS,
 				tag = pathTag
 			)
 		}

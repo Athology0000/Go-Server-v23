@@ -42,15 +42,21 @@ src/main/
       ui/theme/        # Theme system (ThemeManager, ThemePalette, presets)
       util/            # ChatUtils, AngleUtils, NVGRenderer, MovementManager, etc.
     internal/          # Built-in module implementations (not public API)
-      combat/          # CombatMacroModule
+      chat/            # ChatFilterModule
+      combat/          # CombatMacroModule, CombatHudModule
       dungeons/        # DungeonsModule
       etherwarp/       # EtherwarpHelperModule, LeftClickEtherwarpModule
-      helper/          # Config (save/load), internal utilities
+      farming/         # FarmingMacroModule
+      garden/          # GardenMacroModule, GardenConfig, ScriptBridge, managers/
+      grotto/          # GrottoModule, route scanning, Crystal Hollows utilities
+      helper/          # Config (save/load), WalkbackBridge
       loader/          # AddonLoader — discovers and loads addon JARs
       mining/          # MiningModule, MiningMacroModule, RoutesModule, etc.
       pathfinding/     # DuskPathfinder, HeadRotationModule, path profiles
+      pig/             # PigMacroModule
       qol/             # QolModule
       rotation/        # RotationsModule
+      spotify/         # SpotifyModule
       ui/              # All NanoVG UI — panels, components, HUD editor, themes
       visual/          # FullBright, DarkMode, BlockOverlay, Freecam, etc.
 ```
@@ -63,9 +69,12 @@ All features are `Module` subclasses. Modules are registered in `Cobalt.onInitia
 class MyModule : Module("My Module") {
   val speed by SliderSetting("Speed", "Speed multiplier", 1.0, 0.1, 5.0)
   val enabled by CheckboxSetting("Enabled", "", false)
+  val mode by ModeSetting("Mode", "", 0, arrayOf("Fast", "Slow"))  // .value is the index
 }
 ```
 Singletons use `object MyModule : Module("Name")`.
+
+Available setting types: `SliderSetting` (Double, optional `step` param), `CheckboxSetting` (Boolean), `ModeSetting` (Int index into `options` array), `ColorSetting`, `TextSetting`, `KeyBindSetting`, `RangeSetting`, `ActionSetting` (button), `CommandHotkeySetting`, `InfoSetting` (read-only label).
 
 ### Event System
 `EventBus` uses `@SubscribeEvent` annotation. Any class must call `EventBus.register(this)` before events fire. Handlers must have exactly one `Event` parameter:
@@ -73,7 +82,7 @@ Singletons use `object MyModule : Module("Name")`.
 @SubscribeEvent
 fun onTick(event: TickEvent.Start) { ... }
 ```
-Available events: `TickEvent.Start/End`, `WorldRenderEvent.Last`, `GuiRenderEvent`, `NvgEvent`, `ChatEvent`, `PacketEvent`, `MouseEvent`, `BlockChangeEvent`.
+Available events: `TickEvent.Start/End`, `WorldRenderEvent.Last`, `GuiRenderEvent`, `GuiPostRenderEvent`, `NvgEvent`, `ChatEvent`, `PacketEvent`, `MouseEvent`, `BlockChangeEvent`.
 
 ### HUD Elements
 Created via the `hudElement()` DSL on a `Module`. Rendered with `NVGRenderer` (NanoVG). Settings inside HUD builders use `setting()` + `.value` (not `by` delegation):
@@ -84,8 +93,10 @@ val myHud = hudElement("my-hud", "My HUD") {
   width { 100f }
   height { 20f }
   render { x, y, scale -> if (show.value) NVGRenderer.rect(...) }
+  postRender { x, y, scale -> /* non-NVG rendering via GuiGraphics */ }
 }
 ```
+`width` and `height` lambdas are called every frame, so they can reference setting values. `minScale`/`maxScale` can also be set in the builder.
 
 ### Command System
 Commands extend `Command(name, aliases)`. Methods annotated with `@DefaultHandler` handle the base command; `@SubCommand("name")` handles subcommands. Register via `CommandManager.register(...)`.
@@ -97,7 +108,7 @@ External addons are JARs placed in `config/cobalt/addons/`. Each JAR must contai
 Settings and HUD positions are serialized automatically to `config/cobalt/addons.json`. Themes save to `config/cobalt/themes.json`. `Config.loadModulesConfig()` is called at startup; `Config.saveModulesConfig()` must be called explicitly to persist changes (triggered by the UI).
 
 ### Rotation System
-`RotationExecutor` applies GCD-aware rotation smoothing each render frame (`WorldRenderEvent.Last`). Call `RotationExecutor.rotateTo(endRot, strategy)` with an `IRotationStrategy`. Built-in strategies: `BezierTrackingRotationStrategy`, `TimedEaseStrategy`, `TrackingRotationStrategy`.
+`RotationExecutor` applies GCD-aware rotation smoothing each render frame (`WorldRenderEvent.Last`). Call `RotationExecutor.rotateTo(endRot, strategy)` with an `IRotationStrategy`. Built-in strategies: `BezierTrackingRotationStrategy`, `TimedEaseStrategy`, `TrackingRotationStrategy`, `HeadRotationStrategy`.
 
 ### Pathfinding
 `DuskPathfinder` (internal) wraps the `AStarPathfinder` from the API. `PathfindingModule` is the user-facing control surface. `PathPlanProfiles` defines preconfigured `PathfinderConfiguration` instances for different movement profiles.

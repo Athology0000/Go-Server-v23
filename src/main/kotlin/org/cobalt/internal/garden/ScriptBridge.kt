@@ -7,10 +7,10 @@ object ScriptBridge {
     private val mc get() = Minecraft.getInstance()
 
     // Taunahi scripts — sent as chat messages (Taunahi intercepts .ez- prefix)
-    fun startFarming(script: String)       = sendChat(".ez-startscript $script")
-    fun startPestScript(script: String)    = sendChat(".ez-startscript $script")
-    fun startVisitorScript(script: String) = sendChat(".ez-startscript $script")
-    fun startReturnScript(script: String)  = sendChat(".ez-startscript $script")
+    fun startFarming(script: String)       { if (script.isNotBlank()) sendChat(".ez-startscript $script") }
+    fun startPestScript(script: String)    { if (script.isNotBlank()) sendChat(".ez-startscript $script") }
+    fun startVisitorScript(script: String) { if (script.isNotBlank()) sendChat(".ez-startscript $script") }
+    fun startReturnScript(script: String)  { if (script.isNotBlank()) sendChat(".ez-startscript $script") }
 
     fun stopScript() {
         // Release held keys before stopping (mirrors ihanuat behaviour)
