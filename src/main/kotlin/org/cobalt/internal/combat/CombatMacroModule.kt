@@ -584,7 +584,7 @@ object CombatMacroModule : Module("Combat Macro") {
       startedPath = false
       lastTargetPos = null
     }
-    if (startedPath && nativeActive()) {
+    if (startedPath && nativeActive() && !CombatPatrolModule.patrolOwnsPathfinder) {
       NativePathfinder.tick()?.applyToPlayer()
     }
     syncLearnedWhitelistFromSetting()
@@ -791,6 +791,17 @@ object CombatMacroModule : Module("Combat Macro") {
         return
       }
 
+      if (CombatPatrolModule.isPatrolRunning) {
+        when (CombatPatrolModule.patrolState) {
+          CombatPatrolModule.PatrolState.COMBAT_INTERRUPT -> CombatPatrolModule.onCombatResume()
+          CombatPatrolModule.PatrolState.AT_KILL_ZONE     -> CombatPatrolModule.onKillZoneCleared()
+          else -> { /* NAVIGATING/WARPING — patrol owns movement */ }
+        }
+        if (startedPath && nativeActive()) nativeStop()
+        startedPath = false; lastTargetPos = null; currentTargetId = null
+        return
+      }
+
       if (startedPath && nativeActive()) {
         nativeStop()
       }
@@ -832,6 +843,10 @@ object CombatMacroModule : Module("Combat Macro") {
     } else {
       // Target spotted — stop kill patrol so combat macro can take over pathfinding.
       if (PathfindingModule.isPatrolActive) PathfindingModule.stopPatrol()
+      if (CombatPatrolModule.patrolState == CombatPatrolModule.PatrolState.NAVIGATING ||
+          CombatPatrolModule.patrolState == CombatPatrolModule.PatrolState.WARPING) {
+        CombatPatrolModule.onCombatInterrupt()
+      }
       val targetPos = target.blockPosition()
       val last = lastTargetPos
       val targetMovedFar = last == null || last.distSqr(targetPos) > TARGET_REPATH_DISTANCE_SQ
@@ -869,6 +884,27 @@ object CombatMacroModule : Module("Combat Macro") {
 
   private fun resolveTarget(player: Player): LivingEntity? {
     val level = mc.level ?: return null
+    // Kill zone mode: only target mobs near the current kill point.
+    val killPoint = CombatPatrolModule.currentKillPoint
+    if (killPoint != null) {
+      val kx = killPoint.x + 0.5; val ky = killPoint.y.toDouble(); val kz = killPoint.z + 0.5
+      val radiusSq = CombatPatrolModule.killZoneRadiusValue * CombatPatrolModule.killZoneRadiusValue
+      val blacklisted = builtInBlacklistedNames
+      val filter = targetName.value.trim().lowercase()
+      var best: LivingEntity? = null
+      var bestDist = Double.POSITIVE_INFINITY
+      for (entity in level.entitiesForRendering()) {
+        val living = entity as? LivingEntity ?: continue
+        if (!isValidTarget(living, player, blacklisted, filter, true)) continue
+        val dx = living.x - kx; val dy = living.y - ky; val dz = living.z - kz
+        val distSq = dx * dx + dy * dy + dz * dz
+        if (distSq > radiusSq) continue
+        val playerDist = player.distanceToSqr(living)
+        if (playerDist < bestDist) { best = living; bestDist = playerDist }
+      }
+      if (best != null) currentTargetId = best.uuid
+      return best
+    }
     val filter = targetName.value.trim().lowercase()
     val blacklisted = builtInBlacklistedNames
     val startOrigin =
@@ -2024,6 +2060,7 @@ object CombatMacroModule : Module("Combat Macro") {
 
   private fun stopMacro() {
     if (PathfindingModule.isPatrolActive) PathfindingModule.stopPatrol()
+    if (CombatPatrolModule.isPatrolRunning) CombatPatrolModule.stopPatrol()
     if (startedPath && nativeActive()) {
       nativeStop()
     }
