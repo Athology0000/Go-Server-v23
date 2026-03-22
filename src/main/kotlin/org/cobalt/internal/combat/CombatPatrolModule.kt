@@ -399,8 +399,8 @@ object CombatPatrolModule : Module("Combat Patrol") {
 
         NativePathfinder.stop()
         RotationExecutor.stopRotating()
-        mc.options.keyUse?.setDown(false)
-        mc.options.keyShift?.setDown(false)
+        mc.options.keyUse.setDown(false)
+        mc.options.keyShift.setDown(false)
 
         warpTargetPoint = point
         warpStage = 0
@@ -412,8 +412,8 @@ object CombatPatrolModule : Module("Combat Patrol") {
     }
 
     private fun cancelWarp() {
-        mc.options.keyUse?.setDown(false)
-        mc.options.keyShift?.setDown(false)
+        mc.options.keyUse.setDown(false)
+        mc.options.keyShift.setDown(false)
         RotationExecutor.stopRotating()
         if (warpRestoreSlot in 0..8) {
             InventoryUtils.holdHotbarSlot(warpRestoreSlot)
@@ -438,17 +438,17 @@ object CombatPatrolModule : Module("Combat Patrol") {
                 val (yawError, pitchError) = applyWarpHeadRotation(player, warpAimPoint)
                 if ((yawError <= WARP_AIM_TOLERANCE && pitchError <= WARP_AIM_TOLERANCE) ||
                     warpStageElapsedMs >= WARP_ALIGN_MS) {
-                    mc.options.keyShift?.setDown(true)
+                    mc.options.keyShift.setDown(true)
                     warpStage = 1
                     resetWarpStageTimer()
                 }
             }
             1 -> {
                 applyWarpHeadRotation(player, warpAimPoint)
-                mc.options.keyShift?.setDown(true)
+                mc.options.keyShift.setDown(true)
                 if (!canWarpToTarget(level, player, target, warpAimPoint)) {
                     if (warpStageElapsedMs >= WARP_STAGE1_TIMEOUT_MS) {
-                        mc.options.keyShift?.setDown(false)
+                        mc.options.keyShift.setDown(false)
                         warpCooldownUntil = level.gameTime + WARP_RETRY_COOLDOWN_TICKS
                         cancelWarp()
                         advanceAndNavigate()
@@ -456,16 +456,16 @@ object CombatPatrolModule : Module("Combat Patrol") {
                     return
                 }
                 if (warpStageElapsedMs >= WARP_SNEAK_MS) {
-                    val shiftKeyHeld = mc.options.keyShift?.isDown == true
+                    val shiftKeyHeld = mc.options.keyShift.isDown
                     val playerIsShifting = player.isShiftKeyDown
                     if (!shiftKeyHeld || !playerIsShifting) return
-                    mc.options.keyUse?.setDown(true)
+                    mc.options.keyUse.setDown(true)
                     warpStage = 2
                     resetWarpStageTimer()
                 }
             }
             else -> {
-                mc.options.keyUse?.setDown(false)
+                mc.options.keyUse.setDown(false)
                 val landed = hasArrived(player, target)
                 // Blend head toward next route point during post-warp dwell
                 val nextIndex = routeIndex + 1
@@ -478,9 +478,9 @@ object CombatPatrolModule : Module("Combat Patrol") {
                     warpAimPoint
                 }
                 applyWarpHeadRotation(player, frameAim)
-                mc.options.keyShift?.setDown(true)
+                mc.options.keyShift.setDown(true)
                 if (warpStageElapsedMs >= WARP_POST_MS) {
-                    mc.options.keyShift?.setDown(false)
+                    mc.options.keyShift.setDown(false)
                     warpCooldownUntil = level.gameTime + WARP_COOLDOWN_TICKS
                     if (landed) {
                         lastSuccessfulWarpTarget = target
@@ -494,7 +494,7 @@ object CombatPatrolModule : Module("Combat Patrol") {
     }
 
     private fun hasArrived(player: Player, target: BlockPos): Boolean {
-        val distSq = player.blockPosition().distSqr(target).toDouble()
+        val distSq = player.blockPosition().distSqr(target)
         return distSq <= ARRIVAL_DISTANCE_SQ
     }
 
@@ -591,7 +591,7 @@ object CombatPatrolModule : Module("Combat Patrol") {
                     val probe = rawPoint.offset(dx, dy, dz)
                     val candidate = candidateWarpBlock(level, probe) ?: continue
                     if (!isWarpBlockViable(level, candidate)) continue
-                    val distSq = candidate.distSqr(rawPoint).toDouble()
+                    val distSq = candidate.distSqr(rawPoint)
                     if (distSq < bestDistSq) {
                         bestDistSq = distSq
                         best = candidate
