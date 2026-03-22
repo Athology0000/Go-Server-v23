@@ -47,6 +47,9 @@ object PathfindingModule : Module("Pathfinding") {
   private var patrolState: PatrolState = PatrolState.IDLE
   private var currentKillWp: KillWaypoint? = null
   private var dwellTicksRemaining: Int = 0
+  // Sub-route waypoints for the current kill navigation leg — visited one at a time.
+  private var subRouteWaypoints: List<Triple<Double, Double, Double>> = emptyList()
+  private var subRouteIndex: Int = 0
 
   private val COLOR_PATH_NORMAL = OverlayRenderEngine.Color(0, 200, 255, 220)   // cyan
   private val COLOR_PATH_AOTV   = OverlayRenderEngine.Color(255, 160, 0, 220)   // orange
@@ -330,8 +333,16 @@ object PathfindingModule : Module("Pathfinding") {
         PatrolState.NAVIGATING -> {
           val nativeStatus = NativePathfinder.status
           if (nativeStatus == PathStatus.ARRIVED || nativeStatus == PathStatus.FAILED) {
-            dwellTicksRemaining = killDwellTicks.value.toInt()
-            patrolState = PatrolState.AT_KILL
+            subRouteIndex++
+            if (subRouteIndex < subRouteWaypoints.size) {
+              // More intermediate waypoints to visit — navigate to next one.
+              val (wx, wy, wz) = subRouteWaypoints[subRouteIndex]
+              NativePathfinder.setTarget(wx, wy, wz)
+            } else {
+              // All sub-route waypoints reached — transition to kill dwell.
+              dwellTicksRemaining = killDwellTicks.value.toInt()
+              patrolState = PatrolState.AT_KILL
+            }
           }
         }
         PatrolState.AT_KILL -> {
@@ -516,8 +527,25 @@ object PathfindingModule : Module("Pathfinding") {
       return
     }
     currentKillWp = target
-    val waypoints = buildSubRoute(player.x, player.y, player.z, target)
-    NativePathfinder.setRoute(waypoints, loop = false, profile = MovementProfile.DEFAULT)
+    // Build the sub-route as individual waypoints (skip index 0 which is the player start pos).
+    val flat = buildSubRoute(player.x, player.y, player.z, target)
+    val wps = mutableListOf<Triple<Double, Double, Double>>()
+    var i = 3  // skip first triple (player position)
+    while (i + 2 < flat.size) {
+      wps.add(Triple(flat[i], flat[i + 1], flat[i + 2]))
+      i += 3
+    }
+    if (i + 2 == flat.size) wps.add(Triple(flat[i], flat[i + 1], flat[i + 2]))
+    subRouteWaypoints = wps
+    subRouteIndex = 0
+    if (wps.isEmpty()) {
+      // Degenerate case — already at kill point.
+      dwellTicksRemaining = killDwellTicks.value.toInt()
+      patrolState = PatrolState.AT_KILL
+      return
+    }
+    val (wx, wy, wz) = wps[0]
+    NativePathfinder.setTarget(wx, wy, wz)
     moduleOwnsPath = true
     patrolState = PatrolState.NAVIGATING
     ChatUtils.sendMessage("Patrolling to kill spot (${PatrolWaypointStore.killWaypoints.indexOf(target) + 1}/${PatrolWaypointStore.killWaypoints.size}).")
