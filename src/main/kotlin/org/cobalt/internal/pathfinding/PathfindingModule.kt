@@ -328,7 +328,7 @@ object PathfindingModule : Module("Pathfinding") {
     killCountInfo.value  = "${PatrolWaypointStore.killWaypoints.size} points"
 
     // Patrol state machine — runs independently of moduleOwnsPath
-    if (patrolModeEnabled.value && patrolState != PatrolState.IDLE) {
+    if (patrolState != PatrolState.IDLE) {
       when (patrolState) {
         PatrolState.NAVIGATING -> {
           val nativeStatus = NativePathfinder.status

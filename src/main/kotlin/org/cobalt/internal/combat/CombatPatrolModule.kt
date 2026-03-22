@@ -30,6 +30,7 @@ import org.cobalt.api.rotation.RotationExecutor
 import org.cobalt.api.util.AngleUtils
 import org.cobalt.api.util.ChatUtils
 import org.cobalt.api.util.InventoryUtils
+import org.cobalt.api.util.player.MovementManager
 import org.cobalt.internal.etherwarp.EtherwarpLogic
 import org.cobalt.internal.pathfinding.PathfindingModule
 
@@ -265,6 +266,7 @@ object CombatPatrolModule : Module("Combat Patrol") {
 
     fun startPatrol() {
         if (patrolPoints.isEmpty()) { ChatUtils.sendMessage("No patrol points. Add some first."); return }
+        if (!enabled.value) enabled.value = true
         PathfindingModule.ensureEnabledForAutomation("combat-patrol")
         routeIndex = if (startFromNearest.value) findNearestIndex() else 0
         patrolRunning = true
@@ -282,6 +284,7 @@ object CombatPatrolModule : Module("Combat Patrol") {
         killZoneClearTicks = 0
         killZoneClearedThisTick = false
         NativePathfinder.stop()
+        MovementManager.setMovementLock(false)
         statusInfo.value = "Idle"
     }
 
