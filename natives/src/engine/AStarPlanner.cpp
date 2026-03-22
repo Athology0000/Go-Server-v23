@@ -114,7 +114,9 @@ void AStarPlanner::startAsync(Vec3i start, Vec3i goal,
                 Vec3i c = cur;
                 while (!(c.x==start.x && c.y==start.y && c.z==start.z)) {
                     path.push_back(c);
-                    c = parent[c];
+                    auto it = parent.find(c);
+                    if (it == parent.end()) { path.clear(); break; }
+                    c = it->second;
                 }
                 path.push_back(start);
                 std::reverse(path.begin(), path.end());
