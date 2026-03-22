@@ -6,6 +6,12 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import java.io.File
 import net.minecraft.client.Minecraft
+import net.minecraft.core.BlockPos
+import net.minecraft.world.phys.BlockHitResult
+import net.minecraft.world.phys.HitResult
+import org.cobalt.api.event.annotation.SubscribeEvent
+import org.cobalt.api.event.impl.client.MouseEvent
+import org.cobalt.api.event.impl.client.TickEvent
 import org.cobalt.api.module.Module
 import org.cobalt.api.module.setting.impl.ActionSetting
 import org.cobalt.api.module.setting.impl.CheckboxSetting
@@ -14,7 +20,11 @@ import org.cobalt.api.module.setting.impl.InfoType
 import org.cobalt.api.module.setting.impl.ModeSetting
 import org.cobalt.api.module.setting.impl.SliderSetting
 import org.cobalt.api.module.setting.impl.TextSetting
+import org.cobalt.api.pathfinder.jni.NativePathfinder
+import org.cobalt.api.pathfinder.jni.PathStatus
+import org.cobalt.api.pathfinder.minecraft.MinecraftPathingRules
 import org.cobalt.api.util.ChatUtils
+import org.cobalt.internal.pathfinding.PathfindingModule
 
 enum class CombatPatrolPointType(val id: String) {
     WALK("walk"), WARP("warp"), KILL("kill");
@@ -34,6 +44,20 @@ object CombatPatrolModule : Module("Combat Patrol") {
     }
 
     internal val patrolPoints = mutableListOf<CombatPatrolPoint>()
+
+    enum class PatrolState { IDLE, NAVIGATING, WARPING, COMBAT_INTERRUPT, AT_KILL_ZONE }
+
+    var patrolState: PatrolState = PatrolState.IDLE
+        private set
+    var patrolOwnsPathfinder: Boolean = false
+        private set
+
+    private var patrolRunning = false
+    private var routeIndex = 0
+    private var killZoneClearTicks = 0
+    private var lastPathStartGameTime = 0L
+
+    val enabled = CheckboxSetting("Enabled", "Enable the Combat Patrol module.", false)
 
     private val routeName = TextSetting("Route Name", "Name used for save/load.", "default")
     private val pointsInfo = InfoSetting("Points", "Number of recorded points.", InfoType.INFO)
@@ -60,6 +84,7 @@ object CombatPatrolModule : Module("Combat Patrol") {
 
     init {
         addSetting(
+            enabled,
             routeName, pointsInfo, statusInfo,
             recordOnRightClick, loopRoute, startFromNearest, pointType,
             killZoneRadius, killZoneDwellTicks, aotvSlot,
@@ -69,6 +94,61 @@ object CombatPatrolModule : Module("Combat Patrol") {
         )
         statusInfo.value = "Idle"
         org.cobalt.api.event.EventBus.register(this)
+    }
+
+    @SubscribeEvent
+    fun onTick(@Suppress("UNUSED_PARAMETER") event: TickEvent.Start) {
+        updateInfo()
+        if (!enabled.value) {
+            if (patrolRunning) stopPatrol("Patrol module disabled.")
+            return
+        }
+        if (patrolPoints.isEmpty()) {
+            if (patrolRunning) stopPatrol("No patrol points.")
+            return
+        }
+        if (!patrolRunning) return
+
+        when (patrolState) {
+            PatrolState.NAVIGATING -> {
+                NativePathfinder.tick()?.applyToPlayer()
+                val s = NativePathfinder.status
+                if (s == PathStatus.ARRIVED || s == PathStatus.FAILED) {
+                    val current = patrolPoints.getOrNull(routeIndex)
+                    if (current?.type == CombatPatrolPointType.KILL) {
+                        NativePathfinder.stop()
+                        patrolOwnsPathfinder = false
+                        patrolState = PatrolState.AT_KILL_ZONE
+                        killZoneClearTicks = 0
+                    } else {
+                        advanceAndNavigate()
+                    }
+                }
+            }
+            PatrolState.WARPING -> {
+                // Warp sub-machine runs in onRender (added in Task 5). Timeout handled there.
+            }
+            PatrolState.AT_KILL_ZONE -> {
+                if (killZoneClearTicks >= killZoneDwellTicks.value.toInt()) {
+                    killZoneClearTicks = 0
+                    advanceAndNavigate()
+                }
+            }
+            PatrolState.COMBAT_INTERRUPT, PatrolState.IDLE -> { /* CombatMacroModule owns pathfinder */ }
+        }
+        statusInfo.value = patrolState.name
+    }
+
+    @SubscribeEvent
+    fun onRightClick(@Suppress("UNUSED_PARAMETER") event: MouseEvent.RightClick) {
+        if (!enabled.value || !recordOnRightClick.value) return
+        val hit = mc.hitResult
+        if (hit is BlockHitResult && hit.type == HitResult.Type.BLOCK) {
+            val pos = hit.blockPos
+            patrolPoints.add(CombatPatrolPoint(pos.x, pos.y, pos.z, currentPointType()))
+            ChatUtils.sendMessage("Patrol point recorded at ${pos.x} ${pos.y} ${pos.z} (${currentPointType().id}).")
+            updateInfo()
+        }
     }
 
     private fun currentPointType() = when (pointType.value) {
@@ -144,6 +224,96 @@ object CombatPatrolModule : Module("Combat Patrol") {
         pointsInfo.value = "${patrolPoints.size} points"
     }
 
-    fun startPatrol() { /* filled in Task 2 */ }
-    fun stopPatrol(msg: String = "") { /* filled in Task 2 */ }
+    fun startPatrol() {
+        if (patrolPoints.isEmpty()) { ChatUtils.sendMessage("No patrol points. Add some first."); return }
+        PathfindingModule.ensureEnabledForAutomation("combat-patrol")
+        routeIndex = if (startFromNearest.value) findNearestIndex() else 0
+        patrolRunning = true
+        killZoneClearTicks = 0
+        navigateTo(patrolPoints[routeIndex])
+        ChatUtils.sendMessage("Combat patrol started at point ${routeIndex + 1}/${patrolPoints.size}.")
+    }
+
+    fun stopPatrol(msg: String = "") {
+        if (patrolRunning && msg.isNotEmpty()) ChatUtils.sendMessage(msg)
+        patrolRunning = false
+        patrolOwnsPathfinder = false
+        patrolState = PatrolState.IDLE
+        killZoneClearTicks = 0
+        NativePathfinder.stop()
+        statusInfo.value = "Idle"
+    }
+
+    val isPatrolRunning: Boolean get() = patrolRunning
+
+    private fun advanceAndNavigate() {
+        routeIndex++
+        if (routeIndex >= patrolPoints.size) {
+            if (loopRoute.value) {
+                routeIndex = 0
+            } else {
+                stopPatrol("Patrol complete.")
+                return
+            }
+        }
+        navigateTo(patrolPoints[routeIndex])
+    }
+
+    internal fun navigateTo(point: CombatPatrolPoint) {
+        when (point.type) {
+            CombatPatrolPointType.WALK, CombatPatrolPointType.KILL -> {
+                val level = mc.level
+                val resolved = if (level != null) {
+                    MinecraftPathingRules.resolveTarget(level, BlockPos(point.x, point.y, point.z))
+                        ?: BlockPos(point.x, point.y, point.z)
+                } else BlockPos(point.x, point.y, point.z)
+                NativePathfinder.setTarget(resolved.x + 0.5, resolved.y.toDouble(), resolved.z + 0.5)
+                lastPathStartGameTime = mc.level?.gameTime ?: 0L
+                patrolOwnsPathfinder = true
+                patrolState = PatrolState.NAVIGATING
+            }
+            CombatPatrolPointType.WARP -> {
+                // Full warp logic added in Task 5. Fall back to walking for now.
+                NativePathfinder.setTarget(point.x + 0.5, point.y.toDouble(), point.z + 0.5)
+                patrolOwnsPathfinder = true
+                patrolState = PatrolState.NAVIGATING
+            }
+        }
+    }
+
+    private fun findNearestIndex(): Int {
+        val player = mc.player ?: return 0
+        val px = player.x; val py = player.y; val pz = player.z
+        return patrolPoints.indices.minByOrNull { i ->
+            val p = patrolPoints[i]
+            val dx = p.x + 0.5 - px; val dy = p.y - py; val dz = p.z + 0.5 - pz
+            dx * dx + dy * dy + dz * dz
+        } ?: 0
+    }
+
+    /** Called by CombatMacroModule when a stray mob is found while patrol is navigating. */
+    fun onCombatInterrupt() {
+        if (patrolState != PatrolState.NAVIGATING && patrolState != PatrolState.WARPING) return
+        NativePathfinder.stop()
+        patrolOwnsPathfinder = false
+        patrolState = PatrolState.COMBAT_INTERRUPT
+    }
+
+    /** Called by CombatMacroModule when no target remains (edge-triggered: only acts on COMBAT_INTERRUPT). */
+    fun onCombatResume() {
+        if (patrolState != PatrolState.COMBAT_INTERRUPT) return
+        val point = patrolPoints.getOrNull(routeIndex) ?: run { stopPatrol("Route index out of bounds."); return }
+        navigateTo(point)
+    }
+
+    /** Called by CombatMacroModule each tick there are no mobs in the kill zone. */
+    fun onKillZoneCleared() {
+        if (patrolState != PatrolState.AT_KILL_ZONE) return
+        killZoneClearTicks++
+    }
+
+    val currentKillPoint: CombatPatrolPoint?
+        get() = if (patrolState == PatrolState.AT_KILL_ZONE) patrolPoints.getOrNull(routeIndex) else null
+
+    val killZoneRadiusValue: Double get() = killZoneRadius.value
 }
