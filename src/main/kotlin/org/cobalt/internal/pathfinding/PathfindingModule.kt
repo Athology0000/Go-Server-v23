@@ -305,7 +305,7 @@ object PathfindingModule : Module("Pathfinding") {
 
   @SubscribeEvent
   fun onRightClick(event: MouseEvent.RightClick) {
-    if (!enabled.value || !recordingKillPoints.value) return
+    if (!recordingKillPoints.value) return
     val mc = Minecraft.getInstance()
     val hit = mc.hitResult ?: return
     if (hit !is net.minecraft.world.phys.BlockHitResult) return
@@ -498,6 +498,7 @@ object PathfindingModule : Module("Pathfinding") {
   }
 
   fun startPatrol() {
+    if (patrolState != PatrolState.IDLE) stopPatrol()
     if (PatrolWaypointStore.killWaypoints.size < 2) {
       ChatUtils.sendMessage("Need at least 2 kill waypoints to patrol. Use 'Record Kill Points'.")
       return
@@ -508,7 +509,10 @@ object PathfindingModule : Module("Pathfinding") {
   }
 
   private fun navigateToKill(target: KillWaypoint) {
-    val player = mc.player ?: return
+    val player = mc.player ?: run {
+      patrolState = PatrolState.IDLE
+      return
+    }
     currentKillWp = target
     val waypoints = buildSubRoute(player.x, player.y, player.z, target)
     NativePathfinder.setRoute(waypoints, loop = false, profile = MovementProfile.DEFAULT)
