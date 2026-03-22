@@ -28,6 +28,7 @@ import org.cobalt.internal.mining.CommissionMacroModule
 import org.cobalt.internal.mining.VeinDirectionModule
 import org.cobalt.internal.mining.AutoLanternModule
 import org.cobalt.internal.pathfinding.PathfindingModule
+import org.cobalt.internal.pathfinding.PatrolWaypointStore
 import org.cobalt.internal.qol.QolModule
 import org.cobalt.internal.visual.BlockOverlayModule
 import org.cobalt.internal.visual.BlockOutlineModule
@@ -100,6 +101,7 @@ object Cobalt : ClientModInitializer {
     ).forEach { EventBus.register(it) }
     NativePathfinder.init()
     Config.loadModulesConfig()
+    PatrolWaypointStore.load()
     EventBus.register(this)
     println("Dutt Client Initialized")
   }
