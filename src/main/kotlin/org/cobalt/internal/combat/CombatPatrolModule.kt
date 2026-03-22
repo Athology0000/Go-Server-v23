@@ -67,6 +67,8 @@ object CombatPatrolModule : Module("Combat Patrol") {
             saveRouteAction, loadRouteAction,
             startPatrolAction, stopPatrolAction,
         )
+        statusInfo.value = "Idle"
+        org.cobalt.api.event.EventBus.register(this)
     }
 
     private fun currentPointType() = when (pointType.value) {
