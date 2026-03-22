@@ -56,7 +56,6 @@ object CombatPatrolModule : Module("Combat Patrol") {
     private var routeIndex = 0
     private var killZoneClearTicks = 0
     private var killZoneClearedThisTick = false
-    private var lastPathStartGameTime = 0L
 
     val enabled = CheckboxSetting("Enabled", "Enable the Combat Patrol module.", false)
 
@@ -73,10 +72,10 @@ object CombatPatrolModule : Module("Combat Patrol") {
 
     private val addPointAction = ActionSetting("Add Point", "Record your current position.", "Add") { addPointFromPlayer() }
     private val removeLastAction = ActionSetting("Remove Last", "Remove the last recorded point.", "Remove") {
-        if (patrolPoints.isNotEmpty()) { patrolPoints.removeAt(patrolPoints.lastIndex); updateInfo() }
+        if (patrolPoints.isNotEmpty()) { patrolPoints.removeAt(patrolPoints.lastIndex); updatePointsInfo() }
     }
     private val clearRouteAction = ActionSetting("Clear Route", "Remove all patrol points.", "Clear") {
-        patrolPoints.clear(); updateInfo()
+        patrolPoints.clear(); updatePointsInfo()
     }
     private val saveRouteAction = ActionSetting("Save Route", "Save route to disk.", "Save") { saveRoute() }
     private val loadRouteAction = ActionSetting("Load Route", "Load route from disk.", "Load") { loadRoute() }
@@ -99,7 +98,7 @@ object CombatPatrolModule : Module("Combat Patrol") {
 
     @SubscribeEvent
     fun onTick(@Suppress("UNUSED_PARAMETER") event: TickEvent.Start) {
-        updateInfo()
+        updatePointsInfo()
         if (!enabled.value) {
             if (patrolRunning) stopPatrol("Patrol module disabled.")
             return
@@ -116,6 +115,7 @@ object CombatPatrolModule : Module("Combat Patrol") {
                 val s = NativePathfinder.status
                 if (s == PathStatus.ARRIVED || s == PathStatus.FAILED) {
                     val current = patrolPoints.getOrNull(routeIndex)
+                    if (s == PathStatus.FAILED) ChatUtils.sendMessage("Patrol: pathfinding failed at point ${routeIndex + 1}, skipping.")
                     if (current?.type == CombatPatrolPointType.KILL) {
                         NativePathfinder.stop()
                         patrolOwnsPathfinder = false
@@ -154,7 +154,7 @@ object CombatPatrolModule : Module("Combat Patrol") {
             val pos = hit.blockPos
             patrolPoints.add(CombatPatrolPoint(pos.x, pos.y, pos.z, currentPointType()))
             ChatUtils.sendMessage("Patrol point recorded at ${pos.x} ${pos.y} ${pos.z} (${currentPointType().id}).")
-            updateInfo()
+            updatePointsInfo()
         }
     }
 
@@ -167,9 +167,10 @@ object CombatPatrolModule : Module("Combat Patrol") {
     private fun addPointFromPlayer() {
         val player = mc.player ?: return
         val pos = player.blockPosition()
-        patrolPoints.add(CombatPatrolPoint(pos.x, pos.y, pos.z, currentPointType()))
-        ChatUtils.sendMessage("Patrol point added (${patrolPoints.size} total, type=${currentPointType().id}).")
-        updateInfo()
+        val type = currentPointType()
+        patrolPoints.add(CombatPatrolPoint(pos.x, pos.y, pos.z, type))
+        ChatUtils.sendMessage("Patrol point added (${patrolPoints.size} total, type=${type.id}).")
+        updatePointsInfo()
     }
 
     private fun isValidName(name: String): Boolean {
@@ -223,11 +224,11 @@ object CombatPatrolModule : Module("Combat Patrol") {
         }
         patrolPoints.clear()
         patrolPoints.addAll(loaded)
-        updateInfo()
+        updatePointsInfo()
         ChatUtils.sendMessage("Loaded patrol route \"$name\" (${patrolPoints.size} points).")
     }
 
-    internal fun updateInfo() {
+    internal fun updatePointsInfo() {
         pointsInfo.value = "${patrolPoints.size} points"
     }
 
@@ -276,7 +277,6 @@ object CombatPatrolModule : Module("Combat Patrol") {
                         ?: BlockPos(point.x, point.y, point.z)
                 } else BlockPos(point.x, point.y, point.z)
                 NativePathfinder.setTarget(resolved.x + 0.5, resolved.y.toDouble(), resolved.z + 0.5)
-                lastPathStartGameTime = mc.level?.gameTime ?: 0L
                 patrolOwnsPathfinder = true
                 patrolState = PatrolState.NAVIGATING
             }
