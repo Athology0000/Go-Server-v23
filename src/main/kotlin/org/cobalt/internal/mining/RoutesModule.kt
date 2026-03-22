@@ -619,32 +619,6 @@ object RoutesModule : Module("Routes") {
     if (!enabled.value) enabled.value = true
     PathfindingModule.ensureEnabledForAutomation("routes")
 
-    // If all remaining points are NORMAL, feed them directly to bypass A* entirely.
-    // This makes the pathfinder follow the recorded path geometry rather than
-    // computing its own route between waypoints.
-    val remaining = routePoints.subList(routeIndex, routePoints.size)
-    if (remaining.isNotEmpty() && remaining.all { it.type == RoutePointType.NORMAL }) {
-      val waypoints = remaining.map { it.pos }
-      // startFromBeginning=true: findNearestPointIndex() already identified the correct
-      // starting waypoint via 3D distance — don't let startDirect re-search by XZ and
-      // jump ahead to a later node that may be through a wall (e.g. the crypt exit).
-      val flat = DoubleArray(waypoints.size * 3) { i ->
-        val bp = waypoints[i / 3]
-        when (i % 3) { 0 -> bp.x + 0.5; 1 -> bp.y.toDouble(); else -> bp.z + 0.5 }
-      }
-      NativePathfinder.setRoute(flat, loop = false, MovementProfile.DEFAULT)
-      action = RouteAction.WALK
-      awaitingArrival = true
-      walkCompletePointOnArrival = true
-      lastTarget = routePoints.last().pos
-      lastResolvedTarget = lastTarget
-      activePoint = null
-      routeIndex = routePoints.lastIndex  // completePoint will push past end → stopRoute
-      updateStatus()
-      ChatUtils.sendMessage("Walkback \"$trimmedName\" started (direct, ${waypoints.size} nodes).")
-      return true
-    }
-
     updateStatus()
     ChatUtils.sendMessage("Walkback \"$trimmedName\" started at checkpoint ${routeIndex + 1}/${loaded.size}.")
     return true
@@ -1084,27 +1058,9 @@ object RoutesModule : Module("Routes") {
         startMine(level, point)
       }
       else -> {
-        // Batch all consecutive NORMAL points (including single ones) into startDirect so
-        // the pathfinder follows recorded route geometry instead of A* shortcuts through walls.
-        var batchEnd = routeIndex
-        while (batchEnd + 1 < routePoints.size && routePoints[batchEnd + 1].type == RoutePointType.NORMAL) {
-          batchEnd++
-        }
-        val waypoints = routePoints.subList(routeIndex, batchEnd + 1).map { it.pos }
-        val flat = DoubleArray(waypoints.size * 3) { i ->
-          val bp = waypoints[i / 3]
-          when (i % 3) { 0 -> bp.x + 0.5; 1 -> bp.y.toDouble(); else -> bp.z + 0.5 }
-        }
-        NativePathfinder.setRoute(flat, loop = false, MovementProfile.DEFAULT)
-        action = RouteAction.WALK
-        awaitingArrival = true
-        walkCompletePointOnArrival = true
-        lastTarget = waypoints.last()
-        lastResolvedTarget = lastTarget
-        activePoint = null
-        routeIndex = batchEnd  // completePoint() → routeIndex++ → next non-NORMAL
-        updateStatus()
-        return
+        // Navigate to each NORMAL point individually so the pathfinder follows the
+        // recorded waypoints in order rather than A*-ing its own shortcut path.
+        startWalk(point.pos)
       }
     }
   }
