@@ -70,7 +70,9 @@ void AStarPlanner::startAsync(Vec3i start, Vec3i goal,
         snapBz = world.originZ();
     }
 
-    thread_ = std::thread([this, start, goal, costs,
+    bool goalInBuffer = world.inBuffer(goal.x, goal.y, goal.z);
+
+    thread_ = std::thread([this, start, goal, costs, goalInBuffer,
                            bufSnapshot = std::move(bufSnapshot),
                            snapBx, snapBy, snapBz]() mutable {
         // Thread-local WorldAccessor using snapshot — no shared state with main thread
@@ -89,10 +91,23 @@ void AStarPlanner::startAsync(Vec3i start, Vec3i goal,
 
         AStarResult res;
         int iters = 0;
-        const int MAX_ITER = 50000;
+        const int MAX_ITER = 150000;
+
+        Vec3i bestFrontierNode = start;
+        float bestFrontierDist = heuristic(start, goal);   // initial = distance from start
+        bool  frontierAdvanced = false;
 
         while (!open.empty() && !cancelled_.load() && iters++ < MAX_ITER) {
             auto [f, cur] = open.top(); open.pop();
+
+            if (!goalInBuffer) {
+                float d = heuristic(cur, goal);
+                if (d < bestFrontierDist) {
+                    bestFrontierDist  = d;
+                    bestFrontierNode  = cur;
+                    frontierAdvanced  = true;
+                }
+            }
 
             if (cur.x==goal.x && cur.y==goal.y && cur.z==goal.z) {
                 std::vector<Vec3i> path;
@@ -117,6 +132,26 @@ void AStarPlanner::startAsync(Vec3i start, Vec3i goal,
                     open.push({ng + heuristic(nb.pos, goal), nb.pos});
                 }
             }
+        }
+
+        if (!res.found && !goalInBuffer && frontierAdvanced) {
+            // Reconstruct path to best frontier node
+            std::vector<Vec3i> path;
+            Vec3i c = bestFrontierNode;
+            while (!(c.x == start.x && c.y == start.y && c.z == start.z)) {
+                path.push_back(c);
+                auto it = parent.find(c);
+                if (it == parent.end()) { path.clear(); break; }
+                c = it->second;
+            }
+            if (!path.empty()) {
+                path.push_back(start);
+                std::reverse(path.begin(), path.end());
+                res.found     = false;
+                res.isPartial = true;
+                res.nodes     = std::move(path);
+            }
+            // If path reconstruction failed (no parent chain), leave res.found=false, isPartial=false → FAILED
         }
 
         {
