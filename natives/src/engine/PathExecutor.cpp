@@ -89,7 +89,7 @@ PathCommand PathExecutor::tick(const WorldAccessor& world,
     case PathStatus::PLANNING:
         if (planner_.isComplete()) {
             auto res = planner_.takeResult();
-            if (!res.found) { status_ = PathStatus::FAILED; return idleCmd(yaw, pitch); }
+            if (!res.found && !res.isPartial) { status_ = PathStatus::FAILED; return idleCmd(yaw, pitch); }
             activePath_ = std::move(res.nodes);
             pathNodeIdx_ = 0;
             rotation_.setPath(activePath_, 0);
@@ -103,7 +103,7 @@ PathCommand PathExecutor::tick(const WorldAccessor& world,
     case PathStatus::REPLANNING:
         if (planner_.isComplete()) {
             auto res = planner_.takeResult();
-            if (!res.found) { status_ = PathStatus::FAILED; return idleCmd(yaw, pitch); }
+            if (!res.found && !res.isPartial) { status_ = PathStatus::FAILED; return idleCmd(yaw, pitch); }
             activePath_ = std::move(res.nodes);
             pathNodeIdx_ = 0;
             rotation_.setPath(activePath_, 0);
