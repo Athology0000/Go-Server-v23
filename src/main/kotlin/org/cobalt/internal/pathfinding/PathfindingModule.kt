@@ -13,6 +13,10 @@ import net.minecraft.world.InteractionHand
 import net.minecraft.world.phys.Vec3
 import org.cobalt.internal.pathfinding.OverlayRenderEngine
 import org.cobalt.internal.pathfinding.PathSplineRenderer
+import org.cobalt.internal.pathfinding.PatrolWaypointStore
+import org.cobalt.internal.pathfinding.RouteWaypoint
+import org.cobalt.internal.pathfinding.KillWaypoint
+import org.cobalt.api.pathfinder.jni.MovementProfile
 import org.cobalt.api.module.setting.impl.SliderSetting
 import org.cobalt.api.module.Module
 import org.cobalt.api.module.setting.impl.ActionSetting
@@ -29,6 +33,7 @@ import org.cobalt.api.ui.theme.ThemeManager
 import org.cobalt.api.util.ChatUtils
 import org.cobalt.api.util.player.MovementManager
 import org.cobalt.api.util.ui.NVGRenderer
+import kotlin.math.sqrt
 
 object PathfindingModule : Module("Pathfinding") {
 
@@ -36,6 +41,12 @@ object PathfindingModule : Module("Pathfinding") {
   private var moduleOwnsPath = false
   private var cachedSpline: PathSplineRenderer.SplineResult? = null
   private var lastNodesRef: List<Vec3>? = null
+
+  private enum class PatrolState { IDLE, NAVIGATING, AT_KILL }
+
+  private var patrolState: PatrolState = PatrolState.IDLE
+  private var currentKillWp: KillWaypoint? = null
+  private var dwellTicksRemaining: Int = 0
 
   private val COLOR_PATH_NORMAL = OverlayRenderEngine.Color(0, 200, 255, 220)   // cyan
   private val COLOR_PATH_AOTV   = OverlayRenderEngine.Color(255, 160, 0, 220)   // orange
@@ -113,6 +124,83 @@ object PathfindingModule : Module("Pathfinding") {
     "Stop"
   ) {
     stopPath()
+  }
+
+  private val patrolModeEnabled = CheckboxSetting(
+    "Patrol Mode",
+    "Randomly patrol between kill waypoints using the recorded route.",
+    false
+  )
+
+  private val recordRouteAction = ActionSetting(
+    "Record Route Point",
+    "Appends your current position to the patrol route.",
+    "Record"
+  ) {
+    val player = mc.player ?: return@ActionSetting
+    PatrolWaypointStore.routeWaypoints.add(RouteWaypoint(player.x, player.y, player.z))
+    PatrolWaypointStore.save()
+    ChatUtils.sendMessage("Route point recorded (${PatrolWaypointStore.routeWaypoints.size} total).")
+  }
+
+  private val clearRouteAction = ActionSetting(
+    "Clear Route",
+    "Removes all recorded route waypoints.",
+    "Clear"
+  ) {
+    PatrolWaypointStore.routeWaypoints.clear()
+    PatrolWaypointStore.save()
+    ChatUtils.sendMessage("Route cleared.")
+  }
+
+  private val recordingKillPoints = CheckboxSetting(
+    "Record Kill Points",
+    "Right-click a block to record a kill waypoint while this is enabled.",
+    false
+  )
+
+  private val clearKillAction = ActionSetting(
+    "Clear Kill Points",
+    "Removes all recorded kill waypoints.",
+    "Clear"
+  ) {
+    PatrolWaypointStore.killWaypoints.clear()
+    PatrolWaypointStore.save()
+    ChatUtils.sendMessage("Kill waypoints cleared.")
+  }
+
+  private val killDwellTicks = SliderSetting(
+    "Kill Dwell Ticks",
+    "Ticks to wait at a kill spot before moving to the next.",
+    20.0, 0.0, 100.0
+  )
+
+  private val routeCountInfo = InfoSetting(
+    "Route Points",
+    "Number of recorded route waypoints.",
+    InfoType.INFO
+  )
+
+  private val killCountInfo = InfoSetting(
+    "Kill Points",
+    "Number of recorded kill waypoints.",
+    InfoType.INFO
+  )
+
+  private val startPatrolAction = ActionSetting(
+    "Start Patrol",
+    "Start patrolling between kill waypoints.",
+    "Start Patrol"
+  ) {
+    startPatrol()
+  }
+
+  private val stopPatrolAction = ActionSetting(
+    "Stop Patrol",
+    "Stop the patrol loop.",
+    "Stop Patrol"
+  ) {
+    stopPatrol()
   }
 
   val cacheHud = hudElement(
@@ -200,6 +288,16 @@ object PathfindingModule : Module("Pathfinding") {
       aotvSlot,
       startAction,
       stopAction,
+      patrolModeEnabled,
+      recordRouteAction,
+      clearRouteAction,
+      recordingKillPoints,
+      clearKillAction,
+      killDwellTicks,
+      routeCountInfo,
+      killCountInfo,
+      startPatrolAction,
+      stopPatrolAction,
     )
 
     EventBus.register(this)
@@ -207,15 +305,53 @@ object PathfindingModule : Module("Pathfinding") {
 
   @SubscribeEvent
   fun onRightClick(event: MouseEvent.RightClick) {
-    // No-op: target is set via commands.
+    if (!enabled.value || !recordingKillPoints.value) return
+    val mc = Minecraft.getInstance()
+    val hit = mc.hitResult ?: return
+    if (hit !is net.minecraft.world.phys.BlockHitResult) return
+    val pos = hit.blockPos
+    val wp = KillWaypoint(pos.x + 0.5, pos.y + 1.0, pos.z + 0.5)
+    PatrolWaypointStore.killWaypoints.add(wp)
+    PatrolWaypointStore.save()
+    ChatUtils.sendMessage("Kill waypoint recorded (${PatrolWaypointStore.killWaypoints.size} total).")
   }
 
   @SubscribeEvent
   fun onTick(@Suppress("UNUSED_PARAMETER") event: TickEvent.Start) {
     org.cobalt.internal.pathfinding.DebugLog.debugFileEnabled = debugFileLogging.value
-    // PathfindingModule only drives NativePathfinder when the user explicitly
-    // started a path via the UI (startFromSettings / startTo). Macros tick it themselves.
+
+    // Update live info settings
+    routeCountInfo.value = "${PatrolWaypointStore.routeWaypoints.size} points"
+    killCountInfo.value  = "${PatrolWaypointStore.killWaypoints.size} points"
+
+    // Patrol state machine — runs independently of moduleOwnsPath
+    if (patrolModeEnabled.value && patrolState != PatrolState.IDLE) {
+      when (patrolState) {
+        PatrolState.NAVIGATING -> {
+          val nativeStatus = NativePathfinder.status
+          if (nativeStatus == PathStatus.ARRIVED || nativeStatus == PathStatus.FAILED) {
+            dwellTicksRemaining = killDwellTicks.value.toInt()
+            patrolState = PatrolState.AT_KILL
+          }
+        }
+        PatrolState.AT_KILL -> {
+          if (dwellTicksRemaining-- <= 0) {
+            val kills = PatrolWaypointStore.killWaypoints
+            val next = kills.filter { it != currentKillWp }
+            if (next.isEmpty()) {
+              stopPatrol()
+              ChatUtils.sendMessage("No other kill waypoints available.")
+            } else {
+              navigateToKill(next.random())
+            }
+          }
+        }
+        PatrolState.IDLE -> { /* nothing */ }
+      }
+    }
+
     if (!enabled.value || !moduleOwnsPath) return
+
     val cmd = NativePathfinder.tick()
     if (cmd != null) {
       cmd.applyToPlayer()
@@ -229,8 +365,11 @@ object PathfindingModule : Module("Pathfinding") {
         }
       }
     } else {
-      moduleOwnsPath = false
-      MovementManager.setMovementLock(false)
+      val s = NativePathfinder.status
+      if (s == PathStatus.IDLE || s == PathStatus.ARRIVED || s == PathStatus.FAILED) {
+        moduleOwnsPath = false
+        MovementManager.setMovementLock(false)
+      }
     }
   }
 
@@ -314,6 +453,73 @@ object PathfindingModule : Module("Pathfinding") {
     cachedSpline = null
     lastNodesRef = null
     OverlayRenderEngine.clearTag("path-spline")
+  }
+
+  private fun buildSubRoute(
+    fromX: Double, fromY: Double, fromZ: Double,
+    killWp: KillWaypoint
+  ): DoubleArray {
+    val route = PatrolWaypointStore.routeWaypoints
+    if (route.isEmpty()) {
+      // No route — navigate directly (player position + kill target)
+      return doubleArrayOf(fromX, fromY, fromZ, killWp.x, killWp.y, killWp.z)
+    }
+
+    fun dist3(wp: RouteWaypoint, x: Double, y: Double, z: Double): Double {
+      val dx = wp.x - x; val dy = wp.y - y; val dz = wp.z - z
+      return sqrt(dx*dx + dy*dy + dz*dz)
+    }
+
+    val j = route.indices.minByOrNull { dist3(route[it], fromX, fromY, fromZ) } ?: 0
+    val i = route.indices.minByOrNull { dist3(route[it], killWp.x, killWp.y, killWp.z) } ?: 0
+
+    val slice: List<RouteWaypoint> = if (j == i) {
+      emptyList()
+    } else {
+      val fwd = if (j <= i) route.subList(j, i + 1) else emptyList()
+      val bwd = if (i <= j) route.subList(i, j + 1).reversed() else emptyList()
+      when {
+        fwd.isEmpty() -> bwd
+        bwd.isEmpty() -> fwd
+        else          -> if (fwd.size <= bwd.size) fwd else bwd
+      }
+    }
+
+    // Build flat double[] for NativePathfinder.setRoute: [x0,y0,z0, x1,y1,z1, ...]
+    val points = mutableListOf<Double>()
+    // Start at player position
+    points += listOf(fromX, fromY, fromZ)
+    // Route slice
+    slice.forEach { wp -> points += listOf(wp.x, wp.y, wp.z) }
+    // Kill waypoint as final destination
+    points += listOf(killWp.x, killWp.y, killWp.z)
+
+    return points.toDoubleArray()
+  }
+
+  fun startPatrol() {
+    if (PatrolWaypointStore.killWaypoints.size < 2) {
+      ChatUtils.sendMessage("Need at least 2 kill waypoints to patrol. Use 'Record Kill Points'.")
+      return
+    }
+    if (!enabled.value) ensureEnabledForAutomation("patrol")
+    val first = PatrolWaypointStore.killWaypoints.random()
+    navigateToKill(first)
+  }
+
+  private fun navigateToKill(target: KillWaypoint) {
+    val player = mc.player ?: return
+    currentKillWp = target
+    val waypoints = buildSubRoute(player.x, player.y, player.z, target)
+    NativePathfinder.setRoute(waypoints, loop = false, profile = MovementProfile.DEFAULT)
+    moduleOwnsPath = true
+    patrolState = PatrolState.NAVIGATING
+    ChatUtils.sendMessage("Patrolling to kill spot (${PatrolWaypointStore.killWaypoints.indexOf(target) + 1}/${PatrolWaypointStore.killWaypoints.size}).")
+  }
+
+  fun stopPatrol() {
+    patrolState = PatrolState.IDLE
+    stopPath()
   }
 
   private fun nativeActive(): Boolean {
