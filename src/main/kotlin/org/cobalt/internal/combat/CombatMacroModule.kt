@@ -797,7 +797,7 @@ object CombatMacroModule : Module("Combat Macro") {
           CombatPatrolModule.PatrolState.AT_KILL_ZONE     -> CombatPatrolModule.onKillZoneCleared()
           else -> { /* NAVIGATING/WARPING — patrol owns movement */ }
         }
-        if (startedPath && nativeActive()) nativeStop()
+        if (startedPath && nativeActive() && !CombatPatrolModule.patrolOwnsPathfinder) nativeStop()
         startedPath = false; lastTargetPos = null; currentTargetId = null
         return
       }
