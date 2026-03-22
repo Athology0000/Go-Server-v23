@@ -174,9 +174,7 @@ object CombatPatrolModule : Module("Combat Patrol") {
         if (mc.screen != null) return
         val player = mc.player ?: return
         val level = mc.level ?: return
-        if (warpTargetPoint != null || warpStage > 0) {
-            handleWarp(player, level)
-        }
+        handleWarp(player, level)
     }
 
     @SubscribeEvent
@@ -379,17 +377,18 @@ object CombatPatrolModule : Module("Combat Patrol") {
 
         // Ensure AOTV is selected (use configured slot)
         val slot = aotvSlot.value  // index 0-8
-        val currentSlot = player.inventory.selectedSlot
         if (!EtherwarpLogic.holdingEtherwarpItem()) {
-            if (slot in 0..8) {
-                if (warpRestoreSlot == -1) warpRestoreSlot = currentSlot
-                InventoryUtils.holdHotbarSlot(slot)
-            }
+            val currentSlot = player.inventory.selectedSlot
+            InventoryUtils.holdHotbarSlot(slot)
             if (!EtherwarpLogic.holdingEtherwarpItem()) {
+                // Item not in that slot — restore immediately and skip
+                InventoryUtils.holdHotbarSlot(currentSlot)
                 ChatUtils.sendMessage("Patrol: no AOTV in slot ${slot + 1}, skipping warp.")
                 advanceAndNavigate()
                 return
             }
+            // Successfully switched — record slot to restore after warp
+            warpRestoreSlot = currentSlot
         }
 
         NativePathfinder.stop()
@@ -462,7 +461,17 @@ object CombatPatrolModule : Module("Combat Patrol") {
             else -> {
                 mc.options.keyUse?.setDown(false)
                 val landed = hasArrived(player, target)
-                applyWarpHeadRotation(player, warpAimPoint)
+                // Blend head toward next route point during post-warp dwell
+                val nextIndex = routeIndex + 1
+                val nextPoint = patrolPoints.getOrNull(if (nextIndex < patrolPoints.size) nextIndex else 0)
+                val postWarpAim = nextPoint?.let { Vec3(it.x + 0.5, it.y + 0.6, it.z + 0.5) }
+                val frameAim = if (postWarpAim != null) {
+                    val t = (warpStageElapsedMs / WARP_POST_MS).coerceIn(0.0, 1.0)
+                    blendVec3(warpAimPoint, postWarpAim, t)
+                } else {
+                    warpAimPoint
+                }
+                applyWarpHeadRotation(player, frameAim)
                 mc.options.keyShift?.setDown(true)
                 if (warpStageElapsedMs >= WARP_POST_MS) {
                     mc.options.keyShift?.setDown(false)
