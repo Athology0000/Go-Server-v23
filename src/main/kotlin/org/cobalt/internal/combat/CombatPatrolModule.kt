@@ -345,7 +345,13 @@ object CombatPatrolModule : Module("Combat Patrol") {
         navigateTo(point)
     }
 
-    /** Called by CombatMacroModule each tick there are no mobs in the kill zone. */
+    /**
+     * Called by CombatMacroModule each tick there are no mobs in the kill zone.
+     *
+     * NOTE: requires CombatMacroModule's TickEvent.Start handler to fire BEFORE this module's
+     * handler in the same tick — ensured by registration order in Cobalt.kt
+     * (CombatMacroModule is registered before CombatPatrolModule).
+     */
     fun onKillZoneCleared() {
         if (patrolState != PatrolState.AT_KILL_ZONE) return
         killZoneClearedThisTick = true
