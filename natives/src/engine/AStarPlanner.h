@@ -8,7 +8,8 @@
 #include <atomic>
 
 struct AStarResult {
-    bool found = false;
+    bool found     = false;
+    bool isPartial = false;   // true = path leads to best frontier node, not the real goal
     std::vector<Vec3i> nodes;
 };
 
