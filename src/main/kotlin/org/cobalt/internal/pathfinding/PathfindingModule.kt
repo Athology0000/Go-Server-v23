@@ -413,6 +413,8 @@ object PathfindingModule : Module("Pathfinding") {
     }
   }
 
+  val isPatrolActive: Boolean get() = patrolState != PatrolState.IDLE
+
   fun ensureEnabledForAutomation(source: String) {
     if (enabled.value) return
     enabled.value = true

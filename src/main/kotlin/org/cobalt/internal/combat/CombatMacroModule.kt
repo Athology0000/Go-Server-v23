@@ -45,6 +45,7 @@ import org.cobalt.api.pathfinder.jni.NativePathfinder
 import org.cobalt.api.pathfinder.jni.PathStatus
 import org.cobalt.api.util.player.MovementManager
 import org.cobalt.internal.pathfinding.PathfindingModule
+import org.cobalt.internal.pathfinding.PatrolWaypointStore
 import org.cobalt.internal.helper.WalkbackBridge
 import org.cobalt.internal.rotation.RotationsModule
 
@@ -587,7 +588,7 @@ object CombatMacroModule : Module("Combat Macro") {
       NativePathfinder.tick()?.applyToPlayer()
     }
     syncLearnedWhitelistFromSetting()
-    if (cryptZombieSlayer.value && !slayerModeEnabled) {
+    if (cryptZombieSlayer.value && !slayerModeEnabled && enabled.value) {
       slayerModeEnabled = true
       slayerNeedsQuestRestart = false  // detection will set this if no quest found
       slayerQuestReady = false
@@ -760,6 +761,17 @@ object CombatMacroModule : Module("Combat Macro") {
       }
       // Crypt patrol: sweep waypoints in order to find ghouls when none are nearby.
       if (cryptZombieSlayer.value && slayerLocation.value == 1 && !slayerNeedsQuestRestart) {
+        // If kill waypoints are recorded, delegate to the kill-patrol system (random route-guided patrol).
+        if (PatrolWaypointStore.killWaypoints.size >= 2) {
+          if (!PathfindingModule.isPatrolActive) {
+            PathfindingModule.startPatrol()
+          }
+          startedPath = false   // PathfindingModule owns the tick loop while patrol runs
+          lastTargetPos = null
+          currentTargetId = null
+          return
+        }
+        // Fall back to sequential hardcoded crypt patrol when no kill waypoints are configured.
         if (cryptPatrolIndex < 0) cryptPatrolIndex = findNearestCryptPatrolIndex()
         val dest = CRYPT_PATROL_WAYPOINTS[cryptPatrolIndex]
         val dx = dest.x - player.x
@@ -818,6 +830,8 @@ object CombatMacroModule : Module("Combat Macro") {
       stuckRepathCount = 0
       attemptAttack(player, target)
     } else {
+      // Target spotted — stop kill patrol so combat macro can take over pathfinding.
+      if (PathfindingModule.isPatrolActive) PathfindingModule.stopPatrol()
       val targetPos = target.blockPosition()
       val last = lastTargetPos
       val targetMovedFar = last == null || last.distSqr(targetPos) > TARGET_REPATH_DISTANCE_SQ
@@ -2009,6 +2023,7 @@ object CombatMacroModule : Module("Combat Macro") {
   }
 
   private fun stopMacro() {
+    if (PathfindingModule.isPatrolActive) PathfindingModule.stopPatrol()
     if (startedPath && nativeActive()) {
       nativeStop()
     }
