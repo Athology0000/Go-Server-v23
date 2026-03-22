@@ -55,6 +55,7 @@ object CombatPatrolModule : Module("Combat Patrol") {
     private var patrolRunning = false
     private var routeIndex = 0
     private var killZoneClearTicks = 0
+    private var killZoneClearedThisTick = false
     private var lastPathStartGameTime = 0L
 
     val enabled = CheckboxSetting("Enabled", "Enable the Combat Patrol module.", false)
@@ -129,10 +130,16 @@ object CombatPatrolModule : Module("Combat Patrol") {
                 // Warp sub-machine runs in onRender (added in Task 5). Timeout handled there.
             }
             PatrolState.AT_KILL_ZONE -> {
-                if (killZoneClearTicks >= killZoneDwellTicks.value.toInt()) {
+                if (killZoneClearedThisTick) {
+                    killZoneClearTicks++
+                    if (killZoneClearTicks >= killZoneDwellTicks.value.toInt()) {
+                        killZoneClearTicks = 0
+                        advanceAndNavigate()
+                    }
+                } else {
                     killZoneClearTicks = 0
-                    advanceAndNavigate()
                 }
+                killZoneClearedThisTick = false
             }
             PatrolState.COMBAT_INTERRUPT, PatrolState.IDLE -> { /* CombatMacroModule owns pathfinder */ }
         }
@@ -240,6 +247,7 @@ object CombatPatrolModule : Module("Combat Patrol") {
         patrolOwnsPathfinder = false
         patrolState = PatrolState.IDLE
         killZoneClearTicks = 0
+        killZoneClearedThisTick = false
         NativePathfinder.stop()
         statusInfo.value = "Idle"
     }
@@ -309,7 +317,7 @@ object CombatPatrolModule : Module("Combat Patrol") {
     /** Called by CombatMacroModule each tick there are no mobs in the kill zone. */
     fun onKillZoneCleared() {
         if (patrolState != PatrolState.AT_KILL_ZONE) return
-        killZoneClearTicks++
+        killZoneClearedThisTick = true
     }
 
     val currentKillPoint: CombatPatrolPoint?
