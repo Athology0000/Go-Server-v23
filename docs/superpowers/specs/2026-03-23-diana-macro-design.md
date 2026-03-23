@@ -120,7 +120,7 @@ private val rotationStrategy = BezierTrackingRotationStrategy(
 
 Each tick in COMBAT:
 1. **Clear** `MovementManager.forcedAttack = false` (clears flag set last tick).
-2. Look up target: `level.getEntity(targetEntityId)`. If null or `!(entity as? LivingEntity)?.isAlive == true` → transition to WAITING (`waitTicksElapsed = 0`). Return.
+2. Look up target: `level.getEntity(targetEntityId)`. If null or `(entity as? LivingEntity)?.isAlive != true` → transition to WAITING (`waitTicksElapsed = 0`). Return.
 3. Re-check `mc.player != null` (disconnect race). If null → `cleanup()`; return.
 4. Aim: `RotationExecutor.rotateTo(AngleUtils.getRotation(targetEntity as Entity), rotationStrategy)`. `AngleUtils.getRotation(Entity)` computes yaw/pitch from player eye to mob automatically — no manual angle math needed.
 5. Ensure `hasForcedMovement = true`: `MovementManager.setForcedMovement(false, false, false, false, false, false, false)`. (Follows established API contract — do not assign `hasForcedMovement` directly.)
