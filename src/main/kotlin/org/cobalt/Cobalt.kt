@@ -46,6 +46,7 @@ import org.cobalt.internal.farming.FarmingMacroModule
 import org.cobalt.internal.pig.PigMacroModule
 import org.cobalt.internal.spotify.SpotifyModule
 import org.cobalt.internal.chat.ChatFilterModule
+import org.cobalt.internal.diana.DianaModule
 
 @Suppress("UNUSED")
 object Cobalt : ClientModInitializer {
@@ -85,7 +86,8 @@ object Cobalt : ClientModInitializer {
         FarmingMacroModule,
         PigMacroModule,
         SpotifyModule,
-        ChatFilterModule
+        ChatFilterModule,
+        DianaModule,
       )
     )
 
