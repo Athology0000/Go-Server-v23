@@ -265,8 +265,6 @@ object DianaModule : Module("Diana") {
           return
         }
 
-        mc.player ?: run { cleanup(); return }
-
         RotationExecutor.rotateTo(AngleUtils.getRotation(target), rotationStrategy)
 
         MovementManager.setForcedMovement(false, false, false, false, false, false, false)
@@ -296,7 +294,7 @@ object DianaModule : Module("Diana") {
 
   @SubscribeEvent
   fun onRender(@Suppress("UNUSED_PARAMETER") event: WorldRenderEvent.Last) {
-    if (state !in listOf(State.PATHFINDING, State.DIGGING, State.COMBAT)) return
+    if (state != State.PATHFINDING && state != State.DIGGING && state != State.COMBAT) return
     val level = mc.level ?: return
     val bp = burrowPos ?: return
     OverlayRenderEngine.addBox(
