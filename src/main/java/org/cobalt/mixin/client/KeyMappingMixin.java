@@ -52,8 +52,13 @@ public class KeyMappingMixin {
       cir.setReturnValue(MovementManager.hasForcedMovement && MovementManager.forcedSprint);
       return;
     }
-    if (self == mc.options.keyAttack || self == mc.options.keyUse) {
-      cir.setReturnValue(false);
+    if (self == mc.options.keyAttack) {
+      cir.setReturnValue(MovementManager.hasForcedMovement && MovementManager.forcedAttack);
+      return;
+    }
+    if (self == mc.options.keyUse) {
+      cir.setReturnValue(MovementManager.hasForcedMovement && MovementManager.forcedUse);
+      return;
     }
   }
 }

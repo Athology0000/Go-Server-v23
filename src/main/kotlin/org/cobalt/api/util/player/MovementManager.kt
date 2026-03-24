@@ -42,6 +42,14 @@ object MovementManager {
   @Volatile
   var forcedSprint = false
 
+  @JvmField
+  @Volatile
+  var forcedAttack = false
+
+  @JvmField
+  @Volatile
+  var forcedUse = false
+
   @JvmStatic
   fun setLookLock(state: Boolean = true) {
     isLookLocked = state
@@ -85,6 +93,8 @@ object MovementManager {
     forcedJump = false
     forcedShift = false
     forcedSprint = false
+    forcedAttack = false
+    forcedUse    = false
   }
 
 }
