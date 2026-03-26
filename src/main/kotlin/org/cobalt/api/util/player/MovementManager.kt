@@ -50,6 +50,13 @@ object MovementManager {
   @Volatile
   var forcedUse = false
 
+  /** When true, the mixin intercepts keyAttack/keyUse and returns the forced values.
+   *  Must be set by callers that need to control those keys (e.g. DianaModule).
+   *  Cleared automatically by clearForcedMovement(). */
+  @JvmField
+  @Volatile
+  var forcedActionsEnabled = false
+
   @JvmStatic
   fun setLookLock(state: Boolean = true) {
     isLookLocked = state
@@ -95,6 +102,7 @@ object MovementManager {
     forcedSprint = false
     forcedAttack = false
     forcedUse    = false
+    forcedActionsEnabled = false
   }
 
 }

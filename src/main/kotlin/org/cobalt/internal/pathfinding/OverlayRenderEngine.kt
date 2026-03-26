@@ -30,7 +30,8 @@ object OverlayRenderEngine {
     val color: Color,
     val lineWidth: Float,
     val expiresAt: Long,
-    val tag: String?
+    val tag: String?,
+    val forceRender: Boolean = false
   )
 
   data class Box(
@@ -44,7 +45,8 @@ object OverlayRenderEngine {
     val outline: Color?,
     val lineWidth: Float,
     val expiresAt: Long,
-    val tag: String?
+    val tag: String?,
+    val forceRender: Boolean = false
   )
 
   private val highlightFill = Color(180, 0, 255, 90)
@@ -77,10 +79,11 @@ object OverlayRenderEngine {
     color: Color,
     lineWidth: Float = 1.5f,
     durationTicks: Int = 2,
-    tag: String? = null
+    tag: String? = null,
+    forceRender: Boolean = false
   ) {
     val expiresAt = level.gameTime + durationTicks
-    lines.add(Line(Vec3(x1, y1, z1), Vec3(x2, y2, z2), color, lineWidth, expiresAt, tag))
+    lines.add(Line(Vec3(x1, y1, z1), Vec3(x2, y2, z2), color, lineWidth, expiresAt, tag, forceRender))
   }
 
   fun addBox(
@@ -95,10 +98,11 @@ object OverlayRenderEngine {
     outline: Color?,
     lineWidth: Float = 1.5f,
     durationTicks: Int = 2,
-    tag: String? = null
+    tag: String? = null,
+    forceRender: Boolean = false
   ) {
     val expiresAt = level.gameTime + durationTicks
-    boxes.add(Box(minX, minY, minZ, maxX, maxY, maxZ, fill, outline, lineWidth, expiresAt, tag))
+    boxes.add(Box(minX, minY, minZ, maxX, maxY, maxZ, fill, outline, lineWidth, expiresAt, tag, forceRender))
   }
 
   fun highlightBlock(
@@ -221,7 +225,7 @@ object OverlayRenderEngine {
   }
 
   private fun renderBox(context: WorldRenderContext, box: Box) {
-    if (!FrustumUtils.isVisible(context.frustum, box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ)) {
+    if (!box.forceRender && !FrustumUtils.isVisible(context.frustum, box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ)) {
       return
     }
 
@@ -233,13 +237,13 @@ object OverlayRenderEngine {
   }
 
   private fun renderLine(context: WorldRenderContext, line: Line) {
-    if (!FrustumUtils.isVisible(
+    if (!line.forceRender && !FrustumUtils.isVisible(
         context.frustum,
         minOf(line.start.x, line.end.x),
         minOf(line.start.y, line.end.y),
         minOf(line.start.z, line.end.z),
         maxOf(line.start.x, line.end.x),
-        maxOf(line.start.y, line.end.y),
+        maxOf(line.start.y, line.end.y) + 1.0, // pad to avoid degenerate zero-height AABB for flat lines
         maxOf(line.start.z, line.end.z)
       )
     ) return

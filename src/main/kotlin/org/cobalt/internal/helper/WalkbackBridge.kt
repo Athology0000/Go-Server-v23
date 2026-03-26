@@ -9,5 +9,6 @@ package org.cobalt.internal.helper
  */
 object WalkbackBridge {
   var startWalkback: ((name: String, fromEnd: Int) -> Boolean)? = null
+  var stopWalkback: (() -> Unit)? = null
   var isRunning: (() -> Boolean)? = null
 }

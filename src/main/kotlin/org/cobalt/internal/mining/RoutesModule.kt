@@ -336,6 +336,7 @@ object RoutesModule : Module("Routes") {
     EventBus.register(this)
     EventBus.register(org.cobalt.internal.ui.hud.RoutePointPopup)
     org.cobalt.internal.helper.WalkbackBridge.startWalkback = ::loadAndStartWalkback
+    org.cobalt.internal.helper.WalkbackBridge.stopWalkback = { if (routeRunning) stopRoute("Walkback cancelled.") }
     org.cobalt.internal.helper.WalkbackBridge.isRunning = { routeRunning }
   }
 
@@ -383,7 +384,9 @@ object RoutesModule : Module("Routes") {
 
     if (action == RouteAction.WALK) {
       if (nativeActive()) {
-        NativePathfinder.tick()?.applyToPlayer()
+        val cmd = NativePathfinder.tick()
+        if (cmd != null) cmd.applyToPlayer()
+        else MovementManager.clearForcedMovement()  // PLANNING: clear stale movement flags (prevents jump spam)
         return
       }
       if (awaitingArrival) {
@@ -605,13 +608,12 @@ object RoutesModule : Module("Routes") {
     } ?: return false
     if (loaded.isEmpty()) return false
 
+    // Reverse the route so the player walks back toward the start (exit/camp).
+    // The route is recorded going in (camp → crypt); reversing it gives crypt → camp.
+    // fromEndOffset is ignored — nearest-point search on the reversed list is always correct.
     routePoints.clear()
-    routePoints.addAll(loaded)
-    routeIndex = if (fromEndOffset > 0) {
-      (loaded.size - fromEndOffset).coerceIn(0, loaded.size - 1)
-    } else {
-      findNearestPointIndex()
-    }
+    routePoints.addAll(loaded.reversed())
+    routeIndex = findNearestPointIndex()
     loopRoute.value = false  // walkback runs once — don't loop
     routeRunning = true
     resetRuntimeState()
@@ -1101,6 +1103,7 @@ object RoutesModule : Module("Routes") {
 
   private fun startWalk(target: BlockPos, completePointOnArrival: Boolean = true) {
     PathfindingModule.ensureEnabledForAutomation("routes")
+    NativePathfinder.stop()
     val resolved = resolveApproxTarget(target)
     if (resolved == null) {
       stopRoute("Route failed: no walkable target near point ${routeIndex + 1}.")

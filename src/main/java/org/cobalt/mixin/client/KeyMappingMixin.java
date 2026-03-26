@@ -53,11 +53,15 @@ public class KeyMappingMixin {
       return;
     }
     if (self == mc.options.keyAttack) {
-      cir.setReturnValue(MovementManager.hasForcedMovement && MovementManager.forcedAttack);
+      if (MovementManager.forcedActionsEnabled) {
+        cir.setReturnValue(MovementManager.hasForcedMovement && MovementManager.forcedAttack);
+      }
       return;
     }
     if (self == mc.options.keyUse) {
-      cir.setReturnValue(MovementManager.hasForcedMovement && MovementManager.forcedUse);
+      if (MovementManager.forcedActionsEnabled) {
+        cir.setReturnValue(MovementManager.hasForcedMovement && MovementManager.forcedUse);
+      }
       return;
     }
   }

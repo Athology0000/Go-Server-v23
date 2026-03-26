@@ -51,6 +51,10 @@ public class DarkModeRenderer {
     if (initialized) return;
     try {
       tintShader = new DarkTintShader();
+      if (tintShader == null || !tintShader.isValid()) {
+        tintShader = null;
+        return;
+      }
       createFullscreenQuad();
       initialized = true;
     } catch (Exception e) {
@@ -138,6 +142,24 @@ public class DarkModeRenderer {
       }
     }
 
+    int prevShaderProgram = 0;
+    int prevVAO = 0;
+    int prevActiveTexture = 0;
+    int prevBoundTexture = 0;
+    int prevBlendSrcRGB = 0;
+    int prevBlendDstRGB = 0;
+    int prevBlendSrcAlpha = 0;
+    int prevBlendDstAlpha = 0;
+    int prevBlendEquationRGB = 0;
+    int prevBlendEquationAlpha = 0;
+    boolean blendEnabled = false;
+    boolean depthTestEnabled = false;
+    boolean cullFaceEnabled = false;
+    boolean scissorTestEnabled = false;
+    boolean depthMaskEnabled = false;
+    int[] viewport = new int[4];
+    boolean stateCaptured = false;
+
     try {
       RenderTarget mainFramebuffer = mc.getMainRenderTarget();
       if (mainFramebuffer == null) {
@@ -165,24 +187,23 @@ public class DarkModeRenderer {
 
       ensureTempTexture(fbWidth, fbHeight);
 
-      int prevShaderProgram = GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM);
-      int prevVAO = GL11.glGetInteger(GL30.GL_VERTEX_ARRAY_BINDING);
-      int prevActiveTexture = GL11.glGetInteger(GL13.GL_ACTIVE_TEXTURE);
-      int prevBoundTexture = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
-      int prevBlendSrcRGB = GL11.glGetInteger(GL30.GL_BLEND_SRC_RGB);
-      int prevBlendDstRGB = GL11.glGetInteger(GL30.GL_BLEND_DST_RGB);
-      int prevBlendSrcAlpha = GL11.glGetInteger(GL30.GL_BLEND_SRC_ALPHA);
-      int prevBlendDstAlpha = GL11.glGetInteger(GL30.GL_BLEND_DST_ALPHA);
-      int prevBlendEquationRGB = GL11.glGetInteger(GL20.GL_BLEND_EQUATION_RGB);
-      int prevBlendEquationAlpha = GL11.glGetInteger(GL20.GL_BLEND_EQUATION_ALPHA);
-      boolean blendEnabled = GL11.glIsEnabled(GL11.GL_BLEND);
-      boolean depthTestEnabled = GL11.glIsEnabled(GL11.GL_DEPTH_TEST);
-      boolean cullFaceEnabled = GL11.glIsEnabled(GL11.GL_CULL_FACE);
-      boolean scissorTestEnabled = GL11.glIsEnabled(GL11.GL_SCISSOR_TEST);
-      boolean depthMaskEnabled = GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK);
-
-      int[] viewport = new int[4];
+      prevShaderProgram = GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM);
+      prevVAO = GL11.glGetInteger(GL30.GL_VERTEX_ARRAY_BINDING);
+      prevActiveTexture = GL11.glGetInteger(GL13.GL_ACTIVE_TEXTURE);
+      prevBoundTexture = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
+      prevBlendSrcRGB = GL11.glGetInteger(GL30.GL_BLEND_SRC_RGB);
+      prevBlendDstRGB = GL11.glGetInteger(GL30.GL_BLEND_DST_RGB);
+      prevBlendSrcAlpha = GL11.glGetInteger(GL30.GL_BLEND_SRC_ALPHA);
+      prevBlendDstAlpha = GL11.glGetInteger(GL30.GL_BLEND_DST_ALPHA);
+      prevBlendEquationRGB = GL11.glGetInteger(GL20.GL_BLEND_EQUATION_RGB);
+      prevBlendEquationAlpha = GL11.glGetInteger(GL20.GL_BLEND_EQUATION_ALPHA);
+      blendEnabled = GL11.glIsEnabled(GL11.GL_BLEND);
+      depthTestEnabled = GL11.glIsEnabled(GL11.GL_DEPTH_TEST);
+      cullFaceEnabled = GL11.glIsEnabled(GL11.GL_CULL_FACE);
+      scissorTestEnabled = GL11.glIsEnabled(GL11.GL_SCISSOR_TEST);
+      depthMaskEnabled = GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK);
       GL11.glGetIntegerv(GL11.GL_VIEWPORT, viewport);
+      stateCaptured = true;
       GL11.glViewport(0, 0, fbWidth, fbHeight);
 
       GL13.glActiveTexture(GL13.GL_TEXTURE0);
@@ -200,7 +221,13 @@ public class DarkModeRenderer {
       GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
       GL20.glBlendEquationSeparate(GL20.GL_FUNC_ADD, GL20.GL_FUNC_ADD);
 
-      tintShader.use();
+      if (!tintShader.use()) {
+        System.err.println("[DarkModeRenderer] Shader program failed to bind; reinitializing.");
+        tintShader.cleanup();
+        tintShader = null;
+        initialized = false;
+        return;
+      }
       tintShader.setTexture(0);
       tintShader.setExcludeViewmodel(false);
       tintShader.setDepthThreshold(depthThreshold);
@@ -216,6 +243,13 @@ public class DarkModeRenderer {
       GL30.glBindVertexArray(quadVAO);
       GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 6);
       GL30.glBindVertexArray(0);
+    } catch (Exception e) {
+      System.err.println("[DarkModeRenderer] Error during rendering: " + e.getMessage());
+      e.printStackTrace();
+    } finally {
+      if (!stateCaptured) {
+        return;
+      }
 
       GL20.glUseProgram(prevShaderProgram);
       GL30.glBindVertexArray(prevVAO);
@@ -230,9 +264,6 @@ public class DarkModeRenderer {
       if (scissorTestEnabled) GL11.glEnable(GL11.GL_SCISSOR_TEST);
       GL11.glDepthMask(depthMaskEnabled);
       GL11.glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
-    } catch (Exception e) {
-      System.err.println("[DarkModeRenderer] Error during rendering: " + e.getMessage());
-      e.printStackTrace();
     }
   }
 

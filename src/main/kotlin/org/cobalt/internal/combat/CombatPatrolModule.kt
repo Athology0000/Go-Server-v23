@@ -4,13 +4,17 @@ import com.google.gson.GsonBuilder
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import java.awt.Color
 import java.io.File
 import net.minecraft.client.Minecraft
 import net.minecraft.core.BlockPos
 import net.minecraft.world.entity.player.Player
+import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.Vec3
+import org.cobalt.internal.ui.hud.PatrolPointPopup
+import org.cobalt.api.util.render.Render3D
 import org.cobalt.api.event.annotation.SubscribeEvent
 import org.cobalt.api.event.impl.client.MouseEvent
 import org.cobalt.api.event.impl.client.TickEvent
@@ -65,6 +69,13 @@ object CombatPatrolModule : Module("Combat Patrol") {
     private var killZoneClearTicks = 0
     private var killZoneClearedThisTick = false
 
+    // True once the pathfinder has been seen PLANNING or EXECUTING for the current leg.
+    // Used together with proximity check to filter stale ARRIVED status.
+    private var navPathActivated = false
+
+    // Pending block position from the last right-click, waiting for type selection in PatrolPointPopup.
+    private var pendingClickPos: BlockPos? = null
+
     // ── warp sub-machine state ─────────────────────────────────────────────
     private var warpStage = 0
     private var warpTargetPoint: CombatPatrolPoint? = null
@@ -78,7 +89,7 @@ object CombatPatrolModule : Module("Combat Patrol") {
 
     val enabled = CheckboxSetting("Enabled", "Enable the Combat Patrol module.", false)
 
-    private val routeName = TextSetting("Route Name", "Name used for save/load.", "default")
+    internal val routeName = TextSetting("Route Name", "Name used for save/load.", "default")
     private val pointsInfo = InfoSetting("Points", "Number of recorded points.", InfoType.INFO)
     private val statusInfo = InfoSetting("Status", "Current patrol state.", InfoType.INFO)
     private val recordOnRightClick = CheckboxSetting("Record on Right Click", "Append a point when you right-click a block.", false)
@@ -113,6 +124,7 @@ object CombatPatrolModule : Module("Combat Patrol") {
         )
         statusInfo.value = "Idle"
         org.cobalt.api.event.EventBus.register(this)
+        org.cobalt.api.event.EventBus.register(PatrolPointPopup)
     }
 
     @SubscribeEvent
@@ -130,18 +142,61 @@ object CombatPatrolModule : Module("Combat Patrol") {
 
         when (patrolState) {
             PatrolState.NAVIGATING -> {
-                NativePathfinder.tick()?.applyToPlayer()
+                val cmd = NativePathfinder.tick()
+                if (cmd != null) cmd.applyToPlayer()
+                else MovementManager.clearForcedMovement()  // PLANNING: clear stale flags (prevents jump spam)
+                // Only mark activated once the pathfinder is genuinely executing
+                // (tick() returns non-null exclusively for EXECUTING status).
+                // PLANNING status does NOT count — the native side can transition
+                // PLANNING → ARRIVED in one native update without the player moving.
+                if (cmd != null) navPathActivated = true
+
                 val s = NativePathfinder.status
                 if (s == PathStatus.ARRIVED || s == PathStatus.FAILED) {
                     val current = patrolPoints.getOrNull(routeIndex)
-                    if (s == PathStatus.FAILED) ChatUtils.sendMessage("Patrol: pathfinding failed at point ${routeIndex + 1}, skipping.")
-                    if (current?.type == CombatPatrolPointType.KILL) {
-                        NativePathfinder.stop()
-                        patrolOwnsPathfinder = false
-                        patrolState = PatrolState.AT_KILL_ZONE
-                        killZoneClearTicks = 0
+                    val player = mc.player
+                    val distSq = if (player != null && current != null) {
+                        val dx = player.x - (current.x + 0.5)
+                        val dy = player.y - current.y.toDouble()
+                        val dz = player.z - (current.z + 0.5)
+                        dx * dx + dy * dy + dz * dz
+                    } else Double.MAX_VALUE
+
+                    // Accept arrival if:
+                    //  • FAILED — always skip
+                    //  • navPathActivated — player actually moved along this path leg
+                    //  • distSq <= trivial threshold — player was already at the point
+                    val confirmedArrival = s == PathStatus.FAILED
+                        || navPathActivated
+                        || distSq <= NAV_TRIVIAL_DIST_SQ
+
+                    if (confirmedArrival) {
+                        navPathActivated = false
+                        if (s == PathStatus.FAILED) ChatUtils.sendMessage("Patrol: pathfinding failed at point ${routeIndex + 1}, skipping.")
+                        if (current?.type == CombatPatrolPointType.KILL) {
+                            NativePathfinder.stop()
+                            patrolOwnsPathfinder = false
+                            patrolState = PatrolState.AT_KILL_ZONE
+                            killZoneClearTicks = 0
+                        } else {
+                            advanceAndNavigate()
+                        }
                     } else {
-                        advanceAndNavigate()
+                        // Stale ARRIVED from the previous path leg — the native side hasn't
+                        // started planning our new target yet.  Re-issue setTarget so the
+                        // engine resets to PLANNING; on the next tick tick() will eventually
+                        // return non-null and navPathActivated will be set correctly.
+                        if (current != null) {
+                            val level = mc.level
+                            if (level != null) {
+                                val resolved = MinecraftPathingRules.resolveTarget(
+                                    level, BlockPos(current.x, current.y, current.z)
+                                ) ?: BlockPos(current.x, current.y, current.z)
+                                NativePathfinder.setTarget(
+                                    resolved.x + 0.5, resolved.y.toDouble(), resolved.z + 0.5
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -170,24 +225,77 @@ object CombatPatrolModule : Module("Combat Patrol") {
     }
 
     @SubscribeEvent
-    fun onRender(@Suppress("UNUSED_PARAMETER") event: WorldRenderEvent.Last) {
-        if (!patrolRunning || patrolState != PatrolState.WARPING) return
-        if (mc.screen != null) return
-        val player = mc.player ?: return
-        val level = mc.level ?: return
-        handleWarp(player, level)
+    fun onRender(event: WorldRenderEvent.Last) {
+        // Warp sub-machine — frame-driven
+        if (patrolRunning && patrolState == PatrolState.WARPING && mc.screen == null) {
+            val player = mc.player
+            val level = mc.level
+            if (player != null && level != null) handleWarp(player, level)
+        }
+        // Route visualization — always shown while module is enabled
+        if (enabled.value && patrolPoints.isNotEmpty()) renderRoute(event)
+    }
+
+    private fun renderRoute(event: WorldRenderEvent.Last) {
+        val points = patrolPoints
+        for (i in points.indices) {
+            val p = points[i]
+            val isActive = patrolRunning && i == routeIndex
+            val inflate = if (isActive) 0.07 else 0.02
+            val box = AABB(
+                p.x - inflate, p.y - inflate, p.z - inflate,
+                p.x + 1.0 + inflate, p.y + 1.0 + inflate, p.z + 1.0 + inflate
+            )
+            val color = when (p.type) {
+                CombatPatrolPointType.WALK -> if (isActive) Color(100, 220, 255, 255) else Color(70, 150, 255, 180)
+                CombatPatrolPointType.WARP -> if (isActive) Color(220, 110, 255, 255) else Color(170, 70, 220, 180)
+                CombatPatrolPointType.KILL -> if (isActive) Color(255, 80, 80, 255) else Color(210, 50, 50, 180)
+            }
+            Render3D.drawBox(event.context, box, color, esp = true)
+
+            // Kill zone radius preview — wireframe sphere (3 rings)
+            if (p.type == CombatPatrolPointType.KILL) {
+                val zoneColor = if (isActive) Color(255, 80, 80, 200) else Color(210, 50, 50, 140)
+                drawSphereRings(event, Vec3(p.x + 0.5, p.y + 0.5, p.z + 0.5), killZoneRadius.value, zoneColor)
+            }
+
+            // Line to next point (skip last→first when loop is off)
+            if (i < points.size - 1 || loopRoute.value) {
+                val next = points[(i + 1) % points.size]
+                val lineColor = if (isActive) Color(255, 255, 255, 200) else Color(190, 190, 190, 120)
+                Render3D.drawLine(
+                    event.context,
+                    Vec3(p.x + 0.5, p.y + 0.5, p.z + 0.5),
+                    Vec3(next.x + 0.5, next.y + 0.5, next.z + 0.5),
+                    lineColor, esp = true, thickness = 1.5f
+                )
+            }
+        }
     }
 
     @SubscribeEvent
-    fun onRightClick(@Suppress("UNUSED_PARAMETER") event: MouseEvent.RightClick) {
+    fun onRightClick(event: MouseEvent.RightClick) {
         if (!enabled.value || !recordOnRightClick.value) return
         val hit = mc.hitResult
         if (hit is BlockHitResult && hit.type == HitResult.Type.BLOCK) {
-            val pos = hit.blockPos
-            patrolPoints.add(CombatPatrolPoint(pos.x, pos.y, pos.z, currentPointType()))
-            ChatUtils.sendMessage("Patrol point recorded at ${pos.x} ${pos.y} ${pos.z} (${currentPointType().id}).")
-            updatePointsInfo()
+            event.setCancelled(true)
+            pendingClickPos = hit.blockPos
+            PatrolPointPopup.open()
         }
+    }
+
+    /** Called by PatrolPointPopup when the user picks a type. */
+    fun applyPickedType(type: CombatPatrolPointType) {
+        val pos = pendingClickPos ?: return
+        pendingClickPos = null
+        patrolPoints.add(CombatPatrolPoint(pos.x, pos.y, pos.z, type))
+        ChatUtils.sendMessage("Patrol point added at ${pos.x} ${pos.y} ${pos.z} (${type.id}).")
+        updatePointsInfo()
+    }
+
+    /** Called by PatrolPointPopup when the user cancels. */
+    fun cancelPendingPick() {
+        pendingClickPos = null
     }
 
     private fun currentPointType() = when (pointType.value) {
@@ -213,7 +321,7 @@ object CombatPatrolModule : Module("Combat Patrol") {
 
     private fun routeFile(name: String) = File(patrolDir, "$name.json")
 
-    private fun saveRoute() {
+    internal fun saveRoute() {
         val name = routeName.value.trim()
         if (name.isEmpty()) { ChatUtils.sendMessage("Route name is empty."); return }
         if (!isValidName(name)) { ChatUtils.sendMessage("Invalid route name characters."); return }
@@ -231,7 +339,7 @@ object CombatPatrolModule : Module("Combat Patrol") {
         ChatUtils.sendMessage("Saved patrol route \"$name\" (${patrolPoints.size} points).")
     }
 
-    private fun loadRoute() {
+    internal fun loadRoute() {
         val name = routeName.value.trim()
         if (name.isEmpty()) { ChatUtils.sendMessage("Route name is empty."); return }
         if (!isValidName(name)) { ChatUtils.sendMessage("Invalid route name characters."); return }
@@ -312,6 +420,7 @@ object CombatPatrolModule : Module("Combat Patrol") {
                         ?: BlockPos(point.x, point.y, point.z)
                 } else BlockPos(point.x, point.y, point.z)
                 NativePathfinder.setTarget(resolved.x + 0.5, resolved.y.toDouble(), resolved.z + 0.5)
+                navPathActivated = false
                 patrolOwnsPathfinder = true
                 patrolState = PatrolState.NAVIGATING
             }
@@ -682,7 +791,38 @@ object CombatPatrolModule : Module("Combat Patrol") {
         )
     }
 
+    // ── render helpers ─────────────────────────────────────────────────────
+
+    private fun drawSphereRings(event: WorldRenderEvent.Last, center: Vec3, radius: Double, color: Color) {
+        val segments = 40
+        for (i in 0 until segments) {
+            val a1 = i * TWO_PI / segments
+            val a2 = (i + 1) * TWO_PI / segments
+            val c1 = kotlin.math.cos(a1); val s1 = kotlin.math.sin(a1)
+            val c2 = kotlin.math.cos(a2); val s2 = kotlin.math.sin(a2)
+            // horizontal ring (XZ)
+            Render3D.drawLine(event.context,
+                Vec3(center.x + radius * c1, center.y, center.z + radius * s1),
+                Vec3(center.x + radius * c2, center.y, center.z + radius * s2),
+                color, esp = true, thickness = 1.2f)
+            // vertical ring facing Z (XY)
+            Render3D.drawLine(event.context,
+                Vec3(center.x + radius * c1, center.y + radius * s1, center.z),
+                Vec3(center.x + radius * c2, center.y + radius * s2, center.z),
+                color, esp = true, thickness = 1.2f)
+            // vertical ring facing X (YZ)
+            Render3D.drawLine(event.context,
+                Vec3(center.x, center.y + radius * c1, center.z + radius * s1),
+                Vec3(center.x, center.y + radius * c2, center.z + radius * s2),
+                color, esp = true, thickness = 1.2f)
+        }
+    }
+
     // ── warp constants ─────────────────────────────────────────────────────
+    private val TWO_PI = kotlin.math.PI * 2.0
+    // Player must be within this many blocks (sq) for "already at destination" trivial arrival.
+    // Kept deliberately small (2 blocks) so nearby-but-not-there points don't trigger false advance.
+    private const val NAV_TRIVIAL_DIST_SQ = 2.0 * 2.0
     private const val WARP_AIM_TOLERANCE = 6.0
     private const val WARP_LOOK_YAW_SPEED_DPS = 360.0
     private const val WARP_LOOK_PITCH_SPEED_DPS = 300.0

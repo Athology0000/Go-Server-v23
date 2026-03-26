@@ -67,6 +67,12 @@ object PathfindingModule : Module("Pathfinding") {
     InfoType.INFO
   )
 
+  private val statusInfo = InfoSetting(
+    "Pathfinder Status",
+    "Live status of the native pathfinder engine.",
+    InfoType.INFO
+  )
+
   val targetX = TextSetting("Target X", "Target X coordinate.", "0")
   val targetY = TextSetting("Target Y", "Target Y coordinate.", "0")
   val targetZ = TextSetting("Target Z", "Target Z coordinate.", "0")
@@ -279,6 +285,7 @@ object PathfindingModule : Module("Pathfinding") {
     addSetting(
       enabled,
       info,
+      statusInfo,
       targetX,
       targetY,
       targetZ,
@@ -326,9 +333,14 @@ object PathfindingModule : Module("Pathfinding") {
     // Update live info settings
     routeCountInfo.value = "${PatrolWaypointStore.routeWaypoints.size} points"
     killCountInfo.value  = "${PatrolWaypointStore.killWaypoints.size} points"
+    statusInfo.value = if (!NativePathfinder.isInitialized) "Not initialized" else {
+      val s = NativePathfinder.status
+      if (!moduleOwnsPath) "${s.name} (idle)" else s.name
+    }
 
-    // Patrol state machine — runs independently of moduleOwnsPath
-    if (patrolState != PatrolState.IDLE) {
+    // Patrol state machine — runs independently of moduleOwnsPath,
+    // but must yield when CombatPatrolModule owns the native pathfinder.
+    if (patrolState != PatrolState.IDLE && !org.cobalt.internal.combat.CombatPatrolModule.patrolOwnsPathfinder) {
       when (patrolState) {
         PatrolState.NAVIGATING -> {
           val nativeStatus = NativePathfinder.status
@@ -346,7 +358,7 @@ object PathfindingModule : Module("Pathfinding") {
           }
         }
         PatrolState.AT_KILL -> {
-          if (dwellTicksRemaining-- <= 0) {
+          if (--dwellTicksRemaining <= 0) {
             val kills = PatrolWaypointStore.killWaypoints
             val next = kills.filter { it != currentKillWp }
             if (next.isEmpty()) {
@@ -380,6 +392,9 @@ object PathfindingModule : Module("Pathfinding") {
       if (s == PathStatus.IDLE || s == PathStatus.ARRIVED || s == PathStatus.FAILED) {
         moduleOwnsPath = false
         MovementManager.setMovementLock(false)
+      } else {
+        // PLANNING/REPLANNING: no movement command yet — clear stale flags to prevent jump spam
+        MovementManager.clearForcedMovement()
       }
     }
   }
@@ -390,16 +405,20 @@ object PathfindingModule : Module("Pathfinding") {
     val player = mc.player ?: return
     val level  = mc.level  ?: return
 
-    // Head-direction ray from eye position along crosshair
+    // Head-direction ray — only while pathfinder is actively navigating
     OverlayRenderEngine.clearTag("head-ray")
-    val eye  = player.getEyePosition()
-    val look = player.getLookAngle()
-    OverlayRenderEngine.addLine(
-      level,
-      eye.x, eye.y, eye.z,
-      eye.x + look.x * 5.0, eye.y + look.y * 5.0, eye.z + look.z * 5.0,
-      COLOR_HEAD_RAY, 1.5f, durationTicks = 1, tag = "head-ray"
-    )
+    val pfStatus = NativePathfinder.status
+    if (pfStatus == PathStatus.EXECUTING || pfStatus == PathStatus.REPLANNING ||
+        pfStatus == PathStatus.RECOVERING) {
+      val eye  = player.getEyePosition()
+      val look = player.getLookAngle()
+      OverlayRenderEngine.addLine(
+        level,
+        eye.x, eye.y, eye.z,
+        eye.x + look.x * 5.0, eye.y + look.y * 5.0, eye.z + look.z * 5.0,
+        COLOR_HEAD_RAY, 1.5f, durationTicks = 1, tag = "head-ray"
+      )
+    }
 
     // Spline path rendering — rebuild only when path nodes change
     val nodes = NativePathfinder.cachedPathNodes

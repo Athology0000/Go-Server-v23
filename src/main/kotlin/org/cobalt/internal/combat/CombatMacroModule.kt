@@ -24,6 +24,7 @@ import org.cobalt.api.event.impl.client.TickEvent
 import org.cobalt.api.event.impl.render.WorldRenderEvent
 import org.cobalt.api.module.Module
 import org.cobalt.api.module.setting.inGroup
+import org.cobalt.api.module.setting.impl.ActionSetting
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.InfoSetting
 import org.cobalt.api.module.setting.impl.InfoType
@@ -45,7 +46,6 @@ import org.cobalt.api.pathfinder.jni.NativePathfinder
 import org.cobalt.api.pathfinder.jni.PathStatus
 import org.cobalt.api.util.player.MovementManager
 import org.cobalt.internal.pathfinding.PathfindingModule
-import org.cobalt.internal.pathfinding.PatrolWaypointStore
 import org.cobalt.internal.helper.WalkbackBridge
 import org.cobalt.internal.rotation.RotationsModule
 
@@ -188,6 +188,28 @@ object CombatMacroModule : Module("Combat Macro") {
     "Route name to follow back to farming area after boss kill (if Auto Warp is off). Leave blank to skip.",
     ""
   )
+
+  // ── Patrol settings (mirror of Combat Patrol module, settable from slayer tab) ───────────────
+  private val patrolRouteNameProxy = TextSetting(
+    "Patrol Route",
+    "Patrol route name. Shared with the Combat Patrol module.",
+    CombatPatrolModule.routeName.value
+  )
+  private val patrolLoadAction = ActionSetting("Load Patrol Route", "Load the patrol route by name.", "Load") {
+    CombatPatrolModule.routeName.value = patrolRouteNameProxy.value
+    CombatPatrolModule.loadRoute()
+  }
+  private val patrolSaveAction = ActionSetting("Save Patrol Route", "Save the current patrol route.", "Save") {
+    CombatPatrolModule.routeName.value = patrolRouteNameProxy.value
+    CombatPatrolModule.saveRoute()
+  }
+  private val patrolStartAction = ActionSetting("Start Patrol", "Start patrol immediately.", "Start") {
+    CombatPatrolModule.routeName.value = patrolRouteNameProxy.value
+    CombatPatrolModule.startPatrol()
+  }
+  private val patrolStopAction = ActionSetting("Stop Patrol", "Stop the running patrol.", "Stop") {
+    CombatPatrolModule.stopPatrol()
+  }
 
   private val searchRange = SliderSetting(
     "Search Range",
@@ -425,7 +447,6 @@ object CombatMacroModule : Module("Combat Macro") {
     enabled.value = false
   }
 
-  private var cryptPatrolIndex = -1  // -1 = uninitialized, resolved to nearest on first use
   private var lastTargetPos: BlockPos? = null
   private var lastMoveX = 0.0
   private var lastMoveY = 0.0
@@ -463,8 +484,10 @@ object CombatMacroModule : Module("Combat Macro") {
   private var slayerDetectStartTick = -1L
   private var slayerNeedsQuestClaim = false
   private var slayerNeedsWalkback = false
-  private var slayerWalkbackJustFarm = false  // true = walkback is a walk-IN after quest buy, not post-boss
+  private var slayerWalkbackJustFarm = false  // true = walkback is walk-IN to farm area (skip quest restart)
   private var slayerWalkInDelayUntilTick = -1L  // wait for warp to finish before starting walkin route
+  private var slayerDeathRespawnPending = false  // player died; trigger walkback once they respawn
+  private var lastKnownLevel: net.minecraft.client.multiplayer.ClientLevel? = null  // server-switch detection
   private var slayerBossLastPos: net.minecraft.world.phys.Vec3? = null
   private var slayerClaimStartTick = -1L
   private var slayerClaimLastClickTick = -1L
@@ -496,6 +519,11 @@ object CombatMacroModule : Module("Combat Macro") {
       slayerAutoWarp,
       slayerLocation,
       slayerWalkbackRoute,
+      patrolRouteNameProxy,
+      patrolLoadAction,
+      patrolSaveAction,
+      patrolStartAction,
+      patrolStopAction,
       searchRange,
       minCps,
       maxCps,
@@ -556,6 +584,12 @@ object CombatMacroModule : Module("Combat Macro") {
     slayerLocation.inGroup(TAB_SLAYER_SETTINGS_GROUP)
     slayerWalkbackRoute.inGroup(TAB_SLAYER_SETTINGS_GROUP)
 
+    patrolRouteNameProxy.inGroup(TAB_PATROL_GROUP)
+    patrolLoadAction.inGroup(TAB_PATROL_GROUP)
+    patrolSaveAction.inGroup(TAB_PATROL_GROUP)
+    patrolStartAction.inGroup(TAB_PATROL_GROUP)
+    patrolStopAction.inGroup(TAB_PATROL_GROUP)
+
     oneTapMode.inGroup(TAB_COMBAT_GROUP)
     autoHeal.inGroup(TAB_AUTO_ITEMS_GROUP)
     autoWandOfAtonement.inGroup(TAB_AUTO_ITEMS_GROUP)
@@ -568,6 +602,16 @@ object CombatMacroModule : Module("Combat Macro") {
 
   @SubscribeEvent
   fun onTick(@Suppress("UNUSED_PARAMETER") event: TickEvent.Start) {
+    // Server-switch detection: if level instance changes while macro is active, stop everything.
+    val currentLevel = mc.level
+    if (currentLevel !== lastKnownLevel) {
+      if (lastKnownLevel != null && (enabled.value || slayerModeEnabled)) {
+        stopMacro()
+        ChatUtils.sendMessage("Combat macro stopped: server change detected.")
+      }
+      lastKnownLevel = currentLevel
+    }
+
     // Release heal key and restore slot from previous heal use
     if (pendingHealRelease) {
       mc.options.keyUse?.setDown(false)
@@ -584,8 +628,10 @@ object CombatMacroModule : Module("Combat Macro") {
       startedPath = false
       lastTargetPos = null
     }
-    if (startedPath && nativeActive() && !CombatPatrolModule.patrolOwnsPathfinder) {
-      NativePathfinder.tick()?.applyToPlayer()
+    if (startedPath && nativeActive() && !CombatPatrolModule.patrolOwnsPathfinder && !slayerNeedsWalkback) {
+      val cmd = NativePathfinder.tick()
+      if (cmd != null) cmd.applyToPlayer()
+      else MovementManager.clearForcedMovement()  // PLANNING: clear stale flags (prevents jump spam)
     }
     syncLearnedWhitelistFromSetting()
     if (cryptZombieSlayer.value && !slayerModeEnabled && enabled.value) {
@@ -599,7 +645,7 @@ object CombatMacroModule : Module("Combat Macro") {
       slayerLastBatphoneAttemptTick = -1L
       slayerLastBatphoneUseTick = -1L
       slayerLastGuiActionTick = -1L
-      // If enabling at hub (not already in the crypt), walk in immediately.
+      // If not already in the farming area, navigate there via walkback route.
       if (slayerLocation.value == 1) {
         val initPos = mc.player?.blockPosition()
         val alreadyInCrypt = initPos != null && CRYPT_PATROL_WAYPOINTS.any { wp ->
@@ -607,14 +653,20 @@ object CombatMacroModule : Module("Combat Macro") {
           dx * dx + dz * dz < CRYPT_PROXIMITY_RANGE_SQ
         }
         if (!alreadyInCrypt) {
-          // Warp hub first so the walkback route starts from the correct origin
-          nativeStop()
-          mc.player?.connection?.sendCommand("warp hub")
           slayerEnteredCrypt = false
-          slayerWalkInDelayUntilTick = (mc.level?.gameTime ?: 0L) + SLAYER_WALKIN_WARP_DELAY_TICKS
+          triggerWalkToFarmArea(justFarm = true)
         } else {
           slayerEnteredCrypt = true
         }
+      } else if (slayerLocation.value == 0 && slayerWalkbackRoute.value.isNotBlank()
+          && CombatPatrolModule.patrolPoints.isNotEmpty()) {
+        // Graveyard: check proximity to any patrol point.
+        val initPos = mc.player?.blockPosition()
+        val nearFarm = initPos == null || CombatPatrolModule.patrolPoints.any { p ->
+          val dx = p.x - initPos.x; val dz = p.z - initPos.z
+          dx * dx + dz * dz < GRAVEYARD_PROXIMITY_RANGE_SQ
+        }
+        if (!nearFarm) triggerWalkToFarmArea(justFarm = true)
       }
     }
     if (!cryptZombieSlayer.value) {
@@ -640,29 +692,39 @@ object CombatMacroModule : Module("Combat Macro") {
       if (slayerNeedsQuestClaim) {
         if (handleClaimSlayerQuest(player, level)) return
       }
-      // Crypt walk-in: after quest purchase, warp hub then walk the cryptwalkback route in.
+      // Legacy hub-warp delay — drained on upgrade; can be removed once all users have new config.
       if (slayerWalkInDelayUntilTick >= 0L) {
         if (level.gameTime < slayerWalkInDelayUntilTick) {
           slayerStatus.value = "Warping to Hub..."
           return
         }
         slayerWalkInDelayUntilTick = -1L
-        val started = WalkbackBridge.startWalkback?.invoke(CRYPT_WALKBACK_ROUTE_NAME, 0) ?: false
-        if (started) {
-          slayerNeedsWalkback = true
-          slayerWalkbackJustFarm = true
-        }
+        triggerWalkToFarmArea(justFarm = true)
       }
       if (slayerNeedsWalkback) {
+        // Walkback owns the pathfinder — prevent CombatMacroModule from double-ticking it.
+        startedPath = false
+        lastTargetPos = null
         if (WalkbackBridge.isRunning?.invoke() == true) {
-          slayerStatus.value = if (slayerWalkbackJustFarm) "Walking to Crypt..." else "Walking Back..."
-          return
+          // Boss spawned during walkback — interrupt immediately and engage.
+          if (slayerBossActive) {
+            WalkbackBridge.stopWalkback?.invoke()
+            slayerNeedsWalkback = false
+            startAreaOrigin = null
+            slayerStatus.value = "Boss! Engaging..."
+            // fall through to combat resolution below
+          } else {
+            slayerStatus.value = if (slayerWalkbackJustFarm) "Walking to Farm..." else "Walking Back..."
+            return
+          }
         } else {
           slayerNeedsWalkback = false
           startAreaOrigin = null
           if (slayerWalkbackJustFarm) {
             slayerWalkbackJustFarm = false
-            cryptPatrolIndex = -1  // farm immediately from nearest patrol point
+            // Walkback complete — ensure quest detection runs for fresh quest
+            slayerAutoDetected = false
+            slayerDetectStartTick = mc.level?.gameTime ?: -1L
           } else {
             slayerNeedsQuestRestart = true
           }
@@ -690,8 +752,25 @@ object CombatMacroModule : Module("Combat Macro") {
     }
 
     if (player.isDeadOrDying || player.health <= 0f) {
-      stopMacro()
+      if (cryptZombieSlayer.value && !slayerDeathRespawnPending) {
+        // Slayer: don't stop — queue walkback for when the player respawns.
+        slayerDeathRespawnPending = true
+        if (CombatPatrolModule.isPatrolRunning) CombatPatrolModule.stopPatrol()
+        if (PathfindingModule.isPatrolActive) PathfindingModule.stopPatrol()
+        if (slayerNeedsWalkback) WalkbackBridge.stopWalkback?.invoke()
+        slayerNeedsWalkback = false
+        nativeStop()
+        slayerStatus.value = "Died — respawning..."
+      } else if (!cryptZombieSlayer.value) {
+        stopMacro()
+      }
       return
+    }
+    // Respawn after slayer death: trigger walkback so player returns to farm area.
+    if (slayerDeathRespawnPending) {
+      slayerDeathRespawnPending = false
+      startAreaOrigin = null
+      triggerWalkToFarmArea(justFarm = false)
     }
 
     if (stayNearStart.value && startAreaOrigin == null) {
@@ -721,13 +800,11 @@ object CombatMacroModule : Module("Combat Macro") {
       if (inCrypt) {
         slayerEnteredCrypt = true   // confirmed inside — enable recovery trigger
       } else if (slayerEnteredCrypt) {
-        // Was inside the crypt but now isn't — recover via hub warp
-        nativeStop()
-        (player as? net.minecraft.client.player.LocalPlayer)?.connection?.sendCommand("warp hub")
-        ChatUtils.sendMessage("Combat macro: outside crypt, warping hub for walkback.")
+        // Was inside the crypt but now isn't — navigate back via walkback route.
+        ChatUtils.sendMessage("Combat macro: outside crypt, walking back.")
         startAreaOrigin = null
         slayerEnteredCrypt = false
-        slayerWalkInDelayUntilTick = level.gameTime + SLAYER_WALKIN_WARP_DELAY_TICKS
+        triggerWalkToFarmArea(justFarm = false)
         return
       }
       // If !inCrypt && !slayerEnteredCrypt: still making initial walk-in, do nothing here
@@ -759,38 +836,10 @@ object CombatMacroModule : Module("Combat Macro") {
           return
         }
       }
-      // Crypt patrol: sweep waypoints in order to find ghouls when none are nearby.
-      if (cryptZombieSlayer.value && slayerLocation.value == 1 && !slayerNeedsQuestRestart) {
-        // If kill waypoints are recorded, delegate to the kill-patrol system (random route-guided patrol).
-        if (PatrolWaypointStore.killWaypoints.size >= 2) {
-          if (!PathfindingModule.isPatrolActive) {
-            PathfindingModule.startPatrol()
-          }
-          startedPath = false   // PathfindingModule owns the tick loop while patrol runs
-          lastTargetPos = null
-          currentTargetId = null
-          return
-        }
-        // Fall back to sequential hardcoded crypt patrol when no kill waypoints are configured.
-        if (cryptPatrolIndex < 0) cryptPatrolIndex = findNearestCryptPatrolIndex()
-        val dest = CRYPT_PATROL_WAYPOINTS[cryptPatrolIndex]
-        val dx = dest.x - player.x
-        val dy = dest.y - player.y
-        val dz = dest.z - player.z
-        if (dx * dx + dy * dy + dz * dz < 9.0) {
-          cryptPatrolIndex = (cryptPatrolIndex + 1) % CRYPT_PATROL_WAYPOINTS.size
-        }
-        if (!nativeActive() || lastTargetPos != dest) {
-          if (level.gameTime - lastPathStartTick >= MIN_PATH_START_INTERVAL_TICKS) {
-            lastPathStartTick = level.gameTime
-            NativePathfinder.setTarget(dest.x + 0.5, dest.y.toDouble(), dest.z + 0.5)
-            lastTargetPos = dest; startedPath = true
-          }
-        }
-        currentTargetId = null
-        return
+      // No target — hand off to CombatPatrolModule if patrol points are configured.
+      if (CombatPatrolModule.patrolPoints.isNotEmpty() && !CombatPatrolModule.isPatrolRunning) {
+        CombatPatrolModule.startPatrol()
       }
-
       if (CombatPatrolModule.isPatrolRunning) {
         when (CombatPatrolModule.patrolState) {
           CombatPatrolModule.PatrolState.COMBAT_INTERRUPT -> CombatPatrolModule.onCombatResume()
@@ -1171,13 +1220,10 @@ object CombatMacroModule : Module("Combat Macro") {
             dx * dx + dz * dz < CRYPT_PROXIMITY_RANGE_SQ
           }
           if (alreadyInCrypt) {
-            cryptPatrolIndex = -1  // already in crypt, resume patrol from nearest
             slayerEnteredCrypt = true
           } else {
-            nativeStop()
-            player.connection?.sendCommand("warp hub")
             slayerEnteredCrypt = false
-            slayerWalkInDelayUntilTick = nowTick + SLAYER_WALKIN_WARP_DELAY_TICKS
+            triggerWalkToFarmArea(justFarm = true)
           }
         } else if (slayerAutoWarp.value) {
           val warp = slayerWarpCommand
@@ -1213,7 +1259,6 @@ object CombatMacroModule : Module("Combat Macro") {
           return
         }
       }
-      cryptPatrolIndex = -1
       slayerNeedsQuestRestart = true
       return
     }
@@ -1335,9 +1380,23 @@ object CombatMacroModule : Module("Combat Macro") {
 
   @SubscribeEvent
   fun onChatReceive(event: ChatEvent.Receive) {
-    if (!cryptZombieSlayer.value) return
     val raw = event.message ?: return
     val msg = ChatFormatting.stripFormatting(raw)?.lowercase(Locale.ROOT)?.trim() ?: return
+
+    if (enabled.value) {
+      // Player name mentioned in chat → play system alert sound.
+      val ign = mc.player?.gameProfile?.name?.lowercase(Locale.ROOT) ?: ""
+      if (ign.isNotEmpty() && msg.contains(ign)) {
+        java.awt.Toolkit.getDefaultToolkit().beep()
+      }
+      // Evacuated from hub or moved to different server → walk back to farm area.
+      if (msg.contains("evacuated from") || msg.contains("moved to a different server")) {
+        triggerWalkToFarmArea(justFarm = false)
+        return
+      }
+    }
+
+    if (!cryptZombieSlayer.value) return
 
     if (SLAYER_QUEST_READY_CHAT_KEYWORDS.any { msg.contains(it) }) {
       slayerQuestReady = true
@@ -1996,16 +2055,15 @@ object CombatMacroModule : Module("Combat Macro") {
 
     stuckRepathCount = 0
     if (warpOnStuck.value) {
-      nativeStop()
-      (player as? LocalPlayer)?.connection?.sendCommand("warp hub")
-      if (cryptZombieSlayer.value && slayerLocation.value == 1) {
-        // Crypt slayer: warp hub then walkback instead of stopping the macro
-        ChatUtils.sendMessage("Combat macro stuck. Warping hub for walkback.")
+      if (cryptZombieSlayer.value) {
+        ChatUtils.sendMessage("Combat macro stuck. Triggering walkback.")
         startAreaOrigin = null
         stuckTicks = 0
         slayerEnteredCrypt = false
-        slayerWalkInDelayUntilTick = level.gameTime + SLAYER_WALKIN_WARP_DELAY_TICKS
+        triggerWalkToFarmArea(justFarm = false)
       } else {
+        nativeStop()
+        (player as? LocalPlayer)?.connection?.sendCommand("warp hub")
         ChatUtils.sendMessage("Combat macro stuck. Warping to hub.")
         stopMacro()
       }
@@ -2024,6 +2082,35 @@ object CombatMacroModule : Module("Combat Macro") {
     val offX = (Math.random() * (PATH_JITTER_RANGE * 2 + 1) - PATH_JITTER_RANGE).toInt()
     val offZ = (Math.random() * (PATH_JITTER_RANGE * 2 + 1) - PATH_JITTER_RANGE).toInt()
     return pos.offset(offX, 0, offZ)
+  }
+
+  /**
+   * Navigate back to the farming area using the configured walkback route.
+   * [justFarm] = true  → just walk in; don't restart the quest after arriving.
+   * [justFarm] = false → buy a new quest once walkback completes.
+   */
+  private fun triggerWalkToFarmArea(justFarm: Boolean) {
+    if (CombatPatrolModule.isPatrolRunning) CombatPatrolModule.stopPatrol()
+    if (PathfindingModule.isPatrolActive) PathfindingModule.stopPatrol()
+    if (slayerNeedsWalkback) WalkbackBridge.stopWalkback?.invoke()
+    nativeStop()
+    val routeName = when {
+      slayerLocation.value == 1 -> CRYPT_WALKBACK_ROUTE_NAME
+      slayerWalkbackRoute.value.isNotBlank() -> slayerWalkbackRoute.value.trim()
+      else -> ""
+    }
+    if (routeName.isBlank()) {
+      if (!justFarm) slayerNeedsQuestRestart = true
+      return
+    }
+    val started = WalkbackBridge.startWalkback?.invoke(routeName, 0) ?: false
+    if (started) {
+      slayerNeedsWalkback = true
+      slayerWalkbackJustFarm = justFarm
+    } else {
+      ChatUtils.sendMessage("Combat macro: walkback route \"$routeName\" not found.")
+      if (!justFarm) slayerNeedsQuestRestart = true
+    }
   }
 
   private fun findNearestWalkableAround(
@@ -2069,7 +2156,6 @@ object CombatMacroModule : Module("Combat Macro") {
     stuckTicks = 0
     nextAttackNs = 0L
     startedPath = false
-    cryptPatrolIndex = -1
     currentTargetId = null
     lastPathStartTick = 0L
     clearKillCandidate()
@@ -2092,8 +2178,10 @@ object CombatMacroModule : Module("Combat Macro") {
     slayerAutoDetected = false
     slayerDetectStartTick = -1L
     slayerNeedsQuestClaim = false
+    if (slayerNeedsWalkback) WalkbackBridge.stopWalkback?.invoke()
     slayerNeedsWalkback = false
     slayerWalkbackJustFarm = false
+    slayerDeathRespawnPending = false
     slayerWalkInDelayUntilTick = -1L
     slayerBossLastPos = null
     slayerClaimStartTick = -1L
@@ -2109,6 +2197,7 @@ object CombatMacroModule : Module("Combat Macro") {
   private const val TAB_COMBAT_GROUP = "Combat Macro"
   private const val TAB_SLAYER_GROUP = "Slayer Macro"
   private const val TAB_SLAYER_SETTINGS_GROUP = "Slayer Settings"
+  private const val TAB_PATROL_GROUP = "Patrol"
   private const val TAB_AUTO_ITEMS_GROUP = "Auto Items"
   private const val KILL_CANDIDATE_TTL_TICKS = 80L
   private const val KILL_DISAPPEAR_CONFIRM_TICKS = 2L
@@ -2136,6 +2225,7 @@ object CombatMacroModule : Module("Combat Macro") {
   private const val CRYPT_WALKBACK_ROUTE_NAME = "cryptwalkback"
   private const val SLAYER_WALKIN_WARP_DELAY_TICKS = 40L  // ticks to wait after warp hub before starting walkin route
   private const val CRYPT_PROXIMITY_RANGE_SQ = 1600.0    // 40-block radius — if within this of any patrol point, already in crypt
+  private const val GRAVEYARD_PROXIMITY_RANGE_SQ = 900.0  // 30-block radius — if within this of any patrol point, already at graveyard
   private const val CHASE_RESOLVE_RADIUS = 3
   private const val CHASE_RESOLVE_VERTICAL = 2
   private const val START_AREA_RETURN_BUFFER = 2.0
@@ -2258,8 +2348,7 @@ object CombatMacroModule : Module("Combat Macro") {
     5 -> "warp blazing_fortress"
     else -> ""
   }
-  // Hardcoded crypt patrol loop — 26 waypoints covering all ghoul spawn zones.
-  // Visited in order (looping), starting from whichever point is nearest the player.
+  // Reference positions spread across the crypt — used only for "is player inside crypt?" proximity checks.
   private val CRYPT_PATROL_WAYPOINTS = listOf(
     BlockPos(-152, 57, -102), BlockPos(-133, 50, -101), BlockPos(-132, 45, -121),
     BlockPos(-129, 41, -134), BlockPos(-129, 41, -143), BlockPos(-119, 41, -136),
@@ -2271,20 +2360,6 @@ object CombatMacroModule : Module("Combat Macro") {
     BlockPos(-145, 57, -114), BlockPos(-136, 58, -127), BlockPos(-121, 55, -126),
     BlockPos(-109, 50, -119), BlockPos(-102, 48, -119),
   )
-
-  private fun findNearestCryptPatrolIndex(): Int {
-    val player = mc.player ?: return 0
-    var best = 0
-    var bestDist = Double.MAX_VALUE
-    for ((i, pos) in CRYPT_PATROL_WAYPOINTS.withIndex()) {
-      val dx = pos.x - player.x
-      val dy = pos.y - player.y
-      val dz = pos.z - player.z
-      val d = dx * dx + dy * dy + dz * dz
-      if (d < bestDist) { bestDist = d; best = i }
-    }
-    return best
-  }
 
   private val CYAN_COLOR = Color(0, 255, 255)
   private val PINK_COLOR = Color(255, 105, 180)

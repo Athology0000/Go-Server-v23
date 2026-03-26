@@ -1,8 +1,11 @@
 package org.cobalt
 
 import net.fabricmc.api.ClientModInitializer
+import net.minecraft.network.protocol.game.ClientboundRespawnPacket
 import org.cobalt.api.command.CommandManager
 import org.cobalt.api.event.EventBus
+import org.cobalt.api.event.annotation.SubscribeEvent
+import org.cobalt.api.event.impl.client.PacketEvent
 import org.cobalt.api.hud.HudModuleManager
 import org.cobalt.api.hud.modules.WatermarkModule
 import org.cobalt.api.hud.modules.InventoryHudModule
@@ -46,7 +49,8 @@ import org.cobalt.internal.farming.FarmingMacroModule
 import org.cobalt.internal.pig.PigMacroModule
 import org.cobalt.internal.spotify.SpotifyModule
 import org.cobalt.internal.chat.ChatFilterModule
-import org.cobalt.internal.diana.DianaModule
+import org.cobalt.internal.diana.DianaMacroModule
+import org.cobalt.internal.diana.DianaHelperModule
 
 @Suppress("UNUSED")
 object Cobalt : ClientModInitializer {
@@ -87,7 +91,8 @@ object Cobalt : ClientModInitializer {
         PigMacroModule,
         SpotifyModule,
         ChatFilterModule,
-        DianaModule,
+        DianaMacroModule,
+        DianaHelperModule,
       )
     )
 
@@ -108,6 +113,11 @@ object Cobalt : ClientModInitializer {
     PatrolWaypointStore.load()
     EventBus.register(this)
     println("Dutt Client Initialized")
+  }
+
+  @SubscribeEvent
+  fun onRespawn(event: PacketEvent.Incoming) {
+    if (event.packet is ClientboundRespawnPacket) NativePathfinder.onLevelChange()
   }
 
 }

@@ -24,6 +24,7 @@ object NativePathfinder {
         private set
 
     private var lastTickStatus: PathStatus = PathStatus.IDLE
+    private var prevJump: Boolean = false
 
     fun init() {
         if (handle != 0L) return
@@ -59,6 +60,13 @@ object NativePathfinder {
     fun stop() {
         if (handle == 0L) return
         NativePathfinderBridge.stop(handle)
+        prevJump = false
+    }
+
+    /** Call when the player changes dimension or disconnects so the buffer cache is flushed. */
+    fun onLevelChange() {
+        WorldBufferSerializer.invalidate()
+        prevJump = false
     }
 
     val status: PathStatus
@@ -112,13 +120,20 @@ object NativePathfinder {
             parsedStatus == PathStatus.PLANNING ||
             parsedStatus == PathStatus.ARRIVED ||
             parsedStatus == PathStatus.FAILED) {
+            prevJump = false
             return null
         }
+
+        // Edge-trigger jump: fire for exactly one tick on the rising edge.
+        // Prevents bunny-hopping when the DLL holds jump=true for multiple ticks.
+        val jumpRaw = r[2] != 0
+        val jumpPulse = jumpRaw && !prevJump
+        prevJump = jumpRaw
 
         return PathCommand(
             forward  = r[0] != 0,
             back     = r[1] != 0,
-            jump     = r[2] != 0,
+            jump     = jumpPulse,
             sneak    = r[3] != 0,
             sprint   = r[4] != 0,
             targetYaw   = java.lang.Float.intBitsToFloat(r[5]),

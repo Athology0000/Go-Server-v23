@@ -12,6 +12,7 @@ public class DarkTintShader {
   private int programId;
   private int vertexShaderId;
   private int fragmentShaderId;
+  private boolean linked;
 
   private int uTexture;
   private int uTintColor;
@@ -143,6 +144,7 @@ public class DarkTintShader {
   }
 
   private void compile() {
+    cleanup();
     try {
       programId = GL20.glCreateProgram();
 
@@ -152,6 +154,7 @@ public class DarkTintShader {
       if (GL20.glGetShaderi(vertexShaderId, GL20.GL_COMPILE_STATUS) == GL11.GL_FALSE) {
         System.err.println("[DarkTintShader] Vertex shader compilation failed:");
         System.err.println(GL20.glGetShaderInfoLog(vertexShaderId));
+        cleanup();
         return;
       }
 
@@ -161,6 +164,7 @@ public class DarkTintShader {
       if (GL20.glGetShaderi(fragmentShaderId, GL20.GL_COMPILE_STATUS) == GL11.GL_FALSE) {
         System.err.println("[DarkTintShader] Fragment shader compilation failed:");
         System.err.println(GL20.glGetShaderInfoLog(fragmentShaderId));
+        cleanup();
         return;
       }
 
@@ -173,6 +177,7 @@ public class DarkTintShader {
       if (GL20.glGetProgrami(programId, GL20.GL_LINK_STATUS) == GL11.GL_FALSE) {
         System.err.println("[DarkTintShader] Program linking failed:");
         System.err.println(GL20.glGetProgramInfoLog(programId));
+        cleanup();
         return;
       }
 
@@ -188,16 +193,22 @@ public class DarkTintShader {
       uDepthTexture = GL20.glGetUniformLocation(programId, "uDepthTexture");
       uDepthThreshold = GL20.glGetUniformLocation(programId, "uDepthThreshold");
       uExcludeViewmodel = GL20.glGetUniformLocation(programId, "uExcludeViewmodel");
+      linked = true;
 
       System.out.println("[DarkTintShader] Dark tint shader compiled successfully!");
     } catch (Exception e) {
       System.err.println("[DarkTintShader] Failed to compile shader: " + e.getMessage());
       e.printStackTrace();
+      cleanup();
     }
   }
 
-  public void use() {
+  public boolean use() {
+    if (!isValid()) {
+      return false;
+    }
     GL20.glUseProgram(programId);
+    return GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM) == programId;
   }
 
   public void setTexture(int textureUnit) {
@@ -253,12 +264,16 @@ public class DarkTintShader {
   }
 
   public boolean isValid() {
-    return programId != 0;
+    return linked && programId != 0;
   }
 
   public void cleanup() {
     if (vertexShaderId != 0) GL20.glDeleteShader(vertexShaderId);
     if (fragmentShaderId != 0) GL20.glDeleteShader(fragmentShaderId);
     if (programId != 0) GL20.glDeleteProgram(programId);
+    vertexShaderId = 0;
+    fragmentShaderId = 0;
+    programId = 0;
+    linked = false;
   }
 }
