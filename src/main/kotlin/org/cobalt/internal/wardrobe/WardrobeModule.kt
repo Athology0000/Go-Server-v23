@@ -95,7 +95,7 @@ object WardrobeModule : Module("Wardrobe GUI") {
         WardrobeState.currentVanillaPage = page
         openContainerId = pkt.containerId
 
-        if (scanState == ScanState.IDLE) {
+        if (scanState == ScanState.IDLE || scanState == ScanState.SCANNING) {
             scanState = ScanState.SCANNING
             scanPagesReceived = 0
             currentCustomPage = 1
@@ -168,7 +168,6 @@ object WardrobeModule : Module("Wardrobe GUI") {
 
     @SubscribeEvent
     fun onLeftClick(event: MouseEvent.LeftClick) {
-        if (event.action != MouseEvent.PRESS) return
         if (!shouldSuppressVanillaRender()) return
 
         val mx = mc.mouseHandler.xpos().toFloat()
@@ -214,9 +213,7 @@ object WardrobeModule : Module("Wardrobe GUI") {
         } else {
             pendingEquipSetId = setId
             val pageDiff = set.vanillaPage - currentVanillaPage
-            repeat(kotlin.math.abs(pageDiff)) {
-                clickVanillaSlot(if (pageDiff > 0) 53 else 45)
-            }
+            clickVanillaSlot(if (pageDiff > 0) 53 else 45)
         }
     }
 
