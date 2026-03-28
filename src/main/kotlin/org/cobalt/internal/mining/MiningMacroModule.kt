@@ -963,16 +963,21 @@ object MiningMacroModule : Module("Mining Macro") {
     }
 
     val rangeSq = mineRange.value * mineRange.value
+    val eye = player.eyePosition
 
-    // For in-range blocks, prefer the one already closest to the player's current aim -
-    // this minimises rotation time and maximises continuous mining throughput.
+    // For in-range blocks, prefer the one whose visible face is closest to the
+    // player's current aim. Using the actual face point (not block center) gives
+    // the real rotation cost and avoids picking blocks that require more turn than
+    // their center angle implies.
     var bestInRange: BlockPos? = null
     var bestAngle = Float.POSITIVE_INFINITY
     for (pos in vein.blocks) {
       if (!isMineableTarget(level, player, pos, vein.targetIds)) continue
-      if (REQUIRE_MINE_LOS && !hasLineOfSight(level, player, pos)) continue
       if (distanceToBlockSq(player, pos) > rangeSq) continue
-      val ang = angularDistanceTo(player, pos)
+      val visiblePoint: Vec3? = if (REQUIRE_MINE_LOS) findVisibleAimPoint(level, player, eye, pos) else null
+      if (REQUIRE_MINE_LOS && visiblePoint == null) continue
+      val aimPoint = visiblePoint ?: Vec3(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5)
+      val ang = angularDistanceTo(player, aimPoint)
       if (ang < bestAngle) { bestAngle = ang; bestInRange = pos }
     }
     if (bestInRange != null) return bestInRange
@@ -1742,17 +1747,8 @@ object MiningMacroModule : Module("Mining Macro") {
   }
 
   /** Angular distance in degrees between the player's current look direction and a target block. */
-  private fun angularDistanceTo(player: Player, target: BlockPos): Float {
-    val dx = (target.x + 0.5) - player.x
-    val dy = (target.y + 0.5) - player.eyeY
-    val dz = (target.z + 0.5) - player.z
-    val targetYaw = Math.toDegrees(kotlin.math.atan2(-dx, dz)).toFloat()
-    val horizDist = sqrt(dx * dx + dz * dz)
-    val targetPitch = Math.toDegrees(kotlin.math.atan2(-dy, horizDist)).toFloat()
-    val yawDelta = abs(AngleUtils.getRotationDelta(player.yRot, targetYaw))
-    val pitchDelta = abs(targetPitch - player.xRot)
-    return sqrt(yawDelta * yawDelta + pitchDelta * pitchDelta)
-  }
+  private fun angularDistanceTo(player: Player, target: BlockPos): Float =
+    angularDistanceTo(player, Vec3(target.x + 0.5, target.y + 0.5, target.z + 0.5))
 
   private fun angularDistanceTo(player: Player, point: Vec3): Float {
     val dx = point.x - player.x
