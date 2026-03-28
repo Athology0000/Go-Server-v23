@@ -1952,6 +1952,16 @@ object MiningMacroModule : Module("Mining Macro") {
           return AimTarget(point, true)
         }
       }
+      // Tracker has no data yet — use the exact face hit point from the crosshair raycast.
+      // This fires immediately when the crosshair lands on the block so the precision
+      // rotation scale applies from the very first tick of mining.
+      val hit = mc.hitResult
+      if (hit is BlockHitResult && hit.type == HitResult.Type.BLOCK && hit.blockPos == target) {
+        val loc = hit.location
+        if (canSeeAimPoint(level, player, eye, loc, target)) {
+          return AimTarget(loc, true)
+        }
+      }
     }
     if (level != null) {
       findVisibleAimPoint(level, player, eye, target)?.let { return AimTarget(it, false) }
