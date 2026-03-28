@@ -27,12 +27,13 @@ import org.cobalt.internal.mining.MiningModule
 import org.cobalt.internal.mining.FairyModule
 import org.cobalt.internal.mining.RoutesModule
 import org.cobalt.internal.mining.MiningMacroModule
-import org.cobalt.internal.mining.CommissionHudModule
+import org.cobalt.internal.mining.MiningHudModule
 import org.cobalt.internal.mining.CommissionMacroModule
 import org.cobalt.internal.mining.VeinDirectionModule
 import org.cobalt.internal.mining.AutoLanternModule
 import org.cobalt.internal.pathfinding.PathfindingModule
 import org.cobalt.internal.pathfinding.PatrolWaypointStore
+import org.cobalt.internal.qol.AutoStashModule
 import org.cobalt.internal.qol.QolModule
 import org.cobalt.internal.visual.BlockOverlayModule
 import org.cobalt.internal.visual.BlockOutlineModule
@@ -51,6 +52,8 @@ import org.cobalt.internal.spotify.SpotifyModule
 import org.cobalt.internal.chat.ChatFilterModule
 import org.cobalt.internal.diana.DianaMacroModule
 import org.cobalt.internal.diana.DianaHelperModule
+import org.cobalt.internal.wardrobe.WardrobeModule
+import org.cobalt.internal.garden.GardenHudModule
 
 @Suppress("UNUSED")
 object Cobalt : ClientModInitializer {
@@ -62,11 +65,11 @@ object Cobalt : ClientModInitializer {
         WatermarkModule(),
         InventoryHudModule(),
         MiningModule,
+        MiningHudModule,
         FairyModule,
         RoutesModule,
         MiningMacroModule,
         CommissionMacroModule,
-        CommissionHudModule,
         VeinDirectionModule,
         AutoLanternModule,
         CombatMacroModule,
@@ -83,6 +86,7 @@ object Cobalt : ClientModInitializer {
         BlockOverlayModule,
         BlockOutlineModule,
         QolModule,
+        AutoStashModule,
         RotationsModule,
         HotbarOverlayModule,
         PetDisplayModule,
@@ -93,6 +97,8 @@ object Cobalt : ClientModInitializer {
         ChatFilterModule,
         DianaMacroModule,
         DianaHelperModule,
+        WardrobeModule,
+        GardenHudModule,
       )
     )
 
@@ -110,6 +116,7 @@ object Cobalt : ClientModInitializer {
     ).forEach { EventBus.register(it) }
     NativePathfinder.init()
     Config.loadModulesConfig()
+    WardrobeModule.loadFavorites()
     PatrolWaypointStore.load()
     EventBus.register(this)
     println("Dutt Client Initialized")
