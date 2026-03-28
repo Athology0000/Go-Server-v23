@@ -30,6 +30,10 @@ object WardrobeState {
 
     val favorites: MutableSet<Int> = mutableSetOf()
 
+    /**
+     * Resets wardrobe open/parse state when the wardrobe screen is closed.
+     * [favorites] is intentionally preserved — it persists until explicitly cleared.
+     */
     fun reset() {
         isOpen = false
         currentVanillaPage = null
@@ -50,12 +54,13 @@ object WardrobeState {
         lockedIds: Set<Int>,
     ) {
         if (equippedId != null) equippedSlotId = equippedId
-        for ((setId, armor) in armorBySetId) {
-            val idx = setId - 1
+        val startId = (page - 1) * 9 + 1
+        for (id in startId until startId + 9) {
+            val idx = id - 1
             if (idx in sets.indices) {
                 sets[idx] = sets[idx].copy(
-                    armor  = armor,
-                    locked = setId in lockedIds,
+                    armor  = armorBySetId[id] ?: listOf(null, null, null, null),
+                    locked = id in lockedIds,
                 )
             }
         }
