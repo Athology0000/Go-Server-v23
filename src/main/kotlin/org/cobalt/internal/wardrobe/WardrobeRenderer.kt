@@ -3,7 +3,6 @@ package org.cobalt.internal.wardrobe
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiGraphics
 import net.minecraft.client.gui.screens.inventory.InventoryScreen
-import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.item.ItemStack
 import org.cobalt.api.ui.theme.ThemeManager
 import org.cobalt.api.util.ui.NVGRenderer

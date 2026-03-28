@@ -12,7 +12,7 @@ object WardrobeModule : Module("Wardrobe") {
     // Will be replaced with full implementations in Task 6.
 
     /** The currently displayed custom page (1–3). */
-    val currentCustomPage: Int = 1
+    var currentCustomPage: Int = 1
 
     /**
      * Returns the list of [WardrobeSet]s that should be shown on [currentCustomPage].
