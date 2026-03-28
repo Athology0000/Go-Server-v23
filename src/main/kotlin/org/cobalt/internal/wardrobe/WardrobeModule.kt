@@ -31,7 +31,7 @@ object WardrobeModule : Module("Wardrobe") {
 
     // ── Inner data classes ────────────────────────────────────────────────────
 
-    data class SlotHitbox(val id: Int, val x: Float, val y: Float, val w: Float, val h: Float)
+    data class SlotHitbox(val setId: Int, val x: Float, val y: Float, val w: Float, val h: Float)
 
     data class TabHitbox(val page: Int, val x: Float, val y: Float, val w: Float, val h: Float)
 
