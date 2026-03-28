@@ -578,11 +578,18 @@ object MiningMacroModule : Module("Mining Macro") {
     val inRange = distSq <= mineRange.value * mineRange.value
 
     if (inRange) {
-      // Block is in mining range - always keep rotating toward it.
-      // Click as soon as LOS passes or the crosshair lands on it (confirms visibility).
-      val hasLos = !REQUIRE_MINE_LOS || hasLineOfSight(level, player, target)
-      val canClick = hasLos || isCrosshairOnTarget(target)
-      if (canClick) {
+      // Crosshair-first mining: mine whatever valid vein block the crosshair is on.
+      // This prevents dig packets firing at bedrock while the camera is still rotating.
+      val hitPos = (mc.hitResult as? BlockHitResult)
+        ?.takeIf { it.type == HitResult.Type.BLOCK }?.blockPos
+      val crosshairVeinBlock = hitPos?.takeIf { pos ->
+        vein.blocks.contains(pos) &&
+          isMineableTarget(level, player, pos, vein.targetIds) &&
+          distanceToBlockSq(player, pos) <= mineRange.value * mineRange.value
+      }
+
+      if (crosshairVeinBlock != null) {
+        currentTarget = crosshairVeinBlock
         maybeRefreshLantern(level, player)
         if (startedPath && nativeActive()) {
           nativeStop()
@@ -591,9 +598,9 @@ object MiningMacroModule : Module("Mining Macro") {
         lastPathTarget = null
         resetApproachTracking()
         MovementManager.clearForcedMovement()
-        startMining(player, target)
+        startMining(player, crosshairVeinBlock)
       } else {
-        // Rotate toward the block so the crosshair will land on it next tick.
+        // Not on a vein block yet — release attack and keep rotating toward selected target.
         if (miningActive) {
           mc.options.keyAttack?.setDown(false)
           miningActive = false
