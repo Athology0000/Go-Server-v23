@@ -1957,10 +1957,7 @@ object MiningMacroModule : Module("Mining Macro") {
       // rotation scale applies from the very first tick of mining.
       val hit = mc.hitResult
       if (hit is BlockHitResult && hit.type == HitResult.Type.BLOCK && hit.blockPos == target) {
-        val loc = hit.location
-        if (canSeeAimPoint(level, player, eye, loc, target)) {
-          return AimTarget(loc, true)
-        }
+        return AimTarget(hit.location, true)
       }
     }
     if (level != null) {
