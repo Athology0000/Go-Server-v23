@@ -22,7 +22,7 @@ object RecoveryManager {
     fun onDisconnect(restartFarming: () -> Unit) {
         if (isRecovering) return
         if (recoveryAttempts >= GardenConfig.maxRecoveryAttempts) {
-            // Max attempts reached — signal caller to stop macro
+            // Max attempts reached - signal caller to stop macro
             return
         }
         isRecovering = true

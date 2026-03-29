@@ -23,8 +23,8 @@ public class NativePathfinderBridge {
     /**
      * Returns int[10]:
      * [0] forward  [1] back  [2] jump  [3] sneak  [4] sprint
-     * [5] targetYaw   (Float.intBitsToFloat — raw, no GCD)
-     * [6] targetPitch (Float.intBitsToFloat — raw, no GCD)
+     * [5] targetYaw   (Float.intBitsToFloat - raw, no GCD)
+     * [6] targetPitch (Float.intBitsToFloat - raw, no GCD)
      * [7] PathStatus ordinal
      * [8] ActionType ordinal
      * [9] distanceToTarget (Float.intBitsToFloat)

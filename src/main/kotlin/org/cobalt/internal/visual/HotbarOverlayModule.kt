@@ -40,7 +40,7 @@ object HotbarOverlayModule : Module("Liquid Hotbar") {
     minScale = 1f
     maxScale = 1f
 
-    // Base size in screen pixels — tracks guiScale so position stays correct
+    // Base size in screen pixels - tracks guiScale so position stays correct
     width  { mc.window.guiScale.toFloat() * 182f }
     height { mc.window.guiScale.toFloat() * 22f  }
 
@@ -51,11 +51,11 @@ object HotbarOverlayModule : Module("Liquid Hotbar") {
       val bh  = sc * 22f
       val rad = 4f * sc
 
-      // Selected slot dark rounded overlay (on top of items — intentional)
+      // Selected slot dark rounded overlay (on top of items - intentional)
       val sel = mc.player?.inventory?.selectedSlot ?: 0
       NVGRenderer.rect((1f + sel.toFloat() * 20f) * sc, sc, 20f * sc, 20f * sc, 0x55000000.toInt(), 4f * sc)
 
-      // Rotating gradient border — same animation as inventory HUD
+      // Rotating gradient border - same animation as inventory HUD
       val angle  = (System.currentTimeMillis() % 12000L).toFloat() / 12000f * (Math.PI * 2.0).toFloat()
       val shiftX = cos(angle) * (bw * 0.45f)
       val shiftY = sin(angle) * (bh * 0.45f)
@@ -93,7 +93,7 @@ object HotbarOverlayModule : Module("Liquid Hotbar") {
   }
 
   /**
-   * GuiRenderEvent — fills + items, drawn before NVG so items sit below
+   * GuiRenderEvent - fills + items, drawn before NVG so items sit below
    * the decorative NVG border and selected overlay.
    */
   @SubscribeEvent
@@ -109,7 +109,7 @@ object HotbarOverlayModule : Module("Liquid Hotbar") {
     val gx = (sx / guiScale).toInt()
     val gy = (sy / guiScale).toInt()
 
-    // Dark grey glass fill — matches inventory HUD panelColor
+    // Dark grey glass fill - matches inventory HUD panelColor
     event.graphics.fill(gx, gy, gx + 182, gy + 22, 0x50101010.toInt())
 
     val offhand = player.offhandItem

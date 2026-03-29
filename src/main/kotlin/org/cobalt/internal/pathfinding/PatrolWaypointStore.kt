@@ -20,7 +20,7 @@ internal object PatrolWaypointStore {
     var killWaypoints:  MutableList<KillWaypoint>  = mutableListOf()
 
     fun load() {
-        routeWaypoints.clear()   // idempotent — prevent double-append on reload
+        routeWaypoints.clear()   // idempotent - prevent double-append on reload
         killWaypoints.clear()
         if (!file.exists()) return
         val text = file.bufferedReader().use { it.readText() }

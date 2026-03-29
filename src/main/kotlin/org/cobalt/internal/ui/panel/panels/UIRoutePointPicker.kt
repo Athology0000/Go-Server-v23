@@ -28,7 +28,7 @@ internal class UIRoutePointPicker(
   private val buttons = listOf(
     RouteButton("Walk", "Standard route point.") { select(RoutesModule.RoutePointType.NORMAL) },
     RouteButton("Warp", "Warp point trigger.") { select(RoutesModule.RoutePointType.WARP) },
-    RouteButton("Mine", "Mine vein start/end.") { select(RoutesModule.RoutePointType.MINE) },
+    RouteButton("Mine", "Ordered mining anchor.") { select(RoutesModule.RoutePointType.MINE) },
   )
 
   private val gridLayout = GridLayout(

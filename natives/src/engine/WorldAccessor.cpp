@@ -17,7 +17,7 @@ uint8_t WorldAccessor::bufferAt(int x, int y, int z) const {
 }
 
 uint8_t WorldAccessor::callbackBlock(int, int, int) const {
-    // JNI callbacks from background threads require AttachCurrentThread — not implemented.
+    // JNI callbacks from background threads require AttachCurrentThread - not implemented.
     // Buffer covers all Skyblock pathfinding; treat out-of-range as SOLID.
     return BT_SOLID;
 }
@@ -26,8 +26,8 @@ uint8_t WorldAccessor::getBlock(int x, int y, int z) const {
     return inBuffer(x, y, z) ? bufferAt(x, y, z) : callbackBlock(x, y, z);
 }
 
-bool WorldAccessor::isSolid(int x, int y, int z) const    { return getBlock(x,y,z) == BT_SOLID; }
-bool WorldAccessor::isPassable(int x, int y, int z) const { auto b = getBlock(x,y,z); return b == BT_AIR || b == BT_WATER; }
+bool WorldAccessor::isSolid(int x, int y, int z) const    { auto b = getBlock(x,y,z); return b == BT_SOLID || b == BT_STEP; }
+bool WorldAccessor::isPassable(int x, int y, int z) const { auto b = getBlock(x,y,z); return b == BT_AIR || b == BT_WATER || b == BT_LADDER; }
 bool WorldAccessor::isLadder(int x, int y, int z) const   { return getBlock(x,y,z) == BT_LADDER; }
 bool WorldAccessor::isWater(int x, int y, int z) const    { return getBlock(x,y,z) == BT_WATER; }
 bool WorldAccessor::isLava(int x, int y, int z) const     { return getBlock(x,y,z) == BT_LAVA; }

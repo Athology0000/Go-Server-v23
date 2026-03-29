@@ -62,7 +62,7 @@ class InventoryHudModule : Module("Inventory HUD") {
       p * 2 + ROWS * ss + (ROWS - 1) * sg
     }
 
-    // ── NVG render — smooth rounded fills + gradient border ───────────────────
+    // -- NVG render - smooth rounded fills + gradient border -------------------
     // Items are drawn BEFORE this (in onGuiRender) and show through the
     // semi-transparent fills, giving a glass-inside-slot look.
     render { _, _, _ ->
@@ -96,7 +96,7 @@ class InventoryHudModule : Module("Inventory HUD") {
     EventBus.register(this)
   }
 
-  // ── GuiRenderEvent — items drawn here so GL state is correct ─────────────
+  // -- GuiRenderEvent - items drawn here so GL state is correct -------------
   // They render before NVG fills; the semi-transparent fills sit on top.
   @SubscribeEvent
   fun onGuiRender(event: GuiRenderEvent) {

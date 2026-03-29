@@ -24,8 +24,8 @@ object PetXpTracker {
         val mc      = Minecraft.getInstance()
         val overlay = mc.gui.tabList as? TabOverlayAccessor ?: return
         val text = buildString {
-            overlay.header?.let { append(it.string.replace(Regex("§[0-9a-fk-or]"), "")) }
-            overlay.footer?.let { append(it.string.replace(Regex("§[0-9a-fk-or]"), "")) }
+            overlay.header?.let { append(it.string.replace(Regex("\u00A7[0-9a-fk-or]"), "")) }
+            overlay.footer?.let { append(it.string.replace(Regex("\u00A7[0-9a-fk-or]"), "")) }
         }
         XP_REGEX.find(text)?.let { m ->
             val newXp = m.groupValues[1].replace(",", "").toLongOrNull() ?: return

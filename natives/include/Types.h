@@ -23,7 +23,7 @@ struct PathCommand {
     float targetYaw, targetPitch;   // raw angles — no GCD applied
     PathStatus status;
     ActionType activeAction;
-    float distanceToTarget;         // horizontal dist to current waypoint target
+    float distanceToTarget;         // 3D distance to current waypoint target
 };
 
 // World buffer constants
@@ -38,3 +38,6 @@ static constexpr uint8_t BT_SOLID  = 1;
 static constexpr uint8_t BT_WATER  = 2;
 static constexpr uint8_t BT_LAVA   = 3;
 static constexpr uint8_t BT_LADDER = 4;
+// Half-height blocks (slabs 0.5, thin snow, etc.) that Minecraft auto-steps onto.
+// Treated as solid ground but do not require an explicit jump to ascend.
+static constexpr uint8_t BT_STEP   = 5;

@@ -21,7 +21,7 @@ object SpotifyModule : Module("Spotify") {
 
     private val mc = Minecraft.getInstance()
 
-    // ── Settings ──────────────────────────────────────────────────────────────
+    // -- Settings --------------------------------------------------------------
 
     private val color1Setting = TextSetting(
         "Color 1", "Gradient start color (hex, no #).", "1DB954"
@@ -31,14 +31,14 @@ object SpotifyModule : Module("Spotify") {
     )
     private val gradientDirectionSetting = ModeSetting(
         "Gradient", "Progress bar gradient direction.",
-        0, arrayOf("Left→Right", "Top→Bottom")
+        0, arrayOf("Left->Right", "Top->Bottom")
     )
     private val autoColorSetting  = CheckboxSetting("Auto Color",  "Derive gradient color from album art.", true)
     private val glowSetting       = CheckboxSetting("Glow",        "Animated glow border.",                 true)
     private val particlesSetting  = CheckboxSetting("Particles",   "Sparkle particle effects.",             true)
     private val showTimeSetting   = CheckboxSetting("Show Time",   "Show elapsed / total time.",            true)
 
-    // ── Derived colors ────────────────────────────────────────────────────────
+    // -- Derived colors --------------------------------------------------------
 
     private fun hexToArgb(hex: String, alpha: Int = 0xFF): Int {
         val stripped = hex.trim().trimStart('#').takeLast(6).padStart(6, '0')
@@ -56,7 +56,7 @@ object SpotifyModule : Module("Spotify") {
     private val color1 get() = if (autoColorSetting.value) artDominantC1 else manualColor1
     private val color2 get() = if (autoColorSetting.value) artDominantC2 else manualColor2
 
-    // ── Art cache + crossfade ─────────────────────────────────────────────────
+    // -- Art cache + crossfade -------------------------------------------------
 
     private var cachedArtVersion  = -1
     private var cachedArtImage:   Image? = null
@@ -67,7 +67,7 @@ object SpotifyModule : Module("Spotify") {
     private fun artFadeAlpha(now: Long): Float =
         ((now - artFadeStartMs).toFloat() / ART_FADE_MS).coerceIn(0f, 1f)
 
-    // ── SVG control icons ─────────────────────────────────────────────────────
+    // -- SVG control icons -----------------------------------------------------
 
     private var iconsLoaded = false
     private var imgPrev:  Image? = null
@@ -84,7 +84,7 @@ object SpotifyModule : Module("Spotify") {
         imgNext  = runCatching { NVGRenderer.createImage("/assets/cobalt/textures/ui/ic_spotify_next.svg")  }.getOrNull()
     }
 
-    // ── Scroll + particle state ────────────────────────────────────────────────
+    // -- Scroll + particle state ------------------------------------------------
 
     private var lastTrackName    = ""
     private var lastRenderMs     = System.currentTimeMillis()
@@ -92,7 +92,7 @@ object SpotifyModule : Module("Spotify") {
     private var titleScrollDir   = 1f
     private var titleScrollPause = 0f
 
-    // ── Layout constants ──────────────────────────────────────────────────────
+    // -- Layout constants ------------------------------------------------------
     //
     // Normal HUD (no controls):   title y+18, artist y+31, time y+44, bar y+58
     // With controls (screen open): same rows, then buttons y+BTN_Y_L, bar y+BAR_Y_CTRL
@@ -109,7 +109,7 @@ object SpotifyModule : Module("Spotify") {
     private const val BTN_Y_L        = 54f      // local Y of control buttons (used in onMouseClick)
     private const val BAR_Y          = 76f      // bar always at same Y; art ends at y+68, 8px gap
 
-    // ── HUD ───────────────────────────────────────────────────────────────────
+    // -- HUD -------------------------------------------------------------------
 
     val spotifyHud = hudElement("spotify-now-playing", "Spotify Now Playing", "Spotify currently playing HUD") {
         anchor  = HudAnchor.BOTTOM_LEFT
@@ -126,7 +126,7 @@ object SpotifyModule : Module("Spotify") {
         }
     }
 
-    // ── NvgEvent — render full HUD (with controls) when any screen is open ────
+    // -- NvgEvent - render full HUD (with controls) when any screen is open ----
 
     @SubscribeEvent
     fun onNvg(event: NvgEvent) {
@@ -148,7 +148,7 @@ object SpotifyModule : Module("Spotify") {
         NVGRenderer.endFrame()
     }
 
-    // ── MouseEvent — control button clicks when any screen is open ────────────
+    // -- MouseEvent - control button clicks when any screen is open ------------
 
     @SubscribeEvent
     fun onMouseClick(event: MouseEvent.LeftClick) {
@@ -184,7 +184,7 @@ object SpotifyModule : Module("Spotify") {
         }
     }
 
-    // ── Init ──────────────────────────────────────────────────────────────────
+    // -- Init ------------------------------------------------------------------
 
     init {
         addSetting(
@@ -201,7 +201,7 @@ object SpotifyModule : Module("Spotify") {
         SpotifyPoller.update()
     }
 
-    // ── Core HUD render ───────────────────────────────────────────────────────
+    // -- Core HUD render -------------------------------------------------------
 
     private fun renderHudContent(
         x: Float, y: Float,
@@ -240,20 +240,20 @@ object SpotifyModule : Module("Spotify") {
             }
         }
 
-        // Title row — full width of text area (no time here)
+        // Title row - full width of text area (no time here)
         val nameMaxW = W - TEXT_X - PAD
         drawScrollingTitle(track.name, x + TEXT_X, y + 18f, nameMaxW, 12f, textColor, dt)
 
         // Artist row
         NVGRenderer.text(truncate(track.artist, W - TEXT_X - PAD, 10f), x + TEXT_X, y + 33f, 10f, dimColor)
 
-        // Time row — below artist
+        // Time row - below artist
         if (showTimeSetting.value) {
             val timeStr = "${formatMs(track.currentProgressMs)} / ${formatMs(track.durationMs)}"
             NVGRenderer.text(timeStr, x + TEXT_X, y + 46f, 9f, dimColor)
         }
 
-        // Control buttons — only when a screen is open
+        // Control buttons - only when a screen is open
         if (showControls) {
             ensureIconsLoaded()
 
@@ -302,7 +302,7 @@ object SpotifyModule : Module("Spotify") {
         }
     }
 
-    // ── Shared drawing helpers ─────────────────────────────────────────────────
+    // -- Shared drawing helpers -------------------------------------------------
 
     private fun drawBackground(x: Float, y: Float, w: Float, h: Float, now: Long, c1: Int, c2: Int) {
         val twoPi = (Math.PI * 2).toFloat()
@@ -349,8 +349,8 @@ object SpotifyModule : Module("Spotify") {
             }
         } else {
             NVGRenderer.rect(artX, artY, ART, ART, 0xFF141824.toInt(), 6f)
-            val noteW = NVGRenderer.textWidth("♪", 22f)
-            NVGRenderer.text("♪", artX + ART / 2f - noteW / 2f, artY + ART / 2f - 11f, 22f, 0x33FFFFFF)
+            val noteW = NVGRenderer.textWidth("\u266A", 22f)
+            NVGRenderer.text("\u266A", artX + ART / 2f - noteW / 2f, artY + ART / 2f - 11f, 22f, 0x33FFFFFF)
         }
 
         if (fade >= 1f && prev != null) {
@@ -380,7 +380,7 @@ object SpotifyModule : Module("Spotify") {
         }
     }
 
-    // ── Art cache + dominant color refresh ────────────────────────────────────
+    // -- Art cache + dominant color refresh ------------------------------------
 
     private fun refreshArtCache(now: Long) {
         val ver = SpotifyPoller.artVersion
@@ -411,7 +411,7 @@ object SpotifyModule : Module("Spotify") {
         }
     }
 
-    // ── Dominant color extraction ─────────────────────────────────────────────
+    // -- Dominant color extraction ---------------------------------------------
 
     private fun extractDominantColors(path: String): Pair<Int, Int> {
         return runCatching {
@@ -476,7 +476,7 @@ object SpotifyModule : Module("Spotify") {
                ((ng * 255).toInt().coerceIn(0, 255) shl 8) or (nb * 255).toInt().coerceIn(0, 255)
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // -- Helpers ---------------------------------------------------------------
 
     private fun drawScrollingTitle(text: String, x: Float, y: Float, maxW: Float, size: Float, color: Int, dt: Float) {
         val fullW = NVGRenderer.textWidth(text, size)
@@ -513,8 +513,8 @@ object SpotifyModule : Module("Spotify") {
     private fun truncate(text: String, maxW: Float, size: Float): String {
         if (NVGRenderer.textWidth(text, size) <= maxW) return text
         var t = text
-        while (t.isNotEmpty() && NVGRenderer.textWidth("$t…", size) > maxW) t = t.dropLast(1)
-        return "$t…"
+        while (t.isNotEmpty() && NVGRenderer.textWidth("$t...", size) > maxW) t = t.dropLast(1)
+        return "$t..."
     }
 
     private fun formatMs(ms: Long): String {

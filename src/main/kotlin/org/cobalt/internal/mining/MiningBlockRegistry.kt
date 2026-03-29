@@ -13,8 +13,8 @@ object MiningBlockRegistry {
     "Pure Diamond" to 600.0,
     "Pure Quartz" to 600.0,
     "Mithril (Gray)" to 500.0,
-    "Mithril (Prismarine)" to 800.0,
-    "Mithril (Blue Wool)" to 1500.0,
+    "Mithril (Dark)" to 800.0,
+    "Mithril (Hot)" to 1500.0,
     "Titanium" to 2000.0,
     "Ruby Gemstone" to 2300.0,
     "Amber Gemstone" to 3000.0,
@@ -60,11 +60,13 @@ object MiningBlockRegistry {
     "minecraft:diamond_block" to "Pure Diamond",
     "minecraft:nether_quartz_ore" to "Pure Quartz",
     "minecraft:quartz_block" to "Pure Quartz",
-    "minecraft:stone" to "Mithril (Gray)",
     "minecraft:gray_wool" to "Mithril (Gray)",
-    "minecraft:prismarine" to "Mithril (Prismarine)",
-    "minecraft:blue_wool" to "Mithril (Blue Wool)",
-    "minecraft:light_gray_wool" to "Titanium",
+    "minecraft:cyan_terracotta" to "Mithril (Gray)",
+    "minecraft:prismarine" to "Mithril (Dark)",
+    "minecraft:prismarine_bricks" to "Mithril (Dark)",
+    "minecraft:dark_prismarine" to "Mithril (Dark)",
+    "minecraft:light_blue_wool" to "Mithril (Hot)",
+    "minecraft:polished_diorite" to "Titanium",
     "minecraft:red_stained_glass" to "Ruby Gemstone",
     "minecraft:orange_stained_glass" to "Amber Gemstone",
     "minecraft:purple_stained_glass" to "Amethyst Gemstone",
@@ -87,8 +89,22 @@ object MiningBlockRegistry {
   val TYPE_TO_BLOCK_IDS: Map<String, Set<String>> =
     BLOCK_ID_TO_TYPE.entries.groupBy({ it.value }, { it.key }).mapValues { it.value.toSet() }
 
-  fun idsForType(type: String): Set<String> {
-    return TYPE_TO_BLOCK_IDS[type].orEmpty()
-  }
-}
+  private val LEGACY_TYPE_ALIASES = mapOf(
+    "Mithril (Prismarine)" to "Mithril (Dark)",
+    "Mithril (Blue Wool)" to "Mithril (Hot)",
+  )
 
+  private val BLACKLISTED_BLOCK_IDS = setOf(
+    "minecraft:stone",
+    "minecraft:light_gray_wool",  // hardstone background in tunnels/mineshaft — not titanium
+  )
+
+  fun normalizeType(type: String): String = LEGACY_TYPE_ALIASES[type] ?: type
+
+  fun idsForType(type: String): Set<String> {
+    val normalizedType = normalizeType(type)
+    return TYPE_TO_BLOCK_IDS[normalizedType].orEmpty().filterNotTo(linkedSetOf()) { it in BLACKLISTED_BLOCK_IDS }
+  }
+
+  fun isBlacklisted(id: String): Boolean = id in BLACKLISTED_BLOCK_IDS
+}

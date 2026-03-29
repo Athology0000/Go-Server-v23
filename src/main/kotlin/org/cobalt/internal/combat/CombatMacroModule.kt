@@ -31,13 +31,17 @@ import org.cobalt.api.module.setting.impl.InfoType
 import org.cobalt.api.module.setting.impl.ModeSetting
 import org.cobalt.api.module.setting.impl.SliderSetting
 import org.cobalt.api.module.setting.impl.TextSetting
+import org.cobalt.api.notification.NotificationManager
+import org.cobalt.api.rotation.EasingType
 import org.cobalt.api.rotation.RotationExecutor
 import org.cobalt.api.rotation.strategy.BezierTrackingRotationStrategy
+import org.cobalt.api.rotation.strategy.TimedEaseStrategy
 import org.cobalt.api.util.AngleUtils
 import org.cobalt.api.util.ChatUtils
 import org.cobalt.api.util.InventoryUtils
 import org.cobalt.api.util.MouseUtils
 import org.cobalt.api.util.getLoreLines
+import org.cobalt.api.util.helper.Rotation
 import org.cobalt.api.util.render.Render3D
 import org.cobalt.api.pathfinder.minecraft.MinecraftPathingRules
 import org.cobalt.internal.helper.Config
@@ -121,7 +125,8 @@ object CombatMacroModule : Module("Combat Macro") {
     "gold essence shop",
     "l15l66bsyx",
     "emissary wilson",
-    "3nba7e0ea6"
+    "3nba7e0ea6",
+    "rat"
   )
 
   private val enabled = CheckboxSetting(
@@ -183,13 +188,32 @@ object CombatMacroModule : Module("Combat Macro") {
     arrayOf("Zombie Graveyard", "Zombie Crypt")
   )
 
+  private val slayerBossNotification = CheckboxSetting(
+    "Boss Spawn Notification",
+    "Show a HUD warning when the slayer boss spawns.",
+    true
+  )
+
+  private val slayerBossEsp = CheckboxSetting(
+    "Boss / MiniBoss ESP",
+    "Highlight slayer bosses and minibosses while the slayer macro is active.",
+    true
+  )
+
+  private val slayerEspTargets = ModeSetting(
+    "ESP Targets",
+    "Choose whether the slayer ESP highlights bosses, minibosses, or both.",
+    2,
+    arrayOf("Boss", "MiniBoss", "Both")
+  )
+
   private val slayerWalkbackRoute = TextSetting(
     "Walkback Route",
     "Route name to follow back to farming area after boss kill (if Auto Warp is off). Leave blank to skip.",
     ""
   )
 
-  // ── Patrol settings (mirror of Combat Patrol module, settable from slayer tab) ───────────────
+  // -- Patrol settings (mirror of Combat Patrol module, settable from slayer tab) ---------------
   private val patrolRouteNameProxy = TextSetting(
     "Patrol Route",
     "Patrol route name. Shared with the Combat Patrol module.",
@@ -297,8 +321,114 @@ object CombatMacroModule : Module("Combat Macro") {
 
   private val oneTapMode = CheckboxSetting(
     "One Tap Mode",
-    "Keep moving through mobs — don't stop at each kill. Switch immediately when target dies.",
+    "Keep moving through mobs - don't stop at each kill. Switch immediately when target dies.",
     false
+  )
+
+  private val combatMode = ModeSetting(
+    "Combat Mode",
+    "Melee: left-click. Bow: right-click ranged with drop aim. Mage: right-click projectile with lead aim.",
+    0,
+    arrayOf("Melee", "Bow", "Mage")
+  )
+
+  private val zombieDynamicCombat = CheckboxSetting(
+    "Zombie Auto Swap",
+    "Zombie Slayer only: use the spawn weapon while farming, then swap to Dynamic Sword for the boss.",
+    true
+  )
+
+  private val zombieSpawnWeapon = TextSetting(
+    "Zombie Spawn Weapon",
+    "Comma-separated hotbar keywords for the zombie spawn weapon. Used before the boss spawns.",
+    "halberd"
+  )
+
+  private val zombieDynamicSword = TextSetting(
+    "Dynamic Sword",
+    "Comma-separated hotbar keywords for the zombie boss weapon.",
+    "falchion, reaper, shredded, sword"
+  )
+
+  private val endermanDynamicCombat = CheckboxSetting(
+    "Eman Auto Swap",
+    "Enderman Slayer only: use bow for spawn farming and hit-shield phases, then swap to melee for boss DPS phases.",
+    true
+  )
+
+  private val emanSpawnWeapon = ModeSetting(
+    "Eman Spawn Weapon",
+    "Choose the weapon style for Enderman Slayer spawn farming before the boss appears.",
+    3,
+    arrayOf("Terminator", "Shortbow", "Enderman Slayer Sword", "Dynamic")
+  )
+
+  private val emanDynamicSwapRange = SliderSetting(
+    "Eman Dynamic Swap Range",
+    "Enderman Slayer only: in Dynamic spawn mode, switch from bow to sword when the target is within this distance.",
+    4.5,
+    2.0,
+    8.0,
+    step = 0.1
+  )
+
+  private val emanHitPhaseWeapon = TextSetting(
+    "Eman Hit Phase Weapon",
+    "Comma-separated hotbar keywords for Enderman Slayer hit-shield phases.",
+    "terminator, juju, shortbow, bow"
+  )
+
+  private val emanBossWeapon = TextSetting(
+    "Eman Boss Weapon",
+    "Comma-separated hotbar keywords for Enderman Slayer boss DPS phases.",
+    "atomsplit, vorpal, voidedge, katana"
+  )
+
+  private val spiderPhaseBowCombat = CheckboxSetting(
+    "Spider Hatchling Phase",
+    "Spider Slayer only: when the boss becomes invulnerable, step back and use bow mode on nearby hatchlings.",
+    true
+  )
+
+  private val wolfIgnorePups = CheckboxSetting(
+    "Ignore Wolf Pups",
+    "Wolf Slayer only: during the pups phase, keep tracking the boss instead of retargeting the pups.",
+    false
+  )
+
+  private val swordKeepDistance = SliderSetting(
+    "Sword Keep Distance",
+    "Preferred stand-off distance in melee mode. Lower = closer. 0 = close in fully.",
+    1.8,
+    0.0,
+    6.0,
+    step = 0.1
+  )
+
+  private val bowMinRange = SliderSetting(
+    "Bow Min Range",
+    "Preferred stand-off distance in bow mode. 0 = use Attack Range.",
+    8.0,
+    0.0,
+    20.0
+  )
+
+  private val bowElevationPerBlock = SliderSetting(
+    "Bow Elevation /block",
+    "Degrees to aim upward per block of distance to compensate for arrow drop. Tune to your bow.",
+    0.15,
+    0.0,
+    1.0,
+    step = 0.01
+  )
+
+  private val mageElevationPerBlock = SliderSetting(
+    "Mage Elevation /block",
+    "Degrees to aim upward per block of distance for slower projectiles. 0 for instant/no-drop weapons.",
+    0.0,
+    0.0,
+    1.0,
+    step = 0.01
   )
 
   private val autoSwordOfBadHealth = CheckboxSetting(
@@ -386,8 +516,25 @@ object CombatMacroModule : Module("Combat Macro") {
 
   val isActive: Boolean get() = enabled.value
   val isRunning: Boolean get() = enabled.value
-  val modeDisplay: String get() = if (cryptZombieSlayer.value) "Slayer Macro" else "Combat Macro"
+  val isSlayerHudVisible: Boolean get() = cryptZombieSlayer.value || slayerModeEnabled
+  val modeDisplay: String get() = combatModeDisplayName(currentHudCombatMode())
   val slayerDisplay: String get() = if (cryptZombieSlayer.value) slayerStatus.value else "Disabled"
+  val slayerQuestLevelDisplay: String
+    get() = if (!isSlayerHudVisible) "--" else trackedSlayerQuestLabel()
+  val slayerQuestStateDisplay: String
+    get() = if (!isSlayerHudVisible) "--" else trackedSlayerQuestHudStageLabel()
+  val slayerKillsLeftDisplay: String
+    get() = if (!isSlayerHudVisible) "--" else (currentSlayerKillsLeft()?.toString() ?: "--")
+  val slayerKillsPerHourDisplay: String
+    get() = if (!isSlayerHudVisible) "--" else formatSessionRateDisplay(slayerSessionMobKills)
+  val slayerQuestsCompletedDisplay: String
+    get() = if (!isSlayerHudVisible) "--" else slayerSessionQuestCompletions.toString()
+  val slayerQuestsPerHourDisplay: String
+    get() = if (!isSlayerHudVisible) "--" else formatSessionRateDisplay(slayerSessionQuestCompletions)
+  val slayerQuestsFailedDisplay: String
+    get() = if (!isSlayerHudVisible) "--" else slayerSessionQuestFailures.toString()
+  val slayerQuestFailsPerHourDisplay: String
+    get() = if (!isSlayerHudVisible) "--" else formatSessionRateDisplay(slayerSessionQuestFailures)
   val statusDisplay: String
     get() =
       when {
@@ -409,7 +556,7 @@ object CombatMacroModule : Module("Combat Macro") {
         val activeName = resolveCurrentTargetName()
         if (!activeName.isNullOrBlank()) {
           val norm = normalizeNameForMatch(activeName)
-          if (isSlayerPriorityMobName(norm)) return "⭐ $activeName"
+          if (isSlayerPriorityMobName(norm)) return "\u2B50 $activeName"
         }
         return when (slayerType.value) {
           0 -> "Zombie / Ghoul"
@@ -436,6 +583,38 @@ object CombatMacroModule : Module("Combat Macro") {
       return (target.health.coerceAtLeast(0f) / maxHealth).coerceIn(0f, 1f)
     }
 
+  private fun currentHudCombatMode(): Int {
+    val target = resolveCurrentTarget()
+    if (target != null) return effectiveCombatMode(target)
+    if (!cryptZombieSlayer.value) return combatMode.value
+    return fallbackSlayerCombatModeForHud()
+  }
+
+  private fun fallbackSlayerCombatModeForHud(): Int {
+    if (shouldUseSpiderPhaseBowCombat() && slayerBossActive && isSpiderBossHatchlingsPhaseActive()) {
+      return 1
+    }
+    if (shouldUseEndermanDynamicCombat()) {
+      val boss = resolveNearestSlayerBoss()
+      if (boss != null) {
+        return if (isEndermanBossHitPhase(boss)) 1 else 0
+      }
+      return when (emanSpawnWeapon.value) {
+        EMAN_SPAWN_WEAPON_ENDERMAN_SWORD -> 0
+        else -> 1
+      }
+    }
+    return combatMode.value
+  }
+
+  private fun combatModeDisplayName(mode: Int): String =
+    when (mode) {
+      0 -> "Melee"
+      1 -> "Bow"
+      2 -> "Mage"
+      else -> "Unknown"
+    }
+
   fun startForAutomation(mobName: String) {
     cryptZombieSlayer.value = false
     targetName.value = mobName
@@ -455,9 +634,15 @@ object CombatMacroModule : Module("Combat Macro") {
   private var nextAttackNs = 0L
   private var startedPath = false
   private var currentTargetId: UUID? = null
+  private var closeChaseActive = false
+  private var closeChaseTargetId: UUID? = null
+  private var losScanStrafeRight = false
+  private var losScanLastFlipTick = 0L
   private var lastPathStartTick = 0L
   private var killCandidateId: UUID? = null
   private var killCandidateName: String? = null
+  private var killCandidateWasSlayerMob = false
+  private var killCandidateWasSlayerBoss = false
   private var killCandidateExpiresTick = 0L
   private var killCandidateAttackTick = 0L
   private val learnedWhitelist = LinkedHashSet<String>()
@@ -468,7 +653,22 @@ object CombatMacroModule : Module("Combat Macro") {
   private var startAreaOrigin: BlockPos? = null
   private var pendingHealRelease = false
   private var pendingHealRestoreSlot = -1
+  private var pendingOverfluxLookDownTicks = 0
+  private var pendingOverfluxRecoverLookTicks = 0
+  private var pendingOverfluxRestoreSlot = -1
   private var slayerBossActive = false
+  private var slayerSessionStartMs = 0L
+  private var slayerTrackedQuestActive = false
+  private var slayerTrackedQuestType = -1
+  private var slayerTrackedQuestTier = 0
+  private var slayerTrackedQuestProgressKills = 0
+  private var slayerTrackedQuestTargetKills = 0
+  private var slayerTrackedQuestSawMobKill = false
+  private var slayerTrackedQuestBossSeen = false
+  private var slayerTrackedQuestCompletionPendingRestart = false
+  private var slayerSessionMobKills = 0
+  private var slayerSessionQuestCompletions = 0
+  private var slayerSessionQuestFailures = 0
   private var slayerBossLastSeenTick = 0L
   private var slayerOverfluxUsedThisBoss = false
   private var slayerRagnarokUsedThisBoss = false
@@ -496,6 +696,12 @@ object CombatMacroModule : Module("Combat Macro") {
   private var slayerLastGuiActionTick = -1L
   private var slayerWarnNoBatphoneTick = -1L
   private var slayerModeEnabled = false
+  private var slayerQuestStateGraceUntilTick = -1L
+  private var spiderHatchlingsPhaseActive = false
+  private var spiderHatchlingsPhaseUntilTick = -1L
+  private var spiderHatchlingsBossId: UUID? = null
+  private var spiderHatchlingsBossAnchor: net.minecraft.world.phys.Vec3? = null
+  private var wolfPupsPhaseUntilTick = -1L
   /** True once the player has physically been confirmed inside the crypt since the last warp-hub.
    *  The outside-crypt recovery check only fires when this is true, preventing the startup spam
    *  loop where the player warps to hub and the check immediately re-triggers before they arrive. */
@@ -505,19 +711,23 @@ object CombatMacroModule : Module("Combat Macro") {
   private var overfluxWasInHotbar = false
   private var ragnarokWasInHotbar = false
   private var badHealthWasInHotbar = false
+  private val overfluxLookDownStrategy = TimedEaseStrategy(EasingType.LINEAR, EasingType.LINEAR, 220L)
 
   init {
     assignSettingGroups()
-    addSetting(
-      enabled,
-      info,
-      targetName,
-      cryptZombieSlayer,
-      slayerStatus,
-      slayerType,
+      addSetting(
+        enabled,
+        info,
+        targetName,
+        cryptZombieSlayer,
+        slayerStatus,
+        slayerType,
       slayerTier,
       slayerAutoWarp,
       slayerLocation,
+      slayerBossNotification,
+      slayerBossEsp,
+      slayerEspTargets,
       slayerWalkbackRoute,
       patrolRouteNameProxy,
       patrolLoadAction,
@@ -532,6 +742,21 @@ object CombatMacroModule : Module("Combat Macro") {
       stayNearStart,
       startAreaRadius,
       oneTapMode,
+      combatMode,
+      zombieDynamicCombat,
+      zombieSpawnWeapon,
+      zombieDynamicSword,
+      endermanDynamicCombat,
+      emanSpawnWeapon,
+      emanDynamicSwapRange,
+      emanHitPhaseWeapon,
+      emanBossWeapon,
+      spiderPhaseBowCombat,
+      wolfIgnorePups,
+      swordKeepDistance,
+      bowMinRange,
+      bowElevationPerBlock,
+      mageElevationPerBlock,
       autoHeal,
       autoWandOfAtonement,
       autoZombieSword,
@@ -554,12 +779,12 @@ object CombatMacroModule : Module("Combat Macro") {
   }
 
   private fun assignSettingGroups() {
-    enabled.inGroup(TAB_COMBAT_GROUP)
-    info.inGroup(TAB_COMBAT_GROUP)
-    targetName.inGroup(TAB_COMBAT_GROUP)
-    searchRange.inGroup(TAB_COMBAT_GROUP)
-    minCps.inGroup(TAB_COMBAT_GROUP)
-    maxCps.inGroup(TAB_COMBAT_GROUP)
+      enabled.inGroup(TAB_COMBAT_GROUP)
+      info.inGroup(TAB_COMBAT_GROUP)
+      targetName.inGroup(TAB_COMBAT_GROUP)
+      searchRange.inGroup(TAB_COMBAT_GROUP)
+      minCps.inGroup(TAB_COMBAT_GROUP)
+      maxCps.inGroup(TAB_COMBAT_GROUP)
     attackRange.inGroup(TAB_COMBAT_GROUP)
     chaseStopBuffer.inGroup(TAB_COMBAT_GROUP)
     stayNearStart.inGroup(TAB_COMBAT_GROUP)
@@ -580,10 +805,17 @@ object CombatMacroModule : Module("Combat Macro") {
     slayerType.inGroup(TAB_SLAYER_GROUP)
     slayerTier.inGroup(TAB_SLAYER_GROUP)
     slayerAutoWarp.inGroup(TAB_SLAYER_GROUP)
+    slayerBossNotification.inGroup(TAB_SLAYER_GROUP)
+    slayerBossEsp.inGroup(TAB_SLAYER_GROUP)
+    slayerEspTargets.inGroup(TAB_SLAYER_GROUP)
 
     slayerLocation.inGroup(TAB_SLAYER_SETTINGS_GROUP)
     slayerWalkbackRoute.inGroup(TAB_SLAYER_SETTINGS_GROUP)
-
+    endermanDynamicCombat.inGroup(TAB_SLAYER_SETTINGS_GROUP)
+    emanSpawnWeapon.inGroup(TAB_SLAYER_SETTINGS_GROUP)
+    emanDynamicSwapRange.inGroup(TAB_SLAYER_SETTINGS_GROUP)
+    emanHitPhaseWeapon.inGroup(TAB_SLAYER_SETTINGS_GROUP)
+    emanBossWeapon.inGroup(TAB_SLAYER_SETTINGS_GROUP)
     patrolRouteNameProxy.inGroup(TAB_PATROL_GROUP)
     patrolLoadAction.inGroup(TAB_PATROL_GROUP)
     patrolSaveAction.inGroup(TAB_PATROL_GROUP)
@@ -591,6 +823,16 @@ object CombatMacroModule : Module("Combat Macro") {
     patrolStopAction.inGroup(TAB_PATROL_GROUP)
 
     oneTapMode.inGroup(TAB_COMBAT_GROUP)
+    combatMode.inGroup(TAB_COMBAT_GROUP)
+    zombieDynamicCombat.inGroup(TAB_COMBAT_GROUP)
+    zombieSpawnWeapon.inGroup(TAB_COMBAT_GROUP)
+    zombieDynamicSword.inGroup(TAB_COMBAT_GROUP)
+    spiderPhaseBowCombat.inGroup(TAB_COMBAT_GROUP)
+    wolfIgnorePups.inGroup(TAB_COMBAT_GROUP)
+    swordKeepDistance.inGroup(TAB_COMBAT_GROUP)
+    bowMinRange.inGroup(TAB_COMBAT_GROUP)
+    bowElevationPerBlock.inGroup(TAB_COMBAT_GROUP)
+    mageElevationPerBlock.inGroup(TAB_COMBAT_GROUP)
     autoHeal.inGroup(TAB_AUTO_ITEMS_GROUP)
     autoWandOfAtonement.inGroup(TAB_AUTO_ITEMS_GROUP)
     autoZombieSword.inGroup(TAB_AUTO_ITEMS_GROUP)
@@ -622,7 +864,28 @@ object CombatMacroModule : Module("Combat Macro") {
       pendingHealRestoreSlot = -1
     }
 
-    val player = mc.player ?: return
+    val player = mc.player ?: run {
+      clearPendingOverfluxPlacement()
+      return
+    }
+    if (pendingOverfluxLookDownTicks > 0) {
+      pendingOverfluxLookDownTicks--
+      MovementManager.clearForcedMovement()
+      RotationExecutor.rotateTo(Rotation(player.yRot, OVERFLUX_PLACE_PITCH), overfluxLookDownStrategy)
+      if (pendingOverfluxLookDownTicks <= 0) {
+        RotationExecutor.stopRotating()
+        mc.options.keyUse?.setDown(true)
+        pendingHealRelease = true
+        pendingHealRestoreSlot = pendingOverfluxRestoreSlot
+        pendingOverfluxRecoverLookTicks = OVERFLUX_RECOVER_LOOK_TICKS
+        pendingOverfluxRestoreSlot = -1
+      }
+      return
+    }
+    if (pendingOverfluxRecoverLookTicks > 0) {
+      pendingOverfluxRecoverLookTicks--
+      applyOverfluxRecoverLook(player)
+    }
     syncAutoItemToggles(player)
     if (startedPath && !nativeActive()) {
       startedPath = false
@@ -631,17 +894,20 @@ object CombatMacroModule : Module("Combat Macro") {
     if (startedPath && nativeActive() && !CombatPatrolModule.patrolOwnsPathfinder && !slayerNeedsWalkback) {
       val cmd = NativePathfinder.tick()
       if (cmd != null) cmd.applyToPlayer()
-      else MovementManager.clearForcedMovement()  // PLANNING: clear stale flags (prevents jump spam)
+      else {
+        when (NativePathfinder.status) {
+          PathStatus.IDLE, PathStatus.ARRIVED, PathStatus.FAILED -> MovementManager.clearForcedMovement()
+          else -> Unit
+        }
+      }
     }
     syncLearnedWhitelistFromSetting()
     if (cryptZombieSlayer.value && !slayerModeEnabled && enabled.value) {
       slayerModeEnabled = true
-      slayerNeedsQuestRestart = false  // detection will set this if no quest found
-      slayerQuestReady = false
+      beginSlayerSession()
+      beginSlayerQuestDetection(mc.level?.gameTime ?: -1L)
       slayerRagnarokUsedPreBoss = false
-      slayerAutoDetected = false
       slayerEnteredCrypt = false
-      slayerDetectStartTick = mc.level?.gameTime ?: -1L
       slayerLastBatphoneAttemptTick = -1L
       slayerLastBatphoneUseTick = -1L
       slayerLastGuiActionTick = -1L
@@ -692,7 +958,7 @@ object CombatMacroModule : Module("Combat Macro") {
       if (slayerNeedsQuestClaim) {
         if (handleClaimSlayerQuest(player, level)) return
       }
-      // Legacy hub-warp delay — drained on upgrade; can be removed once all users have new config.
+      // Legacy hub-warp delay - drained on upgrade; can be removed once all users have new config.
       if (slayerWalkInDelayUntilTick >= 0L) {
         if (level.gameTime < slayerWalkInDelayUntilTick) {
           slayerStatus.value = "Warping to Hub..."
@@ -702,11 +968,11 @@ object CombatMacroModule : Module("Combat Macro") {
         triggerWalkToFarmArea(justFarm = true)
       }
       if (slayerNeedsWalkback) {
-        // Walkback owns the pathfinder — prevent CombatMacroModule from double-ticking it.
+        // Walkback owns the pathfinder - prevent CombatMacroModule from double-ticking it.
         startedPath = false
         lastTargetPos = null
         if (WalkbackBridge.isRunning?.invoke() == true) {
-          // Boss spawned during walkback — interrupt immediately and engage.
+          // Boss spawned during walkback - interrupt immediately and engage.
           if (slayerBossActive) {
             WalkbackBridge.stopWalkback?.invoke()
             slayerNeedsWalkback = false
@@ -715,18 +981,17 @@ object CombatMacroModule : Module("Combat Macro") {
             // fall through to combat resolution below
           } else {
             slayerStatus.value = if (slayerWalkbackJustFarm) "Walking to Farm..." else "Walking Back..."
-            return
+            currentTargetId = null
           }
         } else {
           slayerNeedsWalkback = false
           startAreaOrigin = null
           if (slayerWalkbackJustFarm) {
             slayerWalkbackJustFarm = false
-            // Walkback complete — ensure quest detection runs for fresh quest
-            slayerAutoDetected = false
-            slayerDetectStartTick = mc.level?.gameTime ?: -1L
+            // Walkback complete - ensure quest detection runs for fresh quest
+            beginSlayerQuestDetection(mc.level?.gameTime ?: -1L)
           } else {
-            slayerNeedsQuestRestart = true
+            queueSlayerQuestRestart(countFailure = false)
           }
         }
       }
@@ -753,14 +1018,14 @@ object CombatMacroModule : Module("Combat Macro") {
 
     if (player.isDeadOrDying || player.health <= 0f) {
       if (cryptZombieSlayer.value && !slayerDeathRespawnPending) {
-        // Slayer: don't stop — queue walkback for when the player respawns.
+        // Slayer: don't stop - queue walkback for when the player respawns.
         slayerDeathRespawnPending = true
         if (CombatPatrolModule.isPatrolRunning) CombatPatrolModule.stopPatrol()
         if (PathfindingModule.isPatrolActive) PathfindingModule.stopPatrol()
         if (slayerNeedsWalkback) WalkbackBridge.stopWalkback?.invoke()
         slayerNeedsWalkback = false
         nativeStop()
-        slayerStatus.value = "Died — respawning..."
+        slayerStatus.value = "Died - respawning..."
       } else if (!cryptZombieSlayer.value) {
         stopMacro()
       }
@@ -776,7 +1041,7 @@ object CombatMacroModule : Module("Combat Macro") {
     if (stayNearStart.value && startAreaOrigin == null) {
       val pos = player.blockPosition()
       // For crypt location, only anchor the start area when the player is actually
-      // inside the crypt — prevents hub spawn from being used as the anchor point
+      // inside the crypt - prevents hub spawn from being used as the anchor point
       // which would block the walk-in route.
       val shouldAnchor = !(cryptZombieSlayer.value && slayerLocation.value == 1) ||
         CRYPT_PATROL_WAYPOINTS.any { wp ->
@@ -798,9 +1063,9 @@ object CombatMacroModule : Module("Combat Macro") {
         dx * dx + dz * dz < CRYPT_PROXIMITY_RANGE_SQ
       }
       if (inCrypt) {
-        slayerEnteredCrypt = true   // confirmed inside — enable recovery trigger
+        slayerEnteredCrypt = true   // confirmed inside - enable recovery trigger
       } else if (slayerEnteredCrypt) {
-        // Was inside the crypt but now isn't — navigate back via walkback route.
+        // Was inside the crypt but now isn't - navigate back via walkback route.
         ChatUtils.sendMessage("Combat macro: outside crypt, walking back.")
         startAreaOrigin = null
         slayerEnteredCrypt = false
@@ -809,14 +1074,23 @@ object CombatMacroModule : Module("Combat Macro") {
       }
       // If !inCrypt && !slayerEnteredCrypt: still making initial walk-in, do nothing here
     }
-    // Don't enforce start area when the slayer boss is active — chase it wherever it goes
+    // Walkback owns pathfinding - yield before enforceStartArea can override it.
+    if (slayerNeedsWalkback && WalkbackBridge.isRunning?.invoke() == true && !slayerBossActive) {
+      currentTargetId = null
+      return
+    }
+    // Don't enforce start area when the slayer boss is active - chase it wherever it goes
     if (!(cryptZombieSlayer.value && slayerBossActive) && enforceStartArea(player, level)) {
       return
     }
 
     val target = if (cryptZombieSlayer.value) resolveSlayerTarget(player, level) else resolveTarget(player)
+    if (cryptZombieSlayer.value) {
+      tryUseSlayerSupportItems(player, target, level.gameTime)
+    }
     if (target == null) {
-      // Boss is active but not yet visible — walk toward its last known position so we can find it.
+      resetCloseChase()
+      // Boss is active but not yet visible - walk toward its last known position so we can find it.
       if (cryptZombieSlayer.value && slayerBossActive) {
         val bossPos = slayerBossLastPos
         if (bossPos != null) {
@@ -836,7 +1110,7 @@ object CombatMacroModule : Module("Combat Macro") {
           return
         }
       }
-      // No target — hand off to CombatPatrolModule if patrol points are configured.
+      // No target - hand off to CombatPatrolModule if patrol points are configured.
       if (CombatPatrolModule.patrolPoints.isNotEmpty() && !CombatPatrolModule.isPatrolRunning) {
         CombatPatrolModule.startPatrol()
       }
@@ -844,7 +1118,7 @@ object CombatMacroModule : Module("Combat Macro") {
         when (CombatPatrolModule.patrolState) {
           CombatPatrolModule.PatrolState.COMBAT_INTERRUPT -> CombatPatrolModule.onCombatResume()
           CombatPatrolModule.PatrolState.AT_KILL_ZONE     -> CombatPatrolModule.onKillZoneCleared()
-          else -> { /* NAVIGATING/WARPING — patrol owns movement */ }
+          else -> { /* NAVIGATING/WARPING - patrol owns movement */ }
         }
         if (startedPath && nativeActive() && !CombatPatrolModule.patrolOwnsPathfinder) nativeStop()
         startedPath = false; lastTargetPos = null; currentTargetId = null
@@ -857,40 +1131,79 @@ object CombatMacroModule : Module("Combat Macro") {
       startedPath = false
       lastTargetPos = null
       currentTargetId = null
+      MovementManager.clearForcedMovement()
       return
     }
 
     val dist = player.distanceTo(target)
-    val inAttackRange = dist <= attackRange.value
-    val inCloseChaseRange = dist <= attackRange.value + chaseStopBuffer.value
+    val pathActiveNow = startedPath && nativeActive()
+    val hasLos = player.hasLineOfSight(target)
+    val activeCombatMode = effectiveCombatMode(target)
+    val engageRange = combatEngageRange(activeCombatMode)
+    val keepDistance = combatKeepDistance(activeCombatMode)
+    val suppressAttack = cryptZombieSlayer.value && shouldSuppressSlayerAttack(target, level.gameTime)
+    val inAttackRange =
+      when (activeCombatMode) {
+        0 -> dist <= attackRange.value
+        else -> hasLos && dist <= engageRange
+      }
+    val inKeepDistanceZone =
+      when (activeCombatMode) {
+        0 -> dist <= keepDistance
+        else -> hasLos && dist <= keepDistance
+      }
+    val inCloseChaseRange = dist <= engageRange + chaseStopBuffer.value
 
     ensurePreferredWeapon(player, target, level.gameTime)
     if (cryptZombieSlayer.value) {
-      ensureSlayerWeapon(player)
-      tryUseSlayerSupportItems(player, target, level.gameTime)
+      ensureSlayerWeapon(player, target)
     }
 
-    if (inCloseChaseRange) {
-      // Always update the rotation target so the camera smoothly tracks a moving mob.
-      // BezierTrackingRotationStrategy + snapThreshold handle natural deceleration near target.
-      RotationExecutor.rotateTo(AngleUtils.getRotation(target), rotationStrategy)
-    } else if (dist > attackRange.value + chaseStopBuffer.value + ROTATION_STOP_HYSTERESIS) {
-      // Only stop rotating once clearly out of range — prevents rapid start/stop at the boundary.
+    val aimRotation = if (activeCombatMode != 0) rangedAimRotation(player, target, activeCombatMode) else AngleUtils.getRotation(target)
+    val phaseMovementActive =
+      if (cryptZombieSlayer.value) {
+        handleSlayerPhaseMovement(player, target, dist.toDouble(), hasLos, activeCombatMode, level.gameTime)
+      } else {
+        false
+      }
+    if (inCloseChaseRange && (hasLos || inAttackRange)) {
+      // Let native path rotation steer the player until it has fully arrived;
+      // overriding it early makes the movement drift off-path and circle.
+      if (!pathActiveNow || inAttackRange) {
+        RotationExecutor.rotateTo(aimRotation, rotationStrategy)
+      }
+    } else if (!pathActiveNow && !inCloseChaseRange && dist > attackRange.value + chaseStopBuffer.value + ROTATION_STOP_HYSTERESIS) {
       RotationExecutor.stopRotating()
     }
 
-    if (inAttackRange) {
-      if (!oneTapMode.value && startedPath && nativeActive()) {
+    if (inAttackRange || inKeepDistanceZone) {
+      if (!oneTapMode.value && inKeepDistanceZone && startedPath && nativeActive()) {
         nativeStop()
       }
-      if (!oneTapMode.value) {
+      if (!oneTapMode.value && inKeepDistanceZone) {
         startedPath = false
         lastTargetPos = null
       }
       stuckRepathCount = 0
-      attemptAttack(player, target)
+      if (inAttackRange) {
+        losScanLastFlipTick = 0L
+        val keepRangedMomentum = activeCombatMode != 0 && oneTapMode.value && pathActiveNow
+        if (!keepRangedMomentum && !phaseMovementActive) {
+          MovementManager.clearForcedMovement()
+        }
+        if (!suppressAttack) {
+          attemptAttack(player, target, activeCombatMode)
+        }
+      } else {
+        // In range but no LOS - face target and strafe to find a clear angle
+        RotationExecutor.rotateTo(aimRotation, rotationStrategy)
+        applyLosStrafeScan(level.gameTime)
+      }
+    } else if (slayerNeedsWalkback) {
+      // Walkback owns movement - don't chase, just rotate toward target so we can attack when it comes in range.
+      RotationExecutor.rotateTo(aimRotation, rotationStrategy)
     } else {
-      // Target spotted — stop kill patrol so combat macro can take over pathfinding.
+      // Target spotted - stop kill patrol so combat macro can take over pathfinding.
       if (PathfindingModule.isPatrolActive) PathfindingModule.stopPatrol()
       if (CombatPatrolModule.patrolState == CombatPatrolModule.PatrolState.NAVIGATING ||
           CombatPatrolModule.patrolState == CombatPatrolModule.PatrolState.WARPING) {
@@ -899,10 +1212,22 @@ object CombatMacroModule : Module("Combat Macro") {
       val targetPos = target.blockPosition()
       val last = lastTargetPos
       val targetMovedFar = last == null || last.distSqr(targetPos) > TARGET_REPATH_DISTANCE_SQ
-      if (!nativeActive() || targetMovedFar) {
+      val pathDone = !pathActiveNow
+      val directChaseZone = activeCombatMode == 0 && shouldUseDirectChase(target, hasLos, dist.toDouble())
+      if (directChaseZone) {
+        // Once LOS is established and the target is close enough, stop letting the
+        // pathfinder keep re-solving around the mob and finish the approach with
+        // strict forward-only chase.
+        if (pathActiveNow) {
+          nativeStop()
+        }
+        startedPath = false
+        lastTargetPos = null
+        handleSoftChaseMovement(player, target, dist.toDouble())
+      } else if (pathDone || targetMovedFar) {
         if (level.gameTime - lastPathStartTick >= MIN_PATH_START_INTERVAL_TICKS) {
           lastPathStartTick = level.gameTime
-          val started = startCombatPathToTarget(level, targetPos)
+          val started = startCombatPathToTarget(level, targetPos, activeCombatMode)
           if (started) {
             lastTargetPos = targetPos
             startedPath = true
@@ -916,13 +1241,18 @@ object CombatMacroModule : Module("Combat Macro") {
       }
     }
 
-    updateStuck(player, inAttackRange, level)
+    updateStuck(player, inAttackRange || inKeepDistanceZone, level)
   }
 
   @SubscribeEvent
   fun onRender(event: WorldRenderEvent.Last) {
     if (!enabled.value) return
     val level = mc.level ?: return
+
+    if (cryptZombieSlayer.value && slayerBossEsp.value) {
+      renderSlayerHighlights(event.context, level)
+    }
+
     val targetId = currentTargetId ?: return
     val target = level.entitiesForRendering().firstOrNull { it.uuid == targetId } as? LivingEntity ?: return
     if (!target.isAlive || target.health <= 0f) return
@@ -956,11 +1286,12 @@ object CombatMacroModule : Module("Combat Macro") {
     }
     val filter = targetName.value.trim().lowercase()
     val blacklisted = builtInBlacklistedNames
+    // Patrol running (non-kill-zone): bypass stayNearStart - patrol route defines the area.
     val startOrigin =
-      if (stayNearStart.value) {
-        startAreaOrigin ?: player.blockPosition().also { startAreaOrigin = it }
-      } else {
+      if (CombatPatrolModule.isPatrolRunning || !stayNearStart.value) {
         null
+      } else {
+        startAreaOrigin ?: player.blockPosition().also { startAreaOrigin = it }
       }
     val startAreaRangeSq = startAreaRadius.value * startAreaRadius.value
 
@@ -993,14 +1324,26 @@ object CombatMacroModule : Module("Combat Macro") {
 
   private fun resolveSlayerTarget(player: Player, level: ClientLevel): LivingEntity? {
     val blacklisted = builtInBlacklistedNames
-    val startOrigin =
-      if (stayNearStart.value) {
-        startAreaOrigin ?: player.blockPosition().also { startAreaOrigin = it }
-      } else {
-        null
-      }
-    val startAreaRangeSq = startAreaRadius.value * startAreaRadius.value
-    val searchRangeSq = searchRange.value * searchRange.value
+    // Kill zone mode: when patrol is AT_KILL_ZONE, anchor the mob search around the kill
+    // point instead of startAreaOrigin. This matches how resolveTarget() works and prevents
+    // the slayer from marking the kill zone "cleared" before any mobs there are targeted.
+    val killPoint = CombatPatrolModule.currentKillPoint
+    val patrolRunning = CombatPatrolModule.isPatrolRunning
+    val startOrigin = when {
+      // Kill zone: anchor search around the kill point
+      killPoint != null -> BlockPos(killPoint.x, killPoint.y, killPoint.z)
+      // Patrol navigating: don't constrain by startAreaOrigin - patrol route defines the area
+      patrolRunning -> null
+      stayNearStart.value -> startAreaOrigin ?: player.blockPosition().also { startAreaOrigin = it }
+      else -> null
+    }
+    val startAreaRangeSq = when {
+      killPoint != null -> CombatPatrolModule.killZoneRadiusValue.let { it * it }
+      else -> startAreaRadius.value * startAreaRadius.value
+    }
+    // In kill zone mode the kill-point radius already constrains the search; skip the
+    // player-distance searchRange filter so mobs at the kill zone are never missed.
+    val searchRangeSq = if (killPoint != null) Double.POSITIVE_INFINITY else searchRange.value * searchRange.value
     var bestBoss: LivingEntity? = null
     var bestBossDist = Double.POSITIVE_INFINITY
     var bestPriorityMob: LivingEntity? = null
@@ -1010,16 +1353,16 @@ object CombatMacroModule : Module("Combat Macro") {
 
     for (entity in level.entitiesForRendering()) {
       val living = entity as? LivingEntity ?: continue
-      if (!isValidTarget(living, player, blacklisted, "", true)) continue
+      if (!isValidTarget(living, player, blacklisted, "", true, ignoreWhitelist = true)) continue
 
-      val name = normalizeNameForMatch(living.name.string)
+      val name = normalizedTargetDisplayName(living)
       val isBoss = isSlayerBossName(name)
       val isPriority = isSlayerPriorityMobName(name)
       val isFarmMob = isSlayerFarmMobName(name)
       if (!isBoss && !isPriority && !isFarmMob) continue
 
       if (startOrigin != null && !isBoss) {
-        // Boss ignores start area — chase it wherever it goes
+        // Boss ignores start area - chase it wherever it goes
         val ox = living.x - (startOrigin.x + 0.5)
         val oz = living.z - (startOrigin.z + 0.5)
         if (ox * ox + oz * oz > startAreaRangeSq) continue
@@ -1052,9 +1395,15 @@ object CombatMacroModule : Module("Combat Macro") {
       clearSlayerBossState()
     }
 
+    updateSlayerBossPhaseState(level, bestBoss)
+    val phaseTarget = if (slayerBossActive) resolveSlayerPhaseTarget(player, level, bestBoss) else null
+
     // Priority: boss > priority farm mob (rare/bonus) > regular farm mob
-    val selected = if (slayerBossActive) bestBoss
-      else bestBoss ?: bestPriorityMob ?: bestFarmMob
+    val selected = when {
+      phaseTarget != null -> phaseTarget
+      slayerBossActive -> bestBoss
+      else -> bestBoss ?: bestPriorityMob ?: bestFarmMob
+    }
     if (selected != null) {
       currentTargetId = selected.uuid
     }
@@ -1063,25 +1412,37 @@ object CombatMacroModule : Module("Combat Macro") {
 
   private fun updateSlayerBossState(nowTick: Long) {
     val tabLines = readTabListLines(nowTick)
-    val hasBossTabLine = tabLines.any { line -> SLAYER_BOSS_TAB_KEYWORDS.any { keyword -> line.contains(keyword) } }
-    val hasClearTabLine = tabLines.any { line -> SLAYER_BOSS_CLEAR_KEYWORDS.any { keyword -> line.contains(keyword) } }
-    val hasQuestTabLine = tabLines.any { line ->
-      SLAYER_QUEST_TAB_KEYWORDS.any { keyword -> line.contains(keyword) }
-        || SLAYER_GENERIC_QUEST_KEYWORDS.any { keyword -> line.contains(keyword) }
+    val scoreboardLines = readScoreboardSidebarLines(mc.level)
+    for (line in scoreboardLines) {
+      applyQuestDetection(line, "scoreboard", nowTick)
+      applyQuestProgressDetection(line, nowTick)
     }
+    for (line in tabLines) {
+      applyQuestDetection(line, "tab", nowTick)
+      applyQuestProgressDetection(line, nowTick)
+    }
+    val questLines = tabLines + scoreboardLines
+    val hasBossTabLine = questLines.any { line -> SLAYER_BOSS_TAB_KEYWORDS.any { keyword -> line.contains(keyword) } }
+    val hasClearTabLine = questLines.any { line -> SLAYER_BOSS_CLEAR_KEYWORDS.any { keyword -> line.contains(keyword) } }
+    val hasQuestTabLine = questLines.any { line ->
+      lineHasActiveSlayerQuestSignal(line)
+    }
+    val questStateSettling = isSlayerQuestStateSettling(nowTick)
 
     if (hasBossTabLine) {
       onSlayerBossDetected(nowTick)
-      slayerNeedsQuestRestart = false
+      confirmActiveSlayerQuest(nowTick)
       slayerQuestReady = false
     } else {
       if (hasClearTabLine) {
         if (slayerBossActive) {
           clearSlayerBossState()
         }
-        slayerNeedsQuestRestart = true
+        if (!questStateSettling) {
+          queueSlayerQuestRestart()
+        }
       } else if (hasQuestTabLine) {
-        slayerNeedsQuestRestart = false
+        confirmActiveSlayerQuest(nowTick)
       }
       if (slayerBossActive && nowTick - slayerBossLastSeenTick > SLAYER_BOSS_TAB_LOST_TICKS) {
         clearSlayerBossState()
@@ -1090,6 +1451,9 @@ object CombatMacroModule : Module("Combat Macro") {
 
     slayerStatus.value =
       when {
+        slayerBossActive && isSpiderBossHatchlingsPhaseActive(nowTick) -> "Boss Active - Hatchlings"
+        slayerBossActive && isWolfBossPupsPhaseActive(nowTick) ->
+          if (wolfIgnorePups.value) "Boss Active - Pups (Ignored)" else "Boss Active - Pups"
         slayerBossActive -> "Boss Active"
         slayerNeedsQuestClaim -> "Claiming Loot"
         slayerQuestReady -> "Quest Ready!"
@@ -1101,13 +1465,19 @@ object CombatMacroModule : Module("Combat Macro") {
   private fun onSlayerBossDetected(nowTick: Long) {
     val wasActive = slayerBossActive
     slayerBossActive = true
+    slayerTrackedQuestBossSeen = true
     slayerBossLastSeenTick = nowTick
     slayerNeedsQuestRestart = false
     if (!wasActive) {
       slayerOverfluxUsedThisBoss = false
       slayerRagnarokUsedThisBoss = false
       slayerLastBadHealthUseTick = -1L
-      ChatUtils.sendMessage("Combat macro: Slayer boss detected.")
+      slayerLastOverfluxUseTick = -1L
+      val bossName = slayerBossDisplayName()
+      ChatUtils.sendMessage("Combat macro: $bossName spawned.")
+      if (slayerBossNotification.value) {
+        NotificationManager.queue("Slayer Boss Spawned", bossName, 3200L)
+      }
     }
   }
 
@@ -1115,6 +1485,9 @@ object CombatMacroModule : Module("Combat Macro") {
     if (slayerBossActive && announce) {
       ChatUtils.sendMessage("Combat macro: Slayer boss no longer detected.")
     }
+    clearPendingOverfluxPlacement()
+    clearSpiderHatchlingsPhase()
+    wolfPupsPhaseUntilTick = -1L
     slayerBossActive = false
     slayerBossLastSeenTick = 0L
     slayerOverfluxUsedThisBoss = false
@@ -1125,13 +1498,12 @@ object CombatMacroModule : Module("Combat Macro") {
     slayerBossLastPos = null
   }
 
-  private fun tryUseSlayerSupportItems(player: Player, target: LivingEntity, nowTick: Long) {
+  private fun tryUseSlayerSupportItems(player: Player, target: LivingEntity?, nowTick: Long) {
     if (!slayerBossActive) return
-    if (!isSlayerBossName(normalizeNameForMatch(target.name.string))) return
-    if (pendingHealRelease || pendingHealRestoreSlot >= 0) return
+    if (pendingHealRelease || pendingHealRestoreSlot >= 0 || pendingOverfluxLookDownTicks > 0) return
 
     if (autoOverflux.value && !slayerOverfluxUsedThisBoss && nowTick - slayerLastOverfluxUseTick >= SLAYER_OVERFLUX_COOLDOWN_TICKS) {
-      if (useHotbarUtilityItem(player, SLAYER_OVERFLUX_KEYWORDS)) {
+      if (useHotbarOverflux(player)) {
         slayerOverfluxUsedThisBoss = true
         slayerLastOverfluxUseTick = nowTick
         return
@@ -1208,13 +1580,12 @@ object CombatMacroModule : Module("Combat Macro") {
       slayerLastBatphoneAttemptTick = nowTick
       if (isFinalPurchase) {
         player.closeContainer()
-        slayerNeedsQuestRestart = false
-        slayerQuestReady = false
+        beginSlayerQuestDetection(nowTick)
+        startTrackedSlayerQuest(slayerType.value, slayerTier.value.toInt())
         slayerRagnarokUsedPreBoss = false
-        slayerAutoDetected = true
         startAreaOrigin = null
         if (cryptZombieSlayer.value && slayerLocation.value == 1) {
-          // Crypt: check if already inside the farming area — if so skip the warp and walk-in.
+          // Crypt: check if already inside the farming area - if so skip the warp and walk-in.
           val alreadyInCrypt = CRYPT_PATROL_WAYPOINTS.any { wp ->
             val dx = wp.x - player.x; val dz = wp.z - player.z
             dx * dx + dz * dz < CRYPT_PROXIMITY_RANGE_SQ
@@ -1249,29 +1620,23 @@ object CombatMacroModule : Module("Combat Macro") {
   private fun finishSlayerClaim() {
     slayerNeedsQuestClaim = false
     slayerBossLastPos = null
-    // Crypt: use the configured walkback route to walk out and back to hub for quest restart.
-    if (slayerLocation.value == 1 && cryptZombieSlayer.value) {
-      val routeName = slayerWalkbackRoute.value.trim()
-      if (!slayerAutoWarp.value && routeName.isNotBlank()) {
-        val started = WalkbackBridge.startWalkback?.invoke(routeName, 5) ?: false
-        if (started) {
-          slayerNeedsWalkback = true
-          return
-        }
-      }
-      slayerNeedsQuestRestart = true
-      return
-    }
-    // Graveyard: use configured walkback route if auto-warp is off.
     val routeName = slayerWalkbackRoute.value.trim()
     if (!slayerAutoWarp.value && routeName.isNotBlank()) {
-      val started = WalkbackBridge.startWalkback?.invoke(routeName, 5) ?: false
+      if (startedPath && nativeActive()) nativeStop()
+      startedPath = false
+      lastTargetPos = null
+      currentTargetId = null
+      stuckTicks = 0
+      stuckRepathCount = 0
+      RotationExecutor.stopRotating()
+      MovementManager.clearForcedMovement()
+      val started = WalkbackBridge.startWalkback?.invoke(routeName, 5, true) ?: false
       if (started) {
         slayerNeedsWalkback = true
         return
       }
     }
-    slayerNeedsQuestRestart = true
+    queueSlayerQuestRestart(countFailure = false)
   }
 
   /**
@@ -1281,7 +1646,7 @@ object CombatMacroModule : Module("Combat Macro") {
   private fun handleClaimSlayerQuest(player: LocalPlayer, level: ClientLevel): Boolean {
     val nowTick = level.gameTime
 
-    // Timeout — give up and restart the quest anyway
+    // Timeout - give up and restart the quest anyway
     if (slayerClaimStartTick >= 0L && nowTick - slayerClaimStartTick > SLAYER_CLAIM_TIMEOUT_TICKS) {
       finishSlayerClaim()
       return false
@@ -1289,7 +1654,7 @@ object CombatMacroModule : Module("Combat Macro") {
 
     val deathPos = slayerBossLastPos
     if (deathPos == null) {
-      // No tracked position — skip straight to restart
+      // No tracked position - skip straight to restart
       finishSlayerClaim()
       return false
     }
@@ -1315,7 +1680,7 @@ object CombatMacroModule : Module("Combat Macro") {
       }
 
     if (lootEntity == null) {
-      // No loot bag found yet — walk to death pos and keep waiting
+      // No loot bag found yet - walk to death pos and keep waiting
       val targetPos = BlockPos(deathPos.x.toInt(), deathPos.y.toInt(), deathPos.z.toInt())
       if (!nativeActive() || lastTargetPos != targetPos) {
         if (nowTick - lastPathStartTick >= MIN_PATH_START_INTERVAL_TICKS) {
@@ -1331,7 +1696,7 @@ object CombatMacroModule : Module("Combat Macro") {
       return true
     }
 
-    // Loot entity found — stop pathing, look at it and right-click
+    // Loot entity found - stop pathing, look at it and right-click
     if (startedPath && nativeActive()) {
       nativeStop()
       startedPath = false
@@ -1384,12 +1749,12 @@ object CombatMacroModule : Module("Combat Macro") {
     val msg = ChatFormatting.stripFormatting(raw)?.lowercase(Locale.ROOT)?.trim() ?: return
 
     if (enabled.value) {
-      // Player name mentioned in chat → play system alert sound.
+      // Player name mentioned in chat -> play system alert sound.
       val ign = mc.player?.gameProfile?.name?.lowercase(Locale.ROOT) ?: ""
       if (ign.isNotEmpty() && msg.contains(ign)) {
         java.awt.Toolkit.getDefaultToolkit().beep()
       }
-      // Evacuated from hub or moved to different server → walk back to farm area.
+      // Evacuated from hub or moved to different server -> walk back to farm area.
       if (msg.contains("evacuated from") || msg.contains("moved to a different server")) {
         triggerWalkToFarmArea(justFarm = false)
         return
@@ -1399,18 +1764,27 @@ object CombatMacroModule : Module("Combat Macro") {
     if (!cryptZombieSlayer.value) return
 
     if (SLAYER_QUEST_READY_CHAT_KEYWORDS.any { msg.contains(it) }) {
+      confirmActiveSlayerQuest(mc.level?.gameTime ?: -1L)
       slayerQuestReady = true
-      slayerNeedsQuestRestart = false
-      ChatUtils.sendMessage("Combat macro: Quest ready — Ragnarok prepped for boss spawn.")
+      ChatUtils.sendMessage("Combat macro: Quest ready - Ragnarok prepped for boss spawn.")
     }
 
     if (SLAYER_BOSS_SPAWNED_CHAT_KEYWORDS.any { msg.contains(it) }) {
       val level = mc.level ?: return
       onSlayerBossDetected(level.gameTime)
+      confirmActiveSlayerQuest(level.gameTime)
       slayerQuestReady = false
     }
 
+    if (shouldUseSpiderPhaseBowCombat() &&
+      msg.contains("broodfather's hatchlings") &&
+      msg.contains("before it can be damaged again")
+    ) {
+      activateSpiderHatchlingsPhase(mc.level?.gameTime ?: -1L)
+    }
+
     if (SLAYER_BOSS_KILLED_CHAT_KEYWORDS.any { msg.contains(it) }) {
+      completeTrackedSlayerQuest()
       clearSlayerBossState(false)
       slayerNeedsQuestClaim = true
       slayerClaimStartTick = mc.level?.gameTime ?: -1L
@@ -1419,48 +1793,117 @@ object CombatMacroModule : Module("Combat Macro") {
 
   private fun tryAutoDetectSlayerQuest(level: ClientLevel) {
     val nowTick = level.gameTime
+    if (isSlayerQuestStateSettling(nowTick)) return
 
     // Scan scoreboard sidebar
-    val scoreboard = level.scoreboard
-    val objective = scoreboard.getDisplayObjective(DisplaySlot.SIDEBAR)
-    if (objective != null) {
-      for (score in scoreboard.listPlayerScores(objective)) {
-        val ownerName = score.owner()
-        val team = scoreboard.getPlayersTeam(ownerName)
-        val raw = if (team != null) team.playerPrefix.string + ownerName + team.playerSuffix.string else ownerName
-        val line = ChatFormatting.stripFormatting(raw)?.lowercase(Locale.ROOT)?.trim() ?: continue
-        if (applyQuestDetection(line, "scoreboard")) return
-      }
+    for (line in readScoreboardSidebarLines(level)) {
+      if (applyQuestDetection(line, "scoreboard", nowTick)) return
     }
 
     // Scan tab list
     val tabLines = readTabListLines(nowTick)
     for (line in tabLines) {
-      if (applyQuestDetection(line, "tab")) return
+      if (applyQuestDetection(line, "tab", nowTick)) return
     }
 
-    // Nothing found yet — only conclude "no quest" after the detection window expires
+    // Nothing found yet - only conclude "no quest" after the detection window expires
     if (slayerDetectStartTick >= 0L && nowTick - slayerDetectStartTick >= SLAYER_DETECT_WINDOW_TICKS) {
       slayerAutoDetected = true
-      slayerNeedsQuestRestart = true // no quest found in window → buy one
+      queueSlayerQuestRestart() // no quest found in window -> buy one
     }
-    // else: still within window — farming continues normally, detection runs next tick
+    // else: still within window - farming continues normally, detection runs next tick
   }
 
   /** Returns true and updates state if the line matches any active slayer quest. */
-  private fun applyQuestDetection(line: String, source: String): Boolean {
-    var typeIdx = -1
-    when {
-      line.contains("zombie slayer") || (line.contains("revenant") && line.contains("slayer")) -> typeIdx = 0
-      line.contains("wolf slayer") || (line.contains("sven") && line.contains("slayer")) -> typeIdx = 1
-      line.contains("spider slayer") || (line.contains("tarantula") && line.contains("slayer")) -> typeIdx = 2
-      line.contains("enderman slayer") || (line.contains("voidgloom") && line.contains("slayer")) -> typeIdx = 3
-      line.contains("vampire slayer") || (line.contains("riftstalker") && line.contains("slayer")) -> typeIdx = 4
-      line.contains("blaze slayer") || (line.contains("inferno") && line.contains("slayer")) -> typeIdx = 5
-    }
+  private fun applyQuestDetection(line: String, source: String, nowTick: Long): Boolean {
+    val typeIdx = detectSlayerTypeFromLine(line)
     if (typeIdx < 0) return false
 
-    val tier = when {
+    val tier = parseSlayerTierFromLine(line)
+    if (slayerType.value != typeIdx) {
+      slayerType.value = typeIdx
+      ChatUtils.sendMessage("Combat macro: Detected ${slayerType.options[typeIdx]} Slayer from $source.")
+    }
+    if (tier in 1..5) slayerTier.value = tier.toDouble()
+    confirmActiveSlayerQuest(nowTick, typeIdx, tier)
+    return true
+  }
+
+  private fun beginSlayerQuestDetection(nowTick: Long) {
+    slayerNeedsQuestRestart = false
+    slayerQuestReady = false
+    slayerAutoDetected = false
+    slayerDetectStartTick = nowTick
+    slayerQuestStateGraceUntilTick =
+      if (nowTick >= 0L) nowTick + SLAYER_QUEST_STATE_GRACE_TICKS else -1L
+  }
+
+  private fun confirmActiveSlayerQuest(
+    nowTick: Long,
+    detectedType: Int = slayerType.value,
+    detectedTier: Int = slayerTier.value.toInt(),
+  ) {
+    val resolvedType = detectedType.takeIf { it in slayerType.options.indices } ?: slayerType.value
+    val resolvedTier = detectedTier.takeIf { it in 1..5 } ?: slayerTier.value.toInt().coerceIn(1, 5)
+    slayerNeedsQuestRestart = false
+    slayerAutoDetected = true
+    slayerDetectStartTick = -1L
+    if (!slayerTrackedQuestActive || slayerTrackedQuestCompletionPendingRestart) {
+      startTrackedSlayerQuest(resolvedType, resolvedTier)
+    } else {
+      slayerTrackedQuestType = resolvedType
+      slayerTrackedQuestTier = resolvedTier
+    }
+    if (nowTick >= 0L) {
+      slayerQuestStateGraceUntilTick = nowTick + SLAYER_QUEST_STATE_GRACE_TICKS
+    }
+  }
+
+  private fun isSlayerQuestStateSettling(nowTick: Long): Boolean {
+    return slayerQuestStateGraceUntilTick >= 0L && nowTick < slayerQuestStateGraceUntilTick
+  }
+
+  private fun applyQuestProgressDetection(line: String, nowTick: Long): Boolean {
+    val progress = parseSlayerQuestProgress(line) ?: return false
+    val resolvedTier = progress.tier.takeIf { it in 1..5 } ?: slayerTier.value.toInt().coerceIn(1, 5)
+    if (!slayerTrackedQuestActive || slayerTrackedQuestCompletionPendingRestart || slayerTrackedQuestType != progress.typeIndex) {
+      startTrackedSlayerQuest(progress.typeIndex, resolvedTier)
+    }
+    confirmActiveSlayerQuest(nowTick, progress.typeIndex, resolvedTier)
+    slayerTrackedQuestTargetKills = progress.target.coerceAtLeast(progress.progress)
+    slayerTrackedQuestProgressKills = max(slayerTrackedQuestProgressKills, progress.progress)
+    slayerTrackedQuestSawMobKill = slayerTrackedQuestSawMobKill || progress.progress > 0
+    return true
+  }
+
+  private fun parseSlayerQuestProgress(line: String): SlayerQuestProgress? {
+    val match = SLAYER_PROGRESS_PATTERN.find(line) ?: return null
+    val progress = match.groupValues[1].toIntOrNull() ?: return null
+    val target = match.groupValues[2].toIntOrNull() ?: return null
+    if (target <= 0 || progress !in 0..target) return null
+    val detectedType = detectSlayerTypeFromLine(line)
+    val relevant =
+      detectedType >= 0 ||
+        line.contains("slayer quest") ||
+        SLAYER_GENERIC_QUEST_KEYWORDS.any { keyword -> line.contains(keyword) }
+    if (!relevant) return null
+    val typeIndex = if (detectedType >= 0) detectedType else slayerType.value
+    return SlayerQuestProgress(typeIndex, parseSlayerTierFromLine(line), progress, target)
+  }
+
+  private fun detectSlayerTypeFromLine(line: String): Int =
+    when {
+      line.contains("zombie slayer") || line.contains("revenant horror") || line.contains("atoned horror") || (line.contains("revenant") && line.contains("slayer")) -> 0
+      line.contains("wolf slayer") || line.contains("sven packmaster") || (line.contains("sven") && line.contains("slayer")) -> 1
+      line.contains("spider slayer") || line.contains("tarantula broodfather") || (line.contains("tarantula") && line.contains("slayer")) -> 2
+      line.contains("enderman slayer") || line.contains("voidgloom seraph") || (line.contains("voidgloom") && line.contains("slayer")) -> 3
+      line.contains("vampire slayer") || line.contains("riftstalker bloodfiend") || (line.contains("riftstalker") && line.contains("slayer")) -> 4
+      line.contains("blaze slayer") || line.contains("inferno demonlord") || (line.contains("inferno") && line.contains("slayer")) -> 5
+      else -> -1
+    }
+
+  private fun parseSlayerTierFromLine(line: String): Int =
+    when {
       line.contains(" v") && !line.contains(" vi") -> 5
       line.contains(" iv") -> 4
       line.contains(" iii") -> 3
@@ -1468,14 +1911,25 @@ object CombatMacroModule : Module("Combat Macro") {
       line.contains(" i") -> 1
       else -> -1
     }
-    if (slayerType.value != typeIdx) {
-      slayerType.value = typeIdx
-      ChatUtils.sendMessage("Combat macro: Detected ${slayerType.options[typeIdx]} Slayer from $source.")
-    }
-    if (tier in 1..5) slayerTier.value = tier.toDouble()
-    slayerNeedsQuestRestart = false
-    slayerAutoDetected = true
-    return true
+
+  private fun lineHasActiveSlayerQuestSignal(line: String): Boolean {
+    return detectSlayerTypeFromLine(line) >= 0 ||
+      SLAYER_GENERIC_QUEST_KEYWORDS.any { keyword -> line.contains(keyword) } ||
+      parseSlayerQuestProgress(line) != null
+  }
+
+  private fun readScoreboardSidebarLines(level: ClientLevel?): List<String> {
+    val liveLevel = level ?: return emptyList()
+    val scoreboard = liveLevel.scoreboard
+    val objective = scoreboard.getDisplayObjective(DisplaySlot.SIDEBAR) ?: return emptyList()
+    return scoreboard.listPlayerScores(objective)
+      .mapNotNull { score ->
+        val ownerName = score.owner()
+        val team = scoreboard.getPlayersTeam(ownerName)
+        val raw = if (team != null) team.playerPrefix.string + ownerName + team.playerSuffix.string else ownerName
+        ChatFormatting.stripFormatting(raw)?.lowercase(Locale.ROOT)?.trim()
+      }
+      .filter { it.isNotBlank() }
   }
 
   private fun moveBatphoneToHotbar(player: Player): Boolean {
@@ -1513,8 +1967,8 @@ object CombatMacroModule : Module("Combat Macro") {
 
   /**
    * Returns (slotIndex, isFinalPurchase).
-   * isFinalPurchase = true  → slot is "Start Quest" / "Restart" / "Confirm" — quest will be bought.
-   * isFinalPurchase = false → slot is just the revenant-icon navigation step.
+   * isFinalPurchase = true  -> slot is "Start Quest" / "Restart" / "Confirm" - quest will be bought.
+   * isFinalPurchase = false -> slot is just the revenant-icon navigation step.
    */
   private fun findMaddoxMenuActionSlot(slots: List<net.minecraft.world.inventory.Slot>): Pair<Int, Boolean> {
     var revenantSlot = -1
@@ -1549,6 +2003,7 @@ object CombatMacroModule : Module("Combat Macro") {
   }
 
   private fun useHotbarUtilityItem(player: Player, keywords: Array<String>): Boolean {
+    if (pendingOverfluxLookDownTicks > 0) return false
     val slot = findHotbarSlotByKeywords(player, keywords)
     if (slot !in 0..8) return false
 
@@ -1561,6 +2016,52 @@ object CombatMacroModule : Module("Combat Macro") {
     pendingHealRelease = true
     pendingHealRestoreSlot = if (previousSlot != slot) previousSlot else -1
     return true
+  }
+
+  private fun useHotbarOverflux(player: Player): Boolean {
+    if (pendingOverfluxLookDownTicks > 0) return false
+    val slot = findHotbarSlotByKeywords(player, SLAYER_OVERFLUX_KEYWORDS)
+    if (slot !in 0..8) return false
+
+    val previousSlot = player.inventory.selectedSlot
+    if (previousSlot != slot) {
+      InventoryUtils.holdHotbarSlot(slot)
+    }
+
+    pendingOverfluxLookDownTicks = OVERFLUX_LOOK_DOWN_TICKS
+    pendingOverfluxRestoreSlot = if (previousSlot != slot) previousSlot else -1
+    return true
+  }
+
+  private fun clearPendingOverfluxPlacement() {
+    if (pendingOverfluxLookDownTicks > 0) {
+      RotationExecutor.stopRotating()
+    }
+    pendingOverfluxLookDownTicks = 0
+    pendingOverfluxRecoverLookTicks = 0
+    pendingOverfluxRestoreSlot = -1
+  }
+
+  private fun applyOverfluxRecoverLook(player: Player) {
+    val target = resolveCurrentTarget() ?: if (cryptZombieSlayer.value) resolveNearestSlayerBoss() else null
+    if (target != null) {
+      val activeCombatMode = effectiveCombatMode(target)
+      val rotation =
+        if (activeCombatMode != 0) {
+          rangedAimRotation(player, target, activeCombatMode)
+        } else {
+          AngleUtils.getRotation(target)
+        }
+      RotationExecutor.rotateTo(rotation, rotationStrategy)
+      return
+    }
+
+    if (cryptZombieSlayer.value) {
+      val bossPos = slayerBossLastPos
+      if (bossPos != null) {
+        RotationExecutor.rotateTo(AngleUtils.getRotation(bossPos), rotationStrategy)
+      }
+    }
   }
 
   private fun findHotbarSlotByKeywords(player: Player, keywords: Array<String>): Int {
@@ -1650,21 +2151,27 @@ object CombatMacroModule : Module("Combat Macro") {
     player: Player,
     blacklisted: Set<String>,
     nameFilter: String,
-    requireRange: Boolean
+    requireRange: Boolean,
+    ignoreWhitelist: Boolean = false
   ): Boolean {
     if (living is ArmorStand) return false
     if (living == player) return false
     if (!living.isAlive) return false
-    val displayName = normalizeNameForMatch(living.name.string)
+    if (living is Player && mc.connection?.getPlayerInfo(living.uuid) != null) return false
+    val displayName = normalizedTargetDisplayName(living)
     if (blacklisted.contains(displayName)) return false
     if (nameFilter.isNotEmpty() && !displayName.contains(nameFilter)) return false
-    if (whitelistOnly.value && learnedWhitelist.isNotEmpty()) {
-      val whitelistMatch = learnedWhitelist.any { entry ->
-        displayName.contains(entry) || entry.contains(displayName)
+    if (!ignoreWhitelist && whitelistOnly.value) {
+      // Only apply whitelist if there are user-learned entries beyond the default seed.
+      // The default "ice walker" entry is always present and must not block all other mobs.
+      val effectiveWhitelist = learnedWhitelist.filter { it != DEFAULT_WHITELIST_ENTRY && !blacklisted.contains(it) }
+      if (effectiveWhitelist.isNotEmpty()) {
+        val whitelistMatch = effectiveWhitelist.any { entry ->
+          displayName.contains(entry) || entry.contains(displayName)
+        }
+        if (!whitelistMatch) return false
       }
-      if (!whitelistMatch) return false
     }
-    if (living is Player && mc.connection?.getPlayerInfo(living.uuid) != null) return false
     return true
   }
 
@@ -1673,6 +2180,9 @@ object CombatMacroModule : Module("Combat Macro") {
     level: ClientLevel
   ): Boolean {
     if (!stayNearStart.value) return false
+    // Don't fight the patrol: it defines the operational area, so overriding its
+    // pathfinder here would cause false ARRIVED signals and premature point advances.
+    if (CombatPatrolModule.isPatrolRunning) return false
     val origin = startAreaOrigin ?: return false
     val radius = startAreaRadius.value + START_AREA_RETURN_BUFFER
     val distSq = horizontalDistSq(player.x, player.z, origin.x + 0.5, origin.z + 0.5)
@@ -1700,32 +2210,98 @@ object CombatMacroModule : Module("Combat Macro") {
     return dx * dx + dz * dz
   }
 
-  private fun attemptAttack(player: Player, target: LivingEntity) {
-    if (!isAttackReady(player, target)) return
+  private fun attemptAttack(player: Player, target: LivingEntity, activeCombatMode: Int) {
+    when (activeCombatMode) {
+      1    -> attemptBowAttack(player, target)
+      2    -> attemptMageAttack(player, target)
+      else -> attemptMeleeAttack(player, target)
+    }
+  }
 
+  private fun attemptMeleeAttack(player: Player, target: LivingEntity) {
+    if (!isAttackReady(player, target)) return
     val now = System.nanoTime()
     if (now < nextAttackNs) return
-
     val minRate = min(minCps.value, maxCps.value).coerceAtLeast(0.1)
     val maxRate = max(minCps.value, maxCps.value).coerceAtLeast(minRate)
     val cps = minRate + (Math.random() * (maxRate - minRate))
     val delayNs = (1_000_000_000.0 / cps).toLong()
-
     nextAttackNs = now + delayNs
     MouseUtils.leftClick()
     registerKillCandidate(target)
   }
 
+  private fun attemptBowAttack(player: Player, target: LivingEntity) {
+    if (!isRangedAttackReady(player, target, 1)) return
+    val now = System.nanoTime()
+    if (now < nextAttackNs) return
+    val minRate = min(minCps.value, maxCps.value).coerceAtLeast(0.1)
+    val maxRate = max(minCps.value, maxCps.value).coerceAtLeast(minRate)
+    val cps = minRate + (Math.random() * (maxRate - minRate))
+    nextAttackNs = now + (1_000_000_000.0 / cps).toLong()
+    MouseUtils.rightClick()
+    registerKillCandidate(target)
+    if (oneTapMode.value) currentTargetId = null
+  }
+
+  private fun attemptMageAttack(player: Player, target: LivingEntity) {
+    if (!isRangedAttackReady(player, target, 2)) return
+    val now = System.nanoTime()
+    if (now < nextAttackNs) return
+    val minRate = min(minCps.value, maxCps.value).coerceAtLeast(0.1)
+    val maxRate = max(minCps.value, maxCps.value).coerceAtLeast(minRate)
+    val cps = minRate + (Math.random() * (maxRate - minRate))
+    nextAttackNs = now + (1_000_000_000.0 / cps).toLong()
+    MouseUtils.rightClick()
+    registerKillCandidate(target)
+    if (oneTapMode.value) currentTargetId = null
+  }
+
+  private fun isRangedAttackReady(player: Player, target: LivingEntity, activeCombatMode: Int): Boolean {
+    if (!player.hasLineOfSight(target)) return false
+    val aimed = rangedAimRotation(player, target, activeCombatMode)
+    val yawError = abs(AngleUtils.getRotationDelta(player.yRot, aimed.yaw))
+    val pitchError = abs(aimed.pitch - player.xRot)
+    val tolerance = aimTolerance.value
+    return yawError <= tolerance && pitchError <= tolerance
+  }
+
+  /**
+   * Returns the aim rotation for ranged modes, including upward pitch correction for
+   * projectile drop/lead. Falls back to standard rotation in melee mode.
+   */
+  private fun rangedAimRotation(
+    player: Player,
+    target: LivingEntity,
+    activeCombatMode: Int = combatMode.value
+  ): org.cobalt.api.util.helper.Rotation {
+    val base = AngleUtils.getRotation(target)
+    val elevPerBlock = when (activeCombatMode) {
+      1    -> bowElevationPerBlock.value
+      2    -> mageElevationPerBlock.value
+      else -> return base
+    }
+    if (elevPerBlock <= 0.0) return base
+    val dist = player.distanceTo(target).toFloat()
+    val correction = (elevPerBlock * dist).toFloat().coerceIn(0f, 45f)
+    return org.cobalt.api.util.helper.Rotation(base.yaw, base.pitch - correction)
+  }
+
   private fun registerKillCandidate(target: LivingEntity) {
     val level = mc.level ?: return
+    val normalizedName = normalizedTargetDisplayName(target)
     killCandidateId = target.uuid
-    killCandidateName = sanitizeTargetName(target.name.string)
+    killCandidateName = resolveTargetDisplayName(target)
+    killCandidateWasSlayerBoss = cryptZombieSlayer.value && isSlayerBossName(normalizedName)
+    killCandidateWasSlayerMob =
+      cryptZombieSlayer.value &&
+        !killCandidateWasSlayerBoss &&
+        (isSlayerPriorityMobName(normalizedName) || isSlayerFarmMobName(normalizedName))
     killCandidateAttackTick = level.gameTime
     killCandidateExpiresTick = level.gameTime + KILL_CANDIDATE_TTL_TICKS
   }
 
   private fun updateKillTracking(level: ClientLevel) {
-    if (!autoLearnLastKill.value) return
     val candidateId = killCandidateId ?: return
     if (level.gameTime > killCandidateExpiresTick) {
       clearKillCandidate()
@@ -1735,8 +2311,7 @@ object CombatMacroModule : Module("Combat Macro") {
     val candidate = level.entitiesForRendering().firstOrNull { it.uuid == candidateId } as? LivingEntity
     if (candidate == null) {
       if (level.gameTime - killCandidateAttackTick >= KILL_DISAPPEAR_CONFIRM_TICKS) {
-        applyLearnedKillTarget(killCandidateName ?: "")
-        if (oneTapMode.value) currentTargetId = null
+        onKillCandidateConfirmed(killCandidateName ?: "")
         clearKillCandidate()
       }
       return
@@ -1745,14 +2320,28 @@ object CombatMacroModule : Module("Combat Macro") {
       return
     }
 
-    applyLearnedKillTarget(killCandidateName ?: candidate.name.string)
-    if (oneTapMode.value) currentTargetId = null
+    onKillCandidateConfirmed(killCandidateName ?: resolveTargetDisplayName(candidate))
     clearKillCandidate()
+  }
+
+  private fun onKillCandidateConfirmed(resolvedName: String) {
+    if (killCandidateWasSlayerMob) {
+      slayerSessionMobKills++
+      if (slayerTrackedQuestActive && !slayerBossActive) {
+        slayerTrackedQuestSawMobKill = true
+      }
+    }
+    if (autoLearnLastKill.value) {
+      applyLearnedKillTarget(resolvedName)
+    }
+    if (oneTapMode.value) currentTargetId = null
   }
 
   private fun clearKillCandidate() {
     killCandidateId = null
     killCandidateName = null
+    killCandidateWasSlayerMob = false
+    killCandidateWasSlayerBoss = false
     killCandidateExpiresTick = 0L
     killCandidateAttackTick = 0L
   }
@@ -1789,12 +2378,47 @@ object CombatMacroModule : Module("Combat Macro") {
 
   private fun sanitizeTargetName(raw: String): String {
     val noFormatting = raw.replace(Regex("\\u00A7."), "").trim()
-    val noHpSuffix = noFormatting.replace(Regex("\\s+[0-9.,]+(?:[kKmMbB])?\\s*[\\u2764]?$"), "")
-    return noHpSuffix.trim()
+    val noLevelPrefix = noFormatting.replace(Regex("^\\[[^\\]]+\\]\\s*"), "")
+    val noSymbolsPrefix = noLevelPrefix.replace(Regex("^[^A-Za-z0-9]+"), "")
+    val noHpSuffix = noSymbolsPrefix.replace(Regex("\\s+[0-9.,]+(?:/[0-9.,]+)?(?:[kKmMbB])?\\s*[\\u2764]?$"), "")
+    return noHpSuffix.replace(Regex("\\s+"), " ").trim()
   }
 
   private fun normalizeNameForMatch(raw: String): String {
     return sanitizeTargetName(raw).lowercase()
+  }
+
+  private fun resolveTargetDisplayName(living: LivingEntity): String {
+    val baseName = sanitizeTargetName(living.name.string)
+    if (living !is Player) return baseName
+    val standName = findAttachedArmorStandName(living)
+    return if (standName.isNotBlank()) standName else baseName
+  }
+
+  private fun normalizedTargetDisplayName(living: LivingEntity): String =
+    normalizeNameForMatch(resolveTargetDisplayName(living))
+
+  private fun findAttachedArmorStandName(living: LivingEntity): String {
+    val level = mc.level ?: return ""
+    val bestStand =
+      level.entitiesForRendering()
+        .asSequence()
+        .filterIsInstance<ArmorStand>()
+        .filter { it.isAlive }
+        .filter { stand ->
+          stand.y >= living.y - 0.5 &&
+            stand.y <= living.y + 3.5 &&
+            horizontalDistSq(stand.x, stand.z, living.x, living.z) <= ATTACHED_NAMEPLATE_HORIZONTAL_RANGE_SQ
+        }
+        .map { stand -> stand to sanitizeTargetName(stand.name.string) }
+        .filter { (_, name) -> name.isNotBlank() }
+        .filter { (_, name) -> !builtInBlacklistedNames.contains(normalizeNameForMatch(name)) }
+        .minByOrNull { (stand, _) ->
+          horizontalDistSq(stand.x, stand.z, living.x, living.z) + kotlin.math.abs(stand.y - living.y)
+        }
+        ?: return ""
+
+    return bestStand.second
   }
 
   private fun resolveCurrentTarget(): LivingEntity? {
@@ -1807,7 +2431,7 @@ object CombatMacroModule : Module("Combat Macro") {
 
   private fun resolveCurrentTargetName(): String? {
     return resolveCurrentTarget()?.let { target ->
-      sanitizeTargetName(target.name.string).ifBlank { null }
+      resolveTargetDisplayName(target).ifBlank { null }
     }
   }
 
@@ -1896,8 +2520,407 @@ object CombatMacroModule : Module("Combat Macro") {
     return learnedWhitelist.joinToString(", ")
   }
 
+  private fun effectiveCombatMode(target: LivingEntity?): Int {
+    if (target == null) return combatMode.value
+    if (shouldUseSpiderPhaseBowCombat() && slayerBossActive && isSpiderBossHatchlingsPhaseActive()) {
+      val targetName = normalizedTargetDisplayName(target)
+      if (isSlayerBossName(targetName) || isSpiderPhaseAddName(targetName)) return 1
+    }
+    if (shouldUseEndermanDynamicCombat()) {
+      val targetName = normalizedTargetDisplayName(target)
+      if (!isSlayerBossName(targetName)) return effectiveEndermanSpawnCombatMode(target)
+      return if (isEndermanBossHitPhase(target)) 1 else 0
+    }
+    return combatMode.value
+  }
+
+  private fun shouldUseZombieDynamicCombat(): Boolean {
+    return cryptZombieSlayer.value && slayerType.value == 0 && zombieDynamicCombat.value
+  }
+
+  private fun shouldUseSpiderPhaseBowCombat(): Boolean {
+    return cryptZombieSlayer.value && slayerType.value == 2 && spiderPhaseBowCombat.value
+  }
+
+  private fun shouldUseWolfPupsLogic(): Boolean {
+    return cryptZombieSlayer.value && slayerType.value == 1
+  }
+
+  private fun shouldUseEndermanDynamicCombat(): Boolean {
+    return cryptZombieSlayer.value && slayerType.value == 3 && endermanDynamicCombat.value
+  }
+
+  private fun effectiveEndermanSpawnCombatMode(target: LivingEntity): Int {
+    return when (emanSpawnWeapon.value) {
+      EMAN_SPAWN_WEAPON_ENDERMAN_SWORD -> 0
+      EMAN_SPAWN_WEAPON_DYNAMIC -> if (shouldUseDynamicEndermanSpawnMelee(target)) 0 else 1
+      else -> 1
+    }
+  }
+
+  private fun shouldUseDynamicEndermanSpawnMelee(target: LivingEntity): Boolean {
+    if (isSlayerPriorityMobName(normalizedTargetDisplayName(target))) return true
+    val player = mc.player ?: return false
+    return player.distanceTo(target).toDouble() <= emanDynamicSwapRange.value
+  }
+
+
+  private fun shouldSuppressSlayerAttack(target: LivingEntity, nowTick: Long): Boolean {
+    if (!cryptZombieSlayer.value) return false
+    val targetName = normalizedTargetDisplayName(target)
+    if (!isSlayerBossName(targetName)) return false
+    return isSpiderBossHatchlingsPhaseActive(nowTick) || isWolfBossPupsPhaseActive(nowTick)
+  }
+
+  private fun handleSlayerPhaseMovement(
+    player: Player,
+    target: LivingEntity,
+    distanceToTarget: Double,
+    hasLos: Boolean,
+    activeCombatMode: Int,
+    nowTick: Long
+  ): Boolean {
+    if (!cryptZombieSlayer.value) return false
+    if (shouldUseEndermanDynamicCombat() && isEndermanBossHitPhase(target)) {
+      val targetName = normalizedTargetDisplayName(target)
+      if (isSlayerBossName(targetName)) {
+        return applyEmanHitsPhaseStandoffMovement(player, target, distanceToTarget)
+      }
+    }
+    if (shouldUseSpiderPhaseBowCombat() && activeCombatMode == 1 && hasLos && isSpiderBossHatchlingsPhaseActive(nowTick)) {
+      val targetName = normalizedTargetDisplayName(target)
+      if (isSlayerBossName(targetName) || isSpiderPhaseAddName(targetName)) {
+        return applySpiderPhaseStepBackMovement(player, target, distanceToTarget)
+      }
+    }
+    if (shouldUseWolfPupsLogic() && wolfIgnorePups.value && isWolfBossPupsPhaseActive(nowTick)) {
+      val targetName = normalizedTargetDisplayName(target)
+      if (isSlayerBossName(targetName)) {
+        MovementManager.clearForcedMovement()
+        return true
+      }
+    }
+    return false
+  }
+
+  private fun applySpiderPhaseStepBackMovement(
+    player: Player,
+    target: LivingEntity,
+    distanceToTarget: Double
+  ): Boolean {
+    val desiredDistance = max(SPIDER_PHASE_MIN_BACKSTEP_DISTANCE, combatEngageRange(1) - SPIDER_PHASE_STEPBACK_BUFFER)
+    if (distanceToTarget > desiredDistance + SPIDER_PHASE_STEPBACK_HYSTERESIS) return false
+
+    val rotation = rangedAimRotation(player, target, 1)
+    RotationExecutor.rotateTo(rotation, rotationStrategy)
+    val yawError = abs(AngleUtils.getRotationDelta(player.yRot, rotation.yaw))
+    val pitchError = abs(rotation.pitch - player.xRot)
+    val aligned = yawError <= SPIDER_PHASE_STEPBACK_YAW_TOLERANCE &&
+      pitchError <= SPIDER_PHASE_STEPBACK_PITCH_TOLERANCE
+
+    if (aligned && distanceToTarget < desiredDistance) {
+      MovementManager.setForcedMovement(
+        forward = false, backward = true,
+        left = false, right = false,
+        jump = false, shift = false, sprint = false
+      )
+    } else {
+      MovementManager.clearForcedMovement()
+    }
+    return true
+  }
+
+  private fun applyEmanHitsPhaseStandoffMovement(
+    player: Player,
+    target: LivingEntity,
+    distanceToTarget: Double
+  ): Boolean {
+    val standoffMin = EMAN_HITS_PHASE_MIN_STANDOFF
+    val standoffMax = attackRange.value + EMAN_HITS_PHASE_STANDOFF_BUFFER
+    if (distanceToTarget > standoffMax + EMAN_HITS_PHASE_STANDOFF_HYSTERESIS) return false
+    val rotation = AngleUtils.getRotation(target)
+    RotationExecutor.rotateTo(rotation, rotationStrategy)
+    val yawError = abs(AngleUtils.getRotationDelta(player.yRot, rotation.yaw))
+    val aligned = yawError <= EMAN_HITS_PHASE_YAW_TOLERANCE
+    if (aligned && distanceToTarget < standoffMin) {
+      MovementManager.setForcedMovement(
+        forward = false, backward = true,
+        left = false, right = false,
+        jump = false, shift = false, sprint = false
+      )
+    } else {
+      MovementManager.clearForcedMovement()
+    }
+    return true
+  }
+
+  private fun updateSlayerBossPhaseState(level: ClientLevel, boss: LivingEntity?) {
+    updateSpiderHatchlingsPhaseState(level, boss)
+    updateWolfPupsPhaseState(level, boss)
+  }
+
+  private fun resolveSlayerPhaseTarget(
+    player: Player,
+    level: ClientLevel,
+    boss: LivingEntity?
+  ): LivingEntity? {
+    val wantsSpiderAdds = shouldUseSpiderPhaseBowCombat() && isSpiderBossHatchlingsPhaseActive(level.gameTime)
+    val wantsWolfAdds = shouldUseWolfPupsLogic() && !wolfIgnorePups.value && isWolfBossPupsPhaseActive(level.gameTime)
+    if (!wantsSpiderAdds && !wantsWolfAdds) return null
+
+    val bossPos = boss?.position() ?: slayerBossLastPos ?: return null
+    val blacklisted = builtInBlacklistedNames
+    var best: LivingEntity? = null
+    var bestDistSq = Double.POSITIVE_INFINITY
+
+    for (entity in level.entitiesForRendering()) {
+      val living = entity as? LivingEntity ?: continue
+      if (!isValidTarget(living, player, blacklisted, "", true, ignoreWhitelist = true)) continue
+      val name = normalizedTargetDisplayName(living)
+      if (isSlayerBossName(name)) continue
+
+      val matchesPhaseTarget =
+        when {
+          wantsSpiderAdds -> isSpiderPhaseAddName(name)
+          wantsWolfAdds -> isWolfPhaseAddName(name)
+          else -> false
+        }
+      if (!matchesPhaseTarget) continue
+      if (horizontalDistSq(living.x, living.z, bossPos.x, bossPos.z) > SLAYER_PHASE_ADD_SEARCH_RADIUS_SQ) continue
+
+      val dx = living.x - player.x
+      val dy = living.y - player.y
+      val dz = living.z - player.z
+      val distSq = dx * dx + dy * dy + dz * dz
+      if (distSq < bestDistSq) {
+        best = living
+        bestDistSq = distSq
+      }
+    }
+
+    return best
+  }
+
+  private fun activateSpiderHatchlingsPhase(nowTick: Long) {
+    if (!shouldUseSpiderPhaseBowCombat()) return
+    spiderHatchlingsPhaseActive = true
+    spiderHatchlingsPhaseUntilTick =
+      if (nowTick >= 0L) nowTick + SPIDER_HATCHLING_PHASE_FALLBACK_TICKS else -1L
+    val boss = resolveNearestSlayerBoss()
+    spiderHatchlingsBossId = boss?.uuid
+    spiderHatchlingsBossAnchor = boss?.position() ?: slayerBossLastPos
+  }
+
+  private fun clearSpiderHatchlingsPhase() {
+    spiderHatchlingsPhaseActive = false
+    spiderHatchlingsPhaseUntilTick = -1L
+    spiderHatchlingsBossId = null
+    spiderHatchlingsBossAnchor = null
+  }
+
+  private fun updateSpiderHatchlingsPhaseState(level: ClientLevel, boss: LivingEntity?) {
+    if (!shouldUseSpiderPhaseBowCombat()) {
+      clearSpiderHatchlingsPhase()
+      return
+    }
+    if (!spiderHatchlingsPhaseActive) return
+    if (!slayerBossActive) {
+      clearSpiderHatchlingsPhase()
+      return
+    }
+
+    val trackedBoss = resolveTrackedSpiderPhaseBoss(level, boss)
+    if (trackedBoss != null) {
+      if (spiderHatchlingsBossId == null) spiderHatchlingsBossId = trackedBoss.uuid
+      if (spiderHatchlingsBossAnchor == null) spiderHatchlingsBossAnchor = trackedBoss.position()
+      val anchor = spiderHatchlingsBossAnchor
+      if (anchor != null && trackedBoss.position().distanceTo(anchor) >= SPIDER_HATCHLING_CLEAR_DISTANCE) {
+        clearSpiderHatchlingsPhase()
+        return
+      }
+    }
+
+    if (spiderHatchlingsPhaseUntilTick >= 0L && level.gameTime >= spiderHatchlingsPhaseUntilTick) {
+      if (trackedBoss != null && hasNearbySpiderPhaseAdds(level, trackedBoss)) {
+        spiderHatchlingsPhaseUntilTick = level.gameTime + SPIDER_HATCHLING_PHASE_REFRESH_TICKS
+      } else {
+        clearSpiderHatchlingsPhase()
+      }
+    }
+  }
+
+  private fun updateWolfPupsPhaseState(level: ClientLevel, boss: LivingEntity?) {
+    if (!shouldUseWolfPupsLogic()) {
+      wolfPupsPhaseUntilTick = -1L
+      return
+    }
+    if (!slayerBossActive || boss == null) {
+      wolfPupsPhaseUntilTick = -1L
+      return
+    }
+
+    if (hasNearbyAttachedText(boss, SLAYER_WOLF_PUPS_TEXT_KEYWORDS)) {
+      wolfPupsPhaseUntilTick = level.gameTime + SLAYER_WOLF_PUPS_PHASE_TICKS
+    } else if (wolfPupsPhaseUntilTick >= 0L && level.gameTime >= wolfPupsPhaseUntilTick) {
+      wolfPupsPhaseUntilTick = -1L
+    }
+  }
+
+  private fun isSpiderBossHatchlingsPhaseActive(nowTick: Long = mc.level?.gameTime ?: -1L): Boolean {
+    if (!shouldUseSpiderPhaseBowCombat() || !spiderHatchlingsPhaseActive) return false
+    return spiderHatchlingsPhaseUntilTick < 0L || nowTick < spiderHatchlingsPhaseUntilTick
+  }
+
+  private fun isWolfBossPupsPhaseActive(nowTick: Long = mc.level?.gameTime ?: -1L): Boolean {
+    if (!shouldUseWolfPupsLogic()) return false
+    return wolfPupsPhaseUntilTick >= 0L && nowTick < wolfPupsPhaseUntilTick
+  }
+
+  private fun resolveNearestSlayerBoss(): LivingEntity? {
+    val level = mc.level ?: return null
+    val player = mc.player
+    return level.entitiesForRendering()
+      .asSequence()
+      .filterIsInstance<LivingEntity>()
+      .filter { it.isAlive && it.health > 0f }
+      .filter { entity -> isSlayerBossName(normalizedTargetDisplayName(entity)) }
+      .minByOrNull { entity ->
+        if (player != null) {
+          val dx = entity.x - player.x
+          val dy = entity.y - player.y
+          val dz = entity.z - player.z
+          dx * dx + dy * dy + dz * dz
+        } else {
+          0.0
+        }
+      }
+  }
+
+  private fun resolveTrackedSpiderPhaseBoss(level: ClientLevel, fallbackBoss: LivingEntity?): LivingEntity? {
+    val trackedId = spiderHatchlingsBossId
+    if (trackedId != null) {
+      val tracked = level.entitiesForRendering().firstOrNull { it.uuid == trackedId } as? LivingEntity
+      if (tracked != null && tracked.isAlive && tracked.health > 0f) {
+        return tracked
+      }
+    }
+    return fallbackBoss?.takeIf { it.isAlive && it.health > 0f && isSlayerBossName(normalizedTargetDisplayName(it)) }
+  }
+
+  private fun hasNearbySpiderPhaseAdds(level: ClientLevel, boss: LivingEntity): Boolean {
+    val bossPos = boss.position()
+    return level.entitiesForRendering()
+      .asSequence()
+      .filterIsInstance<LivingEntity>()
+      .filter { it.isAlive && it.health > 0f }
+      .filter { entity -> !isSlayerBossName(normalizedTargetDisplayName(entity)) }
+      .any { entity ->
+        val name = normalizedTargetDisplayName(entity)
+        isSpiderPhaseAddName(name) &&
+          horizontalDistSq(entity.x, entity.z, bossPos.x, bossPos.z) <= SLAYER_PHASE_ADD_SEARCH_RADIUS_SQ
+      }
+  }
+
+  private fun hasNearbyAttachedText(target: LivingEntity, keywords: Array<String>): Boolean {
+    val level = mc.level ?: return false
+    return level.entitiesForRendering()
+      .asSequence()
+      .filterIsInstance<ArmorStand>()
+      .filter { it.isAlive }
+      .filter { stand ->
+        stand.y >= target.y - 0.5 &&
+          stand.y <= target.y + 3.5 &&
+          horizontalDistSq(stand.x, stand.z, target.x, target.z) <= ATTACHED_NAMEPLATE_HORIZONTAL_RANGE_SQ
+      }
+      .map { stand -> normalizeNameForMatch(stand.name.string) }
+      .any { text -> keywords.any { keyword -> text.contains(keyword) } }
+  }
+
+  private fun isSpiderPhaseAddName(normalizedName: String): Boolean {
+    return SLAYER_SPIDER_PHASE_ADD_KEYWORDS.any { keyword -> normalizedName.contains(keyword) }
+  }
+
+  private fun isWolfPhaseAddName(normalizedName: String): Boolean {
+    return SLAYER_WOLF_PHASE_ADD_KEYWORDS.any { keyword -> normalizedName.contains(keyword) }
+  }
+
+  private fun isEndermanBossHitPhase(target: LivingEntity): Boolean {
+    if (!shouldUseEndermanDynamicCombat()) return false
+    if (!isSlayerBossName(normalizedTargetDisplayName(target))) return false
+    val level = mc.level ?: return false
+    return level.entitiesForRendering()
+      .asSequence()
+      .filterIsInstance<ArmorStand>()
+      .filter { it.isAlive }
+      .filter { stand ->
+        stand.y >= target.y - 0.5 &&
+          stand.y <= target.y + 3.5 &&
+          horizontalDistSq(stand.x, stand.z, target.x, target.z) <= ENDERMAN_HITS_HORIZONTAL_RANGE_SQ
+      }
+      .map { stand -> normalizeNameForMatch(stand.name.string) }
+      .any { name -> ENDERMAN_HITS_PATTERN.containsMatchIn(name) }
+  }
+
+  private fun keywordSettingValues(raw: String, fallback: Array<String>): Array<String> {
+    val parsed = raw
+      .split(',', ';', '\n')
+      .map(::normalizeNameForMatch)
+      .filter { it.isNotBlank() }
+      .distinct()
+    return if (parsed.isEmpty()) fallback else parsed.toTypedArray()
+  }
+
+  private fun preferredEndermanSpawnWeaponKeywords(target: LivingEntity?): Array<String> {
+    return when (emanSpawnWeapon.value) {
+      EMAN_SPAWN_WEAPON_TERMINATOR -> SLAYER_ENDERMAN_TERMINATOR_WEAPON_KEYWORDS
+      EMAN_SPAWN_WEAPON_SHORTBOW -> SLAYER_ENDERMAN_SHORTBOW_WEAPON_KEYWORDS
+      EMAN_SPAWN_WEAPON_ENDERMAN_SWORD ->
+        keywordSettingValues(emanBossWeapon.value, SLAYER_ENDERMAN_BOSS_WEAPON_DEFAULT_KEYWORDS)
+      EMAN_SPAWN_WEAPON_DYNAMIC ->
+        if (target != null && shouldUseDynamicEndermanSpawnMelee(target)) {
+          keywordSettingValues(emanBossWeapon.value, SLAYER_ENDERMAN_BOSS_WEAPON_DEFAULT_KEYWORDS)
+        } else {
+          SLAYER_ENDERMAN_DYNAMIC_BOW_WEAPON_KEYWORDS
+        }
+      else -> SLAYER_ENDERMAN_DYNAMIC_BOW_WEAPON_KEYWORDS
+    }
+  }
+
+  private fun preferredSlayerWeaponKeywords(activeCombatMode: Int, target: LivingEntity?): Array<String> {
+    return when {
+      shouldUseZombieDynamicCombat() && slayerBossActive ->
+        keywordSettingValues(zombieDynamicSword.value, SLAYER_ZOMBIE_DYNAMIC_SWORD_DEFAULT_KEYWORDS)
+      shouldUseZombieDynamicCombat() ->
+        keywordSettingValues(zombieSpawnWeapon.value, SLAYER_ZOMBIE_SPAWN_WEAPON_DEFAULT_KEYWORDS)
+      shouldUseEndermanDynamicCombat() && target != null &&
+        isSlayerBossName(normalizedTargetDisplayName(target)) && isEndermanBossHitPhase(target) ->
+        keywordSettingValues(emanHitPhaseWeapon.value, SLAYER_ENDERMAN_HIT_PHASE_WEAPON_DEFAULT_KEYWORDS)
+      shouldUseEndermanDynamicCombat() && target != null &&
+        isSlayerBossName(normalizedTargetDisplayName(target)) ->
+        keywordSettingValues(emanBossWeapon.value, SLAYER_ENDERMAN_BOSS_WEAPON_DEFAULT_KEYWORDS)
+      shouldUseEndermanDynamicCombat() ->
+        preferredEndermanSpawnWeaponKeywords(target)
+      activeCombatMode == 0 -> SLAYER_MELEE_WEAPON_KEYWORDS
+      activeCombatMode == 1 -> SLAYER_BOW_WEAPON_KEYWORDS
+      activeCombatMode == 2 -> SLAYER_MAGE_WEAPON_KEYWORDS
+      else -> SLAYER_ANY_WEAPON_KEYWORDS
+    }
+  }
+
+  private fun findPreferredSlayerWeaponSlot(player: Player, activeCombatMode: Int, target: LivingEntity?): Int {
+    val primaryKeywords = preferredSlayerWeaponKeywords(activeCombatMode, target)
+    val primarySlot = findHotbarSlotByKeywords(player, primaryKeywords)
+    if (primarySlot in 0..8) return primarySlot
+    return findHotbarSlotByKeywords(player, SLAYER_ANY_WEAPON_KEYWORDS)
+  }
+
+  private fun isSlayerWeaponForMode(normalizedName: String, activeCombatMode: Int, target: LivingEntity?): Boolean {
+    val keywords = preferredSlayerWeaponKeywords(activeCombatMode, target)
+    return keywords.any { keyword -> normalizedName.contains(keyword) }
+  }
+
   private fun ensurePreferredWeapon(player: Player, target: LivingEntity, nowTick: Long) {
-    val name = normalizeNameForMatch(target.name.string)
+    val name = normalizedTargetDisplayName(target)
     if (!name.contains("ice walker")) return
 
     val selected = player.inventory.getItem(player.inventory.selectedSlot)
@@ -1918,17 +2941,23 @@ object CombatMacroModule : Module("Combat Macro") {
 
   /** Ensures a weapon is selected when in slayer mode. Switches away from utility items
    *  (batphone, overflux, etc.) to the nearest sword/weapon in the hotbar. */
-  private fun ensureSlayerWeapon(player: Player) {
+  private fun ensureSlayerWeapon(player: Player, target: LivingEntity?) {
     if (pendingHealRelease || pendingHealRestoreSlot >= 0) return
+    val activeCombatMode = effectiveCombatMode(target)
     val currentSlot = player.inventory.selectedSlot
     val current = player.inventory.getItem(currentSlot)
+    val currentName = normalizeNameForMatch(current.hoverName?.string.orEmpty())
     if (!current.isEmpty) {
-      val name = normalizeNameForMatch(current.hoverName?.string.orEmpty())
-      val isUtility = SLAYER_NON_WEAPON_KEYWORDS.any { name.contains(it) }
-      if (!isUtility) return // already holding a weapon
+      if (isSlayerWeaponForMode(currentName, activeCombatMode, target)) return
+      val isUtility = SLAYER_NON_WEAPON_KEYWORDS.any { currentName.contains(it) }
+      val preferredSlot = findPreferredSlayerWeaponSlot(player, activeCombatMode, target)
+      if (preferredSlot in 0..8 && preferredSlot != currentSlot) {
+        InventoryUtils.holdHotbarSlot(preferredSlot)
+        return
+      }
+      if (!isUtility) return
     }
-    // Current item is a utility item or empty — find a weapon
-    val weaponSlot = findHotbarSlotByKeywords(player, SLAYER_WEAPON_KEYWORDS)
+    val weaponSlot = findPreferredSlayerWeaponSlot(player, activeCombatMode, target)
     if (weaponSlot in 0..8 && weaponSlot != currentSlot) {
       InventoryUtils.holdHotbarSlot(weaponSlot)
     }
@@ -1984,6 +3013,161 @@ object CombatMacroModule : Module("Combat Macro") {
 
   private fun lerpChannel(start: Int, end: Int, t: Double): Int {
     return (start + (end - start) * t).toInt().coerceIn(0, 255)
+  }
+
+  private fun shouldUseDirectChase(target: LivingEntity, hasLos: Boolean, distanceToTarget: Double): Boolean {
+    val targetName = normalizedTargetDisplayName(target)
+    val slayerGapBonus =
+      when {
+        cryptZombieSlayer.value && isSlayerBossName(targetName) -> SLAYER_BOSS_DIRECT_CHASE_GAP_BONUS
+        cryptZombieSlayer.value && isSlayerPriorityMobName(targetName) -> SLAYER_MINIBOSS_DIRECT_CHASE_GAP_BONUS
+        else -> 0.0
+      }
+    val handoffGap = SOFT_CHASE_HANDOFF_GAP + slayerGapBonus
+    val stickyExitGap = SOFT_CHASE_STICKY_EXIT_GAP + slayerGapBonus
+    val losGraceGap = SOFT_CHASE_LOS_GRACE_GAP + min(slayerGapBonus, SOFT_CHASE_MAX_GAP)
+
+    val enterDirectChase = hasLos && distanceToTarget <= attackRange.value + handoffGap
+    val stayDirectChase =
+      closeChaseActive &&
+        closeChaseTargetId == target.uuid &&
+        distanceToTarget <= attackRange.value + stickyExitGap &&
+        (hasLos || distanceToTarget <= attackRange.value + losGraceGap)
+
+    val active = enterDirectChase || stayDirectChase
+    closeChaseActive = active
+    closeChaseTargetId = if (active) target.uuid else null
+    return active
+  }
+
+  private fun resetCloseChase() {
+    closeChaseActive = false
+    closeChaseTargetId = null
+    losScanLastFlipTick = 0L
+  }
+
+  private fun renderSlayerHighlights(context: org.cobalt.api.event.impl.render.WorldRenderContext, level: ClientLevel) {
+    val espMode = slayerEspTargets.value
+    for (entity in level.entitiesForRendering()) {
+      val living = entity as? LivingEntity ?: continue
+      if (!living.isAlive || living.health <= 0f) continue
+
+      val highlightType = slayerHighlightType(living) ?: continue
+      if (!slayerHighlightMatchesMode(highlightType, espMode)) continue
+
+      drawSlayerAura(context, living.boundingBox.inflate(TARGET_BOX_INFLATE), highlightType)
+    }
+  }
+
+  private fun slayerHighlightType(entity: LivingEntity): SlayerHighlightType? {
+    val normalizedName = normalizedTargetDisplayName(entity)
+    return when {
+      isSlayerBossName(normalizedName) -> SlayerHighlightType.BOSS
+      isSlayerPriorityMobName(normalizedName) -> SlayerHighlightType.MINIBOSS
+      else -> null
+    }
+  }
+
+  private fun slayerHighlightMatchesMode(type: SlayerHighlightType, mode: Int): Boolean =
+    when (mode) {
+      0 -> type == SlayerHighlightType.BOSS
+      1 -> type == SlayerHighlightType.MINIBOSS
+      else -> true
+    }
+
+  private fun drawSlayerAura(
+    context: org.cobalt.api.event.impl.render.WorldRenderContext,
+    box: net.minecraft.world.phys.AABB,
+    type: SlayerHighlightType,
+  ) {
+    val palette =
+      when (type) {
+        SlayerHighlightType.BOSS ->
+          SlayerEspPalette(
+            stroke = Color(255, 114, 186, 235),
+            fill = Color(255, 114, 186, 52),
+            outerStroke = Color(110, 226, 255, 170),
+            outerFill = Color(110, 226, 255, 18)
+          )
+        SlayerHighlightType.MINIBOSS ->
+          SlayerEspPalette(
+            stroke = Color(255, 219, 109, 220),
+            fill = Color(255, 219, 109, 42),
+            outerStroke = Color(255, 158, 86, 150),
+            outerFill = Color(255, 158, 86, 14)
+          )
+      }
+
+    Render3D.drawStyledBox(
+      context,
+      box.inflate(SLAYER_ESP_OUTER_INFLATE),
+      palette.outerStroke,
+      palette.outerFill,
+      esp = true,
+      lineWidth = 3.2f
+    )
+    Render3D.drawStyledBox(
+      context,
+      box.inflate(SLAYER_ESP_MID_INFLATE),
+      palette.stroke,
+      palette.fill,
+      esp = true,
+      lineWidth = 2.8f
+    )
+    Render3D.drawStyledBox(
+      context,
+      box,
+      palette.stroke,
+      palette.fill,
+      esp = true,
+      lineWidth = 2.2f
+    )
+  }
+
+  private fun slayerBossDisplayName(): String =
+    when (slayerType.value) {
+      0 -> if (slayerTier.value.toInt() >= 5) "Atoned Horror" else "Revenant Horror"
+      1 -> "Sven Packmaster"
+      2 -> "Tarantula Broodfather"
+      3 -> "Voidgloom Seraph"
+      4 -> "Riftstalker Bloodfiend"
+      5 -> "Inferno Demonlord"
+      else -> "Slayer Boss"
+    }
+
+  private fun applyLosStrafeScan(nowTick: Long) {
+    if (losScanLastFlipTick == 0L) {
+      losScanLastFlipTick = nowTick
+    }
+    if (nowTick - losScanLastFlipTick >= LOS_SCAN_FLIP_TICKS) {
+      losScanStrafeRight = !losScanStrafeRight
+      losScanLastFlipTick = nowTick
+    }
+    MovementManager.setForcedMovement(
+      forward = false, backward = false,
+      left = !losScanStrafeRight, right = losScanStrafeRight,
+      jump = false, shift = false, sprint = false
+    )
+  }
+
+  private fun handleSoftChaseMovement(player: Player, target: LivingEntity, distanceToTarget: Double) {
+    val rotation = AngleUtils.getRotation(target)
+    RotationExecutor.rotateTo(rotation, rotationStrategy)
+
+    val yawError = abs(AngleUtils.getRotationDelta(player.yRot, rotation.yaw))
+    val pitchError = abs(rotation.pitch - player.xRot)
+    val aligned = yawError <= SOFT_CHASE_YAW_TOLERANCE && pitchError <= SOFT_CHASE_PITCH_TOLERANCE
+    val shouldStepForward = distanceToTarget > combatKeepDistance(0) + SOFT_CHASE_STOP_BUFFER
+
+    if (aligned && shouldStepForward) {
+      MovementManager.setForcedMovement(
+        forward = true, backward = false,
+        left = false, right = false,
+        jump = false, shift = false, sprint = true
+      )
+    } else {
+      MovementManager.clearForcedMovement()
+    }
   }
 
   private fun isAttackReady(player: Player, target: LivingEntity): Boolean {
@@ -2042,7 +3226,7 @@ object CombatMacroModule : Module("Combat Macro") {
       if (target != null && target.isAlive && target.health > 0f) {
         nativeStop()
         val targetPos = target.blockPosition()
-        val restarted = startCombatPathToTarget(level, targetPos)
+        val restarted = startCombatPathToTarget(level, targetPos, effectiveCombatMode(target))
         if (restarted) {
           startedPath = true
           lastTargetPos = targetPos
@@ -2070,46 +3254,186 @@ object CombatMacroModule : Module("Combat Macro") {
     }
   }
 
-  private fun startCombatPathToTarget(level: ClientLevel, targetPos: BlockPos): Boolean {
-    // Jitter the destination slightly so the path never goes perfectly straight to the mob.
-    val dest = jitterTargetPos(targetPos)
-    NativePathfinder.setTarget(dest.x + 0.5, dest.y.toDouble(), dest.z + 0.5)
+  private fun startCombatPathToTarget(
+    level: ClientLevel,
+    targetPos: BlockPos,
+    activeCombatMode: Int = combatMode.value
+  ): Boolean {
+    val resolved = findNearestWalkableAround(level, targetPos, CHASE_RESOLVE_RADIUS, CHASE_RESOLVE_VERTICAL) ?: targetPos
+    val radius = combatPathRadius(activeCombatMode)
+    if (!nativeActive()) {
+      MovementManager.clearForcedMovement()
+      RotationExecutor.stopRotating()
+    }
+    NativePathfinder.setTargetWithRadius(resolved.x + 0.5, resolved.y.toDouble(), resolved.z + 0.5, radius)
     return true
   }
 
-  /** Returns a copy of [pos] offset by a small random amount on X/Z so paths curve off-centre. */
-  private fun jitterTargetPos(pos: BlockPos): BlockPos {
-    val offX = (Math.random() * (PATH_JITTER_RANGE * 2 + 1) - PATH_JITTER_RANGE).toInt()
-    val offZ = (Math.random() * (PATH_JITTER_RANGE * 2 + 1) - PATH_JITTER_RANGE).toInt()
-    return pos.offset(offX, 0, offZ)
+  private fun combatEngageRange(activeCombatMode: Int = combatMode.value): Double {
+    return when (activeCombatMode) {
+      1 -> max(attackRange.value, bowMinRange.value.coerceAtLeast(0.0))
+      else -> attackRange.value
+    }
   }
+
+  private fun combatKeepDistance(activeCombatMode: Int = combatMode.value): Double {
+    return when (activeCombatMode) {
+      0 -> {
+        val configured = swordKeepDistance.value.coerceAtLeast(0.0)
+        val desired = if (configured <= 0.0) MELEE_CLOSE_IN_DISTANCE else configured
+        min(attackRange.value, desired)
+      }
+      1 -> combatEngageRange(activeCombatMode)
+      else -> attackRange.value
+    }
+  }
+
+  private fun combatPathRadius(activeCombatMode: Int = combatMode.value): Double {
+    return (combatKeepDistance(activeCombatMode) - COMBAT_PATH_RADIUS_BUFFER).coerceAtLeast(COMBAT_MIN_STANDOFF)
+  }
+
+  private fun beginSlayerSession() {
+    slayerSessionStartMs = System.currentTimeMillis()
+    slayerSessionMobKills = 0
+    slayerSessionQuestCompletions = 0
+    slayerSessionQuestFailures = 0
+    clearTrackedSlayerQuestState(clearIdentity = true)
+  }
+
+  private fun startTrackedSlayerQuest(typeIdx: Int, tier: Int) {
+    slayerTrackedQuestActive = true
+    slayerTrackedQuestType = typeIdx.takeIf { it in slayerType.options.indices } ?: slayerType.value
+    slayerTrackedQuestTier = tier.takeIf { it in 1..5 } ?: slayerTier.value.toInt().coerceIn(1, 5)
+    slayerTrackedQuestProgressKills = 0
+    slayerTrackedQuestTargetKills = 0
+    slayerTrackedQuestSawMobKill = false
+    slayerTrackedQuestBossSeen = false
+    slayerTrackedQuestCompletionPendingRestart = false
+  }
+
+  private fun clearTrackedSlayerQuestState(clearIdentity: Boolean) {
+    slayerTrackedQuestActive = false
+    slayerTrackedQuestProgressKills = 0
+    slayerTrackedQuestTargetKills = 0
+    slayerTrackedQuestSawMobKill = false
+    slayerTrackedQuestBossSeen = false
+    slayerTrackedQuestCompletionPendingRestart = false
+    if (clearIdentity) {
+      slayerTrackedQuestType = -1
+      slayerTrackedQuestTier = 0
+    }
+  }
+
+  private fun completeTrackedSlayerQuest() {
+    if (slayerTrackedQuestCompletionPendingRestart) return
+    slayerSessionQuestCompletions++
+    slayerTrackedQuestActive = false
+    slayerTrackedQuestSawMobKill = true
+    slayerTrackedQuestBossSeen = true
+    slayerTrackedQuestCompletionPendingRestart = true
+  }
+
+  private fun queueSlayerQuestRestart(countFailure: Boolean = true) {
+    if (countFailure) {
+      markTrackedSlayerQuestFailedIfNeeded()
+    }
+    slayerNeedsQuestRestart = true
+  }
+
+  private fun markTrackedSlayerQuestFailedIfNeeded() {
+    if (!slayerTrackedQuestActive) return
+    if (slayerTrackedQuestCompletionPendingRestart || slayerNeedsQuestClaim) return
+    slayerSessionQuestFailures++
+    clearTrackedSlayerQuestState(clearIdentity = false)
+  }
+
+  private fun trackedSlayerQuestLabel(): String {
+    val typeIndex =
+      when {
+        slayerTrackedQuestType in slayerType.options.indices -> slayerTrackedQuestType
+        slayerType.value in slayerType.options.indices -> slayerType.value
+        else -> return "--"
+      }
+    val tier =
+      when {
+        slayerTrackedQuestTier in 1..5 -> slayerTrackedQuestTier
+        else -> slayerTier.value.toInt().coerceIn(1, 5)
+      }
+    return "${slayerType.options[typeIndex]} ${romanTierLabel(tier)}"
+  }
+
+  private fun trackedSlayerQuestHudStageLabel(): String =
+    when {
+      slayerNeedsQuestClaim || slayerTrackedQuestCompletionPendingRestart || slayerBossActive || slayerQuestReady || slayerTrackedQuestBossSeen ->
+        "Killing Boss"
+      slayerTrackedQuestSawMobKill || slayerTrackedQuestProgressKills > 0 -> "Killing Mobs"
+      else -> "Started"
+    }
+
+  private fun currentSlayerKillsLeft(): Int? {
+    if (slayerNeedsQuestClaim || slayerTrackedQuestCompletionPendingRestart || slayerBossActive || slayerQuestReady || slayerTrackedQuestBossSeen) {
+      return 0
+    }
+    val targetKills = slayerTrackedQuestTargetKills
+    if (targetKills <= 0) return null
+    return (targetKills - slayerTrackedQuestProgressKills).coerceAtLeast(0)
+  }
+
+  private fun formatSessionRateDisplay(count: Int): String {
+    val sessionStart = slayerSessionStartMs
+    if (sessionStart <= 0L || count <= 0) return "0/h"
+    val elapsedMs = (System.currentTimeMillis() - sessionStart).coerceAtLeast(1000L)
+    val perHour = count * 3_600_000.0 / elapsedMs.toDouble()
+    return if (perHour >= 100.0 || abs(perHour - perHour.toInt()) < 0.05) {
+      "${perHour.toInt()}/h"
+    } else {
+      String.format(Locale.ROOT, "%.1f/h", perHour)
+    }
+  }
+
+  private fun romanTierLabel(tier: Int): String =
+    when (tier.coerceIn(1, 5)) {
+      1 -> "I"
+      2 -> "II"
+      3 -> "III"
+      4 -> "IV"
+      5 -> "V"
+      else -> "I"
+    }
 
   /**
    * Navigate back to the farming area using the configured walkback route.
-   * [justFarm] = true  → just walk in; don't restart the quest after arriving.
-   * [justFarm] = false → buy a new quest once walkback completes.
+   * [justFarm] = true  -> just walk in; don't restart the quest after arriving.
+   * [justFarm] = false -> buy a new quest once walkback completes.
    */
   private fun triggerWalkToFarmArea(justFarm: Boolean) {
     if (CombatPatrolModule.isPatrolRunning) CombatPatrolModule.stopPatrol()
     if (PathfindingModule.isPatrolActive) PathfindingModule.stopPatrol()
     if (slayerNeedsWalkback) WalkbackBridge.stopWalkback?.invoke()
     nativeStop()
+    startedPath = false
+    lastTargetPos = null
+    currentTargetId = null
+    stuckTicks = 0
+    stuckRepathCount = 0
+    RotationExecutor.stopRotating()
+    MovementManager.clearForcedMovement()
     val routeName = when {
       slayerLocation.value == 1 -> CRYPT_WALKBACK_ROUTE_NAME
       slayerWalkbackRoute.value.isNotBlank() -> slayerWalkbackRoute.value.trim()
       else -> ""
     }
     if (routeName.isBlank()) {
-      if (!justFarm) slayerNeedsQuestRestart = true
+      if (!justFarm) queueSlayerQuestRestart(countFailure = false)
       return
     }
-    val started = WalkbackBridge.startWalkback?.invoke(routeName, 0) ?: false
+    val started = WalkbackBridge.startWalkback?.invoke(routeName, 0, false) ?: false
     if (started) {
       slayerNeedsWalkback = true
       slayerWalkbackJustFarm = justFarm
     } else {
       ChatUtils.sendMessage("Combat macro: walkback route \"$routeName\" not found.")
-      if (!justFarm) slayerNeedsQuestRestart = true
+      if (!justFarm) queueSlayerQuestRestart(countFailure = false)
     }
   }
 
@@ -2157,6 +3481,7 @@ object CombatMacroModule : Module("Combat Macro") {
     nextAttackNs = 0L
     startedPath = false
     currentTargetId = null
+    resetCloseChase()
     lastPathStartTick = 0L
     clearKillCandidate()
     drillWarnTick = 0L
@@ -2168,6 +3493,7 @@ object CombatMacroModule : Module("Combat Macro") {
       pendingHealRelease = false
     }
     pendingHealRestoreSlot = -1
+    clearPendingOverfluxPlacement()
     slayerStatus.value = "Off"
     clearSlayerBossState(false)
     slayerLastTabScanTick = -1L
@@ -2191,7 +3517,13 @@ object CombatMacroModule : Module("Combat Macro") {
     slayerLastGuiActionTick = -1L
     slayerWarnNoBatphoneTick = -1L
     slayerModeEnabled = false
+    slayerQuestStateGraceUntilTick = -1L
     slayerEnteredCrypt = false
+    slayerSessionStartMs = 0L
+    slayerSessionMobKills = 0
+    slayerSessionQuestCompletions = 0
+    slayerSessionQuestFailures = 0
+    clearTrackedSlayerQuestState(clearIdentity = true)
   }
 
   private const val TAB_COMBAT_GROUP = "Combat Macro"
@@ -2207,6 +3539,9 @@ object CombatMacroModule : Module("Combat Macro") {
   private const val SLAYER_BOSS_TAB_LOST_TICKS = 30L
   private const val SLAYER_BOSS_ENTITY_LOST_TICKS = 20L
   private const val SLAYER_OVERFLUX_COOLDOWN_TICKS = 600L
+  private const val OVERFLUX_LOOK_DOWN_TICKS = 4
+  private const val OVERFLUX_RECOVER_LOOK_TICKS = 8
+  private const val OVERFLUX_PLACE_PITCH = 80f
   private const val SLAYER_RAGNAROK_COOLDOWN_TICKS = 400L
   private const val SLAYER_BAD_HEALTH_REUSE_TICKS = 80L
   private const val SLAYER_BATPHONE_RETRY_TICKS = 80L
@@ -2214,26 +3549,66 @@ object CombatMacroModule : Module("Combat Macro") {
   private const val SLAYER_GUI_ACTION_COOLDOWN_TICKS = 5L
   private const val SLAYER_NO_BATPHONE_WARN_TICKS = 200L
   private const val SLAYER_DETECT_WINDOW_TICKS = 100L  // 5 s to scan before assuming no quest
+  private const val SLAYER_QUEST_STATE_GRACE_TICKS = 40L
+  private const val SPIDER_HATCHLING_PHASE_FALLBACK_TICKS = 160L
+  private const val SPIDER_HATCHLING_PHASE_REFRESH_TICKS = 40L
+  private const val SLAYER_WOLF_PUPS_PHASE_TICKS = 60L
   private const val PLAYER_HOTBAR_MENU_SLOT_START = 36
   private const val PLAYER_HOTBAR_MENU_SLOT_END = 44
   private const val DEFAULT_WHITELIST_ENTRY = "ice walker"
-  private const val MIN_PATH_START_INTERVAL_TICKS = 20L
-  private const val TARGET_REPATH_DISTANCE_SQ = 16.0  // repath when mob moves 4+ blocks
-  private const val COMBAT_ROTATION_STEP_SCALE = 0.62
-  private const val PATH_JITTER_RANGE = 2              // slight offset so paths vary naturally
+  private const val MIN_PATH_START_INTERVAL_TICKS = 8L
+  private const val TARGET_REPATH_DISTANCE_SQ = 9.0   // repath when mob moves ~3+ blocks
+  private const val COMBAT_ROTATION_STEP_SCALE = 0.95
   private const val ROTATION_STOP_HYSTERESIS = 2.5     // don't stop rotating until clearly out of range
+  private const val COMBAT_MIN_STANDOFF = 0.45
+  private const val MELEE_CLOSE_IN_DISTANCE = 1.1
+  private const val COMBAT_PATH_RADIUS_BUFFER = 0.18
+  private const val SOFT_CHASE_HANDOFF_GAP = 2.5
+  private const val SOFT_CHASE_STICKY_EXIT_GAP = 3.2
+  private const val SOFT_CHASE_LOS_GRACE_GAP = 0.55
+  private const val SOFT_CHASE_MAX_GAP = 0.45
+  private const val SOFT_CHASE_STOP_BUFFER = 0.10
+  private const val SOFT_CHASE_YAW_TOLERANCE = 7.5
+  private const val SOFT_CHASE_PITCH_TOLERANCE = 18.0
+  private const val SLAYER_BOSS_DIRECT_CHASE_GAP_BONUS = 0.85
+  private const val SLAYER_MINIBOSS_DIRECT_CHASE_GAP_BONUS = 0.45
+  private const val SLAYER_PHASE_ADD_SEARCH_RADIUS_SQ = 100.0
+  private const val SPIDER_HATCHLING_CLEAR_DISTANCE = 0.9
+  private const val SPIDER_PHASE_MIN_BACKSTEP_DISTANCE = 5.0
+  private const val SPIDER_PHASE_STEPBACK_BUFFER = 1.35
+  private const val SPIDER_PHASE_STEPBACK_HYSTERESIS = 0.35
+  private const val SPIDER_PHASE_STEPBACK_YAW_TOLERANCE = 10.0
+  private const val LOS_SCAN_FLIP_TICKS = 20L
+  private const val EMAN_HITS_PHASE_MIN_STANDOFF = 2.5
+  private const val EMAN_HITS_PHASE_STANDOFF_BUFFER = 0.5
+  private const val EMAN_HITS_PHASE_STANDOFF_HYSTERESIS = 0.35
+  private const val EMAN_HITS_PHASE_YAW_TOLERANCE = 25.0
+  private const val SPIDER_PHASE_STEPBACK_PITCH_TOLERANCE = 22.0
   private const val CRYPT_WALKBACK_ROUTE_NAME = "cryptwalkback"
   private const val SLAYER_WALKIN_WARP_DELAY_TICKS = 40L  // ticks to wait after warp hub before starting walkin route
-  private const val CRYPT_PROXIMITY_RANGE_SQ = 1600.0    // 40-block radius — if within this of any patrol point, already in crypt
-  private const val GRAVEYARD_PROXIMITY_RANGE_SQ = 900.0  // 30-block radius — if within this of any patrol point, already at graveyard
+  private const val CRYPT_PROXIMITY_RANGE_SQ = 1600.0    // 40-block radius - if within this of any patrol point, already in crypt
+  private const val GRAVEYARD_PROXIMITY_RANGE_SQ = 900.0  // 30-block radius - if within this of any patrol point, already at graveyard
   private const val CHASE_RESOLVE_RADIUS = 3
   private const val CHASE_RESOLVE_VERTICAL = 2
   private const val START_AREA_RETURN_BUFFER = 2.0
   private const val TARGET_BOX_CYCLE_MS = 4000L
   private const val TARGET_BOX_ALPHA = 170
+  private const val ATTACHED_NAMEPLATE_HORIZONTAL_RANGE_SQ = 2.25
+  private const val ENDERMAN_HITS_HORIZONTAL_RANGE_SQ = 9.0
   private const val TARGET_BOX_INFLATE = 0.08
+  private const val SLAYER_ESP_MID_INFLATE = 0.22
+  private const val SLAYER_ESP_OUTER_INFLATE = 0.38
+  private const val BOW_REFIRE_DELAY_NS = 200_000_000L  // 200 ms between shots
+  private val ENDERMAN_HITS_PATTERN = Regex("\\b\\d+\\s+hits?\\b")
+  private val SLAYER_PROGRESS_PATTERN = Regex("(\\d{1,5})\\s*/\\s*(\\d{1,5})")
+  private data class SlayerQuestProgress(
+    val typeIndex: Int,
+    val tier: Int,
+    val progress: Int,
+    val target: Int,
+  )
   private val SLAYER_BOSS_ENTITY_KEYWORDS get() = when (slayerType.value) {
-    0 -> arrayOf("revenant horror")
+    0 -> arrayOf("revenant horror", "atoned horror")
     1 -> arrayOf("sven packmaster")
     2 -> arrayOf("tarantula broodfather")
     3 -> arrayOf("voidgloom seraph")
@@ -2245,8 +3620,21 @@ object CombatMacroModule : Module("Combat Macro") {
   // Only applies at the relevant tier (zombie: tier 3+).
   private val SLAYER_PRIORITY_MOB_KEYWORDS get() = when {
     slayerType.value == 0 && slayerTier.value >= 3 -> arrayOf(
-      "atoned horror", "atoned revenant", "atoned champion", "revenant champion",
-      "revenant sycophant", "deformed revenant"
+      "revenant sycophant", "revenant champion", "deformed revenant",
+      "atoned champion", "atoned revenant"
+    )
+    slayerType.value == 1 && slayerTier.value >= 3 -> arrayOf(
+      "pack enforcer", "sven follower", "sven alpha"
+    )
+    slayerType.value == 2 && slayerTier.value >= 3 -> arrayOf(
+      "tarantula vermin", "tarantula beast", "mutant tarantula",
+      "primordial jockey", "primordial viscount"
+    )
+    slayerType.value == 3 && slayerTier.value >= 3 -> arrayOf(
+      "voidling devotee", "voidling radical", "voidcrazed maniac"
+    )
+    slayerType.value == 5 && slayerTier.value >= 3 -> arrayOf(
+      "flare demon", "kindleheart demon", "burningsoul demon"
     )
     else -> arrayOf()
   }
@@ -2256,8 +3644,8 @@ object CombatMacroModule : Module("Combat Macro") {
       1 -> arrayOf("crypt ghoul", "golden ghoul") // Zombie Crypt
       else -> arrayOf("zombie", "crypt ghoul", "golden ghoul")
     }
-    1 -> arrayOf("pack wolf", "old wolf", "pit wolf", "zombie wolf", "wolf")
-    2 -> arrayOf("dasher spider", "voracious spider", "weaver spider", "spider")
+    1 -> arrayOf("pack wolf", "old wolf", "pit wolf", "zombie wolf", "wolf", "pup", "pups")
+    2 -> arrayOf("dasher spider", "voracious spider", "weaver spider", "spider", "hatchling", "hatchlings", "broodling")
     3 -> arrayOf("voidling extremist", "voidling radical", "voidling fanatic", "enderman")
     4 -> arrayOf("bat", "vampiric bat", "bloodfiend")
     5 -> arrayOf("blaze", "smoldering blaze", "emerald slime")
@@ -2277,15 +3665,37 @@ object CombatMacroModule : Module("Combat Macro") {
     5 -> arrayOf("slayer quest", "blaze slayer", "inferno demonlord")
     else -> arrayOf("slayer quest")
   }
-  // Items that are NOT weapons — switch away from these when preparing to attack
+  // Items that are NOT weapons - switch away from these when preparing to attack
   private val SLAYER_NON_WEAPON_KEYWORDS = arrayOf(
     "batphone", "overflux", "ragnarok", "ragnorak", "wand of atonement",
     "sword of bad health", "drill", "pickaxe", "gauntlet"
   )
-  // Items that ARE weapons — prefer these for attacking
-  private val SLAYER_WEAPON_KEYWORDS = arrayOf(
-    "sword", "blade", "scythe", "katana", "saber", "cleaver", "axe", "rapier", "claymore"
+  private val SLAYER_MELEE_WEAPON_KEYWORDS = arrayOf(
+    "sword", "blade", "scythe", "katana", "saber", "cleaver", "axe", "rapier", "claymore",
+    "halberd", "dagger", "falchion"
   )
+  private val SLAYER_BOW_WEAPON_KEYWORDS = arrayOf("terminator", "juju", "shortbow", "bow")
+  private val SLAYER_MAGE_WEAPON_KEYWORDS = arrayOf("staff", "wand", "sceptre", "scepter", "scythe")
+  private val SLAYER_ANY_WEAPON_KEYWORDS = arrayOf(
+    *SLAYER_MELEE_WEAPON_KEYWORDS,
+    *SLAYER_BOW_WEAPON_KEYWORDS,
+    *SLAYER_MAGE_WEAPON_KEYWORDS
+  )
+  private val SLAYER_ZOMBIE_SPAWN_WEAPON_DEFAULT_KEYWORDS = arrayOf("halberd")
+  private val SLAYER_ZOMBIE_DYNAMIC_SWORD_DEFAULT_KEYWORDS = arrayOf("falchion", "reaper", "shredded", "sword")
+  private const val EMAN_SPAWN_WEAPON_TERMINATOR = 0
+  private const val EMAN_SPAWN_WEAPON_SHORTBOW = 1
+  private const val EMAN_SPAWN_WEAPON_ENDERMAN_SWORD = 2
+  private const val EMAN_SPAWN_WEAPON_DYNAMIC = 3
+  private val SLAYER_ENDERMAN_TERMINATOR_WEAPON_KEYWORDS = arrayOf("terminator")
+  private val SLAYER_ENDERMAN_SHORTBOW_WEAPON_KEYWORDS = arrayOf("juju", "shortbow", "bow")
+  private val SLAYER_ENDERMAN_DYNAMIC_BOW_WEAPON_KEYWORDS = arrayOf("terminator", "juju", "shortbow", "bow")
+  private val SLAYER_ENDERMAN_SPAWN_WEAPON_DEFAULT_KEYWORDS = arrayOf("terminator", "juju", "shortbow", "bow")
+  private val SLAYER_ENDERMAN_HIT_PHASE_WEAPON_DEFAULT_KEYWORDS = arrayOf("terminator", "juju", "shortbow", "bow")
+  private val SLAYER_ENDERMAN_BOSS_WEAPON_DEFAULT_KEYWORDS = arrayOf("atomsplit", "vorpal", "voidedge", "katana")
+  private val SLAYER_SPIDER_PHASE_ADD_KEYWORDS = arrayOf("spider", "hatchling", "hatchlings", "broodling", "vermin")
+  private val SLAYER_WOLF_PHASE_ADD_KEYWORDS = arrayOf("wolf", "pup", "pups")
+  private val SLAYER_WOLF_PUPS_TEXT_KEYWORDS = arrayOf("calling the pups")
   private val SLAYER_WAND_OF_ATONEMENT_KEYWORDS = arrayOf("wand of atonement")
   private val SLAYER_ZOMBIE_SWORD_KEYWORDS = arrayOf("zombie sword")
   private val SLAYER_OVERFLUX_KEYWORDS = arrayOf("overflux")
@@ -2316,7 +3726,12 @@ object CombatMacroModule : Module("Combat Macro") {
     "boss will spawn"
   )
   private val SLAYER_BOSS_SPAWNED_CHAT_KEYWORDS get() = when (slayerType.value) {
-    0 -> arrayOf("revenant horror has spawned", "your revenant horror spawned")
+    0 -> arrayOf(
+      "revenant horror has spawned",
+      "your revenant horror spawned",
+      "atoned horror has spawned",
+      "your atoned horror spawned"
+    )
     1 -> arrayOf("sven packmaster has spawned", "your sven packmaster spawned")
     2 -> arrayOf("tarantula broodfather has spawned")
     3 -> arrayOf("voidgloom seraph has spawned")
@@ -2348,7 +3763,7 @@ object CombatMacroModule : Module("Combat Macro") {
     5 -> "warp blazing_fortress"
     else -> ""
   }
-  // Reference positions spread across the crypt — used only for "is player inside crypt?" proximity checks.
+  // Reference positions spread across the crypt - used only for "is player inside crypt?" proximity checks.
   private val CRYPT_PATROL_WAYPOINTS = listOf(
     BlockPos(-152, 57, -102), BlockPos(-133, 50, -101), BlockPos(-132, 45, -121),
     BlockPos(-129, 41, -134), BlockPos(-129, 41, -143), BlockPos(-119, 41, -136),
@@ -2363,4 +3778,16 @@ object CombatMacroModule : Module("Combat Macro") {
 
   private val CYAN_COLOR = Color(0, 255, 255)
   private val PINK_COLOR = Color(255, 105, 180)
+
+  private enum class SlayerHighlightType {
+    BOSS,
+    MINIBOSS
+  }
+
+  private data class SlayerEspPalette(
+    val stroke: Color,
+    val fill: Color,
+    val outerStroke: Color,
+    val outerFill: Color,
+  )
 }

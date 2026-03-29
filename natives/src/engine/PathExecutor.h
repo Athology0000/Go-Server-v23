@@ -20,7 +20,7 @@ public:
                      float yaw, float pitch, bool onGround);
 
     PathStatus getStatus() const { return status_; }
-    const std::vector<Vec3i>& getActivePath() const { return activePath_; }
+    const std::vector<Vec3i>& getActivePath() const { return activePathPositions_; }
 
 private:
     PathStatus status_ = PathStatus::IDLE;
@@ -31,7 +31,8 @@ private:
     int waypointIdx_ = 0;
     bool loop_ = false;
 
-    std::vector<Vec3i> activePath_;
+    std::vector<PathNode> activePath_;
+    std::vector<Vec3i> activePathPositions_;
     int pathNodeIdx_ = 0;
 
     AStarPlanner planner_;
@@ -47,5 +48,6 @@ private:
     PathCommand idleCmd(float yaw, float pitch) {
         return {false,false,false,false,false,yaw,pitch,PathStatus::IDLE,ActionType::WALK,0.f};
     }
-    float distToWaypoint(double px, double pz) const;
+    void setActivePath(std::vector<PathNode> nodes);
+    float distToWaypoint(double px, double py, double pz) const;
 };

@@ -63,10 +63,10 @@ object WardrobeModule : Module("Wardrobe GUI") {
         enabled && WardrobeState.isOpen && scanState == ScanState.DONE
 
     fun setsOnCurrentCustomPage(): List<WardrobeSet> {
-        val pageMap = WardrobePageConfig.resolvePages(page1Slots, page2Slots)
+        val currentVanillaPage = WardrobeState.currentVanillaPage ?: return emptyList()
         return WardrobeState.sets
             .filter { !it.isEmpty() && !it.locked }
-            .filter { pageMap[it.id] == currentCustomPage }
+            .filter { it.vanillaPage == currentVanillaPage }
     }
 
     // ── Packet handling ───────────────────────────────────────────────────────
@@ -98,7 +98,7 @@ object WardrobeModule : Module("Wardrobe GUI") {
         if (scanState == ScanState.IDLE || scanState == ScanState.SCANNING) {
             scanState = ScanState.SCANNING
             scanPagesReceived = 0
-            currentCustomPage = 1
+            currentCustomPage = page
         }
     }
 
@@ -135,14 +135,7 @@ object WardrobeModule : Module("Wardrobe GUI") {
         WardrobeState.updatePage(page, armorBySetId, equippedId, lockedIds)
         scanPagesReceived++
 
-        if (scanState == ScanState.SCANNING && scanPagesReceived < 3) {
-            mc.execute {
-                val screen = mc.screen as? AbstractContainerScreen<*> ?: return@execute
-                mc.gameMode?.handleInventoryMouseClick(
-                    screen.menu.containerId, 53, 0, ClickType.PICKUP, mc.player!!,
-                )
-            }
-        } else if (scanState == ScanState.SCANNING && scanPagesReceived >= 3) {
+        if (scanState == ScanState.SCANNING && scanPagesReceived >= 1) {
             scanState = ScanState.DONE
         }
 
@@ -210,10 +203,6 @@ object WardrobeModule : Module("Wardrobe GUI") {
 
         if (set.vanillaPage == currentVanillaPage) {
             clickVanillaSlot(set.inventorySlot)
-        } else {
-            pendingEquipSetId = setId
-            val pageDiff = set.vanillaPage - currentVanillaPage
-            clickVanillaSlot(if (pageDiff > 0) 53 else 45)
         }
     }
 

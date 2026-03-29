@@ -38,7 +38,7 @@ object GardenMacroModule : Module("Garden Macro") {
 
     private val mc = Minecraft.getInstance()
 
-    // ── State ─────────────────────────────────────────────────────────────────
+    // -- State -----------------------------------------------------------------
     @Volatile var state = GardenState.OFF
         private set
     @Volatile var sessionStartTime = System.currentTimeMillis()
@@ -48,10 +48,10 @@ object GardenMacroModule : Module("Garden Macro") {
     @Volatile private var startupGraceUntilMs = 0L
 
     fun setState(newState: GardenState) {
-        state = newState  // @Volatile — safe from any thread, no mc.execute needed
+        state = newState  // @Volatile - safe from any thread, no mc.execute needed
     }
 
-    // ── Settings ──────────────────────────────────────────────────────────────
+    // -- Settings --------------------------------------------------------------
 
     // General
     private val enabledSetting = CheckboxSetting("Enabled", "Run the garden macro.", false)
@@ -143,7 +143,7 @@ object GardenMacroModule : Module("Garden Macro") {
     private val unflyModeSetting                  = TextSetting("Unfly Mode",                   "DOUBLE_TAP_SPACE or SNEAK.",            "DOUBLE_TAP_SPACE").inGroup("Advanced")
     private val petTrackerListSetting             = TextSetting("Pet Tracker List",             "Pets to track (ID:Name:Level:Rarity).", "PET_ROSE_DRAGON:Rose Dragon:200:LEGENDARY").inGroup("Advanced")
 
-    // ── HUD ───────────────────────────────────────────────────────────────────
+    // -- HUD -------------------------------------------------------------------
     private val hudWidth = 200f
 
     private val gardenHudElement = hudElement("garden-macro-hud", "Garden Macro HUD", "Macro status and profit tracking") {
@@ -170,7 +170,7 @@ object GardenMacroModule : Module("Garden Macro") {
         }
     }
 
-    // ── init ──────────────────────────────────────────────────────────────────
+    // -- init ------------------------------------------------------------------
     init {
         addSetting(
             enabledSetting,
@@ -209,7 +209,7 @@ object GardenMacroModule : Module("Garden Macro") {
         EventBus.register(this)
     }
 
-    // ── GardenConfig sync ─────────────────────────────────────────────────────
+    // -- GardenConfig sync -----------------------------------------------------
     private fun syncConfig() {
         // Scripts
         GardenConfig.farmScript   = farmScriptSetting.value
@@ -299,7 +299,7 @@ object GardenMacroModule : Module("Garden Macro") {
         GardenConfig.guiOnlyInGarden = guiOnlyInGardenSetting.value
     }
 
-    // ── Events ────────────────────────────────────────────────────────────────
+    // -- Events ----------------------------------------------------------------
 
     @SubscribeEvent
     fun onTick(event: TickEvent.End) {
@@ -358,7 +358,7 @@ object GardenMacroModule : Module("Garden Macro") {
 
     @SubscribeEvent
     fun onChat(event: ChatEvent.Receive) {
-        val msg = event.message?.replace(Regex("§[0-9a-fk-or]"), "") ?: return
+        val msg = event.message?.replace(Regex("\u00A7[0-9a-fk-or]"), "") ?: return
 
         // Chat spam filter
         if (hideFilteredChatSetting.value) {
@@ -401,7 +401,7 @@ object GardenMacroModule : Module("Garden Macro") {
             return
         }
 
-        // AUTOSELLING — priority: George > BookCombine > Junk
+        // AUTOSELLING - priority: George > BookCombine > Junk
         if (autosellingManager == null) {
             if (GardenConfig.autoGeorgeSell && GeorgeManager.shouldSell()) {
                 autosellingManager = "george"
@@ -434,7 +434,7 @@ object GardenMacroModule : Module("Garden Macro") {
             PestPrepSwapManager.markActive()
         }
 
-        // Pest prep-swap check — triggers at cooldown ≤ 60s before pests spawn,
+        // Pest prep-swap check - triggers at cooldown <= 60s before pests spawn,
         // or after 30 s if the cooldown was never parsed from the tab list.
         if (prepSwapSetting.value && !PestPrepSwapManager.swapDone &&
             System.currentTimeMillis() >= PestManager.cleaningCooldownUntil) {

@@ -41,15 +41,15 @@ object PigMacroModule : Module("Pig Macro") {
 
     private val mc = Minecraft.getInstance()
 
-    // ── State ─────────────────────────────────────────────────────────────────
+    // -- State -----------------------------------------------------------------
 
     /**
-     * IDLE → SPRINT_TO_PIG → DEPLOYING_ORB → WAIT_FOR_ORB_CHAT → HERDING → COLLECTING → WAITING
+     * IDLE -> SPRINT_TO_PIG -> DEPLOYING_ORB -> WAIT_FOR_ORB_CHAT -> HERDING -> COLLECTING -> WAITING
      *
-     *   SPRINT_TO_PIG     : sprint directly toward pig (no pathfinder — pig moves).
+     *   SPRINT_TO_PIG     : sprint directly toward pig (no pathfinder - pig moves).
      *   DEPLOYING_ORB     : equip orb, hold right-click on pig for 4 ticks.
      *                       Long slot-swap settle delay so server registers the change.
-     *   WAIT_FOR_ORB_CHAT : wait for "Bring the pig back!" → random 0–2 s delay → HERDING.
+     *   WAIT_FOR_ORB_CHAT : wait for "Bring the pig back!" -> random 0-2 s delay -> HERDING.
      *   HERDING phases:
      *     AOTV_BEHIND   : one-shot AOTV, aims at ground block behind pig (pig.y-1).
      *     WALK_PRESSURE : sprint toward pig so it flees toward orb.
@@ -84,17 +84,17 @@ object PigMacroModule : Module("Pig Macro") {
     private var actionDelay   = 0   // inter-action pause
     private var stateTimeout  = 0   // WAIT_FOR_ORB_CHAT fallback
 
-    // Stuck detection — track pig distance to orb each tick
+    // Stuck detection - track pig distance to orb each tick
     private var lastPigOrbDist = Double.MAX_VALUE
     private var pigStuckTicks  = 0
 
-    // Pathfinding targets — repath when entity moves too far from last target
+    // Pathfinding targets - repath when entity moves too far from last target
     private var lastBehindPathPos:  BlockPos? = null
     private var lastSprintToPigPos: BlockPos? = null
-    // Rotate behind-approach angle when pig is repeatedly stuck (45° per stuck event)
+    // Rotate behind-approach angle when pig is repeatedly stuck (45 deg per stuck event)
     private var stuckAngleOffsetDeg = 0.0
 
-    // Pig velocity tracking — for overlay velocity ray
+    // Pig velocity tracking - for overlay velocity ray
     private var pigPrevPos: Vec3? = null
 
     // Ticks we have waited for pig to land before firing AOTV
@@ -109,13 +109,13 @@ object PigMacroModule : Module("Pig Macro") {
     private var sessionStartMs = 0L
     private var captureCount   = 0
 
-    // ── Settings ──────────────────────────────────────────────────────────────
+    // -- Settings --------------------------------------------------------------
 
     private val enabledSetting = CheckboxSetting("Enabled", "Start or stop the shiny pig macro.", false)
 
     private val infoSetting = InfoSetting(
         "Shiny Pig",
-        "Sprint to pig → deploy orb → AOTV behind → walk pressure + rod → punch if stuck → collect.",
+        "Sprint to pig -> deploy orb -> AOTV behind -> walk pressure + rod -> punch if stuck -> collect.",
         InfoType.INFO
     )
 
@@ -134,11 +134,11 @@ object PigMacroModule : Module("Pig Macro") {
     private val collectRangeSetting   = SliderSetting("Collect Range", "Distance to orb before clicking to collect.", 3.0, 1.0, 8.0, step = 0.5)
     private val waitBetweenSetting    = SliderSetting("Wait Between", "Ticks to wait before hunting next pig.", 40.0, 10.0, 200.0, step = 5.0)
     private val otherPlayerExclusionSetting = SliderSetting("Player Exclusion Radius", "Skip pigs within N blocks of another player.", 6.0, 2.0, 20.0, step = 1.0)
-    private val abandonDistanceSetting = SliderSetting("Abandon Distance", "Pig→orb distance at which to give up and find a new pig.", 25.0, 10.0, 60.0, step = 1.0)
+    private val abandonDistanceSetting = SliderSetting("Abandon Distance", "Pig->orb distance at which to give up and find a new pig.", 25.0, 10.0, 60.0, step = 1.0)
     private val autoLoopSetting = CheckboxSetting("Auto Loop", "Automatically hunt the next pig after collecting.", true)
     private val walkModeSetting = CheckboxSetting("Walk Mode", "Walk toward pig to make it flee to the orb instead of using AOTV knockback.", false)
 
-    // ── HUD ───────────────────────────────────────────────────────────────────
+    // -- HUD -------------------------------------------------------------------
 
     private const val W      = 200f
     private const val H      = 90f
@@ -193,7 +193,7 @@ object PigMacroModule : Module("Pig Macro") {
         }
     }
 
-    // ── Init ──────────────────────────────────────────────────────────────────
+    // -- Init ------------------------------------------------------------------
 
     init {
         addSetting(
@@ -207,7 +207,7 @@ object PigMacroModule : Module("Pig Macro") {
         EventBus.register(this)
     }
 
-    // ── Tick ──────────────────────────────────────────────────────────────────
+    // -- Tick ------------------------------------------------------------------
 
     @SubscribeEvent
     fun onRender(event: WorldRenderEvent.Last) {
@@ -232,7 +232,7 @@ object PigMacroModule : Module("Pig Macro") {
 
         when (state) {
 
-            // ── IDLE ──────────────────────────────────────────────────────────
+            // -- IDLE ----------------------------------------------------------
             State.IDLE -> {
                 val range           = searchRangeSetting.value
                 val keyword         = pigKeywordSetting.value
@@ -272,7 +272,7 @@ object PigMacroModule : Module("Pig Macro") {
                 }
             }
 
-            // ── SPRINT_TO_PIG ─────────────────────────────────────────────────
+            // -- SPRINT_TO_PIG -------------------------------------------------
             // Pathfind to pig, repathing whenever pig moves > 2 blocks so we
             // route around walls rather than running into them.
             State.SPRINT_TO_PIG -> {
@@ -291,7 +291,7 @@ object PigMacroModule : Module("Pig Macro") {
                     val pigBlock = BlockPos(pig.blockX, pig.blockY, pig.blockZ)
                     val last     = lastSprintToPigPos
                     // Only cancel a running path if pig moved > 5 blocks from the path
-                    // target — frequent stop/start prevents the player from ever moving.
+                    // target - frequent stop/start prevents the player from ever moving.
                     val needRepath = last == null || last.distSqr(pigBlock) > 25.0
                     if (!nativeActive() || needRepath) {
                         if (nativeActive()) nativeStop(null)
@@ -302,22 +302,22 @@ object PigMacroModule : Module("Pig Macro") {
                 }
             }
 
-            // ── DEPLOYING_ORB ─────────────────────────────────────────────────
-            // Phase 1 (slot wrong): chase pig while swapping slot — don't idle.
+            // -- DEPLOYING_ORB -------------------------------------------------
+            // Phase 1 (slot wrong): chase pig while swapping slot - don't idle.
             // Phase 2 (slot correct, actionTicks==0): stop, face pig, wait 1 tick
             //   for pick() to update hitResult.
-            // Phase 3 (actionTicks 1-8): toggle use off→on each tick for 8 chances.
+            // Phase 3 (actionTicks 1-8): toggle use off->on each tick for 8 chances.
             // Transition to WAIT_FOR_ORB_CHAT (chat confirms deploy) or retry.
             State.DEPLOYING_ORB -> {
                 val pig = livePig() ?: run { transition(State.IDLE); return }
 
                 val orbSlot = InventoryUtils.findItemInHotbar(shinyOrbKeywordSetting.value)
                 if (orbSlot == -1) {
-                    ChatUtils.sendMessage("Pig macro: Shiny Orb not found in hotbar — stopping.")
+                    ChatUtils.sendMessage("Pig macro: Shiny Orb not found in hotbar - stopping.")
                     stop(); return
                 }
 
-                // Phase 1: slot not yet correct — chase pig while we wait for it to register
+                // Phase 1: slot not yet correct - chase pig while we wait for it to register
                 if (player.inventory.selectedSlot != orbSlot) {
                     InventoryUtils.holdHotbarSlot(orbSlot)
                     // Keep chasing so pig doesn't escape during the server round-trip
@@ -333,7 +333,7 @@ object PigMacroModule : Module("Pig Macro") {
                     return
                 }
 
-                // Slot is correct — stop chasing
+                // Slot is correct - stop chasing
                 releaseKeys()
 
                 // If pig escaped beyond interaction distance, pathfind back
@@ -347,13 +347,13 @@ object PigMacroModule : Module("Pig Macro") {
                 faceEntity(pig)
 
                 // actionTicks == 0: rotation was just set this tick; pick() ran before us
-                // and hitResult is still stale — return and let it update next tick.
+                // and hitResult is still stale - return and let it update next tick.
                 if (actionTicks == 0) {
                     actionTicks = 1
                     return
                 }
 
-                // actionTicks 1-8: toggle off→on each tick — 8 attempts to hit the pig entity.
+                // actionTicks 1-8: toggle off->on each tick - 8 attempts to hit the pig entity.
                 if (actionTicks <= 8) {
                     // If pig escaped beyond MC's 3-block reach, re-approach before clicking
                     if (player.distanceTo(pig) > 3.0) {
@@ -366,7 +366,7 @@ object PigMacroModule : Module("Pig Macro") {
                     faceEntity(pig)   // keep tracking in case pig moved
                     mc.options.keyUse.setDown(false)
                     mc.options.keyUse.setDown(true)
-                    // Set orbAnchor on the very first use toggle — the "Bring the pig back!"
+                    // Set orbAnchor on the very first use toggle - the "Bring the pig back!"
                     // chat fires within 1-2 ticks of the first right-click, before the loop
                     // finishes.  If orbAnchor isn't set by then, all direction math falls back
                     // to nx=1,nz=0 (arbitrary) and the pig goes the wrong way every time.
@@ -392,22 +392,22 @@ object PigMacroModule : Module("Pig Macro") {
                 transition(State.WAIT_FOR_ORB_CHAT)
             }
 
-            // ── WAIT_FOR_ORB_CHAT ─────────────────────────────────────────────
+            // -- WAIT_FOR_ORB_CHAT ---------------------------------------------
             State.WAIT_FOR_ORB_CHAT -> {
                 stateTimeout--
                 if (stateTimeout <= 0) {
-                    ChatUtils.sendMessage("Pig macro: no chat confirmation — proceeding anyway.")
+                    ChatUtils.sendMessage("Pig macro: no chat confirmation - proceeding anyway.")
                     actionTicks = 0; actionDelay = humanDelay(5, 12)
                     transition(State.HERDING)
                 }
             }
 
-            // ── HERDING ───────────────────────────────────────────────────────
+            // -- HERDING -------------------------------------------------------
             State.HERDING -> {
                 val pig = targetPig
 
                 if (pig != null && pig.isAlive && pig.isInWater) {
-                    ChatUtils.sendMessage("Pig macro: pig in water — blacklisting.")
+                    ChatUtils.sendMessage("Pig macro: pig in water - blacklisting.")
                     waterBlacklist.add(pig.id)
                     releaseKeys()
                     if (nativeActive()) nativeStop(null)
@@ -430,7 +430,7 @@ object PigMacroModule : Module("Pig Macro") {
                     return
                 }
 
-                // Direction unit vector from orb → pig (XZ plane) — resolved early so
+                // Direction unit vector from orb -> pig (XZ plane) - resolved early so
                 // it can be used in the proximity check AND the behind-pos computation.
                 val anchor = orbAnchor
                 val odx = if (anchor != null) pig.x - anchor.x else 1.0
@@ -440,12 +440,12 @@ object PigMacroModule : Module("Pig Macro") {
                 val nz   = if (olen > 0.1) odz / olen else 0.0
                 val D    = behindDistanceSetting.value
 
-                // ── Pig velocity (XZ, from previous tick) ─────────────────────────
+                // -- Pig velocity (XZ, from previous tick) -------------------------
                 val pigVel = pigPrevPos?.let { Vec3(pig.x - it.x, 0.0, pig.z - it.z) } ?: Vec3.ZERO
                 pigPrevPos = Vec3(pig.x, pig.y, pig.z)
 
 
-                // Abandonment check: pig went the wrong way — give up, find a new one
+                // Abandonment check: pig went the wrong way - give up, find a new one
                 if (anchor != null && dist3(pig.x, pig.y, pig.z, anchor) > abandonDistanceSetting.value) {
                     releaseKeys()
                     if (nativeActive()) nativeStop(null)
@@ -458,7 +458,7 @@ object PigMacroModule : Module("Pig Macro") {
                     return
                 }
 
-                // Proximity fallback: pig walked into orb — start collecting
+                // Proximity fallback: pig walked into orb - start collecting
                 if (anchor != null && dist3(pig.x, pig.y, pig.z, anchor) <= 2.0) {
                     releaseKeys()
                     if (nativeActive()) nativeStop(null)
@@ -481,33 +481,33 @@ object PigMacroModule : Module("Pig Macro") {
                 val behindX = pig.x + rnx * D
                 val behindZ = pig.z + rnz * D
 
-                // D blocks behind pig (on the far side from orb) — where player stands to push
+                // D blocks behind pig (on the far side from orb) - where player stands to push
                 val behindPos = Vec3(behindX, pig.y, behindZ)
 
                 // Scan downward from the pig's Y to find the actual ground surface at
-                // the behindPos XZ column — pig may be airborne after being flung.
+                // the behindPos XZ column - pig may be airborne after being flung.
                 val behindGroundY = floorYAt(level, behindX, behindZ, pig.y)
                 val behindGround  = Vec3(behindX, behindGroundY, behindZ)
 
-                // ── Overlay: pig→orb path + velocity ray + player guide ───────────
+                // -- Overlay: pig->orb path + velocity ray + player guide -----------
                 if (anchor != null) {
                     val pigLineColor   = OverlayRenderEngine.Color(0x4C, 0xFF, 0x72, 0xCC)  // green
                     val behindLinColor = OverlayRenderEngine.Color(0xFF, 0xD8, 0x4C, 0xCC)  // yellow
                     val orbMarker      = OverlayRenderEngine.Color(0xFF, 0xD8, 0x4C, 0xAA)  // gold
                     val behindMarker   = OverlayRenderEngine.Color(0x7A, 0x3B, 0xC4, 0x99)  // purple
-                    // Pig → orb (desired path)
+                    // Pig -> orb (desired path)
                     OverlayRenderEngine.addLine(level, pig.x, pig.y + 0.6, pig.z, anchor.x, anchor.y + 0.6, anchor.z, pigLineColor, 2.4f, 3, HERDING_TAG)
                     // Orb position marker
                     OverlayRenderEngine.addBox(level, anchor.x - 0.4, anchor.y - 0.05, anchor.z - 0.4, anchor.x + 0.4, anchor.y + 0.9, anchor.z + 0.4, orbMarker.withAlpha(0x44), orbMarker, 2.2f, 3, HERDING_TAG)
-                    // Player → behindPos
+                    // Player -> behindPos
                     OverlayRenderEngine.addLine(level, player.x, player.y + 0.5, player.z, behindPos.x, behindPos.y + 0.5, behindPos.z, behindLinColor, 1.8f, 3, HERDING_TAG)
                     // BehindPos marker
                     OverlayRenderEngine.addBox(level, behindPos.x - 0.25, behindPos.y, behindPos.z - 0.25, behindPos.x + 0.25, behindPos.y + 0.08, behindPos.z + 0.25, behindMarker, behindMarker.withAlpha(0xCC), 1.6f, 3, HERDING_TAG)
-                    // Pig velocity ray — shows where pig is currently heading
+                    // Pig velocity ray - shows where pig is currently heading
                     // Red = heading wrong way (away from/across orb), Green = on track
                     val velLen = sqrt(pigVel.x * pigVel.x + pigVel.z * pigVel.z)
                     if (velLen > 0.02) {
-                        // dot(pig_velocity_normalised, pig→orb direction)
+                        // dot(pig_velocity_normalised, pig->orb direction)
                         val pigToOrbDot = (pigVel.x / velLen) * (-nx) + (pigVel.z / velLen) * (-nz)
                         val onTrack = pigToOrbDot > 0.5
                         val rayColor = if (onTrack)
@@ -528,14 +528,14 @@ object PigMacroModule : Module("Pig Macro") {
 
                 when (herdPhase) {
 
-                    // ── AOTV_BEHIND ───────────────────────────────────────────
+                    // -- AOTV_BEHIND -------------------------------------------
                     // One-shot AOTV at the start of herding. Aims at the ground
                     // block behind pig (pig.y - 1) so AOTV lands on the ground,
                     // not in the air at pig body height.
                     HerdPhase.AOTV_BEHIND -> {
                         val aotvSlot = InventoryUtils.findItemInHotbar(aotvKeywordSetting.value)
                         if (aotvSlot == -1) {
-                            ChatUtils.sendMessage("Pig macro: AOTV not found — sprinting instead.")
+                            ChatUtils.sendMessage("Pig macro: AOTV not found - sprinting instead.")
                             walkTicks = 0; ticksSinceRod = 0
                             herdPhase = HerdPhase.SPRINT_BEHIND; return
                         }
@@ -546,7 +546,7 @@ object PigMacroModule : Module("Pig Macro") {
                             return
                         }
 
-                        // Wait for pig to land — if airborne the ground block at behindPos
+                        // Wait for pig to land - if airborne the ground block at behindPos
                         // XZ may be correct but pig could still be bouncing; more importantly
                         // the pig's flee direction is undefined until it's on the ground.
                         // Allow up to 60 ticks (3 s) before proceeding regardless.
@@ -556,7 +556,7 @@ object PigMacroModule : Module("Pig Macro") {
                         }
                         pigLandWaitTicks = 0
 
-                        // Look at ground behind pig — AOTV teleports to block crosshair hits
+                        // Look at ground behind pig - AOTV teleports to block crosshair hits
                         facePos(behindGround)
 
                         when (actionTicks) {
@@ -567,7 +567,7 @@ object PigMacroModule : Module("Pig Macro") {
                             }
                             1 -> {
                                 // hit result now points at the ground block behind pig.
-                                // Toggle off→on to guarantee a fresh consumeClick() event.
+                                // Toggle off->on to guarantee a fresh consumeClick() event.
                                 mc.options.keyUse.setDown(false)
                                 mc.options.keyUse.setDown(true)
                                 actionTicks = 2
@@ -584,7 +584,7 @@ object PigMacroModule : Module("Pig Macro") {
                         }
                     }
 
-                    // ── WALK_PRESSURE ─────────────────────────────────────────
+                    // -- WALK_PRESSURE -----------------------------------------
                     // Knockback-based herding: player stands BEHIND the pig (on
                     // the far side from the orb) and punches it with AOTV every
                     // few ticks.  Knockback = direction normalize(pig - player),
@@ -594,7 +594,7 @@ object PigMacroModule : Module("Pig Macro") {
                         mc.options.keyUse.setDown(false)
                         mc.options.keyAttack.setDown(false)
 
-                        // ── Walk mode: pathfind toward pig so it flees toward orb ───
+                        // -- Walk mode: pathfind toward pig so it flees toward orb ---
                         if (walkModeSetting.value) {
                             if (anchor != null) {
                                 val pigOrbDist = dist3(pig.x, pig.y, pig.z, anchor)
@@ -613,7 +613,7 @@ object PigMacroModule : Module("Pig Macro") {
                                     return
                                 }
                             }
-                            // Navigate toward pig via pathfinder — repath when pig moves > 3 blocks
+                            // Navigate toward pig via pathfinder - repath when pig moves > 3 blocks
                             val pigBlock = BlockPos(pig.blockX, pig.blockY, pig.blockZ)
                             val needRepath = lastBehindPathPos == null || lastBehindPathPos!!.distSqr(pigBlock) > 9.0
                             if (!nativeActive() || needRepath) {
@@ -625,9 +625,9 @@ object PigMacroModule : Module("Pig Macro") {
                             return
                         }
 
-                        // ── Alignment check (knockback mode only) ─────────────────
+                        // -- Alignment check (knockback mode only) -----------------
                         // behindSide > 0 = player is on the far (orb-opposite) side
-                        // of the pig — the side that produces knockback toward orb.
+                        // of the pig - the side that produces knockback toward orb.
                         if (walkGraceTicks > 0) {
                             walkGraceTicks--
                         } else {
@@ -643,7 +643,7 @@ object PigMacroModule : Module("Pig Macro") {
                         }
 
                         if (distToPlayer > D + 3.0) {
-                            // Too far — reposition
+                            // Too far - reposition
                             releaseKeys()
                             walkTicks     = 0
                             ticksSinceRod = 0
@@ -679,7 +679,7 @@ object PigMacroModule : Module("Pig Macro") {
                             mc.options.keySprint.setDown(true)
                             mc.options.keyUp.setDown(true)
                         } else {
-                            // Within punch range — stop moving and land a hit
+                            // Within punch range - stop moving and land a hit
                             mc.options.keyUp.setDown(false)
                             mc.options.keySprint.setDown(false)
 
@@ -708,7 +708,7 @@ object PigMacroModule : Module("Pig Macro") {
                         }
                     }
 
-                    // ── SPRINT_BEHIND ─────────────────────────────────────────
+                    // -- SPRINT_BEHIND -----------------------------------------
                     // Pathfind to behind-pig position so the player routes around
                     // walls. Repath whenever pig moves > 1.5 blocks.
                     HerdPhase.SPRINT_BEHIND -> {
@@ -741,15 +741,15 @@ object PigMacroModule : Module("Pig Macro") {
                 }
             }
 
-            // ── COLLECTING ────────────────────────────────────────────────────
-            // Pathfind to orb anchor (static position — pathfinder works here).
+            // -- COLLECTING ----------------------------------------------------
+            // Pathfind to orb anchor (static position - pathfinder works here).
             // Hold right-click for 4 ticks to collect.
             State.COLLECTING -> {
                 val anchor = orbAnchor ?: run { transition(State.IDLE); return }
                 val distToOrb = dist3(player.x, player.y, player.z, anchor)
 
                 if (distToOrb > collectRangeSetting.value) {
-                    // Always restart pathfinder when not active — handles the case where
+                    // Always restart pathfinder when not active - handles the case where
                     // pathfinder finished but player is still too far (e.g. terrain blocked exact tile)
                     if (!nativeActive()) {
                         NativePathfinder.setTarget(anchor.x, anchor.y, anchor.z)
@@ -758,7 +758,7 @@ object PigMacroModule : Module("Pig Macro") {
                     return
                 }
 
-                // Arrived — check we're truly within MC's interaction reach before clicking
+                // Arrived - check we're truly within MC's interaction reach before clicking
                 if (distToOrb > 3.0) {
                     if (nativeActive()) nativeStop(null)
                     NativePathfinder.setTarget(anchor.x, anchor.y, anchor.z)
@@ -786,7 +786,7 @@ object PigMacroModule : Module("Pig Macro") {
                     return
                 }
 
-                // actionTicks 1-8: toggle off→on each tick — 8 chances to hit the orb.
+                // actionTicks 1-8: toggle off->on each tick - 8 chances to hit the orb.
                 if (actionTicks <= 8) {
                     if (orbEntity != null) faceEntity(orbEntity) else facePos(anchor)
                     mc.options.keyUse.setDown(false)
@@ -798,7 +798,7 @@ object PigMacroModule : Module("Pig Macro") {
                 mc.options.keyUse.setDown(false)
                 actionTicks = 0
                 captureCount++
-                ChatUtils.sendMessage("Pig macro: collected orb — capture #$captureCount!")
+                ChatUtils.sendMessage("Pig macro: collected orb - capture #$captureCount!")
                 targetPig = null; orbAnchor = null
 
                 if (autoLoopSetting.value) {
@@ -809,14 +809,14 @@ object PigMacroModule : Module("Pig Macro") {
                 }
             }
 
-            // ── WAITING ───────────────────────────────────────────────────────
+            // -- WAITING -------------------------------------------------------
             State.WAITING -> transition(State.IDLE)
         }
 
         statusSetting.value = state.name.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() }
     }
 
-    // ── Chat ──────────────────────────────────────────────────────────────────
+    // -- Chat ------------------------------------------------------------------
 
     @SubscribeEvent
     fun onChat(event: ChatEvent.Receive) {
@@ -824,14 +824,14 @@ object PigMacroModule : Module("Pig Macro") {
         val msg = ChatFormatting.stripFormatting(event.message ?: return)
             ?.lowercase()?.trim() ?: return
 
-        // Schedule on main game thread — ChatEvent fires on Netty IO thread
+        // Schedule on main game thread - ChatEvent fires on Netty IO thread
         mc.execute {
             if (!enabledSetting.value) return@execute
 
-            // "Oink! Bring the pig back to the Shiny Orb!" — pig flung, AOTV behind it
+            // "Oink! Bring the pig back to the Shiny Orb!" - pig flung, AOTV behind it
             if (msg.contains("bring the pig back to the shiny orb")) {
                 if (state == State.WAIT_FOR_ORB_CHAT || state == State.DEPLOYING_ORB) {
-                    // Guarantee orbAnchor is set — the chat fires within 1-2 ticks of the
+                    // Guarantee orbAnchor is set - the chat fires within 1-2 ticks of the
                     // first right-click, potentially before DEPLOYING_ORB's loop sets it.
                     // Use pig position (orb lands near pig), fall back to player position.
                     if (orbAnchor == null) {
@@ -880,7 +880,7 @@ object PigMacroModule : Module("Pig Macro") {
         }
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // -- Helpers ---------------------------------------------------------------
 
     /**
      * Scans downward from [fromY] at the given XZ column and returns the Y

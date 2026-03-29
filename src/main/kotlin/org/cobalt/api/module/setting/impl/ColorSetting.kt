@@ -94,7 +94,7 @@ class ColorSetting(
 
   override fun read(element: JsonElement) {
     if (element.isJsonPrimitive) {
-      // Legacy format: plain ARGB int → Static mode
+      // Legacy format: plain ARGB int -> Static mode
       val argb = element.asInt
       mode = ColorMode.Static(argb)
       super.value = argb

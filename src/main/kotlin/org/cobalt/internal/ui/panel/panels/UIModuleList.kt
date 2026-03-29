@@ -6,12 +6,16 @@ import org.cobalt.api.module.setting.Setting
 import org.cobalt.api.module.setting.impl.*
 import org.cobalt.api.ui.theme.ThemeManager
 import org.cobalt.api.util.ui.NVGRenderer
+import org.cobalt.internal.mining.CommissionMacroModule
+import org.cobalt.internal.mining.MiningMacroModule
+import org.cobalt.internal.mining.MiningModule
 import org.cobalt.internal.ui.UIComponent
 import org.cobalt.internal.ui.components.UIBackButton
 import org.cobalt.internal.ui.components.UIModule
 import org.cobalt.internal.ui.components.UITopbar
 import org.cobalt.internal.ui.components.settings.*
 import org.cobalt.internal.ui.panel.UIPanel
+import org.cobalt.internal.ui.screen.UIConfig
 import org.cobalt.internal.ui.util.GridLayout
 import org.cobalt.internal.ui.util.ScrollHandler
 import org.cobalt.internal.ui.util.isHoveringOver
@@ -77,6 +81,7 @@ internal class UIModuleList(
 
     refreshTabs(resetSelection = true)
     rebuildSettings(resetScroll = false)
+    updateAuxPanel(modules.first().module)
 
     topBar.searchChanged { searchText ->
       modules = if (searchText.isEmpty()) {
@@ -217,10 +222,22 @@ internal class UIModuleList(
     this.module = module
     refreshTabs(resetSelection = moduleChanged)
     rebuildSettings()
+    updateAuxPanel(module.module)
+  }
+
+  private fun updateAuxPanel(module: org.cobalt.api.module.Module) {
+    if (module === CommissionMacroModule) {
+      UIConfig.setAuxPanel(UICommissionRoutesPanel())
+    } else if (module === MiningModule || module === MiningMacroModule) {
+      UIConfig.setAuxPanel(UIMiningStatsPanel())
+    } else {
+      UIConfig.clearAuxPanel()
+    }
   }
 
   private fun refreshTabs(resetSelection: Boolean) {
     val groups = module.getSettings()
+      .filter { it.uiGroup != SIDE_GROUP }
       .map { setting -> setting.uiGroup.ifBlank { Setting.DEFAULT_UI_GROUP } }
       .distinct()
 
@@ -247,6 +264,7 @@ internal class UIModuleList(
   private fun filteredSettings(): List<Setting<*>> {
     val searchLower = topBar.getSearchText().trim().lowercase()
     return module.getSettings().filter { setting ->
+      if (setting.uiGroup == SIDE_GROUP) return@filter false
       val matchesSearch = searchLower.isEmpty() ||
         setting.name.lowercase().contains(searchLower) ||
         setting.description.lowercase().contains(searchLower)
@@ -311,6 +329,7 @@ internal class UIModuleList(
   }
 
   companion object {
+    const val SIDE_GROUP = "__side__"
     private const val TAB_BAR_HEIGHT = 24F
     private const val TAB_HORIZONTAL_PADDING = 10F
     private const val TAB_GAP = 8F

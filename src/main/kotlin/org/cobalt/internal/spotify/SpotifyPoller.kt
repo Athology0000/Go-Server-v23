@@ -24,7 +24,7 @@ object SpotifyPoller {
 
     /** Absolute path to the cached album-art image, or "" if not yet available. */
     @Volatile var currentArtPath: String = ""
-    /** Incremented each time a new art file is written — used to detect changes. */
+    /** Incremented each time a new art file is written - used to detect changes. */
     @Volatile var artVersion: Int = 0
 
     private const val POLL_MS = 2_000L
@@ -44,7 +44,7 @@ object SpotifyPoller {
     }
 
     // PowerShell script that reads the currently-playing track via Windows SMTC.
-    // Outputs: Title|Artist|PositionMs|DurationMs|IsPlaying|ArtPath  — or "NONE" / "ERROR".
+    // Outputs: Title|Artist|PositionMs|DurationMs|IsPlaying|ArtPath  - or "NONE" / "ERROR".
     // Art is extracted directly from the SMTC session thumbnail (no iTunes lookup needed).
     private val PS_SCRIPT = """
 Add-Type -AssemblyName System.Runtime.WindowsRuntime | Out-Null
@@ -58,7 +58,15 @@ function Await(${'$'}op, ${'$'}type) {
 try {
     ${'$'}mgr = Await ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager,Windows.Media.Control,ContentType=WindowsRuntime]::RequestAsync()) `
               ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager,Windows.Media.Control,ContentType=WindowsRuntime])
-    ${'$'}s = ${'$'}mgr.GetCurrentSession()
+    ${'$'}sessions = ${'$'}mgr.GetSessions()
+    ${'$'}s = ${'$'}null
+    foreach (${'$'}sess in ${'$'}sessions) {
+        ${'$'}pb2 = ${'$'}sess.GetPlaybackInfo()
+        if (${'$'}pb2.PlaybackStatus -eq 'Playing' -or ${'$'}pb2.PlaybackStatus -eq 'Paused') {
+            if (${'$'}sess.SourceAppUserModelId -like '*spotify*') { ${'$'}s = ${'$'}sess; break }
+            if (${'$'}null -eq ${'$'}s) { ${'$'}s = ${'$'}sess }
+        }
+    }
     if (${'$'}null -eq ${'$'}s) { 'NONE'; exit }
     ${'$'}p  = Await (${'$'}s.TryGetMediaPropertiesAsync()) `
               ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionMediaProperties,Windows.Media.Control,ContentType=WindowsRuntime])
@@ -82,7 +90,7 @@ try {
 } catch { 'ERROR' }
     """.trimIndent()
 
-    /** Call from tick — kicks off an async poll when the interval has elapsed. */
+    /** Call from tick - kicks off an async poll when the interval has elapsed. */
     fun update() {
         if (!isWindows) return
         val now = System.currentTimeMillis()
@@ -176,7 +184,7 @@ CobaltKbd::keybd_event($vkCode, 0, 2, 0)
         try {
             val q = java.net.URLEncoder.encode("$artist $title", "UTF-8")
 
-            // Try Deezer first — clean art, no watermarks, no auth needed
+            // Try Deezer first - clean art, no watermarks, no auth needed
             var artUrl: String? = null
             runCatching {
                 val deezerJson = java.net.URL("https://api.deezer.com/search?q=$q&limit=5").readText()

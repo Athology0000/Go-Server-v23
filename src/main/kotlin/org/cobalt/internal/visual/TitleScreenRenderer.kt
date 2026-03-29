@@ -61,7 +61,7 @@ object TitleScreenRenderer {
     return ((v / 0.9375) * 0.5 + 0.5).toFloat().coerceIn(0f, 1f)
   }
 
-  /** Radial vignette weight — bright near the upper-centre, dark at edges. */
+  /** Radial vignette weight - bright near the upper-centre, dark at edges. */
   private fun cloudVignette(fx: Float, fy: Float): Float {
     val cx = fx - 0.50f
     val cy = fy - 0.38f
@@ -76,7 +76,7 @@ object TitleScreenRenderer {
     val cols = 42; val rows = 26
     val cw = sw / cols; val ch = sh / rows
 
-    // Pass 1 — wide soft glow halo (large radius, very low alpha)
+    // Pass 1 - wide soft glow halo (large radius, very low alpha)
     // Gives the "lit-from-within" bloom around every cloud mass.
     for (row in 0 until rows) {
       for (col in 0 until cols) {
@@ -92,7 +92,7 @@ object TitleScreenRenderer {
       }
     }
 
-    // Pass 2 — dense cloud body (tighter radius, moderate alpha)
+    // Pass 2 - dense cloud body (tighter radius, moderate alpha)
     for (row in 0 until rows) {
       for (col in 0 until cols) {
         val px = (col + 0.5f) * cw
@@ -112,7 +112,7 @@ object TitleScreenRenderer {
       }
     }
 
-    // Pass 3 — bright electric core at density peaks
+    // Pass 3 - bright electric core at density peaks
     for (row in 0 until rows) {
       for (col in 0 until cols) {
         val px = (col + 0.5f) * cw
@@ -144,7 +144,7 @@ object TitleScreenRenderer {
     NVGRenderer.gradientRect(0f, 0f, sw, sh * 0.10f, 0x66000000.toInt(), 0x00000000, Gradient.TopToBottom, 0f)
   }
 
-  /** Soft gaussian blob — used only for orb halos and title glow. */
+  /** Soft gaussian blob - used only for orb halos and title glow. */
   private fun drawNebulaBlob(cx: Float, cy: Float, maxR: Float, rgb: Int, peakAlpha: Int, layers: Int = 30) {
     for (i in 0..layers) {
       val frac  = i.toFloat() / layers
@@ -199,7 +199,7 @@ object TitleScreenRenderer {
       Triple(x, y, o.phase)
     }
 
-    // One bolt at a time — each connection holds for BOLT_SLOT_SEC then fades out.
+    // One bolt at a time - each connection holds for BOLT_SLOT_SEC then fades out.
     val slotProgress = (t % BOLT_SLOT_SEC) / BOLT_SLOT_SEC  // 0..1 within current slot
     val slotIdx      = (t / BOLT_SLOT_SEC).toLong()
     val (a, b)       = connections[(slotIdx % connections.size).toInt()]
@@ -229,7 +229,7 @@ object TitleScreenRenderer {
 
   /**
    * Jagged lightning bolt via midpoint displacement.
-   * Seed is quantized so the bolt snaps to a new random shape ~8× per second (flickering).
+   * Seed is quantized so the bolt snaps to a new random shape ~8x per second (flickering).
    */
   private fun drawLightningBolt(
     x1: Float, y1: Float, x2: Float, y2: Float,

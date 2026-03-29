@@ -64,7 +64,7 @@ object ProfitManager {
                     bazaarPrices.clear()
                     bazaarPrices.putAll(prices)
                 }
-            } catch (_: Exception) { /* network failure — keep cached prices */ }
+            } catch (_: Exception) { /* network failure - keep cached prices */ }
         }
     }
 }

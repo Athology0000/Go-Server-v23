@@ -26,7 +26,7 @@ object DianaMacroModule : Module("Diana Macro") {
 
     private val mc = Minecraft.getInstance()
 
-    // ── State ─────────────────────────────────────────────────────────────────
+    // -- State -----------------------------------------------------------------
 
     private enum class State {
         IDLE, ACTIVATING_SPADE, COLLECTING_PARTICLES, PATHFINDING, DIGGING, COMBAT, WAITING
@@ -44,7 +44,7 @@ object DianaMacroModule : Module("Diana Macro") {
     private var burrowPos: Vec3?   = null
     private var targetEntityId: Int = -1
 
-    // ── Settings ──────────────────────────────────────────────────────────────
+    // -- Settings --------------------------------------------------------------
 
     private val enabledSetting = CheckboxSetting("Enabled", "Start or stop the Diana macro.", false)
 
@@ -67,7 +67,7 @@ object DianaMacroModule : Module("Diana Macro") {
     private val spadeSlot  get() = spadeSlotSetting.value.toInt() - 1
     private val weaponSlot get() = weaponSlotSetting.value.toInt() - 1
 
-    // ── Constants ─────────────────────────────────────────────────────────────
+    // -- Constants -------------------------------------------------------------
 
     private val DIANA_MOB_NAMES = listOf(
         "Minotaur", "Minos Hunter", "Minos Champion", "Gaia Construct", "Minos Inquisitor"
@@ -83,7 +83,7 @@ object DianaMacroModule : Module("Diana Macro") {
         minScaleProvider = { RotationsModule.bezierMinScale.value.toFloat() },
     )
 
-    // ── Init ──────────────────────────────────────────────────────────────────
+    // -- Init ------------------------------------------------------------------
 
     init {
         addSetting(
@@ -93,7 +93,7 @@ object DianaMacroModule : Module("Diana Macro") {
         EventBus.register(this)
     }
 
-    // ── Cleanup ───────────────────────────────────────────────────────────────
+    // -- Cleanup ---------------------------------------------------------------
 
     private fun cleanup() {
         NativePathfinder.stop()
@@ -111,7 +111,7 @@ object DianaMacroModule : Module("Diana Macro") {
 
     private fun stop() { cleanup() }
 
-    // ── Tick ──────────────────────────────────────────────────────────────────
+    // -- Tick ------------------------------------------------------------------
 
     @SubscribeEvent
     fun onTick(@Suppress("UNUSED_PARAMETER") event: TickEvent.Start) {
@@ -153,7 +153,7 @@ object DianaMacroModule : Module("Diana Macro") {
 
             State.COLLECTING_PARTICLES -> {
                 collectTicksElapsed++
-                // Transition as soon as we have enough packets — don't wait the full duration
+                // Transition as soon as we have enough packets - don't wait the full duration
                 if (DianaParticleTracker.count() >= minParticlesSetting.value.toInt()) {
                     val pos = DianaParticleTracker.getBurrowPos(level)
                     if (pos != null) {
@@ -163,7 +163,7 @@ object DianaMacroModule : Module("Diana Macro") {
                         return
                     }
                 }
-                // Timeout — no burrow detected, retry
+                // Timeout - no burrow detected, retry
                 if (collectTicksElapsed >= collectDurationSetting.value.toInt()) {
                     state = State.IDLE
                 }
@@ -206,7 +206,7 @@ object DianaMacroModule : Module("Diana Macro") {
                             state = State.IDLE
                         }
                         PathStatus.IDLE -> {
-                            // Guard: ignore IDLE for the first 3 ticks — the native engine
+                            // Guard: ignore IDLE for the first 3 ticks - the native engine
                             // may not have processed setTarget yet on tick 0.
                             if (pathfindingTicksElapsed > 3) {
                                 NativePathfinder.stop()
@@ -215,7 +215,7 @@ object DianaMacroModule : Module("Diana Macro") {
                             }
                         }
                         PathStatus.PLANNING -> MovementManager.clearForcedMovement()
-                        else -> { /* REPLANNING, RECOVERING, EXECUTING — handled via cmd != null */ }
+                        else -> { /* REPLANNING, RECOVERING, EXECUTING - handled via cmd != null */ }
                     }
                 }
 

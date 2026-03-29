@@ -11,8 +11,8 @@ void StuckDetector::update(double px, double py, double pz) {
     if ((int)history_.size() < stuckTickLimit_) { stuck_ = false; return; }
 
     const auto& oldest = history_.front();
-    double dx = px - oldest.x, dz = pz - oldest.z;
-    double moved = std::sqrt(dx*dx + dz*dz);
+    double dx = px - oldest.x, dy = py - oldest.y, dz = pz - oldest.z;
+    double moved = std::sqrt(dx*dx + dy*dy + dz*dz);
     stuck_ = (moved < movementEps_);
 }
 

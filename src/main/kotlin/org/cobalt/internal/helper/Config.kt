@@ -72,7 +72,7 @@ internal object Config {
 
         val settingsMap = module.getSettings().associateBy { it.name }
         moduleObj.getAsJsonObject("settings")?.entrySet()?.forEach { (key, value) ->
-          settingsMap[key]?.read(value)
+          runCatching { settingsMap[key]?.read(value) }
         }
 
         val hudElementsMap = module.getHudElements().associateBy { it.id }

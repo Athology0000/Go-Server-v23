@@ -41,6 +41,7 @@ import org.cobalt.internal.visual.DarkModeModule
 import org.cobalt.internal.visual.FreecamModule
 import org.cobalt.internal.visual.FullBrightModule
 import org.cobalt.internal.rotation.RotationsModule
+import org.cobalt.internal.visual.DeployableHudModule
 import org.cobalt.internal.visual.HotbarOverlayModule
 import org.cobalt.internal.visual.OrbitFreecamModule
 import org.cobalt.internal.visual.PetDisplayModule
@@ -82,6 +83,7 @@ object Cobalt : ClientModInitializer {
         FullBrightModule,
         DarkModeModule,
         FreecamModule,
+        DeployableHudModule,
         OrbitFreecamModule,
         BlockOverlayModule,
         BlockOutlineModule,

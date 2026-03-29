@@ -10,14 +10,14 @@
 struct AStarResult {
     bool found     = false;
     bool isPartial = false;   // true = path leads to best frontier node, not the real goal
-    std::vector<Vec3i> nodes;
+    std::vector<PathNode> nodes;
 };
 
 class AStarPlanner {
 public:
     ~AStarPlanner();
 
-    // Snapshots the world buffer into the thread closure — no shared reference to WorldAccessor.
+    // Snapshots the world buffer into the thread closure - no shared reference to WorldAccessor.
     void startAsync(Vec3i start, Vec3i goal,
                     const WorldAccessor& world,
                     MovementProfile profile);

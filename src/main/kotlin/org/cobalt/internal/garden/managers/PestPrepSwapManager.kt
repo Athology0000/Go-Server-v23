@@ -19,7 +19,7 @@ object PestPrepSwapManager {
 
     fun shouldPrepSwap(cooldownSeconds: Int): Boolean {
         if (swapDone) return false
-        // Tab-list cooldown detected: fire when 1–60 s remain before spawn
+        // Tab-list cooldown detected: fire when 1-60 s remain before spawn
         if (cooldownSeconds in 1..60) return true
         // Fallback: if the tab list never yields a cooldown (regex mismatch / format unknown),
         // fire 30 s after we became eligible so pest gear is on well before spawns.

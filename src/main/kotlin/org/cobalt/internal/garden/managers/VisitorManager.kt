@@ -23,7 +23,7 @@ object VisitorManager {
         if (System.currentTimeMillis() < visitorCooldownUntil) return false
         val mc = Minecraft.getInstance()
         val overlay = mc.gui.tabList as? TabOverlayAccessor ?: return false
-        val footer = overlay.footer?.string?.replace(Regex("§[0-9a-fk-or]"), "") ?: return false
+        val footer = overlay.footer?.string?.replace(Regex("\u00A7[0-9a-fk-or]"), "") ?: return false
         return footer.contains("visitor", ignoreCase = true) &&
                !footer.contains("visitors: 0", ignoreCase = true)
     }
@@ -53,6 +53,6 @@ object VisitorManager {
     }
 
     fun onChatMessage(@Suppress("UNUSED_PARAMETER") message: String) {
-        // ROI tracking hook — ProfitManager handles "offer accepted" messages
+        // ROI tracking hook - ProfitManager handles "offer accepted" messages
     }
 }

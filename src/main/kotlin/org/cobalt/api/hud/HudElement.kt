@@ -67,7 +67,7 @@ abstract class HudElement(
 
   /**
    * Called every frame when this element is [enabled].
-   * Draw using [NVGRenderer][org.cobalt.api.util.ui.NVGRenderer] — coordinates are pre-translated,
+   * Draw using [NVGRenderer][org.cobalt.api.util.ui.NVGRenderer] - coordinates are pre-translated,
    * so draw relative to (0, 0).
    */
   abstract fun render(screenX: Float, screenY: Float, scale: Float)

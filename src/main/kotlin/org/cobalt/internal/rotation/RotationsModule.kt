@@ -14,7 +14,7 @@ object RotationsModule : Module("Rotations") {
   private val headerBezier = InfoSetting("Bezier Shape", "Easing curve shared by combat and route rotations.", InfoType.INFO)
 
   val bezierCurveIn = SliderSetting(
-    "Curve In", "Bezier start control point. Lower = slower start.", 0.06, 0.01, 0.49
+    "Curve In", "Bezier start control point. Lower = slower start.", 0.20, 0.01, 0.49
   )
   val bezierCurveOut = SliderSetting(
     "Curve Out", "Bezier end control point. Higher = smoother finish.", 0.94, 0.51, 0.99
@@ -23,7 +23,7 @@ object RotationsModule : Module("Rotations") {
     "Min Scale", "Minimum movement scale at small deltas (0-1).", 0.18, 0.05, 1.0
   )
   val bezierSnapThreshold = SliderSetting(
-    "Snap Threshold", "Degrees below which rotation snaps instantly.", 0.25, 0.05, 3.0
+    "Snap Threshold", "Degrees below which rotation snaps instantly. Set to 0 to disable.", 0.25, 0.0, 3.0
   )
 
   // --- Combat Macro ---
@@ -56,7 +56,7 @@ object RotationsModule : Module("Rotations") {
     "Mining Max Speed", "Max turn speed (deg/sec) while mining.", Pair(80.0, 120.0), 10.0, 300.0
   )
   val miningMaxAccel = RangeSetting(
-    "Mining Max Accel", "Max turn acceleration (deg/sec²) while mining.", Pair(180.0, 260.0), 50.0, 600.0
+    "Mining Max Accel", "Max turn acceleration (deg/sec^2) while mining.", Pair(180.0, 260.0), 50.0, 600.0
   )
   val miningSpeedScale = RangeSetting(
     "Mining Speed Scale", "Speed scale multiplier while mining.", Pair(0.7, 1.0), 0.1, 2.0

@@ -65,7 +65,7 @@ object PestCleaningSequencer {
     fun onChatMessage(message: String) {
         if (finishQueued) return
 
-        val lower = message.replace(Regex("§[0-9a-fk-or]"), "").lowercase()
+        val lower = message.replace(Regex("\u00A7[0-9a-fk-or]"), "").lowercase()
         val isPestCleanerDone = lower.contains("pest cleaner") &&
             (lower.contains("script stopped") || lower.contains("finished"))
         if (!isPestCleanerDone) return
@@ -73,7 +73,7 @@ object PestCleaningSequencer {
         finishQueued = true
         awaitingFinishChat = false
 
-        // Warp immediately — don't wait for the worker queue
+        // Warp immediately - don't wait for the worker queue
         val mc = Minecraft.getInstance()
         mc.execute { ScriptBridge.warpGarden() }
 

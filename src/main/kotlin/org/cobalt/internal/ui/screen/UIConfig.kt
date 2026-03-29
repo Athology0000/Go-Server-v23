@@ -22,6 +22,7 @@ internal object UIConfig : UIScreen() {
 
   private val sidebar = UISidebar()
   private var body: UIPanel = UIAddonList()
+  private var auxPanel: UIPanel? = null
 
   init {
     EventBus.register(this)
@@ -49,34 +50,45 @@ internal object UIConfig : UIScreen() {
       NVGRenderer.translate(-cx, -cy)
     }
 
-    val originX = width / 2f - 480f
-    val originY = height / 2f - 300f
+    val aux = auxPanel
+    val contentWidth =
+      sidebar.width + BODY_GAP + body.width + if (aux != null) AUX_GAP + aux.width else 0f
+    val contentHeight = maxOf(sidebar.height, body.height, aux?.height ?: 0f)
+    val originX = ((width - contentWidth) / 2f).coerceAtLeast(SCREEN_PADDING)
+    val originY = ((height - contentHeight) / 2f).coerceAtLeast(SCREEN_PADDING)
 
     sidebar
       .updateBounds(originX, originY)
       .render()
 
     body
-      .updateBounds(originX + 80f, originY)
+      .updateBounds(originX + sidebar.width + BODY_GAP, originY)
       .render()
+
+    aux
+      ?.updateBounds(originX + sidebar.width + BODY_GAP + body.width + AUX_GAP, originY)
+      ?.render()
 
     TooltipManager.renderAll()
     NVGRenderer.endFrame()
   }
 
   override fun mouseClicked(click: MouseButtonEvent, doubled: Boolean): Boolean {
-    return body.mouseClicked(click.button()) ||
+    return auxPanel?.mouseClicked(click.button()) == true ||
+      body.mouseClicked(click.button()) ||
       sidebar.mouseClicked(click.button()) ||
       super.mouseClicked(click, doubled)
   }
 
   override fun mouseReleased(click: MouseButtonEvent): Boolean {
-    return body.mouseReleased(click.button()) ||
+    return auxPanel?.mouseReleased(click.button()) == true ||
+      body.mouseReleased(click.button()) ||
       super.mouseReleased(click)
   }
 
   override fun mouseDragged(click: MouseButtonEvent, offsetX: Double, offsetY: Double): Boolean {
-    return body.mouseDragged(click.button(), offsetX, offsetY) ||
+    return auxPanel?.mouseDragged(click.button(), offsetX, offsetY) == true ||
+      body.mouseDragged(click.button(), offsetX, offsetY) ||
       super.mouseDragged(click, offsetX, offsetY)
   }
 
@@ -96,7 +108,8 @@ internal object UIConfig : UIScreen() {
     horizontalAmount: Double,
     verticalAmount: Double,
   ): Boolean {
-    return body.mouseScrolled(horizontalAmount, verticalAmount) ||
+    return auxPanel?.mouseScrolled(horizontalAmount, verticalAmount) == true ||
+      body.mouseScrolled(horizontalAmount, verticalAmount) ||
       super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount)
   }
 
@@ -118,11 +131,19 @@ internal object UIConfig : UIScreen() {
   fun swapBodyPanel(panel: UIPanel): UIPanel {
     val previous = body
     this.body = panel
+    auxPanel = null
     return previous
   }
+
+  fun setAuxPanel(panel: UIPanel) { auxPanel = panel }
+  fun clearAuxPanel() { auxPanel = null }
 
   fun getBodyPanel(): UIPanel {
     return body
   }
+
+  private const val SCREEN_PADDING = 20f
+  private const val BODY_GAP = 10f
+  private const val AUX_GAP = 10f
 
 }

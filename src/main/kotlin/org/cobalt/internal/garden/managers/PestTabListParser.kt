@@ -38,7 +38,7 @@ object PestTabListParser {
 
         val alive    = ALIVE_REGEX.find(raw)?.groupValues?.get(1)?.toIntOrNull() ?: 0
         val cooldown = COOLDOWN_REGEX.find(raw)?.let { m ->
-            // Pattern has two capture groups — one for the long-form match, one for bare "cd:"
+            // Pattern has two capture groups - one for the long-form match, one for bare "cd:"
             m.groupValues.drop(1).firstOrNull { it.isNotEmpty() }?.toIntOrNull()
         } ?: 0
         val plots    = PLOT_REGEX.find(raw)?.groupValues?.get(1)
@@ -48,6 +48,6 @@ object PestTabListParser {
         return TabListData(alive, cooldown, plots, bonus)
     }
 
-    private fun strip(text: String) = text.replace(Regex("§[0-9a-fk-or]"), "")
+    private fun strip(text: String) = text.replace(Regex("\u00A7[0-9a-fk-or]"), "")
     private fun empty() = TabListData(0, 0, emptyList(), false)
 }

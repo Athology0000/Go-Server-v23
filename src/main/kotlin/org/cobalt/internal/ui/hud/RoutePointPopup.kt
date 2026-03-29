@@ -32,7 +32,7 @@ internal object RoutePointPopup {
   private val buttons = listOf(
     PopupButton("Walk", "Standard route point.") { select(RoutesModule.RoutePointType.NORMAL) },
     PopupButton("Warp", "Warp point trigger.") { select(RoutesModule.RoutePointType.WARP) },
-    PopupButton("Mine", "Mine vein start/end.") { select(RoutesModule.RoutePointType.MINE) },
+    PopupButton("Mine", "Ordered mining anchor.") { select(RoutesModule.RoutePointType.MINE) },
     PopupButton("Cancel", "Close without adding.") { close(true) },
   )
 

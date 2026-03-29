@@ -23,7 +23,7 @@ public class NativeLoader {
                 if (in == null) throw new IOException("Native resource not found: " + resourcePath);
                 byte[] bytes = in.readAllBytes();
 
-                // CRC32 comparison — size alone is insufficient across recompilations
+                // CRC32 comparison - size alone is insufficient across recompilations
                 if (Files.exists(dest) && crc32(Files.readAllBytes(dest)) == crc32(bytes)) {
                     return dest.toAbsolutePath().toString();
                 }

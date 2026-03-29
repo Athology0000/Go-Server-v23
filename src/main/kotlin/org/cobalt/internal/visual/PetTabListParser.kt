@@ -10,6 +10,7 @@ data class PetData(
     val xpCurrent: Long,
     val xpRequired: Long,
     val isMaxLevel: Boolean,
+    val isPercentageFormat: Boolean = false,
 )
 
 object PetTabListParser {
@@ -66,10 +67,11 @@ object PetTabListParser {
         var name       = ""
         var level      = 0
         var heldItem   = ""
-        var xpCurrent  = 0L
-        var xpRequired = 0L
-        var xpLineFound = false
-        var xpIsMax    = false
+        var xpCurrent       = 0L
+        var xpRequired      = 0L
+        var xpLineFound     = false
+        var xpIsMax         = false
+        var xpIsPercentage  = false
 
         for (line in text.lines()) {
             val trimmed = line.trim()
@@ -79,7 +81,7 @@ object PetTabListParser {
                 petNameLevel.find(trimmed)?.let { match ->
                     level = (match.groupValues[1].ifEmpty { match.groupValues[4] }).toIntOrNull() ?: 0
                     val raw = (match.groupValues[2].ifEmpty { match.groupValues[3] }).trim()
-                    // Strip trailing "(96%)" / "(MAX)" / "(✦)" suffixes Hypixel appends
+                    // Strip trailing "(96%)" / "(MAX)" / "(star)" suffixes Hypixel appends
                     name = trailingSuffix.replace(raw, "").trim()
                 }
             }
@@ -106,7 +108,8 @@ object PetTabListParser {
                             xpCurrent  = (pct * 100).toLong()
                             xpRequired = 10000L
                         }
-                        xpLineFound = true
+                        xpLineFound    = true
+                        xpIsPercentage = true
                     }
                     // Explicit MAX: "Pet EXP: MAX"
                     petXpMax.containsMatchIn(trimmed) -> {
@@ -118,8 +121,8 @@ object PetTabListParser {
         }
 
         if (name.isEmpty()) return null
-        // isMaxLevel only when the XP line explicitly says MAX — not when the line is absent
-        return PetData(name, level, heldItem, xpCurrent, xpRequired, isMaxLevel = xpIsMax)
+        // isMaxLevel only when the XP line explicitly says MAX - not when the line is absent
+        return PetData(name, level, heldItem, xpCurrent, xpRequired, isMaxLevel = xpIsMax, isPercentageFormat = xpIsPercentage)
     }
 
     private fun StringBuilder.appendSanitizedLine(text: String) {

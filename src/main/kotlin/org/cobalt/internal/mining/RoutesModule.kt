@@ -1,5 +1,7 @@
 package org.cobalt.internal.mining
 
+import com.mojang.blaze3d.opengl.GlStateManager
+import com.mojang.blaze3d.vertex.PoseStack
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
@@ -9,6 +11,8 @@ import java.io.File
 import kotlin.math.abs
 import kotlin.math.max
 import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.Font
+import net.minecraft.client.renderer.LightTexture
 import net.minecraft.core.BlockPos
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.phys.BlockHitResult
@@ -62,13 +66,33 @@ object RoutesModule : Module("Routes") {
     }
   }
 
-  data class RoutePoint(val pos: BlockPos, val type: RoutePointType, val mineEnd: BlockPos? = null)
+  data class RoutePoint(
+    val pos: BlockPos,
+    val type: RoutePointType,
+    val mineEnd: BlockPos? = null,
+    val mineBlockId: String? = null
+  )
+
+  data class SavedRouteInfo(
+    val name: String,
+    val mineTypes: List<String>,
+    val hasMinePoints: Boolean,
+    val hasWarpPoints: Boolean,
+    val pointCount: Int,
+  )
 
   private enum class RouteAction {
     NONE,
     WALK,
     WARP,
     MINE
+  }
+
+  private enum class RouteMineMode {
+    NONE,
+    LEGACY_VEIN,
+    ANCHOR_LIST,
+    SINGLE_ANCHOR_MACRO
   }
 
   private val mc: Minecraft = Minecraft.getInstance()
@@ -87,8 +111,7 @@ object RoutesModule : Module("Routes") {
   private var action = RouteAction.NONE
   private var activePoint: RoutePoint? = null
   private var pendingClickPos: BlockPos? = null
-  private var pendingMineStart: BlockPos? = null
-  private var awaitingMineSecond = false
+  private var anchorPlacementActive = false
 
   private val rotationStrategy = BezierTrackingRotationStrategy(
     yawStepSampler = { RotationsModule.sample(RotationsModule.routeYawStep.value).toFloat() },
@@ -106,21 +129,27 @@ object RoutesModule : Module("Routes") {
   private var warpLookLastNs = 0L
   private var warpCooldownUntil = 0L
   private var warpRestoreSlot = -1
+  private var pendingWarpUseRelease = false
   private var warpCompletePointOnArrival = true
   private var warpResumeAction = RouteAction.NONE
   private var lastSuccessfulWarpTarget: BlockPos? = null
   private var lastSuccessfulWarpTick = -1L
   private var screenPauseNoticeTick = 0L
 
+  private var mineMode = RouteMineMode.NONE
   private var mineBlocks: MutableSet<BlockPos> = LinkedHashSet()
+  private var mineAnchorBlockIds = LinkedHashMap<BlockPos, String>()
   private var mineOrderedBlocks: List<BlockPos> = emptyList()
   private var mineBlockId: String? = null
   private var mineTarget: BlockPos? = null
   private var minePathTarget: BlockPos? = null
+  private var mineAnchors: List<BlockPos> = emptyList()
   private var minePointStart: BlockPos? = null
   private var minePointEnd: BlockPos? = null
   private var mineTravelWaypoints: List<BlockPos> = emptyList()
-  private var chainedMineEndIndex = -1
+  private var activeMineEndIndex = -1
+  private var mineSingleAnchorStarted = false
+  private var routeOwnsMiningMacro = false
   private var lastPathStartTick = 0L
   private var miningActive = false
   private var mineDrillWarnTick = 0L
@@ -338,15 +367,37 @@ object RoutesModule : Module("Routes") {
     org.cobalt.internal.helper.WalkbackBridge.startWalkback = ::loadAndStartWalkback
     org.cobalt.internal.helper.WalkbackBridge.stopWalkback = { if (routeRunning) stopRoute("Walkback cancelled.") }
     org.cobalt.internal.helper.WalkbackBridge.isRunning = { routeRunning }
+    org.cobalt.internal.helper.WalkbackBridge.getRouteEndPos = { name ->
+      val trimmed = name.trim()
+      if (trimmed.isEmpty() || !isValidRouteName(trimmed)) null
+      else {
+        val routeFile = routeFileForName(trimmed)
+        val loaded = if (routeFile.exists()) readRouteFile(routeFile) else readLegacyRoute(trimmed)
+        loaded?.lastOrNull()?.pos
+      }
+    }
   }
 
   @SubscribeEvent
   fun onTick(@Suppress("UNUSED_PARAMETER") event: TickEvent.Start) {
+    if (pendingWarpUseRelease) {
+      mc.options.keyUse?.setDown(false)
+      pendingWarpUseRelease = false
+    }
+
     if (!enabled.value) {
+      stopAnchorPlacement(notify = false)
+      stopOwnedMiningMacro()
       if (routeRunning) {
         stopRoute("Routes disabled.")
       }
       return
+    }
+
+    if (!recordOnRightClick.value) {
+      stopAnchorPlacement(notify = false)
+    } else if (anchorPlacementActive && isChatScreenOpen()) {
+      stopAnchorPlacement()
     }
 
     updateStatus()
@@ -390,8 +441,8 @@ object RoutesModule : Module("Routes") {
         return
       }
       if (awaitingArrival) {
-        val target = lastTarget
-        if (target != null && hasArrived(player, target)) {
+        val arrivalTarget = lastResolvedTarget ?: lastTarget
+        if (arrivalTarget != null && hasArrived(player, arrivalTarget)) {
           if (walkCompletePointOnArrival) {
             completePoint()
           } else {
@@ -403,23 +454,23 @@ object RoutesModule : Module("Routes") {
           }
         } else {
           if (walkCompletePointOnArrival) {
-            if (attemptRouteVisibleEtherwarpRecovery(level, player)) {
-              awaitingArrival = false
-              lastTarget = null
-              lastResolvedTarget = null
-              walkCompletePointOnArrival = true
-              walkRetryCount = 0
-              return
-            }
             // Before giving up, retry with an A* repath from current position
             val retryDest = lastResolvedTarget ?: lastTarget?.let { resolveApproxTarget(it) }
             if (retryDest != null && walkRetryCount < MAX_WALK_RETRIES) {
+              NativePathfinder.stop()
               NativePathfinder.setTarget(retryDest.x + 0.5, retryDest.y.toDouble(), retryDest.z + 0.5)
               walkRetryCount++
               lastResolvedTarget = retryDest
               return
             }
             walkRetryCount = 0
+            if (attemptRouteVisibleEtherwarpRecovery(level, player)) {
+              awaitingArrival = false
+              lastTarget = null
+              lastResolvedTarget = null
+              walkCompletePointOnArrival = true
+              return
+            }
             stopRoute("Route failed: could not reach point ${routeIndex + 1}.")
           } else {
             action = RouteAction.NONE
@@ -454,14 +505,8 @@ object RoutesModule : Module("Routes") {
     val hit = mc.hitResult
     if (hit is BlockHitResult && hit.type == HitResult.Type.BLOCK) {
       val clicked = hit.blockPos
-      if (awaitingMineSecond) {
-        val start = pendingMineStart
-        if (start != null) {
-          addRoutePoint(RoutePoint(start, RoutePointType.MINE, clicked))
-          ChatUtils.sendMessage("Mine point added (start -> end).")
-        }
-        pendingMineStart = null
-        awaitingMineSecond = false
+      if (anchorPlacementActive && currentPointType() == RoutePointType.MINE) {
+        addRoutePoint(createRoutePoint(clicked, RoutePointType.MINE))
         return
       }
       pendingClickPos = clicked
@@ -474,39 +519,20 @@ object RoutesModule : Module("Routes") {
     if (!enabled.value || !renderRoute.value) return
     if (routePoints.isEmpty()) return
     val level = mc.level ?: return
-    val segments = max(1, routePoints.size - 1)
-    if (routePoints.size >= 2) {
-      for (i in 0 until routePoints.size - 1) {
-        val a = routePoints[i].pos
-        val b = routePoints[i + 1].pos
-        val color = gradientColor(i / (segments - 1.0))
-        val start = Vec3(a.x + 0.5, a.y + 0.2, a.z + 0.5)
-        val end = Vec3(b.x + 0.5, b.y + 0.2, b.z + 0.5)
-        Render3D.drawLine(event.context, start, end, color, true, 2.0f)
+    val travelNodes = buildTravelRenderNodes()
+    val mineNodes = buildMineRenderNodes()
+    val mineSegments = collectMineSegments()
+    if (travelNodes.size >= 2) {
+      for (i in 0 until travelNodes.size - 1) {
+        val a = travelNodes[i]
+        val b = travelNodes[i + 1]
+        val start = Vec3(a.pos.x + 0.5, a.pos.y + 0.2, a.pos.z + 0.5)
+        val end = Vec3(b.pos.x + 0.5, b.pos.y + 0.2, b.pos.z + 0.5)
+        Render3D.drawLine(event.context, start, end, a.color, true, 2.0f)
       }
     }
-    for (i in routePoints.indices) {
-      val point = routePoints[i]
-      val p = point.pos
-      val color = pointTypeColor(point.type, i / (segments - 1.0))
-      if (point.type == RoutePointType.MINE) {
-        val end = point.mineEnd
-        if (end != null) {
-          val startVec = Vec3(p.x + 0.5, p.y + 0.4, p.z + 0.5)
-          val endVec = Vec3(end.x + 0.5, end.y + 0.4, end.z + 0.5)
-          Render3D.drawLine(event.context, startVec, endVec, color, true, 2.5f)
-          val endBox = AABB(
-            end.x.toDouble(),
-            end.y.toDouble(),
-            end.z.toDouble(),
-            end.x + 1.0,
-            end.y + 1.0,
-            end.z + 1.0
-          )
-          Render3D.drawBox(event.context, endBox, color, true)
-          highlightVein(level, p, end, color, event.context)
-        }
-      }
+    for (node in travelNodes) {
+      val p = node.pos
       val box = AABB(
         p.x.toDouble(),
         p.y.toDouble(),
@@ -515,13 +541,39 @@ object RoutesModule : Module("Routes") {
         p.y + 1.0,
         p.z + 1.0
       )
-      Render3D.drawBox(event.context, box, color, true)
+      Render3D.drawBox(event.context, box, node.color, true)
     }
+    for (node in mineNodes) {
+      val p = node.pos
+      val box = AABB(
+        p.x.toDouble(),
+        p.y.toDouble(),
+        p.z.toDouble(),
+        p.x + 1.0,
+        p.y + 1.0,
+        p.z + 1.0
+      )
+      Render3D.drawBox(event.context, box, node.color, true)
+    }
+    for (segment in mineSegments) {
+      val color = pointTypeColor(RoutePointType.MINE, pointRenderRatio(segment.startIndex))
+      for (i in 0 until segment.anchors.size - 1) {
+        val startAnchor = segment.anchors[i]
+        val endAnchor = segment.anchors[i + 1]
+        val startVec = Vec3(startAnchor.x + 0.5, startAnchor.y + 0.4, startAnchor.z + 0.5)
+        val endVec = Vec3(endAnchor.x + 0.5, endAnchor.y + 0.4, endAnchor.z + 0.5)
+          Render3D.drawLine(event.context, startVec, endVec, color, true, 2.5f)
+      }
+      if (segment.waypoints.size >= 2) {
+        highlightVein(level, segment.waypoints.first(), segment.waypoints.last(), color, event.context)
+      }
+    }
+    renderRouteLabels(event.context, mineNodes)
   }
 
   private fun addPointFromPlayer() {
     val player = mc.player ?: return
-    addRoutePoint(RoutePoint(player.blockPosition(), currentPointType()))
+    addRoutePoint(createRoutePoint(player.blockPosition(), currentPointType()))
   }
 
   private fun addPointFromCoords() {
@@ -532,23 +584,68 @@ object RoutesModule : Module("Routes") {
       ChatUtils.sendMessage("Invalid coordinates. Use integers for Add X/Y/Z.")
       return
     }
-    addRoutePoint(RoutePoint(BlockPos(x, y, z), currentPointType()))
+    addRoutePoint(createRoutePoint(BlockPos(x, y, z), currentPointType()))
   }
 
   private fun addRoutePoint(point: RoutePoint) {
     routePoints.add(point)
     updateStatus()
+  }
 
-    if (point.type == RoutePointType.NORMAL) {
-      PathfindingModule.startTo(
-        point.pos.x.toDouble(),
-        point.pos.y.toDouble(),
-        point.pos.z.toDouble()
-      )
-    }
+  private fun createRoutePoint(pos: BlockPos, type: RoutePointType): RoutePoint {
+    val recordedBlockId =
+      if (type == RoutePointType.MINE) {
+        mc.level
+          ?.getBlockState(pos)
+          ?.takeUnless { it.isAir }
+          ?.let { net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(it.block).toString() }
+      } else {
+        null
+      }
+    return RoutePoint(pos, type, mineBlockId = recordedBlockId)
   }
 
   val isRunning: Boolean get() = routeRunning
+
+  fun getSavedRouteInfos(): List<SavedRouteInfo> {
+    return listSavedRouteNames()
+      .mapNotNull { name ->
+        val points = loadRoutePointsByName(name) ?: return@mapNotNull null
+        buildSavedRouteInfo(name, points)
+      }
+  }
+
+  fun loadAndStartAutomationRoute(name: String, startNearest: Boolean = true): Boolean {
+    if (routeRunning) return false
+    val trimmedName = name.trim()
+    if (trimmedName.isEmpty() || !isValidRouteName(trimmedName)) return false
+    val loaded = loadRoutePointsByName(trimmedName) ?: return false
+    if (loaded.isEmpty()) return false
+
+    routePoints.clear()
+    routePoints.addAll(loaded)
+    routeName.value = trimmedName
+    routeIndex = if (startNearest) findNearestPointIndex() else 0
+    routeRunning = true
+    resetRuntimeState()
+    detectMiningLoop()
+    if (!enabled.value) {
+      enabled.value = true
+    }
+    if (mc.screen != null) {
+      mc.setScreen(null)
+    }
+    PathfindingModule.stopPath()
+    PathfindingModule.ensureEnabledForAutomation("routes")
+    updateStatus()
+    ChatUtils.sendMessage("Route \"$trimmedName\" started for commission automation.")
+    notifyWarpFallback(trimmedName, loaded)
+    return true
+  }
+
+  fun stopForAutomation(reason: String = "") {
+    stopRoute(reason)
+  }
 
   private fun findNearestPointIndex(): Int {
     val origin = mc.player?.blockPosition() ?: return 0
@@ -562,17 +659,16 @@ object RoutesModule : Module("Routes") {
       ChatUtils.sendMessage("Route has no points.")
       return
     }
-    val hasWarpPoints = routePoints.any { it.type == RoutePointType.WARP }
-    if (hasWarpPoints && EtherwarpLogic.findEtherwarpHotbarSlot() !in 0..8) {
-      ChatUtils.sendMessage("Route has warp points but no EtherWarp item found in hotbar. Aborting.")
-      return
-    }
     if (!enabled.value) {
       enabled.value = true
     }
     if (mc.screen != null) {
       mc.setScreen(null)
     }
+    // Ensure PathfindingModule does not double-tick the native pathfinder by holding
+    // stale moduleOwnsPath state. stopPath() sets moduleOwnsPath=false without
+    // disrupting the route - startWalk will set a fresh target immediately after.
+    PathfindingModule.stopPath()
     PathfindingModule.ensureEnabledForAutomation("routes")
     routeIndex = if (startFromNearest.value) findNearestPointIndex() else 0
     routeRunning = true
@@ -588,15 +684,17 @@ object RoutesModule : Module("Routes") {
     } else {
       ChatUtils.sendMessage("Route started${ if (startMsg.isNotEmpty()) " $startMsg" else "" }.")
     }
+    notifyWarpFallback(routeName.value.trim().takeIf { it.isNotEmpty() }, routePoints)
   }
 
   /**
    * Loads route [name] from disk and starts it.
-   * If [fromEndOffset] > 0, starts that many checkpoints before the last point.
+   * When [reverse] is true, the stored route is reversed before starting.
+   * If [fromEndOffset] > 0, starts that many checkpoints before the end of the active route.
    * Otherwise starts at the checkpoint nearest to the player.
    * Returns true if the route was loaded and started successfully.
    */
-  fun loadAndStartWalkback(name: String, fromEndOffset: Int = 0): Boolean {
+  fun loadAndStartWalkback(name: String, fromEndOffset: Int = 0, reverse: Boolean = true): Boolean {
     // Don't restart if a walkback is already in progress.
     if (routeRunning) return false
     val trimmedName = name.trim()
@@ -608,21 +706,30 @@ object RoutesModule : Module("Routes") {
     } ?: return false
     if (loaded.isEmpty()) return false
 
-    // Reverse the route so the player walks back toward the start (exit/camp).
-    // The route is recorded going in (camp → crypt); reversing it gives crypt → camp.
-    // fromEndOffset is ignored — nearest-point search on the reversed list is always correct.
+    val activeRoute = if (reverse) loaded.asReversed() else loaded
     routePoints.clear()
-    routePoints.addAll(loaded.reversed())
-    routeIndex = findNearestPointIndex()
-    loopRoute.value = false  // walkback runs once — don't loop
+    routePoints.addAll(activeRoute)
+    routeIndex =
+      if (fromEndOffset > 0) {
+        if (reverse) {
+          fromEndOffset.coerceIn(0, routePoints.lastIndex)
+        } else {
+          (routePoints.lastIndex - fromEndOffset).coerceAtLeast(0)
+        }
+      } else {
+        findNearestPointIndex()
+      }
+    loopRoute.value = false  // walkback runs once - don't loop
     routeRunning = true
     resetRuntimeState()
     detectMiningLoop()
     if (!enabled.value) enabled.value = true
+    PathfindingModule.stopPath()
     PathfindingModule.ensureEnabledForAutomation("routes")
 
     updateStatus()
-    ChatUtils.sendMessage("Walkback \"$trimmedName\" started at checkpoint ${routeIndex + 1}/${loaded.size}.")
+    val runType = if (reverse) "Walkback" else "Route"
+    ChatUtils.sendMessage("$runType \"$trimmedName\" started at checkpoint ${routeIndex + 1}/${loaded.size}.")
     return true
   }
 
@@ -638,29 +745,30 @@ object RoutesModule : Module("Routes") {
       stopRoute("Switching to closest vein.")
     }
 
-    val candidates = routePoints.filter { it.type == RoutePointType.MINE && it.mineEnd != null }
+    val candidates = collectMineSegments()
     if (candidates.isEmpty()) {
       ChatUtils.sendMessage("No mine points available.")
       return
     }
 
-    var bestPoint: RoutePoint? = null
+    var bestSegment: MineSegment? = null
     var bestTarget: BlockPos? = null
     var bestDistSq = Double.POSITIVE_INFINITY
     val origin = player.blockPosition()
 
-    for (point in candidates) {
-      if (isVeinOccupied(level, point, player)) continue
-      val target = resolveApproxTarget(point.pos) ?: continue
+    for (segment in candidates) {
+      val anchor = segment.anchors.firstOrNull() ?: continue
+      if (isVeinOccupied(level, segment.waypoints, player)) continue
+      val target = resolveApproxTarget(anchor) ?: continue
       val distSq = target.distSqr(origin).toDouble()
       if (distSq < bestDistSq) {
         bestDistSq = distSq
-        bestPoint = point
+        bestSegment = segment
         bestTarget = target
       }
     }
 
-    if (bestPoint == null || bestTarget == null) {
+    if (bestSegment == null || bestTarget == null) {
       ChatUtils.sendMessage("No unoccupied mine points found.")
       return
     }
@@ -671,7 +779,7 @@ object RoutesModule : Module("Routes") {
     lastPathStartTick = level.gameTime
 
     ChatUtils.sendMessage(
-      "Pathing to vein at ${bestPoint.pos.x} ${bestPoint.pos.y} ${bestPoint.pos.z}."
+      "Pathing to vein at ${bestSegment.anchors.first().x} ${bestSegment.anchors.first().y} ${bestSegment.anchors.first().z}."
     )
   }
 
@@ -772,6 +880,60 @@ object RoutesModule : Module("Routes") {
     return File(routesDirectory, "$name.json")
   }
 
+  private fun loadRoutePointsByName(name: String): List<RoutePoint>? {
+    val routeFile = routeFileForName(name)
+    return when {
+      routeFile.exists() -> readRouteFile(routeFile)
+      else -> readLegacyRoute(name)
+    }
+  }
+
+  private fun listSavedRouteNames(): List<String> {
+    val names = linkedSetOf<String>()
+
+    if (routesDirectory.exists()) {
+      routesDirectory
+        .listFiles { file -> file.isFile && file.extension.equals("json", ignoreCase = true) }
+        ?.forEach { file ->
+          val name = file.nameWithoutExtension.trim()
+          if (name.isNotEmpty() && isValidRouteName(name)) {
+            names.add(name)
+          }
+        }
+    }
+
+    readLegacyRoutesJson()
+      .getAsJsonObject("routes")
+      ?.entrySet()
+      ?.forEach { (name, _) ->
+        val trimmed = name.trim()
+        if (trimmed.isNotEmpty() && isValidRouteName(trimmed)) {
+          names.add(trimmed)
+        }
+      }
+
+    return names.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it })
+  }
+
+  private fun buildSavedRouteInfo(name: String, points: List<RoutePoint>): SavedRouteInfo {
+    val mineTypes = linkedSetOf<String>()
+    points.forEach { point ->
+      val type = point.mineBlockId
+        ?.let(MiningBlockRegistry.BLOCK_ID_TO_TYPE::get)
+        ?.let(MiningBlockRegistry::normalizeType)
+      if (!type.isNullOrBlank()) {
+        mineTypes.add(type)
+      }
+    }
+    return SavedRouteInfo(
+      name = name,
+      mineTypes = mineTypes.toList(),
+      hasMinePoints = points.any { it.type == RoutePointType.MINE },
+      hasWarpPoints = points.any { it.type == RoutePointType.WARP },
+      pointCount = points.size,
+    )
+  }
+
   private fun writeRouteFile(routeFile: File, points: List<RoutePoint>) {
     val root = JsonObject()
     root.add("points", serializeRoutePoints(points))
@@ -786,6 +948,9 @@ object RoutesModule : Module("Routes") {
       obj.addProperty("y", point.pos.y)
       obj.addProperty("z", point.pos.z)
       obj.addProperty("type", point.type.id)
+      point.mineBlockId?.let { blockId ->
+        obj.addProperty("bid", blockId)
+      }
       point.mineEnd?.let { end ->
         obj.addProperty("mx", end.x)
         obj.addProperty("my", end.y)
@@ -827,7 +992,8 @@ object RoutesModule : Module("Routes") {
       val my = obj.get("my")?.asInt
       val mz = obj.get("mz")?.asInt
       val mineEnd = if (mx != null && my != null && mz != null) BlockPos(mx, my, mz) else null
-      loaded.add(RoutePoint(BlockPos(x, y, z), type, mineEnd))
+      val mineBlockId = obj.get("bid")?.asString?.trim()?.takeIf { it.isNotEmpty() }
+      loaded.add(RoutePoint(BlockPos(x, y, z), type, mineEnd, mineBlockId))
     }
     return loaded
   }
@@ -882,6 +1048,84 @@ object RoutesModule : Module("Routes") {
       RoutePointType.WARP -> Color(175, 120, 255, 255)
       RoutePointType.MINE -> Color(80, 255, 140, 255)
       RoutePointType.NORMAL -> gradientColor(t)
+    }
+  }
+
+  private fun pointRenderRatio(index: Int): Double {
+    val segments = max(1, routePoints.size - 1)
+    return if (segments <= 1) 0.0 else index / (segments - 1.0)
+  }
+
+  private fun buildTravelRenderNodes(): List<RouteRenderNode> {
+    val nodes = ArrayList<RouteRenderNode>(routePoints.size)
+    for ((index, point) in routePoints.withIndex()) {
+      if (point.type == RoutePointType.MINE) continue
+      nodes.add(RouteRenderNode(point.pos, pointTypeColor(point.type, pointRenderRatio(index)), null))
+    }
+    return nodes
+  }
+
+  private fun buildMineRenderNodes(): List<RouteRenderNode> {
+    val nodes = ArrayList<RouteRenderNode>(routePoints.size * 2)
+    val segments = collectMineSegments()
+    for ((segmentIndex, segment) in segments.withIndex()) {
+      val color = pointTypeColor(RoutePointType.MINE, pointRenderRatio(segment.startIndex))
+      for ((anchorIndex, anchor) in segment.anchors.withIndex()) {
+        nodes.add(RouteRenderNode(anchor, color, "${segmentIndex + 1} anchor ${anchorIndex + 1}"))
+      }
+    }
+    return nodes
+  }
+
+  private fun renderRouteLabels(
+    context: org.cobalt.api.event.impl.render.WorldRenderContext,
+    nodes: List<RouteRenderNode>
+  ) {
+    if (nodes.none { !it.label.isNullOrBlank() }) return
+    val matrices = context.matrixStack ?: PoseStack()
+    val font: Font = mc.font
+    val buffer = mc.renderBuffers().bufferSource()
+    val cam = context.camera.position()
+    val light = LightTexture.FULL_BRIGHT
+    val scale = 0.05f
+
+    try {
+      GlStateManager._enableBlend()
+      GlStateManager._blendFuncSeparate(770, 771, 1, 771)
+      GlStateManager._disableDepthTest()
+      GlStateManager._depthMask(false)
+
+      for (node in nodes) {
+        val label = node.label ?: continue
+        val textWidth = font.width(label).toFloat()
+        val labelX = node.pos.x + 0.5
+        val labelY = node.pos.y + 1.08
+        val labelZ = node.pos.z + 0.5
+
+        matrices.pushPose()
+        matrices.translate(labelX - cam.x, labelY - cam.y, labelZ - cam.z)
+        matrices.mulPose(context.camera.rotation())
+        matrices.scale(-scale, -scale, scale)
+
+        font.drawInBatch(
+          label,
+          -textWidth / 2.0f,
+          0.0f,
+          0xFFFFFFFF.toInt(),
+          false,
+          matrices.last().pose(),
+          buffer,
+          Font.DisplayMode.SEE_THROUGH,
+          0,
+          light
+        )
+        matrices.popPose()
+      }
+      buffer.endBatch()
+    } finally {
+      GlStateManager._depthMask(true)
+      GlStateManager._enableDepthTest()
+      GlStateManager._disableBlend()
     }
   }
 
@@ -963,6 +1207,9 @@ object RoutesModule : Module("Routes") {
   }
 
   fun setPointType(type: RoutePointType) {
+    if (type != RoutePointType.MINE) {
+      anchorPlacementActive = false
+    }
     pointType.value = when (type) {
       RoutePointType.WARP -> 1
       RoutePointType.MINE -> 2
@@ -976,36 +1223,48 @@ object RoutesModule : Module("Routes") {
     if (clicked == null) {
       return
     }
+    addRoutePoint(createRoutePoint(clicked, type))
     if (type == RoutePointType.MINE) {
-      pendingMineStart = clicked
-      awaitingMineSecond = true
-      pendingClickPos = null
-      ChatUtils.sendMessage("Mine point: select the end block.")
-      return
+      anchorPlacementActive = true
+      ChatUtils.sendMessage("Mine anchor placement active. Right-click blocks to add anchors. Open chat to stop.")
     }
-    addRoutePoint(RoutePoint(clicked, type))
     pendingClickPos = null
   }
 
   fun cancelPendingPick() {
     pendingClickPos = null
-    pendingMineStart = null
-    awaitingMineSecond = false
+  }
+
+  private fun isChatScreenOpen(): Boolean =
+    mc.screen?.javaClass?.simpleName == "ChatScreen"
+
+  private fun stopAnchorPlacement(notify: Boolean = true) {
+    if (!anchorPlacementActive) return
+    anchorPlacementActive = false
+    if (notify) {
+      ChatUtils.sendMessage("Mine anchor placement stopped.")
+    }
+  }
+
+  private fun stopOwnedMiningMacro() {
+    if (!routeOwnsMiningMacro) return
+    MiningMacroModule.stopForAutomation()
+    routeOwnsMiningMacro = false
   }
 
   private fun isVeinOccupied(
     level: net.minecraft.world.level.Level,
-    point: RoutePoint,
+    waypoints: List<BlockPos>,
     player: net.minecraft.world.entity.player.Player
   ): Boolean {
-    val end = point.mineEnd ?: point.pos
+    if (waypoints.isEmpty()) return false
     val radius = veinOccupancyRadius.value
-    val minX = minOf(point.pos.x, end.x).toDouble() - radius
-    val minY = minOf(point.pos.y, end.y).toDouble() - radius
-    val minZ = minOf(point.pos.z, end.z).toDouble() - radius
-    val maxX = maxOf(point.pos.x, end.x).toDouble() + 1.0 + radius
-    val maxY = maxOf(point.pos.y, end.y).toDouble() + 1.0 + radius
-    val maxZ = maxOf(point.pos.z, end.z).toDouble() + 1.0 + radius
+    val minX = waypoints.minOf { it.x }.toDouble() - radius
+    val minY = waypoints.minOf { it.y }.toDouble() - radius
+    val minZ = waypoints.minOf { it.z }.toDouble() - radius
+    val maxX = waypoints.maxOf { it.x }.toDouble() + 1.0 + radius
+    val maxY = waypoints.maxOf { it.y }.toDouble() + 1.0 + radius
+    val maxZ = waypoints.maxOf { it.z }.toDouble() + 1.0 + radius
     val aabb = AABB(minX, minY, minZ, maxX, maxY, maxZ)
 
     for (other in level.players()) {
@@ -1024,7 +1283,7 @@ object RoutesModule : Module("Routes") {
       return
     }
 
-    val point = resolvePointForExecution(routeIndex)
+    val point = routePoints[routeIndex]
     activePoint = point
 
     when (point.type) {
@@ -1035,6 +1294,10 @@ object RoutesModule : Module("Routes") {
         }
         if (isStandingOnWarpTarget(player, warpPoint)) {
           completePoint()
+          return
+        }
+        if (!hasEtherwarpAvailable()) {
+          startWalk(warpPoint)
           return
         }
         if (startWarp(warpPoint)) {
@@ -1057,7 +1320,7 @@ object RoutesModule : Module("Routes") {
         return
       }
       RoutePointType.MINE -> {
-        startMine(level, point)
+        startMine(level, routeIndex)
       }
       else -> {
         // Navigate to each NORMAL point individually so the pathfinder follows the
@@ -1067,43 +1330,11 @@ object RoutesModule : Module("Routes") {
     }
   }
 
-  private fun resolvePointForExecution(pointIndex: Int): RoutePoint {
-    val base = routePoints[pointIndex]
-
-    if (chainedMineEndIndex != -1 && pointIndex >= chainedMineEndIndex) {
-      chainedMineEndIndex = -1
-    }
-
-    if (chainedMineEndIndex > pointIndex) {
-      val nextPos = routePoints.getOrNull(pointIndex + 1)?.pos
-      if (nextPos != null) {
-        return RoutePoint(base.pos, RoutePointType.MINE, nextPos)
-      }
-      chainedMineEndIndex = -1
-      return base
-    }
-
-    if (base.type != RoutePointType.MINE) {
-      return base
-    }
-
-    val end = base.mineEnd ?: return base
-    val matchingEndIndex = findMatchingMineEndPointIndex(pointIndex, end)
-    if (matchingEndIndex != null && matchingEndIndex > pointIndex + 1) {
-      chainedMineEndIndex = matchingEndIndex
-      val nextPos = routePoints.getOrNull(pointIndex + 1)?.pos
-      if (nextPos != null) {
-        return RoutePoint(base.pos, RoutePointType.MINE, nextPos)
-      }
-      chainedMineEndIndex = -1
-    }
-
-    return base
-  }
-
   private fun startWalk(target: BlockPos, completePointOnArrival: Boolean = true) {
     PathfindingModule.ensureEnabledForAutomation("routes")
     NativePathfinder.stop()
+    MovementManager.setMovementLock(false)
+    RotationExecutor.stopRotating()
     val resolved = resolveApproxTarget(target)
     if (resolved == null) {
       stopRoute("Route failed: no walkable target near point ${routeIndex + 1}.")
@@ -1118,37 +1349,160 @@ object RoutesModule : Module("Routes") {
     lastResolvedTarget = resolved
   }
 
-  private fun startMine(level: net.minecraft.world.level.Level, point: RoutePoint) {
-    val end = point.mineEnd ?: run {
-      startWalk(point.pos)
+  private fun startMine(level: net.minecraft.world.level.Level, pointIndex: Int) {
+    val segment = resolveMineSegment(pointIndex) ?: run {
+      startWalk(routePoints[pointIndex].pos)
       return
     }
 
-    minePointStart = point.pos
-    minePointEnd = end
-    mineTravelWaypoints = resolveMineTravelWaypoints(routeIndex, point.pos, end)
+    if (segment.anchors.isEmpty()) {
+      completePoint()
+      return
+    }
 
-    val vein = buildMineVein(level, mineTravelWaypoints)
+    stopOwnedMiningMacro()
+    mineAnchors = segment.anchors
+    minePointStart = segment.anchors.first()
+    minePointEnd = segment.anchors.last()
+    mineTravelWaypoints = segment.waypoints
+    activeMineEndIndex = segment.endIndex
+
+    mineTarget = null
+    minePathTarget = null
+    action = RouteAction.MINE
+
+    if (segment.legacyVein) {
+      startLegacyVeinMine(level, segment)
+      return
+    }
+
+    if (segment.anchors.size == 1 && !segmentHasRecordedAnchorBlock(segment)) {
+      startSingleAnchorMacroMine(level, segment)
+      return
+    }
+
+    startAnchorListMine(segment)
+  }
+
+  private fun startLegacyVeinMine(
+    level: net.minecraft.world.level.Level,
+    segment: MineSegment
+  ) {
+    val vein = buildMineVein(level, segment.waypoints)
     if (vein == null || vein.blocks.isEmpty()) {
       ChatUtils.sendMessage("Mine point empty; skipping.")
       completePoint()
       return
     }
 
+    mineMode = RouteMineMode.LEGACY_VEIN
     mineBlocks = vein.blocks
-    mineOrderedBlocks = buildMineOrder(vein.blocks, mineTravelWaypoints)
+    mineOrderedBlocks = buildMineOrder(vein.blocks, segment.waypoints)
     mineBlockId = vein.blockId
-    mineTarget = null
-    minePathTarget = null
-    action = RouteAction.MINE
-    // Hold sneak for the entire mine phase to prevent falling off vein ledges.
     mc.options.keyShift?.setDown(true)
-    // Face mine1 so the player looks into the vein from the start
-    val mine1Center = Vec3(point.pos.x + 0.5, point.pos.y + 0.5, point.pos.z + 0.5)
-    RotationExecutor.rotateTo(AngleUtils.getRotation(mine1Center), rotationStrategy)
+    val firstAnchor = segment.anchors.first()
+    val anchorCenter = Vec3(firstAnchor.x + 0.5, firstAnchor.y + 0.5, firstAnchor.z + 0.5)
+    RotationExecutor.rotateTo(AngleUtils.getRotation(anchorCenter), rotationStrategy)
   }
 
-  private fun resolveMineTravelWaypoints(
+  private fun startAnchorListMine(segment: MineSegment) {
+    mineMode = RouteMineMode.ANCHOR_LIST
+    mineBlocks = LinkedHashSet(segment.anchors)
+    mineAnchorBlockIds.clear()
+    for ((pos, blockId) in segment.anchorBlockIds) {
+      if (!blockId.isNullOrBlank()) {
+        mineAnchorBlockIds[pos] = blockId
+      }
+    }
+    mineOrderedBlocks = segment.anchors
+    mineBlockId = null
+    mc.options.keyShift?.setDown(true)
+    val firstAnchor = segment.anchors.first()
+    val anchorCenter = Vec3(firstAnchor.x + 0.5, firstAnchor.y + 0.5, firstAnchor.z + 0.5)
+    RotationExecutor.rotateTo(AngleUtils.getRotation(anchorCenter), rotationStrategy)
+  }
+
+  private fun startSingleAnchorMacroMine(
+    level: net.minecraft.world.level.Level,
+    segment: MineSegment
+  ) {
+    mineMode = RouteMineMode.SINGLE_ANCHOR_MACRO
+    mineSingleAnchorStarted = false
+    val anchor = segment.anchors.first()
+    val recordedBlockId = segment.anchorBlockIds[anchor]
+    mineBlockId = recordedBlockId ?: resolveMineBlockIdAt(level, anchor)
+    mineBlocks.clear()
+    mineAnchorBlockIds.clear()
+    mineOrderedBlocks = segment.anchors
+    val anchorCenter = Vec3(anchor.x + 0.5, anchor.y + 0.5, anchor.z + 0.5)
+    RotationExecutor.rotateTo(AngleUtils.getRotation(anchorCenter), rotationStrategy)
+  }
+
+  private fun segmentHasRecordedAnchorBlock(segment: MineSegment): Boolean {
+    return segment.anchors.any { anchor ->
+      !segment.anchorBlockIds[anchor].isNullOrBlank()
+    }
+  }
+
+  private fun resolveMineSegment(pointIndex: Int): MineSegment? {
+    val base = routePoints.getOrNull(pointIndex) ?: return null
+    if (base.type != RoutePointType.MINE) return null
+
+    base.mineEnd?.let { legacyEnd ->
+      val waypoints = resolveLegacyMineWaypoints(pointIndex, base.pos, legacyEnd)
+      if (waypoints.isNotEmpty()) {
+        return MineSegment(
+          pointIndex,
+          findLegacyMineEndPointIndex(pointIndex, legacyEnd) ?: pointIndex,
+          waypoints,
+          waypoints,
+          linkedMapOf(base.pos to base.mineBlockId),
+          true
+        )
+      }
+    }
+
+    val anchors = mutableListOf<BlockPos>()
+    val anchorBlockIds = LinkedHashMap<BlockPos, String?>()
+    var endIndex = pointIndex
+    var i = pointIndex
+    while (i < routePoints.size && routePoints[i].type == RoutePointType.MINE) {
+      val point = routePoints[i]
+      val pos = point.pos
+      if (anchors.isEmpty() || anchors.last() != pos) {
+        anchors.add(pos)
+      }
+      if (!anchorBlockIds.containsKey(pos)) {
+        anchorBlockIds[pos] = point.mineBlockId
+      }
+      endIndex = i
+      i++
+    }
+    if (anchors.isEmpty()) return null
+    return MineSegment(pointIndex, endIndex, anchors, anchors, anchorBlockIds, false)
+  }
+
+  private fun collectMineSegments(): List<MineSegment> {
+    val segments = mutableListOf<MineSegment>()
+    var index = 0
+    while (index < routePoints.size) {
+      val point = routePoints[index]
+      if (point.type != RoutePointType.MINE) {
+        index++
+        continue
+      }
+      val segment = resolveMineSegment(index)
+      if (segment == null) {
+        index++
+        continue
+      }
+      segments.add(segment)
+      index = (segment.endIndex + 1).coerceAtLeast(index + 1)
+    }
+    return segments
+  }
+
+  private fun resolveLegacyMineWaypoints(
     pointIndex: Int,
     start: BlockPos,
     end: BlockPos
@@ -1156,7 +1510,7 @@ object RoutesModule : Module("Routes") {
     val waypoints = mutableListOf<BlockPos>()
     waypoints.add(start)
 
-    val matchingEndIndex = findMatchingMineEndPointIndex(pointIndex, end)
+    val matchingEndIndex = findLegacyMineEndPointIndex(pointIndex, end)
     if (matchingEndIndex != null && matchingEndIndex > pointIndex + 1) {
       for (i in (pointIndex + 1) until matchingEndIndex) {
         val pos = routePoints[i].pos
@@ -1172,7 +1526,7 @@ object RoutesModule : Module("Routes") {
     return waypoints
   }
 
-  private fun findMatchingMineEndPointIndex(pointIndex: Int, end: BlockPos): Int? {
+  private fun findLegacyMineEndPointIndex(pointIndex: Int, end: BlockPos): Int? {
     for (i in (pointIndex + 1) until routePoints.size) {
       if (routePoints[i].pos == end) {
         return i
@@ -1182,33 +1536,43 @@ object RoutesModule : Module("Routes") {
   }
 
   private fun handleMine(player: Player, level: net.minecraft.world.level.Level) {
-    pruneMineBlocks(level)
-    if (mineBlocks.isEmpty()) {
-      val waypoints =
-        if (mineTravelWaypoints.isNotEmpty()) {
-          mineTravelWaypoints
-        } else {
-          val start = minePointStart
-          val end = minePointEnd
-          if (start != null && end != null) {
-            listOf(start, end)
-          } else {
-            emptyList()
-          }
-        }
+    if (mineMode == RouteMineMode.SINGLE_ANCHOR_MACRO) {
+      handleSingleAnchorMacroMine(player, level)
+      return
+    }
 
-      if (waypoints.isNotEmpty()) {
-        val vein = buildMineVein(level, waypoints)
-        if (vein != null && vein.blocks.isNotEmpty()) {
-          mineBlocks = vein.blocks
-          mineBlockId = vein.blockId
-          mineOrderedBlocks = buildMineOrder(vein.blocks, waypoints)
+    pruneMineBlocks(level, player)
+    if (mineBlocks.isEmpty()) {
+      if (mineMode == RouteMineMode.LEGACY_VEIN) {
+        val waypoints =
+          if (mineTravelWaypoints.isNotEmpty()) {
+            mineTravelWaypoints
+          } else {
+            val start = minePointStart
+            val end = minePointEnd
+            if (start != null && end != null) {
+              listOf(start, end)
+            } else {
+              emptyList()
+            }
+          }
+
+        if (waypoints.isNotEmpty()) {
+          val vein = buildMineVein(level, waypoints)
+          if (vein != null && vein.blocks.isNotEmpty()) {
+            mineBlocks = vein.blocks
+            mineBlockId = vein.blockId
+            mineOrderedBlocks = buildMineOrder(vein.blocks, waypoints)
+          } else {
+            finishMine("Vein complete.")
+            return
+          }
         } else {
           finishMine("Vein complete.")
           return
         }
       } else {
-        finishMine("Vein complete.")
+        finishMine("Anchors complete.")
         return
       }
     }
@@ -1236,8 +1600,55 @@ object RoutesModule : Module("Routes") {
     }
   }
 
+  private fun handleSingleAnchorMacroMine(player: Player, level: net.minecraft.world.level.Level) {
+    val anchor = mineAnchors.firstOrNull() ?: run {
+      finishMine("Mine anchor missing.")
+      return
+    }
+
+    val knownBlockId = mineBlockId ?: resolveMineBlockIdAt(level, anchor)
+    if (!knownBlockId.isNullOrBlank()) {
+      mineBlockId = knownBlockId
+    }
+
+    if (routeOwnsMiningMacro && !MiningMacroModule.isActive) {
+      routeOwnsMiningMacro = false
+      mineSingleAnchorStarted = false
+    }
+
+    val hasOre =
+      knownBlockId != null && hasMatchingOreNearAnchor(level, player, anchor, knownBlockId)
+
+    if (!mineSingleAnchorStarted) {
+      stopMiningKeys()
+      RotationExecutor.stopRotating()
+      MovementManager.clearForcedMovement()
+
+      if (!hasOre) {
+        return
+      }
+
+      val macroType = MiningBlockRegistry.BLOCK_ID_TO_TYPE[knownBlockId] ?: "Custom"
+      MiningMacroModule.startForAutomation(macroType, anchor = anchor, customBlockId = knownBlockId)
+      routeOwnsMiningMacro = true
+      mineSingleAnchorStarted = true
+      return
+    }
+
+    if (!routeOwnsMiningMacro) {
+      mineSingleAnchorStarted = false
+      return
+    }
+
+    if (!MiningMacroModule.hasCurrentVein() && !hasOre) {
+      stopOwnedMiningMacro()
+      finishMine("Vein complete.")
+    }
+  }
+
   private fun finishMine(reason: String) {
     ChatUtils.sendMessage(reason)
+    stopOwnedMiningMacro()
     stopMiningKeys()
     mc.options.keyShift?.setDown(false)
     RotationExecutor.stopRotating()
@@ -1247,6 +1658,12 @@ object RoutesModule : Module("Routes") {
 
   private fun completePoint() {
     val completedPoint = activePoint
+    val nextIndex =
+      if (completedPoint?.type == RoutePointType.MINE && activeMineEndIndex >= routeIndex) {
+        activeMineEndIndex + 1
+      } else {
+        routeIndex + 1
+      }
     action = RouteAction.NONE
     awaitingArrival = false
     walkCompletePointOnArrival = true
@@ -1254,24 +1671,17 @@ object RoutesModule : Module("Routes") {
     lastResolvedTarget = null
     activePoint = null
     walkRetryCount = 0
-    routeIndex++
-    if (chainedMineEndIndex != -1 && routeIndex >= chainedMineEndIndex) {
-      chainedMineEndIndex = -1
-    }
+    routeIndex = nextIndex
     stopMiningKeys()
     if (completedPoint?.type == RoutePointType.MINE) {
       mc.options.keyShift?.setDown(false)
     }
+    stopOwnedMiningMacro()
     RotationExecutor.stopRotating()
     resetMineState()
 
     if (!advanceRouteIndexForLoop()) {
       stopRoute("Route complete.")
-      return
-    }
-
-    if (tryStartMineToMineTransition(completedPoint)) {
-      updateStatus()
       return
     }
     if (!routeRunning) {
@@ -1292,7 +1702,6 @@ object RoutesModule : Module("Routes") {
     if (!loopRoute.value || routePoints.isEmpty()) return false
     // Loop is on: restart from the very beginning (point 0 = warp to forge/camp).
     routeIndex = 0
-    chainedMineEndIndex = -1
     return true
   }
 
@@ -1310,28 +1719,6 @@ object RoutesModule : Module("Routes") {
     loopEndIndex = -1
   }
 
-  private fun tryStartMineToMineTransition(completedPoint: RoutePoint?): Boolean {
-    if (completedPoint?.type != RoutePointType.MINE) return false
-    if (routeIndex !in routePoints.indices) return false
-
-    val level = mc.level ?: return false
-    val nextPoint = resolvePointForExecution(routeIndex)
-    if (nextPoint.type != RoutePointType.MINE) return false
-
-    val warpTarget = resolveWarpPoint(level, nextPoint.pos)
-    if (warpTarget != null && startWarp(
-        warpTarget,
-        completePointOnArrival = false,
-        resumeAction = RouteAction.NONE
-      )
-    ) {
-      return true
-    }
-
-    startWalk(nextPoint.pos, completePointOnArrival = false)
-    return routeRunning && action == RouteAction.WALK
-  }
-
   private fun resetRuntimeState() {
     action = RouteAction.NONE
     awaitingArrival = false
@@ -1340,9 +1727,10 @@ object RoutesModule : Module("Routes") {
     lastResolvedTarget = null
     activePoint = null
     walkRetryCount = 0
-    chainedMineEndIndex = -1
+    activeMineEndIndex = -1
     loopStartIndex = -1
     loopEndIndex = -1
+    stopOwnedMiningMacro()
     stopMiningKeys()
     RotationExecutor.stopRotating()
     mc.options.keyUse?.setDown(false)
@@ -1357,14 +1745,19 @@ object RoutesModule : Module("Routes") {
   }
 
   private fun resetMineState() {
+    mineMode = RouteMineMode.NONE
     mineBlocks.clear()
+    mineAnchorBlockIds.clear()
     mineOrderedBlocks = emptyList()
     mineBlockId = null
     mineTarget = null
     minePathTarget = null
+    mineAnchors = emptyList()
     minePointStart = null
     minePointEnd = null
     mineTravelWaypoints = emptyList()
+    activeMineEndIndex = -1
+    mineSingleAnchorStarted = false
     miningActive = false
     mineDrillWarnTick = 0L
   }
@@ -1410,7 +1803,7 @@ object RoutesModule : Module("Routes") {
     val ordered = if (mineOrderedBlocks.isNotEmpty()) mineOrderedBlocks else blocks.toList()
     if (ordered.isEmpty()) return null
     val rangeSq = MINE_RANGE * MINE_RANGE
-    // Always scan from mine1 end so the vein is mined progressively toward mine2
+    // Anchor blocks are ordered first so explicit route anchors are mined in sequence.
     for (pos in ordered) {
       if (!blocks.contains(pos)) continue
       if (distanceToBlockSq(player, pos) > rangeSq) continue
@@ -1422,7 +1815,7 @@ object RoutesModule : Module("Routes") {
 
   private fun selectNextPendingMineBlock(blocks: Set<BlockPos>): BlockPos? {
     val ordered = if (mineOrderedBlocks.isNotEmpty()) mineOrderedBlocks else blocks.toList()
-    // Return the first remaining block in mine1→mine2 order (for etherwarp targeting)
+    // Return the first remaining anchor/path-ordered block for etherwarp/pathing recovery.
     for (pos in ordered) {
       if (blocks.contains(pos)) return pos
     }
@@ -1446,8 +1839,11 @@ object RoutesModule : Module("Routes") {
     }
     if (waypoints.size == 1) {
       val only = waypoints.first()
-      return blocks
+      val anchorPriority = waypoints.filter { it in blocks }.distinct()
+      val remaining = blocks.asSequence().filter { it !in anchorPriority }
+      return anchorPriority + remaining
         .sortedBy { pos -> pos.distSqr(only).toDouble() }
+        .toList()
     }
 
     val centers = waypoints.map { pos ->
@@ -1512,7 +1908,7 @@ object RoutesModule : Module("Routes") {
       MineOrderEntry(pos, progress, bestLateralDistSq, startDistSq)
     }
 
-    return ranked
+    val orderedBlocks = ranked
       .sortedWith(
         compareBy<MineOrderEntry>(
           { it.progress },
@@ -1521,6 +1917,9 @@ object RoutesModule : Module("Routes") {
         )
       )
       .map { it.pos }
+    val anchorPriority = waypoints.filter { it in blocks }.distinct()
+    if (anchorPriority.isEmpty()) return orderedBlocks
+    return anchorPriority + orderedBlocks.filter { it !in anchorPriority }
   }
 
   private fun moveToward(
@@ -1572,15 +1971,57 @@ object RoutesModule : Module("Routes") {
     return MinecraftPathingRules.resolveTarget(level, target)
   }
 
-  private fun pruneMineBlocks(level: net.minecraft.world.level.Level) {
-    val id = mineBlockId ?: return
+  private fun pruneMineBlocks(level: net.minecraft.world.level.Level, player: Player) {
     val iterator = mineBlocks.iterator()
     while (iterator.hasNext()) {
       val pos = iterator.next()
-      if (blockIdAt(level, pos) != id) {
-        iterator.remove()
+      when (mineMode) {
+        RouteMineMode.ANCHOR_LIST -> {
+          val expectedId = mineAnchorBlockIds[pos]
+          val state = level.getBlockState(pos)
+          if (
+            state.isAir ||
+            (expectedId != null && blockIdAt(level, pos) != expectedId) ||
+            (expectedId == null && state.getDestroyProgress(player, level, pos) <= 0f)
+          ) {
+            iterator.remove()
+          }
+        }
+        else -> {
+          val id = mineBlockId ?: return
+          if (blockIdAt(level, pos) != id) {
+            iterator.remove()
+          }
+        }
       }
     }
+  }
+
+  private fun resolveMineBlockIdAt(level: net.minecraft.world.level.Level, pos: BlockPos): String? {
+    val state = level.getBlockState(pos)
+    if (state.isAir) return null
+    val blockId = blockIdAt(level, pos)
+    return blockId.takeUnless { MiningBlockRegistry.isBlacklisted(it) }
+  }
+
+  private fun hasMatchingOreNearAnchor(
+    level: net.minecraft.world.level.Level,
+    player: Player,
+    anchor: BlockPos,
+    blockId: String
+  ): Boolean {
+    val radius = 4
+    for (dy in -radius..radius) {
+      for (dx in -radius..radius) {
+        for (dz in -radius..radius) {
+          val pos = anchor.offset(dx, dy, dz)
+          if (blockIdAt(level, pos) != blockId) continue
+          if (level.getBlockState(pos).getDestroyProgress(player, level, pos) <= 0f) continue
+          return true
+        }
+      }
+    }
+    return false
   }
 
   private fun buildMineVein(
@@ -1713,7 +2154,13 @@ object RoutesModule : Module("Routes") {
   }
 
   private fun hasArrived(player: Player, target: BlockPos): Boolean {
-    val distSq = player.blockPosition().distSqr(target).toDouble()
+    if (player.blockPosition() == target || player.blockPosition().below() == target) {
+      return true
+    }
+    val dx = (target.x + 0.5) - player.x
+    val dy = target.y - player.y
+    val dz = (target.z + 0.5) - player.z
+    val distSq = dx * dx + dy * dy + dz * dz
     return distSq <= ARRIVAL_DISTANCE_SQ
   }
 
@@ -1795,6 +2242,8 @@ object RoutesModule : Module("Routes") {
     if (nativeActive()) {
       nativeStop(null)
     }
+    MovementManager.setMovementLock(false)
+    MovementManager.clearForcedMovement()
     RotationExecutor.stopRotating()
     mc.options.keyUse?.setDown(false)
     mc.options.keyShift?.setDown(false)
@@ -1804,6 +2253,7 @@ object RoutesModule : Module("Routes") {
     warpStageElapsedMs = 0.0
     warpStageLastNs = 0L
     warpLookLastNs = 0L
+    pendingWarpUseRelease = false
     warpCompletePointOnArrival = completePointOnArrival
     warpResumeAction = resumeAction
     action = RouteAction.WARP
@@ -1818,6 +2268,7 @@ object RoutesModule : Module("Routes") {
       resetWarp()
       return
     }
+    MovementManager.clearForcedMovement()
 
     val warpAimPoint = resolveWarpAimPoint(level, player, target)
     advanceWarpFrameTime()
@@ -1851,18 +2302,27 @@ object RoutesModule : Module("Routes") {
         }
         if (warpStageElapsedMs >= WARP_SNEAK_MS) {
           val shiftKeyHeld = mc.options.keyShift?.isDown == true
-          val playerIsShifting = player.isShiftKeyDown
-          if (!shiftKeyHeld || !playerIsShifting) {
+          if (!shiftKeyHeld) {
             return
           }
           mc.options.keyUse?.setDown(true)
+          pendingWarpUseRelease = true
           warpStage = 2
           resetWarpStageTimer()
           return
         }
+        if (warpStageElapsedMs >= WARP_STAGE1_TIMEOUT_MS) {
+          mc.options.keyShift?.setDown(false)
+          warpCooldownUntil = level.gameTime + WARP_RETRY_COOLDOWN_TICKS
+          val resumeAction = warpResumeAction
+          resetWarp()
+          action = resumeAction
+        }
       }
       else -> {
-        mc.options.keyUse?.setDown(false)
+        if (!pendingWarpUseRelease) {
+          mc.options.keyUse?.setDown(false)
+        }
         val landed = hasArrived(player, target)
         val postWarpAim = if (landed) resolveNextRouteLookPoint(level) else null
         val frameAim =
@@ -1937,6 +2397,7 @@ object RoutesModule : Module("Routes") {
   ): Boolean {
     if (routePoints.isEmpty()) return false
     if (level.gameTime < warpCooldownUntil) return false
+    if (!hasEtherwarpAvailable()) return false
 
     val target = findClosestVisibleRouteWarpTarget(level, player) ?: return false
     return startWarp(target)
@@ -2106,7 +2567,7 @@ object RoutesModule : Module("Routes") {
     val point = aimPoint ?: resolveWarpAimPoint(level, player, target)
     val range = EtherwarpLogic.getEtherwarpRange().toDouble() + 0.5
     if (eye.distanceToSqr(point) > range * range) return false
-    // Use etherwarp's own raycast — standard line-of-sight misses blocks that
+    // Use etherwarp's own raycast - standard line-of-sight misses blocks that
     // etherwarp passes through (carpets, vines, flowers, etc.)
     val result = EtherwarpLogic.getEtherwarpResultSneaking()
     return result.succeeded && result.pos == target
@@ -2132,6 +2593,7 @@ object RoutesModule : Module("Routes") {
     mc.options.keyUse?.setDown(false)
     mc.options.keyShift?.setDown(false)
     RotationExecutor.stopRotating()
+    pendingWarpUseRelease = false
     warpStage = 0
     warpTarget = null
     warpStageElapsedMs = 0.0
@@ -2162,6 +2624,20 @@ object RoutesModule : Module("Routes") {
     return false
   }
 
+  private fun hasEtherwarpAvailable(): Boolean {
+    val player = mc.player ?: return false
+    val currentStack = player.inventory.getItem(player.inventory.selectedSlot)
+    return EtherwarpLogic.isEtherwarpStack(currentStack) ||
+      EtherwarpLogic.isEtherwarpStack(player.offhandItem) ||
+      EtherwarpLogic.findEtherwarpHotbarSlot() in 0..8
+  }
+
+  private fun notifyWarpFallback(routeLabel: String?, points: List<RoutePoint>) {
+    if (points.none { it.type == RoutePointType.WARP } || hasEtherwarpAvailable()) return
+    val routePrefix = routeLabel?.takeIf { it.isNotBlank() }?.let { "Route \"$it\"" } ?: "Route"
+    ChatUtils.sendMessage("$routePrefix has warp points but no AOTV/Etherwarp item was found. Those points will be walked.")
+  }
+
   private fun restoreEtherwarpSlot() {
     if (warpRestoreSlot in 0..8) {
       InventoryUtils.holdHotbarSlot(warpRestoreSlot)
@@ -2171,12 +2647,11 @@ object RoutesModule : Module("Routes") {
 
   private fun shouldKeepEtherwarpForNextPoint(): Boolean {
     if (routeIndex !in routePoints.indices) return false
-    if (chainedMineEndIndex > routeIndex) return false
-    return routePoints[routeIndex].type == RoutePointType.WARP
+    return routePoints[routeIndex].type == RoutePointType.WARP && hasEtherwarpAvailable()
   }
 
   private const val MAX_WALK_RETRIES = 3
-  private const val ARRIVAL_DISTANCE_SQ = 6.0 * 6.0
+  private const val ARRIVAL_DISTANCE_SQ = 1.75 * 1.75
   private const val APPROX_SCAN_RADIUS = 6
   private const val APPROX_SCAN_VERTICAL = 4
   private const val MINE_RANGE = 4.5
@@ -2208,5 +2683,20 @@ object RoutesModule : Module("Routes") {
     val progress: Double,
     val lateralDistSq: Double,
     val startDistSq: Double
+  )
+
+  private data class MineSegment(
+    val startIndex: Int,
+    val endIndex: Int,
+    val anchors: List<BlockPos>,
+    val waypoints: List<BlockPos>,
+    val anchorBlockIds: Map<BlockPos, String?>,
+    val legacyVein: Boolean
+  )
+
+  private data class RouteRenderNode(
+    val pos: BlockPos,
+    val color: Color,
+    val label: String?
   )
 }

@@ -55,6 +55,8 @@ import org.lwjgl.nanovg.NVGPaint
 import org.lwjgl.nanovg.NanoSVG.*
 import org.lwjgl.nanovg.NanoVG.*
 import org.lwjgl.nanovg.NanoVGGL3.*
+import org.lwjgl.opengl.GL11C
+import org.lwjgl.opengl.GL13C
 import org.lwjgl.opengl.GL30
 import org.lwjgl.opengl.GL33C
 import org.lwjgl.stb.STBImage.stbi_load_from_memory
@@ -83,6 +85,8 @@ object NVGRenderer {
   private var vg = -1L
   private var prevFramebuffer = 0
   private val prevViewport = IntArray(4)
+  private var prevActiveTexture = GL13C.GL_TEXTURE0
+  private var prevBoundTexture2D = 0
   private var prevSampler0 = 0
 
   init {
@@ -95,12 +99,15 @@ object NVGRenderer {
 
     prevFramebuffer = GL33C.glGetInteger(GL30.GL_FRAMEBUFFER_BINDING)
     GL33C.glGetIntegerv(GL33C.GL_VIEWPORT, prevViewport)
+    prevActiveTexture = GL33C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE)
+    prevBoundTexture2D = GL33C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D)
     val framebuffer = mc.mainRenderTarget
     val glFramebuffer = (framebuffer.colorTexture as GlTexture).getFbo(
       (RenderSystem.getDevice() as GlDevice).directStateAccess(),
       null
     )
 
+    scissor = null
     GlStateManager._glBindFramebuffer(GL30.GL_FRAMEBUFFER, glFramebuffer)
     GlStateManager._viewport(0, 0, framebuffer.width, framebuffer.height)
     GlStateManager._activeTexture(GL30.GL_TEXTURE0)
@@ -119,7 +126,7 @@ object NVGRenderer {
 
     // NanoVG (NVG_STENCIL_STROKES) leaves GL_STENCIL_TEST enabled and writes stencil
     // values into the buffer. If not cleaned up, Minecraft's next-frame text/GUI
-    // rendering will fail the leftover stencil test → corrupted text in chat/inventory.
+    // rendering will fail the leftover stencil test -> corrupted text in chat/inventory.
     GL33C.glDisable(GL33C.GL_STENCIL_TEST)
     GL33C.glStencilMask(0xFF)
     GL33C.glClear(GL33C.GL_STENCIL_BUFFER_BIT)
@@ -136,10 +143,8 @@ object NVGRenderer {
     GlStateManager._blendFuncSeparate(770, 771, 1, 0)
     GlStateManager._glUseProgram(0)
 
-    if (TextureTracker.prevActiveTexture != -1) {
-      GlStateManager._activeTexture(TextureTracker.prevActiveTexture)
-      if (TextureTracker.prevBoundTexture != -1) GlStateManager._bindTexture(TextureTracker.prevBoundTexture)
-    }
+    GlStateManager._activeTexture(prevActiveTexture)
+    GlStateManager._bindTexture(prevBoundTexture2D)
 
     GlStateManager._glBindFramebuffer(GL30.GL_FRAMEBUFFER, prevFramebuffer)
     GlStateManager._viewport(
@@ -148,6 +153,7 @@ object NVGRenderer {
       prevViewport[2],
       prevViewport[3]
     )
+    scissor = null
     drawing = false
   }
 

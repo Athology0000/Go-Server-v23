@@ -29,7 +29,7 @@ object EquipmentManager {
             // Collect matching slot indices from the PLAYER'S INVENTORY section only.
             // In any standard Minecraft chest GUI the last 36 slots (size-36 .. size-1)
             // are always the player's own inventory + hotbar.  The chest display area
-            // (indices 0 .. size-37) shows currently-equipped SkyBlock items — clicking
+            // (indices 0 .. size-37) shows currently-equipped SkyBlock items - clicking
             // those would unequip them.  We only click items found in the player section
             // so we equip items that are currently in the inventory, not strip equipped ones.
             val matchingIndices = mutableListOf<Int>()
@@ -53,7 +53,7 @@ object EquipmentManager {
             latch.await(2000, TimeUnit.MILLISECONDS)
 
             if (matchingIndices.isEmpty()) {
-                // Nothing to equip — close the menu and bail out
+                // Nothing to equip - close the menu and bail out
                 mc.execute { mc.player?.closeContainer() }
                 Thread.sleep(300)
                 return

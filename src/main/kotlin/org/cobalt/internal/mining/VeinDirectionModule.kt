@@ -276,7 +276,7 @@ object VeinDirectionModule : Module("Vein Direction Setter") {
   private fun saveFlowsText() {
     if (!textFile.parentFile.exists()) textFile.parentFile.mkdirs()
     val content = buildString {
-      appendLine("# Vein Direction Setter — one slot per vein type")
+      appendLine("# Vein Direction Setter - one slot per vein type")
       if (flowsByType.isEmpty()) {
         appendLine("EMPTY")
       } else {

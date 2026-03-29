@@ -9,8 +9,11 @@ import java.util.regex.Pattern
 import net.minecraft.ChatFormatting
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
+import net.minecraft.core.BlockPos
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.network.chat.Component
+import net.minecraft.network.protocol.game.ServerboundChatCommandPacket
+import net.minecraft.network.protocol.game.ServerboundChatCommandSignedPacket
 import net.minecraft.world.inventory.Slot
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.TooltipFlag
@@ -18,15 +21,21 @@ import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.HitResult
 import org.cobalt.api.event.EventBus
 import org.cobalt.api.event.annotation.SubscribeEvent
+import org.cobalt.api.event.impl.client.ChatEvent
+import org.cobalt.api.event.impl.client.PacketEvent
 import org.cobalt.api.event.impl.client.TickEvent
 import org.cobalt.api.module.Module
 import org.cobalt.api.module.setting.impl.ActionSetting
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.ModeSetting
+import org.cobalt.api.module.setting.impl.RangeSetting
 import org.cobalt.api.module.setting.impl.SliderSetting
 import org.cobalt.api.module.setting.impl.TextSetting
 import org.cobalt.api.notification.NotificationManager
+import org.cobalt.api.util.InventoryUtils
 import org.cobalt.api.util.getLoreLines
+import org.cobalt.internal.rotation.RotationsModule
+import org.cobalt.internal.ui.panel.panels.UIModuleList
 
 object MiningModule : Module("Mining") {
 
@@ -38,31 +47,19 @@ object MiningModule : Module("Mining") {
     false
   )
 
-  val autoHotmCapture = CheckboxSetting(
-    "Auto HOTM",
-    "Auto-scan Heart of the Mountain perks when /hotm is open.",
-    true
-  )
-
   val blockStrength = SliderSetting(
     "Block Strength",
-    "Block strength used in the tick formula (bstr).",
+    "Fallback block strength used when the current block type is unknown.",
     10.0,
     1.0,
-    200.0
+    6000.0
   )
 
   val blockType = ModeSetting(
     "Block Type",
-    "Select a known block hardness to calculate ticks.",
+    "Select a known block hardness/threshold profile to calculate ticks.",
     0,
     MiningBlockRegistry.BLOCK_TYPES
-  )
-
-  val autoDetectBlock = CheckboxSetting(
-    "Auto Detect Block",
-    "Auto-detect block type from the block you're mining.",
-    true
   )
 
   val detectedBlockText = TextSetting(
@@ -71,20 +68,12 @@ object MiningModule : Module("Mining") {
     "Unknown"
   )
 
-  val pingDelayMin = SliderSetting(
-    "Ping Delay Min",
-    "Minimum extra ticks added based on ping.",
-    0.5,
+  val pingDelay = RangeSetting(
+    "Ping Delay",
+    "Random extra ticks added to look time.",
+    Pair(0.6, 1.4),
     0.0,
-    2.0
-  )
-
-  val pingDelayMax = SliderSetting(
-    "Ping Delay Max",
-    "Maximum extra ticks added based on ping.",
-    2.0,
-    0.5,
-    4.0
+    4.0,
   )
 
   val miningSpeedText = TextSetting(
@@ -117,6 +106,12 @@ object MiningModule : Module("Mining") {
     false
   )
 
+  val autoActivateSpeedBoost = CheckboxSetting(
+    "Auto Speed Boost",
+    "Automatically right-click to activate Mining Speed Boost when it comes off cooldown.",
+    false
+  )
+
   val frontLoadedActive = CheckboxSetting(
     "Front Loaded Active",
     "Front Loaded active (+250 mining speed).",
@@ -142,45 +137,29 @@ object MiningModule : Module("Mining") {
   )
 
   val lookTicksText = TextSetting(
-    "Look Ticks",
-    "Computed ticks to look at a block.",
+    "Look Calc",
+    "Computed total ticks to look at a block.",
     "0"
   )
 
-  private val scrapeStats = ActionSetting(
-    "Scrape Stats",
-    "Open /stats and scrape Mining Speed from the Mining Stats icon.",
+  val lookCountdownText = TextSetting(
+    "Look Left",
+    "Remaining ticks until the next mining target, including ping delay.",
+    "0"
+  )
+
+  internal val scrapeAll = ActionSetting(
+    "Scrape All",
+    "Equip drill, scrape /stats, then auto-scrape /hotm after.",
     "Scrape"
   ) {
+    val drillSlot = InventoryUtils.findItemInHotbar("drill")
+    if (drillSlot >= 0) InventoryUtils.holdHotbarSlot(drillSlot)
     pendingStatsScrape = true
     pendingStatsTick = mc.level?.gameTime ?: 0L
+    pendingScrapeAll = true
+    pendingHotmAfterStats = false
     sendCommand("/stats")
-  }
-
-  private val scrapeHotm = ActionSetting(
-    "Scrape HOTM",
-    "Open /hotm and export Heart of the Mountain perks.",
-    "Scrape"
-  ) {
-    pendingHotmScrape = true
-    pendingHotmTick = mc.level?.gameTime ?: 0L
-    sendCommand("/hotm")
-  }
-
-  private val openStats = ActionSetting(
-    "Open /stats",
-    "Open the stats menu.",
-    "Open"
-  ) {
-    sendCommand("/stats")
-  }
-
-  private val openHotm = ActionSetting(
-    "Open /hotm",
-    "Open the Heart of the Mountain tree.",
-    "Open"
-  ) {
-    sendCommand("/hotm")
   }
 
   private val exportHotm = ActionSetting(
@@ -212,31 +191,58 @@ object MiningModule : Module("Mining") {
   private var pendingStatsTick = 0L
   private var pendingHotmScrape = false
   private var pendingHotmTick = 0L
+  private var pendingScrapeAll = false
+  private var pendingHotmAfterStats = false
   private var lastHotmSignature: String? = null
   private var lastHotmParseTick = 0L
+  private var miningSpeedBoostBuffActive = false
+  val isMiningSpeedBoostActive: Boolean get() = miningSpeedBoostBuffActive
+  private var pendingSpeedBoostUse = false
+  private var pendingSpeedBoostRelease = false
+  private var detectedBlockPos: BlockPos? = null
+  private var detectedBlockId: String? = null
+  private var sampledLookTargetPos: BlockPos? = null
+  private var sampledLookTargetId: String? = null
+  private var sampledPingDelayTicks: Double? = null
 
   init {
+    MiningPrecisionTracker.ensureInitialized()
+
+    val side = UIModuleList.SIDE_GROUP
+    blockStrength.uiGroup      = side
+    pingDelay.uiGroup          = side
+    miningSpeedText.uiGroup    = side
+    hotmMultiplierText.uiGroup = side
+    miningGems.uiGroup         = side
+    precisionActive.uiGroup    = side
+    speedBoostActive.uiGroup          = side
+    autoActivateSpeedBoost.uiGroup    = side
+    frontLoadedActive.uiGroup         = side
+    skymallActive.uiGroup      = side
+    miningUmberTungsten.uiGroup = side
+    pingText.uiGroup           = side
+    lookTicksText.uiGroup      = side
+    lookCountdownText.uiGroup  = side
+    scrapeAll.uiGroup          = side
+
     addSetting(
       enabled,
-      autoHotmCapture,
       blockStrength,
       blockType,
-      autoDetectBlock,
-      detectedBlockText,
-      pingDelayMin,
-      pingDelayMax,
+      pingDelay,
       miningSpeedText,
       hotmMultiplierText,
       miningGems,
       precisionActive,
       speedBoostActive,
+      autoActivateSpeedBoost,
       frontLoadedActive,
       skymallActive,
       miningUmberTungsten,
       pingText,
       lookTicksText,
-      scrapeStats,
-      scrapeHotm,
+      lookCountdownText,
+      scrapeAll,
       exportHotm,
     )
     EventBus.register(this)
@@ -244,26 +250,78 @@ object MiningModule : Module("Mining") {
 
   @SubscribeEvent
   fun onTick(@Suppress("UNUSED_PARAMETER") event: TickEvent.Start) {
-    if (!enabled.value) return
+    if (mc.player == null || mc.level == null) {
+      miningSpeedBoostBuffActive = false
+    }
+
+    if (pendingSpeedBoostRelease) {
+      mc.options.keyUse.setDown(false)
+      pendingSpeedBoostRelease = false
+    }
+
+    if (pendingSpeedBoostUse) {
+      pendingSpeedBoostUse = false
+      val player = mc.player
+      if (player != null && mc.screen == null && MiningMacroModule.isActive) {
+        mc.options.keyUse.setDown(true)
+        pendingSpeedBoostRelease = true
+      }
+    }
 
     val screen = mc.screen
-    val pingMs = getPingMs()
-    pingText.value = pingMs.toString()
+
+    if (pendingHotmAfterStats && screen == null) {
+      pendingHotmAfterStats = false
+      pendingHotmScrape = true
+      pendingHotmTick = mc.level?.gameTime ?: 0L
+      sendCommand("/hotm")
+    }
 
     if (screen is AbstractContainerScreen<*>) {
       if (pendingStatsScrape) {
         captureMiningSpeedFromStats(screen)
       }
-      if (autoHotmCapture.value || pendingHotmScrape) {
-        captureHotmPerks(screen)
+      captureHotmPerks(screen)
+    }
+
+    val trackingActive = enabled.value || MiningMacroModule.isActive
+    if (!trackingActive) {
+      lookCountdownText.value = "0"
+      return
+    }
+
+    val pingMs = getPingMs()
+    pingText.value = pingMs.toString()
+    updateBlockDetection()
+
+    updateLookTicks()
+  }
+
+  @SubscribeEvent
+  fun onChat(event: ChatEvent.Receive) {
+    val message = event.message ?: return
+    when (stripFormatting(message).trim()) {
+      MINING_SPEED_BOOST_USED -> miningSpeedBoostBuffActive = true
+      MINING_SPEED_BOOST_EXPIRED -> miningSpeedBoostBuffActive = false
+      MINING_SPEED_BOOST_READY -> {
+        miningSpeedBoostBuffActive = false
+        if (autoActivateSpeedBoost.value) pendingSpeedBoostUse = true
       }
     }
+  }
 
-    if (autoDetectBlock.value) {
-      updateBlockDetection()
+  @SubscribeEvent
+  fun onPacket(event: PacketEvent.Outgoing) {
+    val command = when (val packet = event.packet) {
+      is ServerboundChatCommandPacket -> packet.command()
+      is ServerboundChatCommandSignedPacket -> packet.command()
+      else -> return
     }
 
-    updateLookTicks(pingMs)
+    if (command.trim().substringBefore(' ').equals("hotm", ignoreCase = true)) {
+      pendingHotmScrape = true
+      pendingHotmTick = mc.level?.gameTime ?: 0L
+    }
   }
 
   private fun sendCommand(command: String) {
@@ -300,6 +358,11 @@ object MiningModule : Module("Mining") {
       miningSpeedText.value = formatNumber(value)
       pendingStatsScrape = false
       notify("Captured Mining Speed: ${formatNumber(value)}")
+      if (pendingScrapeAll) {
+        pendingScrapeAll = false
+        pendingHotmAfterStats = true
+        mc.setScreen(null)
+      }
     }
   }
 
@@ -330,6 +393,7 @@ object MiningModule : Module("Mining") {
     hotmPerks = perks
     exportCombinedStats()
     updateHotmMultiplier()
+    applyHotmPerksToToggles()
     if (pendingHotmScrape) {
       pendingHotmScrape = false
       notify("Exported HOTM perks (${perks.size}).")
@@ -379,6 +443,22 @@ object MiningModule : Module("Mining") {
     return null
   }
 
+  private fun applyHotmPerksToToggles() {
+    if (getPerkLevel("precision miner") > 0)     precisionActive.value    = true
+    if (getPerkLevel("mining speed boost") > 0)  speedBoostActive.value   = true
+    if (getPerkLevel("front loaded") > 0)        frontLoadedActive.value  = true
+    if (getPerkLevel("skymall") > 0)             skymallActive.value      = true
+    if (getPerkLevel("professional") > 0) {
+      miningGems.value = hasSelectedGemstones()
+    }
+    val selectedTypes = MiningMacroModule.getSelectedTypesInOrder()
+    if (getPerkLevel("strong arm") > 0) {
+      if (selectedTypes.any { it == "Umber" || it == "Tungsten" }) {
+        miningUmberTungsten.value = true
+      }
+    }
+  }
+
   private fun updateHotmMultiplier() {
     val base = miningSpeed
     if (base <= 0.0) {
@@ -392,24 +472,53 @@ object MiningModule : Module("Mining") {
     hotmMultiplierText.value = String.format(Locale.US, "%.2f", mult)
   }
 
-  private fun updateLookTicks(pingMs: Int) {
-    val speed = miningSpeed
-    if (speed <= 0.0) {
+  private fun updateLookTicks() {
+    val total = getCalculatedLookTicks(includePingDelay = true)
+    if (total <= 0.0) {
       lookTicksText.value = "0"
+      lookCountdownText.value = "0"
       return
     }
-    val bstr = resolveBlockStrength()
-    val baseTicks = 30.0 * bstr / speed
-    val delay = computePingDelayTicks(pingMs)
-    val total = baseTicks + delay
     lookTicksText.value = String.format(Locale.US, "%.2f", total)
+    val target = resolveLookTarget()
+    val trackedTicks = MiningMacroModule.getTrackedTargetTicks(MiningMacroModule.tickGliding.value).toDouble()
+    val remaining =
+      if (target == null) {
+        0.0
+      } else if (trackedTicks > 0.0) {
+        (total - trackedTicks).coerceAtLeast(0.0)
+      } else {
+        total
+      }
+    lookCountdownText.value = String.format(Locale.US, "%.2f", remaining)
   }
 
-  private fun computePingDelayTicks(pingMs: Int): Double {
-    val min = pingDelayMin.value
-    val max = pingDelayMax.value.coerceAtLeast(min)
-    val normalized = (pingMs / 400.0).coerceIn(0.0, 1.0)
-    return min + (max - min) * normalized
+  fun getCalculatedLookTicks(includePingDelay: Boolean = true): Double {
+    val effectiveSpeed = computeEffectiveMiningSpeed(miningSpeed)
+    if (effectiveSpeed <= 0.0) {
+      return 0.0
+    }
+    val baseTicks = resolveBaseMineTicks(effectiveSpeed).toDouble()
+    return if (includePingDelay) baseTicks + computePingDelayTicks() else baseTicks
+  }
+
+  private fun computePingDelayTicks(): Double {
+    val target = resolveLookTarget()
+    val pos = target?.first
+    val id = target?.second
+    if (pos == null || id.isNullOrEmpty()) {
+      resetLookTickSample()
+      return 0.0
+    }
+    val cached = sampledPingDelayTicks
+    if (cached != null && pos == sampledLookTargetPos && id == sampledLookTargetId) {
+      return cached
+    }
+    return RotationsModule.sample(pingDelay.value).also { sampled ->
+      sampledLookTargetPos = pos
+      sampledLookTargetId = id
+      sampledPingDelayTicks = sampled
+    }
   }
 
   private fun getPingMs(): Int {
@@ -459,7 +568,7 @@ object MiningModule : Module("Mining") {
       writer.appendLine("Base Speed: ${formatNumber(derived.baseSpeed)}")
       writer.appendLine("HOTM Passive: +${formatNumber(derived.passiveBonus)}")
       writer.appendLine("Strong Arm: +${formatNumber(derived.strongArmBonus)} (active=${miningUmberTungsten.value})")
-      writer.appendLine("Gem Bonus (Professional): +${formatNumber(derived.professionalBonus)}")
+      writer.appendLine("Gem Bonus (Professional): +${formatNumber(derived.professionalBonus)} (active=${hasSelectedGemstones()})")
       writer.appendLine("Front Loaded: +${formatNumber(derived.frontLoadedBonus)} (active=${frontLoadedActive.value})")
       writer.appendLine("Skymall: +${formatNumber(derived.skymallBonus)} (active=${skymallActive.value})")
       writer.appendLine("Precision Miner: x${String.format(Locale.US, "%.2f", derived.precisionMultiplier)} (active=${precisionActive.value})")
@@ -569,37 +678,97 @@ object MiningModule : Module("Mining") {
     val level = mc.level ?: return
     val hit = mc.hitResult
     if (hit !is BlockHitResult || hit.type != HitResult.Type.BLOCK) {
+      detectedBlockPos = null
+      detectedBlockId = null
       detectedBlockText.value = "Unknown"
       return
     }
+    detectedBlockPos = hit.blockPos
     val state = level.getBlockState(hit.blockPos)
     val id = BuiltInRegistries.BLOCK.getKey(state.block).toString()
+    detectedBlockId = id
     val label = MiningBlockRegistry.BLOCK_ID_TO_TYPE[id]
     if (label != null) {
       detectedBlockText.value = label
-      setBlockType(label)
     } else {
-      detectedBlockText.value = id
+      detectedBlockText.value = id.substringAfter(':')
     }
   }
 
-  private fun setBlockType(label: String) {
-    val idx = blockType.options.indexOf(label)
-    if (idx >= 0 && blockType.value != idx) {
-      blockType.value = idx
-    }
+  private fun resetLookTickSample() {
+    sampledLookTargetPos = null
+    sampledLookTargetId = null
+    sampledPingDelayTicks = null
   }
+
+  private fun resolveLookTarget(): Pair<BlockPos, String>? {
+    val level = mc.level
+    if (level != null) {
+      MiningMacroModule.getTrackedTargetBlock()?.let { pos ->
+        val id = BuiltInRegistries.BLOCK.getKey(level.getBlockState(pos).block).toString()
+        return pos to id
+      }
+    }
+    val pos = detectedBlockPos ?: return null
+    val id = detectedBlockId ?: return null
+    return pos to id
+  }
+
+  private data class ResolvedMiningTarget(
+    val type: String?,
+    val hardness: Double,
+  )
 
   private fun resolveBlockStrength(): Double {
-    val selected = blockType.options.getOrNull(blockType.value) ?: "Custom"
-    val hardness = MiningBlockRegistry.BLOCK_HARDNESS[selected]
-    return hardness ?: blockStrength.value
+    return resolveMiningTarget().hardness
+  }
+
+  private fun resolveBaseMineTicks(effectiveSpeed: Double): Int {
+    val resolved = resolveMiningTarget()
+    return MiningBreakThresholds.getOptimalTicks(resolved.type, effectiveSpeed, resolved.hardness)
+  }
+
+  private fun resolveMiningTarget(): ResolvedMiningTarget {
+    val level = mc.level
+    val targetId =
+      level?.let { activeLevel ->
+        MiningMacroModule.getTrackedTargetBlock()?.let { pos ->
+          BuiltInRegistries.BLOCK.getKey(activeLevel.getBlockState(pos).block).toString()
+        }
+      } ?: detectedBlockId
+    val targetType = targetId?.let { MiningBlockRegistry.BLOCK_ID_TO_TYPE[it] }
+    val targetHardness = targetType?.let { MiningBlockRegistry.BLOCK_HARDNESS[it] }
+    if (targetHardness != null) {
+      return ResolvedMiningTarget(targetType, targetHardness)
+    }
+
+    val selectedType = blockType.options.getOrNull(blockType.value)
+    val knownHardness = selectedType?.let { MiningBlockRegistry.BLOCK_HARDNESS[it] }
+    if (knownHardness != null) {
+      return ResolvedMiningTarget(selectedType, knownHardness)
+    }
+    return ResolvedMiningTarget(null, blockStrength.value)
   }
 
   private fun computeEffectiveMiningSpeed(baseSpeed: Double): Double {
     if (baseSpeed <= 0.0) return 0.0
     val derived = computeDerivedMiningSpeed(baseSpeed)
     return derived.effectiveSpeed
+  }
+
+  private fun hasSelectedGemstones(): Boolean {
+    val selectedTypes = MiningMacroModule.getSelectedTypesInOrder()
+    if (selectedTypes.any { it.contains("Gemstone") }) {
+      return true
+    }
+    val selectedType = blockType.options.getOrNull(blockType.value)
+    return selectedType?.contains("Gemstone") == true
+  }
+
+  private fun isPrecisionBonusApplied(): Boolean {
+    if (!precisionActive.value) return false
+    if (!MiningMacroModule.isActive) return true
+    return MiningMacroModule.isUsingPrecisionPoint()
   }
 
   private fun computeDerivedMiningSpeed(baseOverride: Double? = null): DerivedMiningSpeed {
@@ -612,7 +781,7 @@ object MiningModule : Module("Mining") {
 
     val professionalLevel = getPerkLevel("professional")
     val professionalBonus =
-      if (miningGems.value && professionalLevel > 0) {
+      if (hasSelectedGemstones() && professionalLevel > 0) {
         55.0 + (professionalLevel - 1).coerceAtLeast(0) * 5.0
       } else {
         0.0
@@ -625,7 +794,7 @@ object MiningModule : Module("Mining") {
 
     val precisionLevel = getPerkLevel("precision miner")
     val precisionMultiplier =
-      if (precisionActive.value && precisionLevel > 0) {
+      if (isPrecisionBonusApplied() && precisionLevel > 0) {
         1.0 + 0.3 * precisionLevel
       } else {
         1.0
@@ -633,7 +802,7 @@ object MiningModule : Module("Mining") {
     val afterPrecision = baseTotal * precisionMultiplier
 
     val speedBoostBonus =
-      if (speedBoostActive.value && getPerkLevel("mining speed boost") > 0) {
+      if (speedBoostActive.value && getPerkLevel("mining speed boost") > 0 && miningSpeedBoostBuffActive) {
         afterPrecision * 2.5
       } else {
         0.0
@@ -678,6 +847,10 @@ object MiningModule : Module("Mining") {
     } else {
       String.format(Locale.US, "%.2f", value)
     }
+  }
+
+  private fun formatRange(value: Pair<Double, Double>): String {
+    return "${formatNumber(value.first)}-${formatNumber(value.second)}"
   }
 
   private fun getTooltipLines(stack: ItemStack): List<Component> {
@@ -737,6 +910,9 @@ object MiningModule : Module("Mining") {
   private val ROMAN_PATTERN = Pattern.compile("(?:Tier|Level)\\s+([IVX]+)", Pattern.CASE_INSENSITIVE)
   private val STAT_PAIR_PATTERN = Pattern.compile("^(.+?)\\s*[:\\s]+([0-9][0-9,]*(?:\\.[0-9]+)?)$")
   private val LEADING_DECORATION_PATTERN = Pattern.compile("^[^A-Za-z0-9]+")
+  private const val MINING_SPEED_BOOST_USED = "You used your Mining Speed Boost Pickaxe Ability!"
+  private const val MINING_SPEED_BOOST_EXPIRED = "Your Mining Speed Boost has expired!"
+  private const val MINING_SPEED_BOOST_READY = "Mining Speed Boost is now available!"
 
   private fun romanToInt(roman: String): Int {
     var sum = 0
@@ -773,4 +949,63 @@ object MiningModule : Module("Mining") {
     val warmHeartLevel: Int,
     val warmHeartCold: Double
   )
+
+  fun getMiningCategory(): String {
+    val types = MiningMacroModule.getSelectedTypesInOrder()
+    return when {
+      types.isEmpty() -> "None"
+      types.any { it.contains("Gemstone") } -> "Gemstone"
+      types.any { it.startsWith("Mithril") || it == "Titanium" } -> "Mithril"
+      types.any { it == "Umber" || it == "Tungsten" || it == "Glacite" } -> "Tunnel"
+      types.any { it.startsWith("Pure") } -> "Pure Ore"
+      else -> types.first()
+    }
+  }
+
+  fun buildOverlayRows(): List<String> =
+    listOf(
+      "Type:     ${getMiningCategory()}",
+      "Block:    ${detectedBlockText.value}",
+      "Hardness: ${formatNumber(resolveBlockStrength())}",
+      "Speed:    ${miningSpeedText.value}",
+      "Ping:     ${pingText.value} ms",
+      "Delay:    ${formatRange(pingDelay.value)} ticks",
+      "LookCalc: ${lookTicksText.value} ticks",
+      "LookLeft: ${lookCountdownText.value} ticks",
+    ) + MiningPrecisionTracker.buildOverlayRows()
+
+  fun getDetectedBlockPos(): BlockPos? = detectedBlockPos
+  fun getDetectedBlockId(): String? = detectedBlockId
+
+  fun getBuffStatuses(): List<Pair<String, Boolean>> = listOf(
+    "Lantern Buff" to AutoLanternModule.isLanternBuffActive(),
+    "Mining Speed Boost" to miningSpeedBoostBuffActive,
+  )
+
+  fun buildBuffStatusRows(): List<String> = listOf(
+    "Lantern Buff: ${AutoLanternModule.getLanternBuffStatus()}",
+    "Mining Speed Boost: ${if (miningSpeedBoostBuffActive) "Active" else "Inactive"}"
+  )
+
+  fun getActivePerks(): List<String> {
+    val result = mutableListOf<String>()
+    if (precisionActive.value) {
+      val lvl = getPerkLevel("precision miner")
+      if (lvl > 0) result.add("Precision Miner x${String.format(Locale.US, "%.1f", 1.0 + 0.3 * lvl)}")
+    }
+    if (speedBoostActive.value && getPerkLevel("mining speed boost") > 0) {
+      result.add("Speed Boost x2.5")
+    }
+    if (frontLoadedActive.value) result.add("Front Loaded +250 MS")
+    if (skymallActive.value) result.add("Skymall +100 MS")
+    if (hasSelectedGemstones()) {
+      val lvl = getPerkLevel("professional")
+      if (lvl > 0) result.add("Professional +${55 + (lvl - 1).coerceAtLeast(0) * 5} MS")
+    }
+    if (miningUmberTungsten.value) {
+      val lvl = getPerkLevel("strong arm")
+      if (lvl > 0) result.add("Strong Arm +${lvl * 5} MS")
+    }
+    return result
+  }
 }

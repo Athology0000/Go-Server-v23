@@ -609,7 +609,7 @@ object MiningMacroModule : Module("Mining Macro") {
         val precisionRotScale =
           if (aim.usesPrecisionPoint) (precisionPointRotationSpeed.value / 100.0).coerceAtLeast(0.1)
           else 1.0
-        frameRotSnapThreshold = if (aim.usesPrecisionPoint) 2.4f else 5.5f
+        frameRotSnapThreshold = RotationsModule.bezierSnapThreshold.value.toFloat()
         frameRotTarget     = aim.point
         frameRotSpeedScale = (RotationsModule.sample(RotationsModule.miningSpeedScale.value) * precisionRotScale).toFloat()
         frameRotAccelScale = (RotationsModule.sample(RotationsModule.miningAccelScale.value) * precisionRotScale).toFloat()
@@ -938,6 +938,27 @@ object MiningMacroModule : Module("Mining Macro") {
     player: Player,
     vein: Vein
   ): BlockPos? {
+    // Priority: in-range titanium blocks beat everything else (including sticky non-titanium targets).
+    // This ensures titanium that appears next to a mithril vein is mined immediately.
+    val titaniumIds = MiningBlockRegistry.idsForType("Titanium")
+    if (titaniumIds.any { it in vein.targetIds }) {
+      val rangeSq = mineRange.value * mineRange.value
+      val eye = player.eyePosition
+      var bestTi: BlockPos? = null
+      var bestTiAngle = Float.POSITIVE_INFINITY
+      for (pos in vein.blocks) {
+        if (!isMineableTarget(level, player, pos, vein.targetIds)) continue
+        if (blockIdAt(level, pos) !in titaniumIds) continue
+        if (distanceToBlockSq(player, pos) > rangeSq) continue
+        val visiblePoint = if (REQUIRE_MINE_LOS) findVisibleAimPoint(level, player, eye, pos) else null
+        if (REQUIRE_MINE_LOS && visiblePoint == null) continue
+        val aimPoint = visiblePoint ?: Vec3(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5)
+        val ang = angularDistanceTo(player, aimPoint)
+        if (ang < bestTiAngle) { bestTiAngle = ang; bestTi = pos }
+      }
+      if (bestTi != null) return bestTi
+    }
+
     val sticky = currentTarget?.takeIf { vein.blocks.contains(it) && isMineableTarget(level, player, it, vein.targetIds) }
     if (sticky != null) {
       val distSq = distanceToBlockSq(player, sticky)
@@ -1244,7 +1265,7 @@ object MiningMacroModule : Module("Mining Macro") {
     val precisionRotScale =
       if (aim.usesPrecisionPoint) (precisionPointRotationSpeed.value / 100.0).coerceAtLeast(0.1)
       else 1.0
-    frameRotSnapThreshold = if (aim.usesPrecisionPoint) 2.4f else 5.5f
+    frameRotSnapThreshold = RotationsModule.bezierSnapThreshold.value.toFloat()
     frameRotTarget     = aim.point
     frameRotSpeedScale = (RotationsModule.sample(RotationsModule.miningSpeedScale.value) * precisionRotScale).toFloat()
     frameRotAccelScale = (RotationsModule.sample(RotationsModule.miningAccelScale.value) * precisionRotScale).toFloat()
@@ -1646,7 +1667,7 @@ object MiningMacroModule : Module("Mining Macro") {
       if (aim.usesPrecisionPoint) (precisionPointRotationSpeed.value / 100.0).coerceAtLeast(0.1)
       else 1.0
     frameRotTarget = aim.point
-    frameRotSnapThreshold = if (aim.usesPrecisionPoint) 2.4f else 1.6f
+    frameRotSnapThreshold = RotationsModule.bezierSnapThreshold.value.toFloat()
     frameRotSpeedScale = (RotationsModule.sample(RotationsModule.miningSpeedScale.value) * precisionRotScale).toFloat()
     frameRotAccelScale = (RotationsModule.sample(RotationsModule.miningAccelScale.value) * precisionRotScale).toFloat()
     frameRotPitchStep = (RotationsModule.sample(RotationsModule.miningPitchStep.value) * precisionRotScale).toFloat()

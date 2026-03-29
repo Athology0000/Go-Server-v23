@@ -22,6 +22,7 @@ private:
 
     float smoothYaw_   = 0;
     float smoothPitch_ = 0;
+    bool initialized_  = false;
     int   noiseTick_   = 0;
     int   noiseInterval_ = 12;
     int   noiseSeed_   = 1337;

@@ -27,7 +27,7 @@ import org.cobalt.api.module.setting.SettingsContainer
  * @param id Stable unique identifier used for serialization.
  * @param name Display name shown in the HUD editor.
  * @param description Optional description for the settings popup.
- * @param init Builder block — configure position, settings, size, and rendering.
+ * @param init Builder block - configure position, settings, size, and rendering.
  * @return The constructed [HudElement] instance.
  */
 fun Module.hudElement(
@@ -47,7 +47,7 @@ fun Module.hudElement(
  * Builder for configuring a [HudElement] inside the [hudElement] DSL block.
  *
  * Register settings with [setting] and read their values via `.value`.
- * Do **not** use `by` delegation for settings inside this builder — it won't compile
+ * Do **not** use `by` delegation for settings inside this builder - it won't compile
  * because Kotlin local delegates require a different type signature.
  */
 class HudElementBuilder(
@@ -89,12 +89,12 @@ class HudElementBuilder(
     return settingsList
   }
 
-  /** Sets the dynamic width provider. Called every frame — can return values based on setting state. */
+  /** Sets the dynamic width provider. Called every frame - can return values based on setting state. */
   fun width(provider: () -> Float) {
     widthProvider = provider
   }
 
-  /** Sets the dynamic height provider. Called every frame — can return values based on setting state. */
+  /** Sets the dynamic height provider. Called every frame - can return values based on setting state. */
   fun height(provider: () -> Float) {
     heightProvider = provider
   }

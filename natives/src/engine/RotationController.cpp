@@ -11,7 +11,13 @@ void RotationController::setPath(const std::vector<Vec3i>& nodes, int idx) {
 }
 void RotationController::setCombatMode(bool c) { combatMode_ = c; }
 void RotationController::reset() {
-    path_.clear(); currentIdx_ = 0; smoothYaw_ = 0; smoothPitch_ = 0;
+    path_.clear();
+    currentIdx_ = 0;
+    smoothYaw_ = 0;
+    smoothPitch_ = 0;
+    initialized_ = false;
+    noiseTick_ = 0;
+    noiseInterval_ = 12;
 }
 
 float RotationController::pseudoRand() {
@@ -53,11 +59,16 @@ void RotationController::tick(double px, double py, double pz,
                                float curYaw, float curPitch,
                                float& outYaw, float& outPitch) {
     if (path_.empty()) { outYaw = curYaw; outPitch = curPitch; return; }
+    if (!initialized_) {
+        smoothYaw_ = curYaw;
+        smoothPitch_ = curPitch;
+        initialized_ = true;
+    }
 
     float targetYaw   = lookAheadYaw(px, py, pz);
     float targetPitch = lookAheadPitch(px, py, pz);
 
-    // Bezier-like easing — raw output, no GCD (RotationExecutor applies GCD on Kotlin side)
+    // Bezier-like easing - raw output, no GCD (RotationExecutor applies GCD on Kotlin side)
     float speed = combatMode_ ? 0.35f : 0.18f;
     float yawDiff   = angleDiff(targetYaw,   smoothYaw_);
     float pitchDiff = targetPitch - smoothPitch_;

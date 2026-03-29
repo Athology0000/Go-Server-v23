@@ -14,7 +14,7 @@ import kotlin.math.floor
 /**
  * Thread-safe detector of Diana Griffin burrow locations via CRIT particle packets.
  *
- * SkyHanni reference: GriffinBurrowParticleFinder.kt — MOB burrow particles:
+ * SkyHanni reference: GriffinBurrowParticleFinder.kt - MOB burrow particles:
  *   type=CRIT, spawned at the burrow block's top surface.
  *
  * Each CRIT packet more than 3 blocks away is treated as a burrow indicator.
@@ -45,7 +45,7 @@ object DianaParticleTracker {
         val dx = pkt.x - player.x
         val dy = pkt.y - player.y
         val dz = pkt.z - player.z
-        // Ignore particles within 3 blocks — those are combat hits on nearby mobs
+        // Ignore particles within 3 blocks - those are combat hits on nearby mobs
         if (dx * dx + dy * dy + dz * dz < 9.0) return
 
         if (activationPos == null) activationPos = player.position()
@@ -77,7 +77,7 @@ object DianaParticleTracker {
         synchronized(seenBurrows) { seenBurrows.remove(key) }
     }
 
-    /** Number of matching CRIT packets received — used by the macro threshold check. */
+    /** Number of matching CRIT packets received - used by the macro threshold check. */
     fun count(): Int = packetCount
 
     fun getLastParticleMs(): Long = lastParticleMs

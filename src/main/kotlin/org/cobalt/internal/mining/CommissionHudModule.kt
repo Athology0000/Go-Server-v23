@@ -23,6 +23,7 @@ object CommissionHudModule : Module("Commission HUD") {
 
   private fun rows() = listOf(
     "Status"     to CommissionMacroModule.statusDisplay,
+    "Mode"       to CommissionMacroModule.modeDisplay,
     "Commission" to CommissionMacroModule.commissionDisplay,
     "Zone"       to CommissionMacroModule.currentZoneDisplay,
     "Target"     to CommissionMacroModule.targetZoneDisplay,
@@ -50,11 +51,9 @@ object CommissionHudModule : Module("Commission HUD") {
       val now    = System.currentTimeMillis()
       val twoPi  = (Math.PI * 2).toFloat()
 
-      // Spotify-style background
       NVGRenderer.rect(x, y, panelW, panelH, 0xFF0A0E1A.toInt(), corner)
       NVGRenderer.gradientRect(x, y, panelW, panelH * 0.5f, 0x14FFFFFF, 0x00000000, Gradient.TopToBottom, corner)
 
-      // Animated gradient border
       val angle  = (now % 10000L).toFloat() / 10000f * twoPi
       val shiftX = cos(angle) * (panelW * 0.42f)
       NVGRenderer.hollowGradientRectShifted(x, y, panelW, panelH, 1.5f, borderColor1, borderColor2, Gradient.LeftToRight, corner, shiftX, 0f)

@@ -43,10 +43,9 @@ object WardrobeRenderer {
         val rows = if (sets.isEmpty()) 1 else (sets.size + MAX_COLS - 1) / MAX_COLS
 
         val gridW = cols * SLOT_W + (cols - 1).coerceAtLeast(0) * SLOT_GAP
-        val tabsW = 3 * TAB_W + 2 * TAB_GAP
         val btnsW = 2 * BTN_W + BTN_GAP
-        val contentW = maxOf(gridW, tabsW, btnsW) + PADDING * 2
-        val contentH = PADDING + TAB_H + SECTION_GAP +
+        val contentW = maxOf(gridW, btnsW) + PADDING * 2
+        val contentH = PADDING +
             rows * SLOT_H + (rows - 1).coerceAtLeast(0) * SLOT_GAP +
             SECTION_GAP + BTN_H + PADDING
 
@@ -58,7 +57,7 @@ object WardrobeRenderer {
             val col = i % MAX_COLS
             val row = i / MAX_COLS
             val x = ox + PADDING + col * (SLOT_W + SLOT_GAP)
-            val y = oy + PADDING + TAB_H + SECTION_GAP + row * (SLOT_H + SLOT_GAP)
+            val y = oy + PADDING + row * (SLOT_H + SLOT_GAP)
             set.id to Rect(x, y, SLOT_W, SLOT_H)
         }.toMap()
 
@@ -71,21 +70,7 @@ object WardrobeRenderer {
         // Panel
         NVGRenderer.rect(ox, oy, contentW, contentH, theme.panel, 12f)
 
-        // Page tabs
-        val newTabHitboxes = mutableListOf<WardrobeModule.TabHitbox>()
-        for (p in 1..3) {
-            val tx = ox + PADDING + (p - 1) * (TAB_W + TAB_GAP)
-            val ty = oy + PADDING
-            val selected = p == module.currentCustomPage
-            val bg = if (selected) theme.selectedOverlay else theme.controlBg
-            val border = if (selected) theme.accent else theme.controlBorder
-            NVGRenderer.rect(tx, ty, TAB_W, TAB_H, bg, 6f)
-            NVGRenderer.hollowRect(tx, ty, TAB_W, TAB_H, 1f, border, 6f)
-            NVGRenderer.text("Page $p", tx + TAB_W / 2f, ty + TAB_H / 2f - 5f, 11f,
-                if (selected) theme.accent else theme.text)
-            newTabHitboxes.add(WardrobeModule.TabHitbox(p, tx, ty, TAB_W, TAB_H))
-        }
-        module.tabHitboxes = newTabHitboxes
+        module.tabHitboxes = emptyList()
 
         // Slot card backgrounds
         val newSlotHitboxes = mutableListOf<WardrobeModule.SlotHitbox>()

@@ -126,7 +126,9 @@ object NativePathfinder {
 
         // Edge-trigger jump: fire for exactly one tick on the rising edge.
         // Prevents bunny-hopping when the DLL holds jump=true for multiple ticks.
+        // Re-arm on landing so a pulse wasted while airborne (e.g. mid-fall) retries.
         val jumpRaw = r[2] != 0
+        if (jumpRaw && player.onGround()) prevJump = false
         val jumpPulse = jumpRaw && !prevJump
         prevJump = jumpRaw
 

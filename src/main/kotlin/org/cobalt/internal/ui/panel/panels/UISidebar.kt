@@ -3,6 +3,7 @@ package org.cobalt.internal.ui.panel.panels
 import net.minecraft.client.Minecraft
 import org.cobalt.api.ui.theme.ThemeManager
 import org.cobalt.api.util.ui.NVGRenderer
+import org.cobalt.api.util.ui.helper.Image
 import org.cobalt.internal.ui.UIComponent
 import org.cobalt.internal.ui.components.tooltips.TooltipPosition
 import org.cobalt.internal.ui.components.tooltips.UITooltip
@@ -19,33 +20,35 @@ internal class UISidebar : UIPanel(
   height = 600F
 ) {
 
-  private val moduleButton = UIButton("/assets/cobalt/textures/ui/box.svg") {
+  private val moduleButton = UIButton("/assets/cobalt/textures/ui/box.svg", "Modules") {
     UIConfig.swapBodyPanel(UIAddonList())
   }
 
-  private val hudButton = UIButton("/assets/cobalt/textures/ui/palette.svg") {
+  private val hudButton = UIButton("/assets/cobalt/textures/ui/palette.svg", "HUD Editor") {
     UIHudEditor().openUI()
   }
 
-  private val steveIcon = NVGRenderer.createImage("/assets/cobalt/textures/steve.png")
-  private val userIcon = try {
-    NVGRenderer.createImage("https://mc-heads.net/avatar/${Minecraft.getInstance().user.profileId}/100/face.png")
-  } catch (_: Exception) {
-    steveIcon
+  private val designButton = UIButton("/assets/cobalt/textures/ui/interface.svg", "Design") {
+    UIConfig.swapBodyPanel(UIThemeSelector())
   }
 
+  private val steveIcon = NVGRenderer.createImage("/assets/cobalt/textures/steve.png")
+  private var cachedProfileId = Minecraft.getInstance().user.profileId.toString()
+  private var userIcon = loadUserIcon(cachedProfileId)
+
   private val userIconTooltip = UITooltip(
-    content = { UITextTooltip("Hello, ${Minecraft.getInstance().user.name}!") },
+    content = { UITextTooltip("Manage Accounts (${Minecraft.getInstance().user.name})") },
     position = TooltipPosition.BELOW
   )
 
   init {
     components.addAll(
-      listOf(moduleButton, hudButton)
+      listOf(moduleButton, hudButton, designButton)
     )
   }
 
   override fun render() {
+    refreshUserIcon()
     NVGRenderer.rect(x, y, width, height, ThemeManager.currentTheme.background, 10F)
     NVGRenderer.text("cb", x + width / 2F - 15F, y + 25F, 25F, ThemeManager.currentTheme.text)
 
@@ -57,6 +60,11 @@ internal class UISidebar : UIPanel(
     hudButton
       .setSelected(isHoveringOver(x + (width / 2F) - (hudButton.width / 2F), y + 75F + 35F, hudButton.width, hudButton.height))
       .updateBounds(x + (width / 2F) - (hudButton.width / 2F), y + 75F + 35F)
+      .render()
+
+    designButton
+      .setSelected(isHoveringOver(x + (width / 2F) - (designButton.width / 2F), y + 75F + 70F, designButton.width, designButton.height))
+      .updateBounds(x + (width / 2F) - (designButton.width / 2F), y + 75F + 70F)
       .render()
 
     val userIconX = x + (width / 2F) - 16F
@@ -79,20 +87,40 @@ internal class UISidebar : UIPanel(
     val userIconY = y + height - 32F - 20F
 
     if (isHoveringOver(userIconX, userIconY, 32F, 32F) && button == 0) {
-      UIConfig.swapBodyPanel(UIThemeSelector())
+      UIConfig.swapBodyPanel(UIAccountManagerPanel())
       return true
     }
 
     return super.mouseClicked(button)
   }
 
+  private fun refreshUserIcon() {
+    val profileId = Minecraft.getInstance().user.profileId.toString()
+    if (profileId == cachedProfileId) return
+    cachedProfileId = profileId
+    userIcon = loadUserIcon(profileId)
+  }
+
+  private fun loadUserIcon(profileId: String): Image {
+    return try {
+      NVGRenderer.createImage("https://mc-heads.net/avatar/$profileId/100/face.png")
+    } catch (_: Exception) {
+      steveIcon
+    }
+  }
+
   private class UIButton(
     iconPath: String,
+    label: String,
     private val onClick: () -> Unit,
   ) : UIComponent(0f, 0f, 22F, 22F) {
 
     val image = NVGRenderer.createImage(iconPath)
     private var selected = false
+    private val tooltip = UITooltip(
+      content = { UITextTooltip(label) },
+      position = TooltipPosition.RIGHT
+    )
 
     fun setSelected(selected: Boolean): UIComponent {
       this.selected = selected
@@ -105,12 +133,13 @@ internal class UISidebar : UIPanel(
       NVGRenderer.image(
         image,
         x, y, width, height,
-
         colorMask = if (hovering || selected)
           ThemeManager.currentTheme.accent
         else
           ThemeManager.currentTheme.textSecondary
       )
+
+      tooltip.updateBounds(x, y, width, height)
     }
 
     override fun mouseClicked(button: Int): Boolean {

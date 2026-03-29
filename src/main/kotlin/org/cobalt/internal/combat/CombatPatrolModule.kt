@@ -76,7 +76,7 @@ object CombatPatrolModule : Module("Combat Patrol") {
     // Pending block position from the last right-click, waiting for type selection in PatrolPointPopup.
     private var pendingClickPos: BlockPos? = null
 
-    // ── warp sub-machine state ─────────────────────────────────────────────
+    // -- warp sub-machine state ---------------------------------------------
     private var warpStage = 0
     private var warpTargetPoint: CombatPatrolPoint? = null
     private var warpStageElapsedMs = 0.0
@@ -147,8 +147,8 @@ object CombatPatrolModule : Module("Combat Patrol") {
                 else MovementManager.clearForcedMovement()  // PLANNING: clear stale flags (prevents jump spam)
                 // Only mark activated once the pathfinder is genuinely executing
                 // (tick() returns non-null exclusively for EXECUTING status).
-                // PLANNING status does NOT count — the native side can transition
-                // PLANNING → ARRIVED in one native update without the player moving.
+                // PLANNING status does NOT count - the native side can transition
+                // PLANNING -> ARRIVED in one native update without the player moving.
                 if (cmd != null) navPathActivated = true
 
                 val s = NativePathfinder.status
@@ -163,9 +163,9 @@ object CombatPatrolModule : Module("Combat Patrol") {
                     } else Double.MAX_VALUE
 
                     // Accept arrival if:
-                    //  • FAILED — always skip
-                    //  • navPathActivated — player actually moved along this path leg
-                    //  • distSq <= trivial threshold — player was already at the point
+                    //  - FAILED - always skip
+                    //  - navPathActivated - player actually moved along this path leg
+                    //  - distSq <= trivial threshold - player was already at the point
                     val confirmedArrival = s == PathStatus.FAILED
                         || navPathActivated
                         || distSq <= NAV_TRIVIAL_DIST_SQ
@@ -182,7 +182,7 @@ object CombatPatrolModule : Module("Combat Patrol") {
                             advanceAndNavigate()
                         }
                     } else {
-                        // Stale ARRIVED from the previous path leg — the native side hasn't
+                        // Stale ARRIVED from the previous path leg - the native side hasn't
                         // started planning our new target yet.  Re-issue setTarget so the
                         // engine resets to PLANNING; on the next tick tick() will eventually
                         // return non-null and navPathActivated will be set correctly.
@@ -226,13 +226,13 @@ object CombatPatrolModule : Module("Combat Patrol") {
 
     @SubscribeEvent
     fun onRender(event: WorldRenderEvent.Last) {
-        // Warp sub-machine — frame-driven
+        // Warp sub-machine - frame-driven
         if (patrolRunning && patrolState == PatrolState.WARPING && mc.screen == null) {
             val player = mc.player
             val level = mc.level
             if (player != null && level != null) handleWarp(player, level)
         }
-        // Route visualization — always shown while module is enabled
+        // Route visualization - always shown while module is enabled
         if (enabled.value && patrolPoints.isNotEmpty()) renderRoute(event)
     }
 
@@ -253,13 +253,13 @@ object CombatPatrolModule : Module("Combat Patrol") {
             }
             Render3D.drawBox(event.context, box, color, esp = true)
 
-            // Kill zone radius preview — wireframe sphere (3 rings)
+            // Kill zone radius preview - wireframe sphere (3 rings)
             if (p.type == CombatPatrolPointType.KILL) {
                 val zoneColor = if (isActive) Color(255, 80, 80, 200) else Color(210, 50, 50, 140)
                 drawSphereRings(event, Vec3(p.x + 0.5, p.y + 0.5, p.z + 0.5), killZoneRadius.value, zoneColor)
             }
 
-            // Line to next point (skip last→first when loop is off)
+            // Line to next point (skip last->first when loop is off)
             if (i < points.size - 1 || loopRoute.value) {
                 val next = points[(i + 1) % points.size]
                 val lineColor = if (isActive) Color(255, 255, 255, 200) else Color(190, 190, 190, 120)
@@ -461,7 +461,7 @@ object CombatPatrolModule : Module("Combat Patrol") {
      * Called by CombatMacroModule each tick there are no mobs in the kill zone.
      *
      * NOTE: requires CombatMacroModule's TickEvent.Start handler to fire BEFORE this module's
-     * handler in the same tick — ensured by registration order in Cobalt.kt
+     * handler in the same tick - ensured by registration order in Cobalt.kt
      * (CombatMacroModule is registered before CombatPatrolModule).
      */
     fun onKillZoneCleared() {
@@ -474,7 +474,7 @@ object CombatPatrolModule : Module("Combat Patrol") {
 
     val killZoneRadiusValue: Double get() = killZoneRadius.value
 
-    // ── warp sub-machine ───────────────────────────────────────────────────
+    // -- warp sub-machine ---------------------------------------------------
 
     private fun startWarpPoint(point: CombatPatrolPoint) {
         val player = mc.player ?: return
@@ -482,7 +482,7 @@ object CombatPatrolModule : Module("Combat Patrol") {
         val target = BlockPos(point.x, point.y, point.z)
 
         if (level.gameTime < warpCooldownUntil) {
-            // cooldown — fall back to walking
+            // cooldown - fall back to walking
             NativePathfinder.setTarget(point.x + 0.5, point.y.toDouble(), point.z + 0.5)
             patrolOwnsPathfinder = true
             patrolState = PatrolState.NAVIGATING
@@ -499,13 +499,13 @@ object CombatPatrolModule : Module("Combat Patrol") {
             val currentSlot = player.inventory.selectedSlot
             InventoryUtils.holdHotbarSlot(slot)
             if (!EtherwarpLogic.holdingEtherwarpItem()) {
-                // Item not in that slot — restore immediately and skip
+                // Item not in that slot - restore immediately and skip
                 InventoryUtils.holdHotbarSlot(currentSlot)
                 ChatUtils.sendMessage("Patrol: no AOTV in slot ${slot + 1}, skipping warp.")
                 advanceAndNavigate()
                 return
             }
-            // Successfully switched — record slot to restore after warp
+            // Successfully switched - record slot to restore after warp
             warpRestoreSlot = currentSlot
         }
 
@@ -791,7 +791,7 @@ object CombatPatrolModule : Module("Combat Patrol") {
         )
     }
 
-    // ── render helpers ─────────────────────────────────────────────────────
+    // -- render helpers -----------------------------------------------------
 
     private fun drawSphereRings(event: WorldRenderEvent.Last, center: Vec3, radius: Double, color: Color) {
         val segments = 40
@@ -818,7 +818,7 @@ object CombatPatrolModule : Module("Combat Patrol") {
         }
     }
 
-    // ── warp constants ─────────────────────────────────────────────────────
+    // -- warp constants -----------------------------------------------------
     private val TWO_PI = kotlin.math.PI * 2.0
     // Player must be within this many blocks (sq) for "already at destination" trivial arrival.
     // Kept deliberately small (2 blocks) so nearby-but-not-there points don't trigger false advance.

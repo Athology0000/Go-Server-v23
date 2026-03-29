@@ -29,7 +29,7 @@ internal class RoutePointPickerScreen : Screen(Component.literal("Route Point Ty
       }.bounds(centerX - buttonWidth / 2, startY + buttonHeight + gap, buttonWidth, buttonHeight).build()
     )
     addRenderableWidget(
-      Button.builder(Component.literal("Mine Vein")) {
+      Button.builder(Component.literal("Mine Anchor")) {
         RoutesModule.applyPickedType(RoutesModule.RoutePointType.MINE)
         onClose()
       }.bounds(centerX - buttonWidth / 2, startY + (buttonHeight + gap) * 2, buttonWidth, buttonHeight).build()

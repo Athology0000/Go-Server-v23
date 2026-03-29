@@ -8,7 +8,7 @@ import net.minecraft.world.level.Level
 import net.minecraft.world.level.block.state.BlockState
 
 /**
- * Serializes a 64×32×64 block region centred on the player into a flat byte[].
+ * Serializes a 64x32x64 block region centred on the player into a flat byte[].
  *
  * Buffer layout (matches Types.h constants):
  *   index(x,y,z) = (y-by)*BUF_STRIDE_Y + (z-bz)*BUF_STRIDE_Z + (x-bx)
@@ -16,15 +16,15 @@ import net.minecraft.world.level.block.state.BlockState
  *   BUF_STRIDE_Z=64, BUF_STRIDE_Y=64*64=4096
  *
  * Block type byte values (must match WorldAccessor.h):
- *   0 = AIR, 1 = SOLID, 2 = WATER, 3 = LAVA, 4 = LADDER
+ *   0 = AIR, 1 = SOLID, 2 = WATER, 3 = LAVA, 4 = LADDER, 5 = STEP
  *
  * Performance notes:
  *   - If the player's block position is unchanged the previous buffer is returned
- *     as-is (0 block reads — critical during the PLANNING phase when the player is frozen).
- *   - If the buffer origin shifts by at most ±1 per axis the buffer is updated
+ *     as-is (0 block reads - critical during the PLANNING phase when the player is frozen).
+ *   - If the buffer origin shifts by at most +/-1 per axis the buffer is updated
  *     incrementally: only the newly exposed slice(s) are read (~2k blocks vs 131k).
  *   - Per-BlockState collision-shape results are cached so decorative blocks
- *     (flowers, carpets, torches…) are classified via a single HashMap lookup
+ *     (flowers, carpets, torches...) are classified via a single HashMap lookup
  *     after the first encounter.
  */
 object WorldBufferSerializer {
@@ -40,8 +40,9 @@ object WorldBufferSerializer {
     private const val BT_WATER: Byte  = 2
     private const val BT_LAVA: Byte   = 3
     private const val BT_LADDER: Byte = 4
+    private const val BT_STEP: Byte   = 5
 
-    // ── Caches ────────────────────────────────────────────────────────────────
+    // -- Caches ----------------------------------------------------------------
 
     /** Buffer from the previous call; reused when origin is unchanged. */
     private var cachedBuf: ByteArray? = null
@@ -50,14 +51,14 @@ object WorldBufferSerializer {
     private var cachedBz = Int.MIN_VALUE
 
     /**
-     * Per-BlockState passability: true = no collision box (treat as AIR).
+     * Per-BlockState max collision height (0.0 = no shape, 1.0 = full block).
      * Most decorative blocks have static shapes, so caching by state is safe and fast.
      * Position-sensitive blocks (fences, walls) have non-empty shapes in all
-     * configurations so they will always cache as false (correctly treated as SOLID).
+     * configurations so they will always cache as 1.0 (correctly treated as SOLID).
      */
-    private val passableByState = HashMap<BlockState, Boolean>(512)
+    private val heightByState = HashMap<BlockState, Double>(512)
 
-    // ── Public API ────────────────────────────────────────────────────────────
+    // -- Public API ------------------------------------------------------------
 
     fun serialize(mc: Minecraft): WorldBufferResult? {
         val level  = mc.level  ?: return null
@@ -67,7 +68,7 @@ object WorldBufferSerializer {
         val by = player.blockY - 8
         val bz = player.blockZ - BUF_D / 2
 
-        // Fast path: player didn't move to a new block — return cached buffer unchanged.
+        // Fast path: player didn't move to a new block - return cached buffer unchanged.
         val cached = cachedBuf
         if (cached != null && bx == cachedBx && by == cachedBy && bz == cachedBz) {
             return WorldBufferResult(cached, bx, by, bz)
@@ -85,7 +86,7 @@ object WorldBufferSerializer {
             && ddz >= -1 && ddz <= 1
         ) {
             // Incremental path: apply each axis shift in sequence.
-            // shiftX copies from cached → buf; shiftY/Z operate on buf in-place.
+            // shiftX copies from cached -> buf; shiftY/Z operate on buf in-place.
             if (ddx != 0) shiftX(cached, buf, ddx, bx, by, bz, level, mpos)
             else System.arraycopy(cached, 0, buf, 0, buf.size)
 
@@ -115,12 +116,12 @@ object WorldBufferSerializer {
     /** Drop caches (call when the player changes dimension or logs out). */
     fun invalidate() {
         cachedBuf = null
-        passableByState.clear()
+        heightByState.clear()
     }
 
-    // ── Incremental shift helpers ─────────────────────────────────────────────
+    // -- Incremental shift helpers ---------------------------------------------
 
-    /** Shift the buffer along the X axis by ddx (±1). Reads src, writes dst. */
+    /** Shift the buffer along the X axis by ddx (+/-1). Reads src, writes dst. */
     private fun shiftX(
         src: ByteArray, dst: ByteArray, ddx: Int,
         bx: Int, by: Int, bz: Int,
@@ -154,7 +155,7 @@ object WorldBufferSerializer {
         }
     }
 
-    /** Shift the buffer along the Y axis by ddy (±1). Modifies buf in-place. */
+    /** Shift the buffer along the Y axis by ddy (+/-1). Modifies buf in-place. */
     private fun shiftY(
         buf: ByteArray, ddy: Int,
         bx: Int, by: Int, bz: Int,
@@ -186,7 +187,7 @@ object WorldBufferSerializer {
         }
     }
 
-    /** Shift the buffer along the Z axis by ddz (±1). Modifies buf in-place. */
+    /** Shift the buffer along the Z axis by ddz (+/-1). Modifies buf in-place. */
     private fun shiftZ(
         buf: ByteArray, ddz: Int,
         bx: Int, by: Int, bz: Int,
@@ -220,7 +221,7 @@ object WorldBufferSerializer {
         }
     }
 
-    // ── Post-shift refill helpers ─────────────────────────────────────────────
+    // -- Post-shift refill helpers ---------------------------------------------
 
     /** Re-classify the new X slice(s) using the settled (final) buffer origins. */
     private fun refillXSlice(
@@ -262,7 +263,7 @@ object WorldBufferSerializer {
         }
     }
 
-    // ── Full rebuild ──────────────────────────────────────────────────────────
+    // -- Full rebuild ----------------------------------------------------------
 
     private fun fullRebuild(
         buf: ByteArray,
@@ -281,7 +282,7 @@ object WorldBufferSerializer {
         }
     }
 
-    // ── Block classification ──────────────────────────────────────────────────
+    // -- Block classification --------------------------------------------------
 
     private fun classify(state: BlockState, level: Level, pos: BlockPos): Byte {
         if (state.isAir) return BT_AIR
@@ -292,8 +293,17 @@ object WorldBufferSerializer {
             else -> BT_WATER
         }
         if (state.`is`(BlockTags.CLIMBABLE)) return BT_LADDER
-        // Cache per-BlockState passability to avoid repeated getCollisionShape calls.
-        return if (passableByState.getOrPut(state) { state.getCollisionShape(level, pos).isEmpty })
-            BT_AIR else BT_SOLID
+        // Cache max collision height per BlockState to distinguish full blocks, slabs, and
+        // thin decoratives (carpets, pressure plates). Position-sensitive blocks (fences,
+        // walls) always have height >= 1.0 in every configuration, so caching by state is safe.
+        val maxHeight = heightByState.getOrPut(state) {
+            val shape = state.getCollisionShape(level, pos)
+            if (shape.isEmpty) 0.0 else shape.bounds().maxY
+        }
+        return when {
+            maxHeight < 0.1  -> BT_AIR   // carpet, pressure plate, flower — walk through
+            maxHeight < 0.75 -> BT_STEP  // slab (0.5), thin snow — auto-step, no jump needed
+            else             -> BT_SOLID
+        }
     }
 }

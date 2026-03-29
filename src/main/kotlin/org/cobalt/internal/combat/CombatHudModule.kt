@@ -25,12 +25,27 @@ object CombatHudModule : Module("Combat HUD") {
   private val borderColor1 get() = ThemeManager.currentTheme.accent
   private val borderColor2 get() = ThemeManager.currentTheme.accentSecondary
 
-  private fun rows() = listOf(
-    "Status" to CombatMacroModule.statusDisplay,
-    "Mode"   to CombatMacroModule.modeDisplay,
-    "Target" to CombatMacroModule.targetDisplay,
-    "Slayer" to CombatMacroModule.slayerDisplay,
-  )
+  private fun rows(): List<Pair<String, String>> {
+    val rows = mutableListOf(
+      "Status" to CombatMacroModule.statusDisplay,
+      "Mode" to CombatMacroModule.modeDisplay,
+      "Target" to CombatMacroModule.targetDisplay,
+      "Slayer" to CombatMacroModule.slayerDisplay,
+    )
+    if (CombatMacroModule.isSlayerHudVisible) {
+      rows += listOf(
+        "Quest" to CombatMacroModule.slayerQuestLevelDisplay,
+        "Quest State" to CombatMacroModule.slayerQuestStateDisplay,
+        "Kills Left" to CombatMacroModule.slayerKillsLeftDisplay,
+        "Kills/hr" to CombatMacroModule.slayerKillsPerHourDisplay,
+        "Quests Done" to CombatMacroModule.slayerQuestsCompletedDisplay,
+        "Quests/hr" to CombatMacroModule.slayerQuestsPerHourDisplay,
+        "Quests Failed" to CombatMacroModule.slayerQuestsFailedDisplay,
+        "Fails/hr" to CombatMacroModule.slayerQuestFailsPerHourDisplay,
+      )
+    }
+    return rows
+  }
 
   val combatHud = hudElement("combat-hud", "Combat HUD", "Tracks combat macro status") {
     anchor  = HudAnchor.TOP_LEFT

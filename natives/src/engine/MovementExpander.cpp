@@ -3,6 +3,9 @@
 
 static const int DX4[] = {1,-1,0,0};
 static const int DZ4[] = {0,0,1,-1};
+static const int DX_DIAGONAL[] = {1, 1, -1, -1};
+static const int DZ_DIAGONAL[] = {1, -1, 1, -1};
+static constexpr float DIAGONAL_COST_SCALE = 1.41421356f;
 
 MovementExpander::MovementExpander(const WorldAccessor& w, const MovementCosts& c)
     : world_(w), costs_(c) {}
@@ -41,19 +44,61 @@ void MovementExpander::addWalkSprint(const Vec3i& from, std::vector<PathNode>& o
         float base = lowCeiling ? costs_.walk : costs_.sprint;
         out.push_back({{nx, from.y, nz}, act, base + adjacentCost({nx, from.y, nz}) + clearanceCost({nx, from.y, nz})});
     }
-}
-
-void MovementExpander::addJumps(const Vec3i& from, std::vector<PathNode>& out) const {
-    // Step up 1 block
+    // Micro step-up: walk/sprint onto half-height blocks (slabs etc.) without jumping.
+    // Minecraft auto-steps blocks up to 0.5 high; no explicit jump input is needed.
     for (int i = 0; i < 4; i++) {
         int nx = from.x + DX4[i], nz = from.z + DZ4[i];
         int ny = from.y + 1;
-        if (!world_.isSolid(nx, ny - 1, nz)) continue;
+        if (world_.getBlock(nx, from.y, nz) != BT_STEP) continue;
         if (!clearanceOk(nx, ny, nz)) continue;
-        // clearanceCost intentionally omitted for jumps — landing geometry differs from corridor walking
-        out.push_back({{nx, ny, nz}, ActionType::JUMP, costs_.jump + adjacentCost({nx, ny, nz})});
+        bool lowCeiling = !world_.isPassable(nx, ny + 2, nz);
+        ActionType act = lowCeiling ? ActionType::WALK : ActionType::SPRINT;
+        float base = lowCeiling ? costs_.walk : costs_.sprint;
+        out.push_back({{nx, ny, nz}, act, base + adjacentCost({nx, ny, nz}) + clearanceCost({nx, ny, nz})});
     }
-    // Sprint-jump gap (2–4 blocks)
+
+    for (int i = 0; i < 4; i++) {
+        int stepX = DX_DIAGONAL[i];
+        int stepZ = DZ_DIAGONAL[i];
+        int nx = from.x + stepX;
+        int nz = from.z + stepZ;
+
+        if (!world_.isWalkable(nx, from.y - 1, nz)) continue;
+        if (!clearanceOk(nx, from.y, nz)) continue;
+
+        int sideAX = from.x + stepX;
+        int sideAZ = from.z;
+        int sideBX = from.x;
+        int sideBZ = from.z + stepZ;
+        if (!world_.isWalkable(sideAX, from.y - 1, sideAZ) || !clearanceOk(sideAX, from.y, sideAZ)) continue;
+        if (!world_.isWalkable(sideBX, from.y - 1, sideBZ) || !clearanceOk(sideBX, from.y, sideBZ)) continue;
+
+        bool lowCeiling = !world_.isPassable(nx, from.y + 2, nz);
+        ActionType act = lowCeiling ? ActionType::WALK : ActionType::SPRINT;
+        float base = (lowCeiling ? costs_.walk : costs_.sprint) * DIAGONAL_COST_SCALE;
+        out.push_back({{nx, from.y, nz}, act, base + adjacentCost({nx, from.y, nz}) + clearanceCost({nx, from.y, nz})});
+    }
+}
+
+void MovementExpander::addJumps(const Vec3i& from, std::vector<PathNode>& out) const {
+    // Player head sweeps through from.y+2 during any jump arc — no jumps under a ceiling.
+    const bool launchClear = world_.isPassable(from.x, from.y + 2, from.z);
+
+    // Step up 1 block — only for full-height solid blocks (BT_SOLID).
+    // BT_STEP (slabs) are handled as walk/sprint step-ups in addWalkSprint.
+    if (launchClear) {
+        for (int i = 0; i < 4; i++) {
+            int nx = from.x + DX4[i], nz = from.z + DZ4[i];
+            int ny = from.y + 1;
+            if (world_.getBlock(nx, ny - 1, nz) != BT_SOLID) continue;
+            if (!clearanceOk(nx, ny, nz)) continue;
+            // clearanceCost intentionally omitted for jumps - landing geometry differs from corridor walking
+            out.push_back({{nx, ny, nz}, ActionType::JUMP, costs_.jump + adjacentCost({nx, ny, nz})});
+        }
+    }
+
+    // Sprint-jump gap (2-4 blocks) — also requires launch clearance.
+    if (!launchClear) return;
     for (int i = 0; i < 4; i++) {
         for (int dist = 2; dist <= 4; dist++) {
             int nx = from.x + DX4[i] * dist, nz = from.z + DZ4[i] * dist;
@@ -62,7 +107,8 @@ void MovementExpander::addJumps(const Vec3i& from, std::vector<PathNode>& out) c
             bool gapClear = true;
             for (int d = 1; d < dist && gapClear; d++) {
                 int mx = from.x + DX4[i]*d, mz = from.z + DZ4[i]*d;
-                gapClear = world_.isPassable(mx, from.y, mz);
+                // Check both feet and head clearance through the mid-gap columns.
+                gapClear = world_.isPassable(mx, from.y, mz) && world_.isPassable(mx, from.y + 1, mz);
             }
             if (!gapClear) break;
             float c = (float)dist + costs_.sprintJump + adjacentCost({nx, from.y, nz});
@@ -82,7 +128,7 @@ void MovementExpander::addFall(const Vec3i& from, std::vector<PathNode>& out) co
         int drop = from.y - landY;
         if (drop <= 0 || drop > 23) continue;
         float c = drop * costs_.fall + adjacentCost({nx, landY, nz});
-        // clearanceCost intentionally omitted for falls — landing clearance less critical for centering
+        // clearanceCost intentionally omitted for falls - landing clearance less critical for centering
         out.push_back({{nx, landY, nz}, ActionType::FALL, c});
     }
 }
@@ -140,7 +186,7 @@ std::vector<PathNode> MovementExpander::expand(const Vec3i& from) const {
     addFall(from, out);
     addLadder(from, out);
     addSwim(from, out);
-    addAOTV(from, out);
-    addEtherwarp(from, out);
+    // Native consumers only have universal execution for locomotion edges.
+    // Keep teleport actions out of the planner until they are handled by every caller.
     return out;
 }

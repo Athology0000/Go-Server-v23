@@ -10,6 +10,7 @@ import org.cobalt.internal.loader.AddonLoader
 import org.cobalt.internal.mining.AutoLanternModule
 import org.cobalt.internal.mining.CommissionHudModule
 import org.cobalt.internal.mining.CommissionMacroModule
+import org.cobalt.internal.mining.MiningHudModule
 import org.cobalt.internal.mining.FairyModule
 import org.cobalt.internal.mining.MiningMacroModule
 import org.cobalt.internal.mining.MiningModule
@@ -100,11 +101,11 @@ internal class UIAddonList : UIPanel(
     entries.addAll(AddonLoader.getAddons().map { UIAddonEntry(it.first, it.second) })
 
     val addonModules = AddonLoader.getAddons().flatMap { it.second.getModules() }.toSet()
-    val builtinModules = ModuleManager.getModules().filter { it !in addonModules }
+    val builtinModules = ModuleManager.getModules().filter { it !in addonModules && it != CommissionHudModule }
 
     val miningModules = builtinModules.filter {
-      it == MiningModule || it == MiningMacroModule || it == FairyModule ||
-        it == RoutesModule || it == CommissionMacroModule || it == CommissionHudModule ||
+      it == MiningModule || it == MiningHudModule || it == MiningMacroModule || it == FairyModule ||
+        it == RoutesModule || it == CommissionMacroModule ||
         it == VeinDirectionModule || it == AutoLanternModule
     }
 
@@ -133,8 +134,8 @@ internal class UIAddonList : UIPanel(
       .map { it.metadata.version.friendlyString }
       .orElse("builtin")
 
-    // Added in reverse display order (each add(0, …) pushes to front).
-    // Final display order: Mining → Combat → Visuals → Core → external addons
+    // Added in reverse display order (each add(0, ...) pushes to front).
+    // Final display order: Mining -> Combat -> Visuals -> Core -> external addons
 
     if (coreModules.isNotEmpty()) {
       val meta = AddonMetadata("cobalt", "Core", version, emptyList(), emptyList())
