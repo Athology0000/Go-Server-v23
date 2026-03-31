@@ -1154,9 +1154,11 @@ object CombatMacroModule : Module("Combat Macro") {
     val currentLevel = mc.level
     if (currentLevel !== lastKnownLevel) {
       if (lastKnownLevel != null && (enabled.value || slayerModeEnabled)) {
+        val wasSlayerActive = slayerModeEnabled
+        val hasWalkbackRoute = walkbackRouteForCurrentType().value.isNotBlank()
         stopMacro()
         enteredFarmingArea = false
-        if (slayerModeEnabled && walkbackRouteForCurrentType().value.isNotBlank()) {
+        if (wasSlayerActive && hasWalkbackRoute) {
           slayerNeedsWalkback = true
           slayerWalkbackJustFarm = false
           ChatUtils.sendMessage("Combat macro: server change detected, will walk back on reconnect.")
