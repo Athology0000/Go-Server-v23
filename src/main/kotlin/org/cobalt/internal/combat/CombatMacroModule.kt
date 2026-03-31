@@ -55,6 +55,7 @@ import org.cobalt.internal.pathfinding.PathfindingModule
 import org.cobalt.internal.helper.WalkbackBridge
 import org.cobalt.internal.rotation.RotationsModule
 import org.cobalt.internal.ui.hud.WalkbackRoutePickerPopup
+import org.cobalt.internal.ui.panel.panels.UIModuleList
 
 object CombatMacroModule : Module("Combat Macro") {
 
@@ -1078,6 +1079,14 @@ object CombatMacroModule : Module("Combat Macro") {
     slayerBossNotification.inGroup(TAB_SLAYER_GROUP)
     slayerBossEsp.inGroup(TAB_SLAYER_GROUP)
     slayerEspTargets.inGroup(TAB_SLAYER_GROUP)
+
+    // Backing route settings — persisted but hidden from UI (rendered via action buttons above)
+    zombieWalkbackRoute.inGroup(UIModuleList.SIDE_GROUP)
+    wolfWalkbackRoute.inGroup(UIModuleList.SIDE_GROUP)
+    spiderWalkbackRoute.inGroup(UIModuleList.SIDE_GROUP)
+    endermanWalkbackRoute.inGroup(UIModuleList.SIDE_GROUP)
+    vampireWalkbackRoute.inGroup(UIModuleList.SIDE_GROUP)
+    blazeWalkbackRoute.inGroup(UIModuleList.SIDE_GROUP)
 
     // Slayer Weapons — per-type locations and weapon swap configurations
     sepZombie.inGroup(TAB_SLAYER_WEAPONS_GROUP)
@@ -3795,9 +3804,10 @@ object CombatMacroModule : Module("Combat Macro") {
     stuckRepathCount = 0
     RotationExecutor.stopRotating()
     MovementManager.clearForcedMovement()
+    val perTypeRoute = walkbackRouteForCurrentType().value.trim()
     val routeName = when {
       slayerLocation.value == 1 -> CRYPT_WALKBACK_ROUTE_NAME
-      walkbackRouteForCurrentType().value.isNotBlank() -> walkbackRouteForCurrentType().value.trim()
+      perTypeRoute.isNotBlank() -> perTypeRoute
       else -> ""
     }
     if (routeName.isBlank()) {
