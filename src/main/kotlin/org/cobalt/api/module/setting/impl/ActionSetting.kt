@@ -12,14 +12,12 @@ class ActionSetting(
   name: String,
   description: String,
   staticLabel: String,
-  buttonLabelProvider: (() -> String)? = null,
-  onClick: () -> Unit,
+  private val buttonLabelProvider: (() -> String)? = null,
+  private val onClick: () -> Unit,
 ) : Setting<Boolean>(name, description, false) {
 
   private val _staticLabel = staticLabel
-  private val _buttonLabelProvider = buttonLabelProvider
-  private val _onClick = onClick
-  val buttonLabel: String get() = _buttonLabelProvider?.invoke() ?: _staticLabel
+  val buttonLabel: String get() = buttonLabelProvider?.invoke() ?: _staticLabel
 
   override val defaultValue: Boolean = false
 
@@ -32,6 +30,6 @@ class ActionSetting(
   }
 
   fun trigger() {
-    _onClick()
+    onClick()
   }
 }
