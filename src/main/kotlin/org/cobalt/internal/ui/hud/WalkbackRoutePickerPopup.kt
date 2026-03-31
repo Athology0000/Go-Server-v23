@@ -39,15 +39,25 @@ internal object WalkbackRoutePickerPopup {
     slayerTypeName = typeName
     targetSetting = setting
     routes = RoutesModule.getSavedRouteInfos()
-    scroll.setMaxScroll(0f, 0f) // reset scroll
+    scroll.reset()
     visible = true
   }
 
   fun isVisible(): Boolean = visible
 
+  fun mouseScrolled(horizontalAmount: Double, verticalAmount: Double): Boolean {
+    if (!visible) return false
+    if (isHoveringOver(panelX, panelY, PANEL_W, PANEL_H)) {
+      scroll.handleScroll(verticalAmount)
+      return true
+    }
+    return false
+  }
+
   private fun close() {
     visible = false
     targetSetting = null
+    routes = emptyList()
   }
 
   @SubscribeEvent
@@ -134,7 +144,7 @@ internal object WalkbackRoutePickerPopup {
     }
 
     // Route rows
-    if (!routes.isEmpty()) {
+    if (routes.isNotEmpty()) {
       val contentY = routeListTop()
       val offset = scroll.getOffset()
       routes.forEachIndexed { i, route ->

@@ -11,13 +11,12 @@ import org.cobalt.api.module.setting.Setting
 class ActionSetting(
   name: String,
   description: String,
-  staticLabel: String,
+  private val staticLabel: String,
   private val buttonLabelProvider: (() -> String)? = null,
   private val onClick: () -> Unit,
 ) : Setting<Boolean>(name, description, false) {
 
-  private val _staticLabel = staticLabel
-  val buttonLabel: String get() = buttonLabelProvider?.invoke() ?: _staticLabel
+  val buttonLabel: String get() = buttonLabelProvider?.invoke() ?: staticLabel
 
   override val defaultValue: Boolean = false
 

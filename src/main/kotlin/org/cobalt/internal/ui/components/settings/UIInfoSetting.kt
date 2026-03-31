@@ -10,11 +10,13 @@ internal class UIInfoSetting(private val setting: InfoSetting) : UIComponent(
   x = 0F,
   y = 0F,
   width = 627.5F,
-  height = 60F,
+  height = if (setting.type == InfoType.SEPARATOR) 32F else 60F,
 ) {
 
   private fun getColors(): Triple<Int, Int, Int> {
     return when (setting.type) {
+      InfoType.SEPARATOR -> Triple(0x00000000, ThemeManager.currentTheme.textDisabled, ThemeManager.currentTheme.textDisabled)
+
       InfoType.INFO -> Triple(
         ThemeManager.currentTheme.infoBackground,
         ThemeManager.currentTheme.infoBorder,
@@ -43,6 +45,7 @@ internal class UIInfoSetting(private val setting: InfoSetting) : UIComponent(
 
   private fun getIcon(): String {
     return when (setting.type) {
+      InfoType.SEPARATOR -> ""
       InfoType.INFO -> "/assets/cobalt/textures/ui/info.svg"
       InfoType.WARNING -> "/assets/cobalt/textures/ui/warning.svg"
       InfoType.SUCCESS -> "/assets/cobalt/textures/ui/checkmark.svg"
@@ -51,6 +54,22 @@ internal class UIInfoSetting(private val setting: InfoSetting) : UIComponent(
   }
 
   override fun render() {
+    if (setting.type == InfoType.SEPARATOR) {
+      val cy = y + height / 2F
+      val label = setting.name
+      if (label.isEmpty()) {
+        NVGRenderer.line(x, cy, x + width, cy, 1F, ThemeManager.currentTheme.textDisabled)
+      } else {
+        val textW = NVGRenderer.textWidth(label, 11F)
+        val gap = 8F
+        val lineY = cy
+        NVGRenderer.line(x, lineY, x + (width - textW) / 2F - gap, lineY, 1F, ThemeManager.currentTheme.textDisabled)
+        NVGRenderer.text(label, x + (width - textW) / 2F, cy - 6F, 11F, ThemeManager.currentTheme.textSecondary)
+        NVGRenderer.line(x + (width + textW) / 2F + gap, lineY, x + width, lineY, 1F, ThemeManager.currentTheme.textDisabled)
+      }
+      return
+    }
+
     val (bgColor, borderColor, iconColor) = getColors()
 
     NVGRenderer.rect(x, y, width, height, bgColor, 10F)
