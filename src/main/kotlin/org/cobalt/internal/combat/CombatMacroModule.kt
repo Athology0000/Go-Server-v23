@@ -935,6 +935,9 @@ object CombatMacroModule : Module("Combat Macro") {
    *  The outside-crypt recovery check only fires when this is true, preventing the startup spam
    *  loop where the player warps to hub and the check immediately re-triggers before they arrive. */
   private var slayerEnteredCrypt = false
+  /** True once the player has been confirmed near a patrol point since the last macro start or walkback.
+   *  Used to detect area-exit (teleport/push) and trigger walkback for non-crypt slayer types. */
+  private var enteredFarmingArea = false
   private var wandWasInHotbar = false
   private var zombieSwordWasInHotbar = false
   private var overfluxWasInHotbar = false
@@ -1146,12 +1149,20 @@ object CombatMacroModule : Module("Combat Macro") {
       cryptZombieSlayer.value = !cryptZombieSlayer.value
     }
 
-    // Server-switch detection: if level instance changes while macro is active, stop everything.
+    // Server-switch detection: if level instance changes while macro is active, stop pathfinding
+    // and queue a walkback so the player returns to the farming area on reconnect.
     val currentLevel = mc.level
     if (currentLevel !== lastKnownLevel) {
       if (lastKnownLevel != null && (enabled.value || slayerModeEnabled)) {
         stopMacro()
-        ChatUtils.sendMessage("Combat macro stopped: server change detected.")
+        enteredFarmingArea = false
+        if (slayerModeEnabled && walkbackRouteForCurrentType().value.isNotBlank()) {
+          slayerNeedsWalkback = true
+          slayerWalkbackJustFarm = false
+          ChatUtils.sendMessage("Combat macro: server change detected, will walk back on reconnect.")
+        } else {
+          ChatUtils.sendMessage("Combat macro stopped: server change detected.")
+        }
       }
       lastKnownLevel = currentLevel
     }
@@ -1210,6 +1221,7 @@ object CombatMacroModule : Module("Combat Macro") {
       beginSlayerQuestDetection(mc.level?.gameTime ?: -1L)
       slayerRagnarokUsedPreBoss = false
       slayerEnteredCrypt = false
+      enteredFarmingArea = false
       slayerLastBatphoneAttemptTick = -1L
       slayerLastBatphoneUseTick = -1L
       slayerLastGuiActionTick = -1L
@@ -1288,6 +1300,7 @@ object CombatMacroModule : Module("Combat Macro") {
         } else {
           slayerNeedsWalkback = false
           startAreaOrigin = null
+          enteredFarmingArea = false
           if (slayerWalkbackJustFarm) {
             slayerWalkbackJustFarm = false
             // Walkback complete - ensure quest detection runs for fresh quest
@@ -1319,7 +1332,7 @@ object CombatMacroModule : Module("Combat Macro") {
     }
 
     if (player.isDeadOrDying || player.health <= 0f) {
-      if (cryptZombieSlayer.value && !slayerDeathRespawnPending) {
+      if (slayerModeEnabled && !slayerDeathRespawnPending) {
         // Slayer: don't stop - queue walkback for when the player respawns.
         slayerDeathRespawnPending = true
         if (CombatPatrolModule.isPatrolRunning) CombatPatrolModule.stopPatrol()
@@ -1375,6 +1388,27 @@ object CombatMacroModule : Module("Combat Macro") {
         return
       }
       // If !inCrypt && !slayerEnteredCrypt: still making initial walk-in, do nothing here
+    }
+    // For non-crypt slayer types: track area entry/exit using patrol points.
+    if (cryptZombieSlayer.value && slayerLocation.value != 1
+      && CombatPatrolModule.patrolPoints.isNotEmpty()
+      && walkbackRouteForCurrentType().value.isNotBlank()) {
+      val pos = player.blockPosition()
+      val nearAnyPoint = CombatPatrolModule.patrolPoints.any { p ->
+        val dx = p.x - pos.x; val dz = p.z - pos.z
+        dx * dx + dz * dz < GRAVEYARD_PROXIMITY_RANGE_SQ
+      }
+      if (nearAnyPoint) {
+        enteredFarmingArea = true
+      } else if (enteredFarmingArea && !slayerBossActive
+        && WalkbackBridge.isRunning?.invoke() != true
+        && !slayerNeedsWalkback && !slayerDeathRespawnPending) {
+        ChatUtils.sendMessage("Combat macro: left farming area, walking back.")
+        enteredFarmingArea = false
+        startAreaOrigin = null
+        triggerWalkToFarmArea(justFarm = false)
+        return
+      }
     }
     // Walkback owns pathfinding - yield before enforceStartArea can override it.
     if (slayerNeedsWalkback && WalkbackBridge.isRunning?.invoke() == true && !slayerBossActive) {
@@ -3877,6 +3911,7 @@ object CombatMacroModule : Module("Combat Macro") {
     lastHealUseTick = 0L
     stuckRepathCount = 0
     startAreaOrigin = null
+    enteredFarmingArea = false
     if (pendingHealRelease) {
       mc.options.keyUse?.setDown(false)
       pendingHealRelease = false
