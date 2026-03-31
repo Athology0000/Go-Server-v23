@@ -29,12 +29,14 @@ import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.InfoSetting
 import org.cobalt.api.module.setting.impl.InfoType
 import org.cobalt.api.module.setting.impl.ModeSetting
+import org.cobalt.api.module.setting.impl.KeyBindSetting
 import org.cobalt.api.module.setting.impl.SliderSetting
 import org.cobalt.api.module.setting.impl.TextSetting
+import org.cobalt.api.util.helper.KeyBind
 import org.cobalt.api.notification.NotificationManager
+import org.cobalt.api.rotation.IRotationStrategy
 import org.cobalt.api.rotation.EasingType
 import org.cobalt.api.rotation.RotationExecutor
-import org.cobalt.api.rotation.strategy.BezierTrackingRotationStrategy
 import org.cobalt.api.rotation.strategy.TimedEaseStrategy
 import org.cobalt.api.util.AngleUtils
 import org.cobalt.api.util.ChatUtils
@@ -52,18 +54,128 @@ import org.cobalt.api.util.player.MovementManager
 import org.cobalt.internal.pathfinding.PathfindingModule
 import org.cobalt.internal.helper.WalkbackBridge
 import org.cobalt.internal.rotation.RotationsModule
+import org.cobalt.internal.ui.hud.WalkbackRoutePickerPopup
 
 object CombatMacroModule : Module("Combat Macro") {
 
   private val mc: Minecraft = Minecraft.getInstance()
-  private val rotationStrategy = BezierTrackingRotationStrategy(
-    yawStepSampler = { (RotationsModule.sample(RotationsModule.combatYawStep.value) * COMBAT_ROTATION_STEP_SCALE).toFloat() },
-    pitchStepSampler = { (RotationsModule.sample(RotationsModule.combatPitchStep.value) * COMBAT_ROTATION_STEP_SCALE).toFloat() },
-    curveInProvider = { RotationsModule.bezierCurveIn.value.toFloat() },
-    curveOutProvider = { RotationsModule.bezierCurveOut.value.toFloat() },
-    minScaleProvider = { RotationsModule.bezierMinScale.value.toFloat() },
-    snapThresholdProvider = { RotationsModule.bezierSnapThreshold.value.toFloat() },
-  )
+  private val rotationStrategy = object : IRotationStrategy {
+    private var sampledYawStep = 0f
+    private var sampledPitchStep = 0f
+    private var lastSampleNs = 0L
+    private var lastRotateNs = 0L
+    private var lastTargetYaw = Float.NaN
+    private var lastTargetPitch = Float.NaN
+
+    override fun onStart() {
+      sampledYawStep = 0f
+      sampledPitchStep = 0f
+      lastSampleNs = 0L
+      lastRotateNs = 0L
+      lastTargetYaw = Float.NaN
+      lastTargetPitch = Float.NaN
+      refreshSamples(0f, 0f, force = true)
+    }
+
+    override fun onStop() {
+      lastRotateNs = 0L
+      lastTargetYaw = Float.NaN
+      lastTargetPitch = Float.NaN
+    }
+
+    override fun onRotate(player: LocalPlayer, targetYaw: Float, targetPitch: Float): Rotation {
+      refreshSamples(targetYaw, targetPitch)
+
+      val frameScale = currentFrameScale()
+      val effectiveCurveIn = RotationsModule.bezierCurveIn.value.toFloat()
+      val effectiveCurveOut = RotationsModule.bezierCurveOut.value.toFloat()
+      val effectiveMinScale = RotationsModule.bezierMinScale.value.toFloat()
+      val effectiveSnap = RotationsModule.bezierSnapThreshold.value.toFloat().coerceAtMost(COMBAT_MAX_SNAP_THRESHOLD)
+
+      val yawDelta = AngleUtils.getRotationDelta(player.yRot, targetYaw)
+      val pitchDelta = targetPitch - player.xRot
+      val angularScale = stepScaleForDelta(abs(yawDelta), abs(pitchDelta))
+      val nextYaw =
+        player.yRot + smoothStep(
+          yawDelta,
+          sampledYawStep * frameScale * angularScale,
+          effectiveCurveIn,
+          effectiveCurveOut,
+          effectiveMinScale,
+          effectiveSnap,
+        )
+      val nextPitch =
+        (
+          player.xRot + smoothStep(
+            pitchDelta,
+            sampledPitchStep * frameScale * angularScale,
+            effectiveCurveIn,
+            effectiveCurveOut,
+            effectiveMinScale,
+            effectiveSnap,
+          )
+          ).coerceIn(-90f, 90f)
+      return Rotation(nextYaw, nextPitch)
+    }
+
+    private fun refreshSamples(targetYaw: Float, targetPitch: Float, force: Boolean = false) {
+      val now = System.nanoTime()
+      val targetShifted =
+        lastTargetYaw.isNaN() ||
+          abs(AngleUtils.getRotationDelta(lastTargetYaw, targetYaw)) >= COMBAT_ROTATION_RESEED_YAW ||
+          abs(targetPitch - lastTargetPitch) >= COMBAT_ROTATION_RESEED_PITCH
+      if (force || lastSampleNs == 0L || now - lastSampleNs >= COMBAT_ROTATION_SAMPLE_NS || targetShifted) {
+        sampledYawStep = (RotationsModule.sample(RotationsModule.combatYawStep.value) * COMBAT_ROTATION_STEP_SCALE).toFloat()
+        sampledPitchStep = (RotationsModule.sample(RotationsModule.combatPitchStep.value) * COMBAT_ROTATION_STEP_SCALE).toFloat()
+        lastSampleNs = now
+      }
+      lastTargetYaw = targetYaw
+      lastTargetPitch = targetPitch
+    }
+
+    private fun currentFrameScale(): Float {
+      val now = System.nanoTime()
+      val dt =
+        if (lastRotateNs == 0L) {
+          1f / COMBAT_ROTATION_BASE_HZ
+        } else {
+          ((now - lastRotateNs) / 1_000_000_000.0f).coerceIn(1f / 240f, 0.1f)
+        }
+      lastRotateNs = now
+      return (dt * COMBAT_ROTATION_BASE_HZ).coerceIn(COMBAT_ROTATION_MIN_FRAME_SCALE, COMBAT_ROTATION_MAX_FRAME_SCALE)
+    }
+
+    private fun stepScaleForDelta(yawDelta: Float, pitchDelta: Float): Float {
+      val maxDelta = max(yawDelta, pitchDelta)
+      return (0.42f + (maxDelta / 65f).coerceIn(0f, 1f) * 0.58f)
+    }
+
+    private fun smoothStep(
+      delta: Float,
+      maxStep: Float,
+      curveIn: Float,
+      curveOut: Float,
+      minScale: Float,
+      snapThreshold: Float,
+    ): Float {
+      val absDelta = abs(delta)
+      if (absDelta < snapThreshold) {
+        return delta
+      }
+      val safeMaxStep = maxStep.coerceAtLeast(0.01f)
+      val stepLimit = min(absDelta, safeMaxStep)
+      val t = (absDelta / safeMaxStep).coerceIn(0f, 1f)
+      val eased = cubicBezier(t, curveIn, curveOut)
+      val scale = minScale + (1f - minScale) * eased
+      val step = stepLimit * scale
+      return if (delta < 0f) -step else step
+    }
+
+    private fun cubicBezier(t: Float, p1: Float, p2: Float): Float {
+      val inv = 1f - t
+      return (3f * inv * inv * t * p1) + (3f * inv * t * t * p2) + (t * t * t)
+    }
+  }
   private val builtInBlacklistedNames = setOf(
     "blacksmith",
     "click",
@@ -135,6 +247,18 @@ object CombatMacroModule : Module("Combat Macro") {
     false
   )
 
+  private val toggleKeybind = KeyBindSetting(
+    "Toggle Keybind",
+    "Key to start/stop the combat macro.",
+    KeyBind(-1)
+  )
+
+  private val slayerToggleKeybind = KeyBindSetting(
+    "Slayer Toggle Keybind",
+    "Key to start/stop the slayer macro.",
+    KeyBind(-1)
+  )
+
   private val info = InfoSetting(
     "Target",
     "Set a target name (partial match). Leave blank to target nearest mob.",
@@ -182,10 +306,51 @@ object CombatMacroModule : Module("Combat Macro") {
   )
 
   private val slayerLocation = ModeSetting(
-    "Location",
-    "Farming location for zombie slayer.",
+    "Zombie Location",
+    "Farming location for Zombie Slayer.",
     0,
     arrayOf("Zombie Graveyard", "Zombie Crypt")
+  )
+
+  private val wolfLocation = ModeSetting(
+    "Wolf Location",
+    "Farming location for Wolf Slayer.",
+    0,
+    arrayOf("Park", "Caves", "Castle")
+  )
+
+  private val spiderLocation = ModeSetting(
+    "Spider Location",
+    "Farming location for Spider Slayer.",
+    0,
+    arrayOf("Spider's Den", "Crimson Isle")
+  )
+
+  private val endermanLocation = ModeSetting(
+    "Enderman Location",
+    "Farming location for Enderman Slayer.",
+    0,
+    arrayOf("The End", "Hideout", "Void Sepulchre")
+  )
+
+  private val endermanVoidWarp = CheckboxSetting(
+    "Warp To Void",
+    "Run /warp void when starting Enderman Slayer at Void Sepulchre.",
+    true
+  )
+
+  private val vampireLocation = ModeSetting(
+    "Vampire Location",
+    "Farming location for Vampire Slayer.",
+    0,
+    arrayOf("Wyld Woods")
+  )
+
+  private val blazeLocation = ModeSetting(
+    "Blaze Location",
+    "Farming location for Blaze Slayer.",
+    0,
+    arrayOf("Blazing Fortress")
   )
 
   private val slayerBossNotification = CheckboxSetting(
@@ -207,11 +372,50 @@ object CombatMacroModule : Module("Combat Macro") {
     arrayOf("Boss", "MiniBoss", "Both")
   )
 
-  private val slayerWalkbackRoute = TextSetting(
-    "Walkback Route",
-    "Route name to follow back to farming area after boss kill (if Auto Warp is off). Leave blank to skip.",
-    ""
-  )
+  // Per-type walkback route backing settings (persisted; not rendered directly — shown via action buttons below)
+  private val zombieWalkbackRoute   = TextSetting("Zombie Walkback Route",   "", "")
+  private val wolfWalkbackRoute     = TextSetting("Wolf Walkback Route",     "", "")
+  private val spiderWalkbackRoute   = TextSetting("Spider Walkback Route",   "", "")
+  private val endermanWalkbackRoute = TextSetting("Enderman Walkback Route", "", "")
+  private val vampireWalkbackRoute  = TextSetting("Vampire Walkback Route",  "", "")
+  private val blazeWalkbackRoute    = TextSetting("Blaze Walkback Route",    "", "")
+
+  /** Returns the backing TextSetting for the currently selected slayer type. */
+  private fun walkbackRouteForCurrentType(): TextSetting = when (slayerType.value) {
+    0 -> zombieWalkbackRoute
+    1 -> wolfWalkbackRoute
+    2 -> spiderWalkbackRoute
+    3 -> endermanWalkbackRoute
+    4 -> vampireWalkbackRoute
+    5 -> blazeWalkbackRoute
+    else -> zombieWalkbackRoute
+  }
+
+  // Per-type walkback route action buttons (open route picker popup)
+  private val zombieWalkbackAction = ActionSetting(
+    "Walkback Route", "Route to follow back to farming area after boss kill.",
+    "None", { zombieWalkbackRoute.value.ifBlank { "None" } }
+  ) { WalkbackRoutePickerPopup.open("Zombie", zombieWalkbackRoute) }
+  private val wolfWalkbackAction = ActionSetting(
+    "Walkback Route", "Route to follow back to farming area after boss kill.",
+    "None", { wolfWalkbackRoute.value.ifBlank { "None" } }
+  ) { WalkbackRoutePickerPopup.open("Wolf", wolfWalkbackRoute) }
+  private val spiderWalkbackAction = ActionSetting(
+    "Walkback Route", "Route to follow back to farming area after boss kill.",
+    "None", { spiderWalkbackRoute.value.ifBlank { "None" } }
+  ) { WalkbackRoutePickerPopup.open("Spider", spiderWalkbackRoute) }
+  private val endermanWalkbackAction = ActionSetting(
+    "Walkback Route", "Route to follow back to farming area after boss kill.",
+    "None", { endermanWalkbackRoute.value.ifBlank { "None" } }
+  ) { WalkbackRoutePickerPopup.open("Enderman", endermanWalkbackRoute) }
+  private val vampireWalkbackAction = ActionSetting(
+    "Walkback Route", "Route to follow back to farming area after boss kill.",
+    "None", { vampireWalkbackRoute.value.ifBlank { "None" } }
+  ) { WalkbackRoutePickerPopup.open("Vampire", vampireWalkbackRoute) }
+  private val blazeWalkbackAction = ActionSetting(
+    "Walkback Route", "Route to follow back to farming area after boss kill.",
+    "None", { blazeWalkbackRoute.value.ifBlank { "None" } }
+  ) { WalkbackRoutePickerPopup.open("Blaze", blazeWalkbackRoute) }
 
   // -- Patrol settings (mirror of Combat Patrol module, settable from slayer tab) ---------------
   private val patrolRouteNameProxy = TextSetting(
@@ -319,6 +523,12 @@ object CombatMacroModule : Module("Combat Macro") {
     false
   )
 
+  private val autoReaperScythe = CheckboxSetting(
+    "Reaper Scythe",
+    "Use Reaper Scythe once when the Slayer boss is active. Auto-enables when the item is detected in hotbar.",
+    false
+  )
+
   private val oneTapMode = CheckboxSetting(
     "One Tap Mode",
     "Keep moving through mobs - don't stop at each kill. Switch immediately when target dies.",
@@ -396,10 +606,26 @@ object CombatMacroModule : Module("Combat Macro") {
     false
   )
 
+  private val sepZombie = InfoSetting("Zombie", "", InfoType.SEPARATOR)
+  private val sepEnderman = InfoSetting("Enderman", "", InfoType.SEPARATOR)
+  private val sepSpider = InfoSetting("Spider", "", InfoType.SEPARATOR)
+  private val sepWolf = InfoSetting("Wolf", "", InfoType.SEPARATOR)
+  private val sepVampire = InfoSetting("Vampire", "", InfoType.SEPARATOR)
+  private val sepBlaze = InfoSetting("Blaze", "", InfoType.SEPARATOR)
+
   private val swordKeepDistance = SliderSetting(
     "Sword Keep Distance",
     "Preferred stand-off distance in melee mode. Lower = closer. 0 = close in fully.",
     1.8,
+    0.0,
+    6.0,
+    step = 0.1
+  )
+
+  private val slayerSwordKeepDistance = SliderSetting(
+    "Slayer Sword Keep Distance",
+    "Preferred stand-off distance in melee mode while the Slayer macro is active. Lower = closer. 0 = close in fully.",
+    0.0,
     0.0,
     6.0,
     step = 0.1
@@ -672,9 +898,11 @@ object CombatMacroModule : Module("Combat Macro") {
   private var slayerBossLastSeenTick = 0L
   private var slayerOverfluxUsedThisBoss = false
   private var slayerRagnarokUsedThisBoss = false
+  private var slayerReaperScytheUsedThisBoss = false
   private var slayerLastBadHealthUseTick = -1L
   private var slayerLastOverfluxUseTick = -1L
   private var slayerLastRagnarokUseTick = -1L
+  private var slayerLastReaperScytheUseTick = -1L
   private var slayerLastTabScanTick = -1L
   private var slayerTabCache: List<String> = emptyList()
   private var slayerNeedsQuestRestart = false
@@ -710,6 +938,7 @@ object CombatMacroModule : Module("Combat Macro") {
   private var zombieSwordWasInHotbar = false
   private var overfluxWasInHotbar = false
   private var ragnarokWasInHotbar = false
+  private var reaperScytheWasInHotbar = false
   private var badHealthWasInHotbar = false
   private val overfluxLookDownStrategy = TimedEaseStrategy(EasingType.LINEAR, EasingType.LINEAR, 220L)
 
@@ -717,18 +946,30 @@ object CombatMacroModule : Module("Combat Macro") {
     assignSettingGroups()
       addSetting(
         enabled,
+        toggleKeybind,
         info,
         targetName,
         cryptZombieSlayer,
+        slayerToggleKeybind,
         slayerStatus,
         slayerType,
       slayerTier,
       slayerAutoWarp,
-      slayerLocation,
       slayerBossNotification,
       slayerBossEsp,
       slayerEspTargets,
-      slayerWalkbackRoute,
+      zombieWalkbackRoute,
+      wolfWalkbackRoute,
+      spiderWalkbackRoute,
+      endermanWalkbackRoute,
+      vampireWalkbackRoute,
+      blazeWalkbackRoute,
+      zombieWalkbackAction,
+      wolfWalkbackAction,
+      spiderWalkbackAction,
+      endermanWalkbackAction,
+      vampireWalkbackAction,
+      blazeWalkbackAction,
       patrolRouteNameProxy,
       patrolLoadAction,
       patrolSaveAction,
@@ -743,17 +984,31 @@ object CombatMacroModule : Module("Combat Macro") {
       startAreaRadius,
       oneTapMode,
       combatMode,
+      sepZombie,
+      slayerLocation,
       zombieDynamicCombat,
       zombieSpawnWeapon,
       zombieDynamicSword,
+      sepEnderman,
+      endermanLocation,
+      endermanVoidWarp,
       endermanDynamicCombat,
       emanSpawnWeapon,
       emanDynamicSwapRange,
       emanHitPhaseWeapon,
       emanBossWeapon,
+      sepSpider,
+      spiderLocation,
       spiderPhaseBowCombat,
+      sepWolf,
+      wolfLocation,
       wolfIgnorePups,
+      sepVampire,
+      vampireLocation,
+      sepBlaze,
+      blazeLocation,
       swordKeepDistance,
+      slayerSwordKeepDistance,
       bowMinRange,
       bowElevationPerBlock,
       mageElevationPerBlock,
@@ -762,6 +1017,7 @@ object CombatMacroModule : Module("Combat Macro") {
       autoZombieSword,
       autoOverflux,
       autoRagnarok,
+      autoReaperScythe,
       autoSwordOfBadHealth,
       healAtHealth,
       stuckTicksSetting,
@@ -776,74 +1032,111 @@ object CombatMacroModule : Module("Combat Macro") {
       lastKillText
     )
     EventBus.register(this)
+    EventBus.register(WalkbackRoutePickerPopup)
   }
 
   private fun assignSettingGroups() {
-      enabled.inGroup(TAB_COMBAT_GROUP)
-      info.inGroup(TAB_COMBAT_GROUP)
-      targetName.inGroup(TAB_COMBAT_GROUP)
-      searchRange.inGroup(TAB_COMBAT_GROUP)
-      minCps.inGroup(TAB_COMBAT_GROUP)
-      maxCps.inGroup(TAB_COMBAT_GROUP)
-    attackRange.inGroup(TAB_COMBAT_GROUP)
-    chaseStopBuffer.inGroup(TAB_COMBAT_GROUP)
+    // General — enable, targeting, area constraints, whitelist
+    enabled.inGroup(TAB_COMBAT_GROUP)
+    toggleKeybind.inGroup(TAB_COMBAT_GROUP)
+    info.inGroup(TAB_COMBAT_GROUP)
+    targetName.inGroup(TAB_COMBAT_GROUP)
+    searchRange.inGroup(TAB_COMBAT_GROUP)
     stayNearStart.inGroup(TAB_COMBAT_GROUP)
     startAreaRadius.inGroup(TAB_COMBAT_GROUP)
-    stuckTicksSetting.inGroup(TAB_COMBAT_GROUP)
-    warpOnStuck.inGroup(TAB_COMBAT_GROUP)
     requireLos.inGroup(TAB_COMBAT_GROUP)
-    aimTolerance.inGroup(TAB_COMBAT_GROUP)
-    minAttackCooldown.inGroup(TAB_COMBAT_GROUP)
-    stuckRepathTries.inGroup(TAB_COMBAT_GROUP)
     autoLearnLastKill.inGroup(TAB_COMBAT_GROUP)
     whitelistOnly.inGroup(TAB_COMBAT_GROUP)
     learnedWhitelistText.inGroup(TAB_COMBAT_GROUP)
     lastKillText.inGroup(TAB_COMBAT_GROUP)
 
+    // Combat — attack behavior, timing, movement, stuck handling
+    combatMode.inGroup(TAB_COMBAT_BEHAVIOR_GROUP)
+    minCps.inGroup(TAB_COMBAT_BEHAVIOR_GROUP)
+    maxCps.inGroup(TAB_COMBAT_BEHAVIOR_GROUP)
+    attackRange.inGroup(TAB_COMBAT_BEHAVIOR_GROUP)
+    chaseStopBuffer.inGroup(TAB_COMBAT_BEHAVIOR_GROUP)
+    aimTolerance.inGroup(TAB_COMBAT_BEHAVIOR_GROUP)
+    minAttackCooldown.inGroup(TAB_COMBAT_BEHAVIOR_GROUP)
+    oneTapMode.inGroup(TAB_COMBAT_BEHAVIOR_GROUP)
+    swordKeepDistance.inGroup(TAB_COMBAT_BEHAVIOR_GROUP)
+    bowMinRange.inGroup(TAB_COMBAT_BEHAVIOR_GROUP)
+    bowElevationPerBlock.inGroup(TAB_COMBAT_BEHAVIOR_GROUP)
+    mageElevationPerBlock.inGroup(TAB_COMBAT_BEHAVIOR_GROUP)
+    stuckTicksSetting.inGroup(TAB_COMBAT_BEHAVIOR_GROUP)
+    warpOnStuck.inGroup(TAB_COMBAT_BEHAVIOR_GROUP)
+    stuckRepathTries.inGroup(TAB_COMBAT_BEHAVIOR_GROUP)
+
+    // Slayer — quest settings, boss options
     cryptZombieSlayer.inGroup(TAB_SLAYER_GROUP)
+    slayerToggleKeybind.inGroup(TAB_SLAYER_GROUP)
     slayerStatus.inGroup(TAB_SLAYER_GROUP)
     slayerType.inGroup(TAB_SLAYER_GROUP)
     slayerTier.inGroup(TAB_SLAYER_GROUP)
     slayerAutoWarp.inGroup(TAB_SLAYER_GROUP)
+    slayerSwordKeepDistance.inGroup(TAB_SLAYER_GROUP)
     slayerBossNotification.inGroup(TAB_SLAYER_GROUP)
     slayerBossEsp.inGroup(TAB_SLAYER_GROUP)
     slayerEspTargets.inGroup(TAB_SLAYER_GROUP)
 
-    slayerLocation.inGroup(TAB_SLAYER_SETTINGS_GROUP)
-    slayerWalkbackRoute.inGroup(TAB_SLAYER_SETTINGS_GROUP)
-    endermanDynamicCombat.inGroup(TAB_SLAYER_SETTINGS_GROUP)
-    emanSpawnWeapon.inGroup(TAB_SLAYER_SETTINGS_GROUP)
-    emanDynamicSwapRange.inGroup(TAB_SLAYER_SETTINGS_GROUP)
-    emanHitPhaseWeapon.inGroup(TAB_SLAYER_SETTINGS_GROUP)
-    emanBossWeapon.inGroup(TAB_SLAYER_SETTINGS_GROUP)
+    // Slayer Weapons — per-type locations and weapon swap configurations
+    sepZombie.inGroup(TAB_SLAYER_WEAPONS_GROUP)
+    zombieWalkbackAction.inGroup(TAB_SLAYER_WEAPONS_GROUP)
+    slayerLocation.inGroup(TAB_SLAYER_WEAPONS_GROUP)
+    zombieDynamicCombat.inGroup(TAB_SLAYER_WEAPONS_GROUP)
+    zombieSpawnWeapon.inGroup(TAB_SLAYER_WEAPONS_GROUP)
+    zombieDynamicSword.inGroup(TAB_SLAYER_WEAPONS_GROUP)
+    sepEnderman.inGroup(TAB_SLAYER_WEAPONS_GROUP)
+    endermanWalkbackAction.inGroup(TAB_SLAYER_WEAPONS_GROUP)
+    endermanLocation.inGroup(TAB_SLAYER_WEAPONS_GROUP)
+    endermanVoidWarp.inGroup(TAB_SLAYER_WEAPONS_GROUP)
+    endermanDynamicCombat.inGroup(TAB_SLAYER_WEAPONS_GROUP)
+    emanSpawnWeapon.inGroup(TAB_SLAYER_WEAPONS_GROUP)
+    emanDynamicSwapRange.inGroup(TAB_SLAYER_WEAPONS_GROUP)
+    emanHitPhaseWeapon.inGroup(TAB_SLAYER_WEAPONS_GROUP)
+    emanBossWeapon.inGroup(TAB_SLAYER_WEAPONS_GROUP)
+    sepSpider.inGroup(TAB_SLAYER_WEAPONS_GROUP)
+    spiderWalkbackAction.inGroup(TAB_SLAYER_WEAPONS_GROUP)
+    spiderLocation.inGroup(TAB_SLAYER_WEAPONS_GROUP)
+    spiderPhaseBowCombat.inGroup(TAB_SLAYER_WEAPONS_GROUP)
+    sepWolf.inGroup(TAB_SLAYER_WEAPONS_GROUP)
+    wolfWalkbackAction.inGroup(TAB_SLAYER_WEAPONS_GROUP)
+    wolfLocation.inGroup(TAB_SLAYER_WEAPONS_GROUP)
+    wolfIgnorePups.inGroup(TAB_SLAYER_WEAPONS_GROUP)
+    sepVampire.inGroup(TAB_SLAYER_WEAPONS_GROUP)
+    vampireWalkbackAction.inGroup(TAB_SLAYER_WEAPONS_GROUP)
+    vampireLocation.inGroup(TAB_SLAYER_WEAPONS_GROUP)
+    sepBlaze.inGroup(TAB_SLAYER_WEAPONS_GROUP)
+    blazeWalkbackAction.inGroup(TAB_SLAYER_WEAPONS_GROUP)
+    blazeLocation.inGroup(TAB_SLAYER_WEAPONS_GROUP)
+
+    // Patrol
     patrolRouteNameProxy.inGroup(TAB_PATROL_GROUP)
     patrolLoadAction.inGroup(TAB_PATROL_GROUP)
     patrolSaveAction.inGroup(TAB_PATROL_GROUP)
     patrolStartAction.inGroup(TAB_PATROL_GROUP)
     patrolStopAction.inGroup(TAB_PATROL_GROUP)
 
-    oneTapMode.inGroup(TAB_COMBAT_GROUP)
-    combatMode.inGroup(TAB_COMBAT_GROUP)
-    zombieDynamicCombat.inGroup(TAB_COMBAT_GROUP)
-    zombieSpawnWeapon.inGroup(TAB_COMBAT_GROUP)
-    zombieDynamicSword.inGroup(TAB_COMBAT_GROUP)
-    spiderPhaseBowCombat.inGroup(TAB_COMBAT_GROUP)
-    wolfIgnorePups.inGroup(TAB_COMBAT_GROUP)
-    swordKeepDistance.inGroup(TAB_COMBAT_GROUP)
-    bowMinRange.inGroup(TAB_COMBAT_GROUP)
-    bowElevationPerBlock.inGroup(TAB_COMBAT_GROUP)
-    mageElevationPerBlock.inGroup(TAB_COMBAT_GROUP)
+    // Auto Items
     autoHeal.inGroup(TAB_AUTO_ITEMS_GROUP)
     autoWandOfAtonement.inGroup(TAB_AUTO_ITEMS_GROUP)
     autoZombieSword.inGroup(TAB_AUTO_ITEMS_GROUP)
     autoOverflux.inGroup(TAB_AUTO_ITEMS_GROUP)
     autoRagnarok.inGroup(TAB_AUTO_ITEMS_GROUP)
+    autoReaperScythe.inGroup(TAB_AUTO_ITEMS_GROUP)
     autoSwordOfBadHealth.inGroup(TAB_AUTO_ITEMS_GROUP)
     healAtHealth.inGroup(TAB_AUTO_ITEMS_GROUP)
   }
 
   @SubscribeEvent
   fun onTick(@Suppress("UNUSED_PARAMETER") event: TickEvent.Start) {
+    if (toggleKeybind.value.isPressed()) {
+      enabled.value = !enabled.value
+    }
+    if (slayerToggleKeybind.value.isPressed()) {
+      cryptZombieSlayer.value = !cryptZombieSlayer.value
+    }
+
     // Server-switch detection: if level instance changes while macro is active, stop everything.
     val currentLevel = mc.level
     if (currentLevel !== lastKnownLevel) {
@@ -924,7 +1217,7 @@ object CombatMacroModule : Module("Combat Macro") {
         } else {
           slayerEnteredCrypt = true
         }
-      } else if (slayerLocation.value == 0 && slayerWalkbackRoute.value.isNotBlank()
+      } else if (walkbackRouteForCurrentType().value.isNotBlank()
           && CombatPatrolModule.patrolPoints.isNotEmpty()) {
         // Graveyard: check proximity to any patrol point.
         val initPos = mc.player?.blockPosition()
@@ -1127,11 +1420,12 @@ object CombatMacroModule : Module("Combat Macro") {
 
       if (startedPath && nativeActive()) {
         nativeStop()
+      } else {
+        MovementManager.setMovementLock(false)
       }
       startedPath = false
       lastTargetPos = null
       currentTargetId = null
-      MovementManager.clearForcedMovement()
       return
     }
 
@@ -1355,10 +1649,9 @@ object CombatMacroModule : Module("Combat Macro") {
       val living = entity as? LivingEntity ?: continue
       if (!isValidTarget(living, player, blacklisted, "", true, ignoreWhitelist = true)) continue
 
-      val name = normalizedTargetDisplayName(living)
-      val isBoss = isSlayerBossName(name)
-      val isPriority = isSlayerPriorityMobName(name)
-      val isFarmMob = isSlayerFarmMobName(name)
+      val isBoss = isSlayerBossEntity(living)
+      val isPriority = isSlayerPriorityMobEntity(living)
+      val isFarmMob = isSlayerFarmMobEntity(living)
       if (!isBoss && !isPriority && !isFarmMob) continue
 
       if (startOrigin != null && !isBoss) {
@@ -1471,8 +1764,10 @@ object CombatMacroModule : Module("Combat Macro") {
     if (!wasActive) {
       slayerOverfluxUsedThisBoss = false
       slayerRagnarokUsedThisBoss = false
+      slayerReaperScytheUsedThisBoss = false
       slayerLastBadHealthUseTick = -1L
       slayerLastOverfluxUseTick = -1L
+      slayerLastReaperScytheUseTick = -1L
       val bossName = slayerBossDisplayName()
       ChatUtils.sendMessage("Combat macro: $bossName spawned.")
       if (slayerBossNotification.value) {
@@ -1492,9 +1787,11 @@ object CombatMacroModule : Module("Combat Macro") {
     slayerBossLastSeenTick = 0L
     slayerOverfluxUsedThisBoss = false
     slayerRagnarokUsedThisBoss = false
+    slayerReaperScytheUsedThisBoss = false
     slayerRagnarokUsedPreBoss = false
     slayerQuestReady = false
     slayerLastBadHealthUseTick = -1L
+    slayerLastReaperScytheUseTick = -1L
     slayerBossLastPos = null
   }
 
@@ -1515,6 +1812,24 @@ object CombatMacroModule : Module("Combat Macro") {
         slayerRagnarokUsedThisBoss = true
         slayerLastRagnarokUseTick = nowTick
         return
+      }
+    }
+
+    if (autoReaperScythe.value && !slayerReaperScytheUsedThisBoss && nowTick - slayerLastReaperScytheUseTick >= SLAYER_REAPER_SCYTHE_COOLDOWN_TICKS) {
+      val bossTarget = target?.takeIf(::isSlayerBossEntity) ?: resolveNearestSlayerBoss()
+      if (bossTarget != null && player.hasLineOfSight(bossTarget)) {
+        val rotation = AngleUtils.getRotation(bossTarget)
+        RotationExecutor.rotateTo(rotation, rotationStrategy)
+        val yawError = abs(AngleUtils.getRotationDelta(player.yRot, rotation.yaw))
+        val pitchError = abs(rotation.pitch - player.xRot)
+        if (yawError <= REAPER_SCYTHE_USE_AIM_TOLERANCE &&
+          pitchError <= REAPER_SCYTHE_USE_AIM_TOLERANCE &&
+          useHotbarUtilityItem(player, SLAYER_REAPER_SCYTHE_KEYWORDS)
+        ) {
+          slayerReaperScytheUsedThisBoss = true
+          slayerLastReaperScytheUseTick = nowTick
+          return
+        }
       }
     }
 
@@ -1620,7 +1935,7 @@ object CombatMacroModule : Module("Combat Macro") {
   private fun finishSlayerClaim() {
     slayerNeedsQuestClaim = false
     slayerBossLastPos = null
-    val routeName = slayerWalkbackRoute.value.trim()
+    val routeName = walkbackRouteForCurrentType().value.trim()
     if (!slayerAutoWarp.value && routeName.isNotBlank()) {
       if (startedPath && nativeActive()) nativeStop()
       startedPath = false
@@ -1865,7 +2180,10 @@ object CombatMacroModule : Module("Combat Macro") {
 
   private fun applyQuestProgressDetection(line: String, nowTick: Long): Boolean {
     val progress = parseSlayerQuestProgress(line) ?: return false
-    val resolvedTier = progress.tier.takeIf { it in 1..5 } ?: slayerTier.value.toInt().coerceIn(1, 5)
+    val resolvedTier =
+      progress.tier.takeIf { it in 1..5 }
+        ?: slayerTrackedQuestTier.takeIf { slayerTrackedQuestActive && it in 1..5 }
+        ?: slayerTier.value.toInt().coerceIn(1, 5)
     if (!slayerTrackedQuestActive || slayerTrackedQuestCompletionPendingRestart || slayerTrackedQuestType != progress.typeIndex) {
       startTrackedSlayerQuest(progress.typeIndex, resolvedTier)
     }
@@ -1882,13 +2200,24 @@ object CombatMacroModule : Module("Combat Macro") {
     val target = match.groupValues[2].toIntOrNull() ?: return null
     if (target <= 0 || progress !in 0..target) return null
     val detectedType = detectSlayerTypeFromLine(line)
+    val hasTrackedQuestContext = slayerTrackedQuestActive && slayerTrackedQuestType in slayerType.options.indices
     val relevant =
       detectedType >= 0 ||
         line.contains("slayer quest") ||
-        SLAYER_GENERIC_QUEST_KEYWORDS.any { keyword -> line.contains(keyword) }
+        SLAYER_GENERIC_QUEST_KEYWORDS.any { keyword -> line.contains(keyword) } ||
+        hasTrackedQuestContext
     if (!relevant) return null
-    val typeIndex = if (detectedType >= 0) detectedType else slayerType.value
-    return SlayerQuestProgress(typeIndex, parseSlayerTierFromLine(line), progress, target)
+    val typeIndex =
+      when {
+        detectedType >= 0 -> detectedType
+        hasTrackedQuestContext -> slayerTrackedQuestType
+        else -> slayerType.value
+      }
+    val resolvedTier =
+      parseSlayerTierFromLine(line).takeIf { it in 1..5 }
+        ?: slayerTrackedQuestTier.takeIf { hasTrackedQuestContext && it in 1..5 }
+        ?: -1
+    return SlayerQuestProgress(typeIndex, resolvedTier, progress, target)
   }
 
   private fun detectSlayerTypeFromLine(line: String): Int =
@@ -2289,14 +2618,13 @@ object CombatMacroModule : Module("Combat Macro") {
 
   private fun registerKillCandidate(target: LivingEntity) {
     val level = mc.level ?: return
-    val normalizedName = normalizedTargetDisplayName(target)
     killCandidateId = target.uuid
     killCandidateName = resolveTargetDisplayName(target)
-    killCandidateWasSlayerBoss = cryptZombieSlayer.value && isSlayerBossName(normalizedName)
+    killCandidateWasSlayerBoss = cryptZombieSlayer.value && isSlayerBossEntity(target)
     killCandidateWasSlayerMob =
       cryptZombieSlayer.value &&
         !killCandidateWasSlayerBoss &&
-        (isSlayerPriorityMobName(normalizedName) || isSlayerFarmMobName(normalizedName))
+        (isSlayerPriorityMobEntity(target) || isSlayerFarmMobEntity(target))
     killCandidateAttackTick = level.gameTime
     killCandidateExpiresTick = level.gameTime + KILL_CANDIDATE_TTL_TICKS
   }
@@ -2390,35 +2718,86 @@ object CombatMacroModule : Module("Combat Macro") {
 
   private fun resolveTargetDisplayName(living: LivingEntity): String {
     val baseName = sanitizeTargetName(living.name.string)
-    if (living !is Player) return baseName
-    val standName = findAttachedArmorStandName(living)
-    return if (standName.isNotBlank()) standName else baseName
+    val standNames = findAttachedArmorStandNames(living)
+    if (standNames.isEmpty()) return baseName
+    val baseNormalized = normalizeNameForMatch(baseName)
+    val preferred = standNames.maxByOrNull { name -> scoreAttachedDisplayName(normalizeNameForMatch(name), baseNormalized) }
+      ?: return baseName
+    return if (scoreAttachedDisplayName(normalizeNameForMatch(preferred), baseNormalized) > 0) preferred else baseName
   }
 
   private fun normalizedTargetDisplayName(living: LivingEntity): String =
     normalizeNameForMatch(resolveTargetDisplayName(living))
 
-  private fun findAttachedArmorStandName(living: LivingEntity): String {
-    val level = mc.level ?: return ""
-    val bestStand =
-      level.entitiesForRendering()
-        .asSequence()
-        .filterIsInstance<ArmorStand>()
-        .filter { it.isAlive }
-        .filter { stand ->
-          stand.y >= living.y - 0.5 &&
-            stand.y <= living.y + 3.5 &&
-            horizontalDistSq(stand.x, stand.z, living.x, living.z) <= ATTACHED_NAMEPLATE_HORIZONTAL_RANGE_SQ
-        }
-        .map { stand -> stand to sanitizeTargetName(stand.name.string) }
-        .filter { (_, name) -> name.isNotBlank() }
-        .filter { (_, name) -> !builtInBlacklistedNames.contains(normalizeNameForMatch(name)) }
-        .minByOrNull { (stand, _) ->
-          horizontalDistSq(stand.x, stand.z, living.x, living.z) + kotlin.math.abs(stand.y - living.y)
-        }
-        ?: return ""
+  private fun targetMatchNames(living: LivingEntity): List<String> {
+    val names = LinkedHashSet<String>()
+    val baseName = normalizeNameForMatch(sanitizeTargetName(living.name.string))
+    if (baseName.isNotBlank()) {
+      names.add(baseName)
+    }
+    for (standName in findAttachedArmorStandNames(living)) {
+      val normalized = normalizeNameForMatch(standName)
+      if (normalized.isNotBlank()) {
+        names.add(normalized)
+      }
+    }
+    return names.toList()
+  }
 
-    return bestStand.second
+  private fun isSlayerBossEntity(living: LivingEntity): Boolean =
+    targetMatchNames(living).any(::isSlayerBossName)
+
+  private fun isSlayerPriorityMobEntity(living: LivingEntity): Boolean =
+    targetMatchNames(living).any(::isSlayerPriorityMobName)
+
+  private fun isSlayerFarmMobEntity(living: LivingEntity): Boolean =
+    targetMatchNames(living).any(::isSlayerFarmMobName)
+
+  private fun matchesEntityLabel(living: LivingEntity, matcher: (String) -> Boolean): Boolean =
+    targetMatchNames(living).any(matcher)
+
+  private fun scoreAttachedDisplayName(normalizedName: String, baseNormalized: String): Int {
+    if (normalizedName.isBlank()) return Int.MIN_VALUE
+    var score = 0
+    if (normalizedName == baseNormalized) score += 300
+    if (baseNormalized.isNotBlank() && (normalizedName.contains(baseNormalized) || baseNormalized.contains(normalizedName))) {
+      score += 120
+    }
+    if (isSlayerBossName(normalizedName)) score += 1200
+    if (isSlayerPriorityMobName(normalizedName)) score += 900
+    if (isSlayerFarmMobName(normalizedName)) score += 700
+    if (normalizedName.any(Char::isLetter)) score += 80
+    if (isTransientAttachedLabel(normalizedName)) score -= 600
+    return score
+  }
+
+  private fun isTransientAttachedLabel(normalizedName: String): Boolean {
+    return ENDERMAN_HITS_PATTERNS.any { pattern -> pattern.containsMatchIn(normalizedName) } ||
+      ATTACHED_LABEL_TRANSIENT_KEYWORDS.any { keyword -> normalizedName.contains(keyword) }
+  }
+
+  private fun findAttachedArmorStandNames(
+    living: LivingEntity,
+    horizontalRangeSq: Double = ATTACHED_NAMEPLATE_HORIZONTAL_RANGE_SQ
+  ): List<String> {
+    val level = mc.level ?: return emptyList()
+    return level.entitiesForRendering()
+      .asSequence()
+      .filterIsInstance<ArmorStand>()
+      .filter { it.isAlive }
+      .filter { stand ->
+        stand.y >= living.y - 0.5 &&
+          stand.y <= living.y + 3.5 &&
+          horizontalDistSq(stand.x, stand.z, living.x, living.z) <= horizontalRangeSq
+      }
+      .map { stand -> stand to sanitizeTargetName(stand.name.string) }
+      .filter { (_, name) -> name.isNotBlank() }
+      .filter { (_, name) -> !builtInBlacklistedNames.contains(normalizeNameForMatch(name)) }
+      .sortedBy { (stand, _) ->
+        horizontalDistSq(stand.x, stand.z, living.x, living.z) + kotlin.math.abs(stand.y - living.y)
+      }
+      .map { (_, name) -> name }
+      .toList()
   }
 
   private fun resolveCurrentTarget(): LivingEntity? {
@@ -2475,6 +2854,13 @@ object CombatMacroModule : Module("Combat Macro") {
     }
     ragnarokWasInHotbar = ragnarokInHotbar
 
+    val reaperScytheInHotbar = findHotbarSlotByKeywords(player, SLAYER_REAPER_SCYTHE_KEYWORDS) in 0..8
+    if (reaperScytheInHotbar && !reaperScytheWasInHotbar && !autoReaperScythe.value) {
+      autoReaperScythe.value = true
+      changed = true
+    }
+    reaperScytheWasInHotbar = reaperScytheInHotbar
+
     val badHealthInHotbar = findHotbarSlotByKeywords(player, SLAYER_BAD_HEALTH_KEYWORDS) in 0..8
     if (badHealthInHotbar && !badHealthWasInHotbar && !autoSwordOfBadHealth.value) {
       autoSwordOfBadHealth.value = true
@@ -2523,12 +2909,10 @@ object CombatMacroModule : Module("Combat Macro") {
   private fun effectiveCombatMode(target: LivingEntity?): Int {
     if (target == null) return combatMode.value
     if (shouldUseSpiderPhaseBowCombat() && slayerBossActive && isSpiderBossHatchlingsPhaseActive()) {
-      val targetName = normalizedTargetDisplayName(target)
-      if (isSlayerBossName(targetName) || isSpiderPhaseAddName(targetName)) return 1
+      if (isSlayerBossEntity(target) || matchesEntityLabel(target, ::isSpiderPhaseAddName)) return 1
     }
     if (shouldUseEndermanDynamicCombat()) {
-      val targetName = normalizedTargetDisplayName(target)
-      if (!isSlayerBossName(targetName)) return effectiveEndermanSpawnCombatMode(target)
+      if (!isSlayerBossEntity(target)) return effectiveEndermanSpawnCombatMode(target)
       return if (isEndermanBossHitPhase(target)) 1 else 0
     }
     return combatMode.value
@@ -2559,7 +2943,7 @@ object CombatMacroModule : Module("Combat Macro") {
   }
 
   private fun shouldUseDynamicEndermanSpawnMelee(target: LivingEntity): Boolean {
-    if (isSlayerPriorityMobName(normalizedTargetDisplayName(target))) return true
+    if (isSlayerPriorityMobEntity(target)) return true
     val player = mc.player ?: return false
     return player.distanceTo(target).toDouble() <= emanDynamicSwapRange.value
   }
@@ -2567,8 +2951,7 @@ object CombatMacroModule : Module("Combat Macro") {
 
   private fun shouldSuppressSlayerAttack(target: LivingEntity, nowTick: Long): Boolean {
     if (!cryptZombieSlayer.value) return false
-    val targetName = normalizedTargetDisplayName(target)
-    if (!isSlayerBossName(targetName)) return false
+    if (!isSlayerBossEntity(target)) return false
     return isSpiderBossHatchlingsPhaseActive(nowTick) || isWolfBossPupsPhaseActive(nowTick)
   }
 
@@ -2581,21 +2964,16 @@ object CombatMacroModule : Module("Combat Macro") {
     nowTick: Long
   ): Boolean {
     if (!cryptZombieSlayer.value) return false
-    if (shouldUseEndermanDynamicCombat() && isEndermanBossHitPhase(target)) {
-      val targetName = normalizedTargetDisplayName(target)
-      if (isSlayerBossName(targetName)) {
-        return applyEmanHitsPhaseStandoffMovement(player, target, distanceToTarget)
-      }
+    if (shouldUseEndermanDynamicCombat() && isSlayerBossEntity(target) && isEndermanBossHitPhase(target)) {
+      return applyEmanHitsPhaseStandoffMovement(player, target, distanceToTarget)
     }
     if (shouldUseSpiderPhaseBowCombat() && activeCombatMode == 1 && hasLos && isSpiderBossHatchlingsPhaseActive(nowTick)) {
-      val targetName = normalizedTargetDisplayName(target)
-      if (isSlayerBossName(targetName) || isSpiderPhaseAddName(targetName)) {
+      if (isSlayerBossEntity(target) || matchesEntityLabel(target, ::isSpiderPhaseAddName)) {
         return applySpiderPhaseStepBackMovement(player, target, distanceToTarget)
       }
     }
     if (shouldUseWolfPupsLogic() && wolfIgnorePups.value && isWolfBossPupsPhaseActive(nowTick)) {
-      val targetName = normalizedTargetDisplayName(target)
-      if (isSlayerBossName(targetName)) {
+      if (isSlayerBossEntity(target)) {
         MovementManager.clearForcedMovement()
         return true
       }
@@ -2676,13 +3054,12 @@ object CombatMacroModule : Module("Combat Macro") {
     for (entity in level.entitiesForRendering()) {
       val living = entity as? LivingEntity ?: continue
       if (!isValidTarget(living, player, blacklisted, "", true, ignoreWhitelist = true)) continue
-      val name = normalizedTargetDisplayName(living)
-      if (isSlayerBossName(name)) continue
+      if (isSlayerBossEntity(living)) continue
 
       val matchesPhaseTarget =
         when {
-          wantsSpiderAdds -> isSpiderPhaseAddName(name)
-          wantsWolfAdds -> isWolfPhaseAddName(name)
+          wantsSpiderAdds -> matchesEntityLabel(living, ::isSpiderPhaseAddName)
+          wantsWolfAdds -> matchesEntityLabel(living, ::isWolfPhaseAddName)
           else -> false
         }
       if (!matchesPhaseTarget) continue
@@ -2783,7 +3160,7 @@ object CombatMacroModule : Module("Combat Macro") {
       .asSequence()
       .filterIsInstance<LivingEntity>()
       .filter { it.isAlive && it.health > 0f }
-      .filter { entity -> isSlayerBossName(normalizedTargetDisplayName(entity)) }
+      .filter(::isSlayerBossEntity)
       .minByOrNull { entity ->
         if (player != null) {
           val dx = entity.x - player.x
@@ -2804,7 +3181,7 @@ object CombatMacroModule : Module("Combat Macro") {
         return tracked
       }
     }
-    return fallbackBoss?.takeIf { it.isAlive && it.health > 0f && isSlayerBossName(normalizedTargetDisplayName(it)) }
+    return fallbackBoss?.takeIf { it.isAlive && it.health > 0f && isSlayerBossEntity(it) }
   }
 
   private fun hasNearbySpiderPhaseAdds(level: ClientLevel, boss: LivingEntity): Boolean {
@@ -2813,10 +3190,9 @@ object CombatMacroModule : Module("Combat Macro") {
       .asSequence()
       .filterIsInstance<LivingEntity>()
       .filter { it.isAlive && it.health > 0f }
-      .filter { entity -> !isSlayerBossName(normalizedTargetDisplayName(entity)) }
+      .filter { entity -> !isSlayerBossEntity(entity) }
       .any { entity ->
-        val name = normalizedTargetDisplayName(entity)
-        isSpiderPhaseAddName(name) &&
+        matchesEntityLabel(entity, ::isSpiderPhaseAddName) &&
           horizontalDistSq(entity.x, entity.z, bossPos.x, bossPos.z) <= SLAYER_PHASE_ADD_SEARCH_RADIUS_SQ
       }
   }
@@ -2846,19 +3222,14 @@ object CombatMacroModule : Module("Combat Macro") {
 
   private fun isEndermanBossHitPhase(target: LivingEntity): Boolean {
     if (!shouldUseEndermanDynamicCombat()) return false
-    if (!isSlayerBossName(normalizedTargetDisplayName(target))) return false
-    val level = mc.level ?: return false
-    return level.entitiesForRendering()
+    if (!isSlayerBossEntity(target)) return false
+    return findAttachedArmorStandNames(target, ENDERMAN_HITS_HORIZONTAL_RANGE_SQ)
       .asSequence()
-      .filterIsInstance<ArmorStand>()
-      .filter { it.isAlive }
-      .filter { stand ->
-        stand.y >= target.y - 0.5 &&
-          stand.y <= target.y + 3.5 &&
-          horizontalDistSq(stand.x, stand.z, target.x, target.z) <= ENDERMAN_HITS_HORIZONTAL_RANGE_SQ
+      .map(::normalizeNameForMatch)
+      .any { name ->
+        ENDERMAN_HITS_PATTERNS.any { pattern -> pattern.containsMatchIn(name) } ||
+          ENDERMAN_HITS_TEXT_KEYWORDS.any { keyword -> name.contains(keyword) }
       }
-      .map { stand -> normalizeNameForMatch(stand.name.string) }
-      .any { name -> ENDERMAN_HITS_PATTERN.containsMatchIn(name) }
   }
 
   private fun keywordSettingValues(raw: String, fallback: Array<String>): Array<String> {
@@ -2893,10 +3264,10 @@ object CombatMacroModule : Module("Combat Macro") {
       shouldUseZombieDynamicCombat() ->
         keywordSettingValues(zombieSpawnWeapon.value, SLAYER_ZOMBIE_SPAWN_WEAPON_DEFAULT_KEYWORDS)
       shouldUseEndermanDynamicCombat() && target != null &&
-        isSlayerBossName(normalizedTargetDisplayName(target)) && isEndermanBossHitPhase(target) ->
+        isSlayerBossEntity(target) && isEndermanBossHitPhase(target) ->
         keywordSettingValues(emanHitPhaseWeapon.value, SLAYER_ENDERMAN_HIT_PHASE_WEAPON_DEFAULT_KEYWORDS)
       shouldUseEndermanDynamicCombat() && target != null &&
-        isSlayerBossName(normalizedTargetDisplayName(target)) ->
+        isSlayerBossEntity(target) ->
         keywordSettingValues(emanBossWeapon.value, SLAYER_ENDERMAN_BOSS_WEAPON_DEFAULT_KEYWORDS)
       shouldUseEndermanDynamicCombat() ->
         preferredEndermanSpawnWeaponKeywords(target)
@@ -3016,11 +3387,10 @@ object CombatMacroModule : Module("Combat Macro") {
   }
 
   private fun shouldUseDirectChase(target: LivingEntity, hasLos: Boolean, distanceToTarget: Double): Boolean {
-    val targetName = normalizedTargetDisplayName(target)
     val slayerGapBonus =
       when {
-        cryptZombieSlayer.value && isSlayerBossName(targetName) -> SLAYER_BOSS_DIRECT_CHASE_GAP_BONUS
-        cryptZombieSlayer.value && isSlayerPriorityMobName(targetName) -> SLAYER_MINIBOSS_DIRECT_CHASE_GAP_BONUS
+        cryptZombieSlayer.value && isSlayerBossEntity(target) -> SLAYER_BOSS_DIRECT_CHASE_GAP_BONUS
+        cryptZombieSlayer.value && isSlayerPriorityMobEntity(target) -> SLAYER_MINIBOSS_DIRECT_CHASE_GAP_BONUS
         else -> 0.0
       }
     val handoffGap = SOFT_CHASE_HANDOFF_GAP + slayerGapBonus
@@ -3060,10 +3430,9 @@ object CombatMacroModule : Module("Combat Macro") {
   }
 
   private fun slayerHighlightType(entity: LivingEntity): SlayerHighlightType? {
-    val normalizedName = normalizedTargetDisplayName(entity)
     return when {
-      isSlayerBossName(normalizedName) -> SlayerHighlightType.BOSS
-      isSlayerPriorityMobName(normalizedName) -> SlayerHighlightType.MINIBOSS
+      isSlayerBossEntity(entity) -> SlayerHighlightType.BOSS
+      isSlayerPriorityMobEntity(entity) -> SlayerHighlightType.MINIBOSS
       else -> null
     }
   }
@@ -3160,13 +3529,14 @@ object CombatMacroModule : Module("Combat Macro") {
     val shouldStepForward = distanceToTarget > combatKeepDistance(0) + SOFT_CHASE_STOP_BUFFER
 
     if (aligned && shouldStepForward) {
+      MovementManager.setMovementLock(true)
       MovementManager.setForcedMovement(
         forward = true, backward = false,
         left = false, right = false,
         jump = false, shift = false, sprint = true
       )
     } else {
-      MovementManager.clearForcedMovement()
+      MovementManager.setMovementLock(false)
     }
   }
 
@@ -3279,12 +3649,19 @@ object CombatMacroModule : Module("Combat Macro") {
   private fun combatKeepDistance(activeCombatMode: Int = combatMode.value): Double {
     return when (activeCombatMode) {
       0 -> {
-        val configured = swordKeepDistance.value.coerceAtLeast(0.0)
+        val configured = configuredSwordKeepDistance().coerceAtLeast(0.0)
         val desired = if (configured <= 0.0) MELEE_CLOSE_IN_DISTANCE else configured
         min(attackRange.value, desired)
       }
       1 -> combatEngageRange(activeCombatMode)
       else -> attackRange.value
+    }
+  }
+
+  private fun configuredSwordKeepDistance(): Double {
+    return when {
+      cryptZombieSlayer.value || slayerModeEnabled -> slayerSwordKeepDistance.value
+      else -> swordKeepDistance.value
     }
   }
 
@@ -3420,7 +3797,7 @@ object CombatMacroModule : Module("Combat Macro") {
     MovementManager.clearForcedMovement()
     val routeName = when {
       slayerLocation.value == 1 -> CRYPT_WALKBACK_ROUTE_NAME
-      slayerWalkbackRoute.value.isNotBlank() -> slayerWalkbackRoute.value.trim()
+      walkbackRouteForCurrentType().value.isNotBlank() -> walkbackRouteForCurrentType().value.trim()
       else -> ""
     }
     if (routeName.isBlank()) {
@@ -3474,6 +3851,8 @@ object CombatMacroModule : Module("Combat Macro") {
     if (CombatPatrolModule.isPatrolRunning) CombatPatrolModule.stopPatrol()
     if (startedPath && nativeActive()) {
       nativeStop()
+    } else {
+      MovementManager.setMovementLock(false)
     }
     RotationExecutor.stopRotating()
     lastTargetPos = null
@@ -3526,9 +3905,10 @@ object CombatMacroModule : Module("Combat Macro") {
     clearTrackedSlayerQuestState(clearIdentity = true)
   }
 
-  private const val TAB_COMBAT_GROUP = "Combat Macro"
-  private const val TAB_SLAYER_GROUP = "Slayer Macro"
-  private const val TAB_SLAYER_SETTINGS_GROUP = "Slayer Settings"
+  private const val TAB_COMBAT_GROUP = "General"
+  private const val TAB_COMBAT_BEHAVIOR_GROUP = "Combat"
+  private const val TAB_SLAYER_GROUP = "Slayer"
+  private const val TAB_SLAYER_WEAPONS_GROUP = "Slayer Weapons"
   private const val TAB_PATROL_GROUP = "Patrol"
   private const val TAB_AUTO_ITEMS_GROUP = "Auto Items"
   private const val KILL_CANDIDATE_TTL_TICKS = 80L
@@ -3543,6 +3923,8 @@ object CombatMacroModule : Module("Combat Macro") {
   private const val OVERFLUX_RECOVER_LOOK_TICKS = 8
   private const val OVERFLUX_PLACE_PITCH = 80f
   private const val SLAYER_RAGNAROK_COOLDOWN_TICKS = 400L
+  private const val SLAYER_REAPER_SCYTHE_COOLDOWN_TICKS = 100L
+  private const val REAPER_SCYTHE_USE_AIM_TOLERANCE = 12.0
   private const val SLAYER_BAD_HEALTH_REUSE_TICKS = 80L
   private const val SLAYER_BATPHONE_RETRY_TICKS = 80L
   private const val SLAYER_MADDOX_GUI_TIMEOUT_TICKS = 80L
@@ -3599,7 +3981,20 @@ object CombatMacroModule : Module("Combat Macro") {
   private const val SLAYER_ESP_MID_INFLATE = 0.22
   private const val SLAYER_ESP_OUTER_INFLATE = 0.38
   private const val BOW_REFIRE_DELAY_NS = 200_000_000L  // 200 ms between shots
-  private val ENDERMAN_HITS_PATTERN = Regex("\\b\\d+\\s+hits?\\b")
+  private const val COMBAT_ROTATION_SAMPLE_NS = 180_000_000L
+  private const val COMBAT_ROTATION_RESEED_YAW = 16f
+  private const val COMBAT_ROTATION_RESEED_PITCH = 10f
+  private const val COMBAT_ROTATION_BASE_HZ = 20f
+  private const val COMBAT_ROTATION_MIN_FRAME_SCALE = 0.28f
+  private const val COMBAT_ROTATION_MAX_FRAME_SCALE = 1.08f
+  private const val COMBAT_MAX_SNAP_THRESHOLD = 0.12f
+  private val ENDERMAN_HITS_PATTERNS = arrayOf(
+    Regex("\\b\\d+[,.]?\\d*\\s+hits?\\b"),
+    Regex("\\bhits?\\s*[:x-]?\\s*\\d+[,.]?\\d*\\b"),
+    Regex("\\b\\d+[,.]?\\d*\\s+hit shield\\b"),
+  )
+  private val ENDERMAN_HITS_TEXT_KEYWORDS = arrayOf("hits", "shield", "shielded", "immune")
+  private val ATTACHED_LABEL_TRANSIENT_KEYWORDS = arrayOf("hits", "hit shield", "shielded", "immune")
   private val SLAYER_PROGRESS_PATTERN = Regex("(\\d{1,5})\\s*/\\s*(\\d{1,5})")
   private data class SlayerQuestProgress(
     val typeIndex: Int,
@@ -3668,7 +4063,7 @@ object CombatMacroModule : Module("Combat Macro") {
   // Items that are NOT weapons - switch away from these when preparing to attack
   private val SLAYER_NON_WEAPON_KEYWORDS = arrayOf(
     "batphone", "overflux", "ragnarok", "ragnorak", "wand of atonement",
-    "sword of bad health", "drill", "pickaxe", "gauntlet"
+    "reaper scythe", "sword of bad health", "drill", "pickaxe", "gauntlet"
   )
   private val SLAYER_MELEE_WEAPON_KEYWORDS = arrayOf(
     "sword", "blade", "scythe", "katana", "saber", "cleaver", "axe", "rapier", "claymore",
@@ -3700,6 +4095,7 @@ object CombatMacroModule : Module("Combat Macro") {
   private val SLAYER_ZOMBIE_SWORD_KEYWORDS = arrayOf("zombie sword")
   private val SLAYER_OVERFLUX_KEYWORDS = arrayOf("overflux")
   private val SLAYER_RAGNAROK_KEYWORDS = arrayOf("ragnarok", "ragnorak")
+  private val SLAYER_REAPER_SCYTHE_KEYWORDS = arrayOf("reaper scythe")
   private val SLAYER_BAD_HEALTH_KEYWORDS = arrayOf("sword of bad health")
   private val SLAYER_BATPHONE_KEYWORDS = arrayOf("maddox batphone", "batphone")
   private val SLAYER_MADDOX_SCREEN_KEYWORDS = arrayOf("maddox", "slayer")
@@ -3754,11 +4150,23 @@ object CombatMacroModule : Module("Combat Macro") {
   private val slayerWarpCommand get() = when (slayerType.value) {
     0 -> when (slayerLocation.value) {
       0 -> "warp crypts"  // Zombie Graveyard
-      else -> ""             // Zombie Crypt: walkback route handles return
+      else -> ""          // Zombie Crypt: walkback route handles return
     }
-    1 -> "warp hub"
-    2 -> "warp spiders_den"
-    3 -> "warp end"
+    1 -> when (wolfLocation.value) {
+      0 -> "warp park"    // Park
+      1 -> "warp park"    // Caves (accessed via park)
+      2 -> "warp hub"     // Castle
+      else -> "warp park"
+    }
+    2 -> when (spiderLocation.value) {
+      0 -> "warp spiders_den"
+      1 -> "warp crimson"
+      else -> "warp spiders_den"
+    }
+    3 -> when (endermanLocation.value) {
+      2 -> if (endermanVoidWarp.value) "warp void" else ""
+      else -> "warp end"
+    }
     4 -> "warp rift"
     5 -> "warp blazing_fortress"
     else -> ""
