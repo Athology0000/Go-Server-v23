@@ -15,7 +15,7 @@ object MiningProfitTracker {
         private set
 
     private val bazaarPrices = mutableMapOf<String, Double>()
-    private var lastBazaarRefresh = 0L
+    @Volatile private var lastBazaarRefresh = 0L
     private val BAZAAR_REFRESH_INTERVAL_MS = 5 * 60 * 1000L  // 5 minutes
 
     private val itemPickupRegex = Regex("""\+\s*(\d[\d,]*)\s+(.+)""")
