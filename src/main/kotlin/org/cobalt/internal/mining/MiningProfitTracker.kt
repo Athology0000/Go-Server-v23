@@ -22,9 +22,12 @@ object MiningProfitTracker {
 
     init {
         EventBus.register(this)
+        refreshBazaarIfNeeded()
     }
 
     fun ensureInitialized() { /* touching this object causes the init block to run */ }
+
+    fun getPriceForKey(key: String): Double? = bazaarPrices[key]
 
     fun resetSession() {
         sessionCoins = 0L
