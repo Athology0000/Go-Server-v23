@@ -1,6 +1,7 @@
 package org.cobalt.internal.mining
 
 import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.math.sin
 import kotlin.math.cos
 import kotlin.math.sqrt
@@ -149,6 +150,14 @@ object MiningMacroModule : Module("Mining Macro") {
     true
   )
 
+  private val anchorRadius = SliderSetting(
+    "Anchor Radius",
+    "Maximum distance from the vein start position before returning to anchor. Disabled when running via Routes.",
+    14.0,
+    4.0,
+    48.0
+  )
+
   private val goldenGoblinInterrupt = CheckboxSetting(
     "Golden Goblin Interrupt",
     "Pause mining and kill Golden Goblins as soon as the spawn message appears, then resume mining.",
@@ -166,7 +175,7 @@ object MiningMacroModule : Module("Mining Macro") {
 
   private val precisionPointChance = SliderSetting(
     "Chance to Look at Precision Point",
-    "Percent chance to glide toward the next block's precision point during tick gliding.",
+    "Percent chance to aim at a block's precision point while mining or tick gliding.",
     100.0,
     0.0,
     100.0,
@@ -252,6 +261,7 @@ object MiningMacroModule : Module("Mining Macro") {
       maxVeinBlocks,
       mineRange,
       stepToNearbyBlocks,
+      anchorRadius,
       goldenGoblinInterrupt,
       precisionPointRotationSpeed,
       precisionPointChance,
@@ -329,6 +339,7 @@ object MiningMacroModule : Module("Mining Macro") {
   private var miningOnTarget: BlockPos? = null
   private var miningUsesPrecisionPoint = false
   private val precisionRolls = HashMap<Long, Boolean>()
+  private var precisionPointChanceSnapshot = precisionPointChance.value
   private var startedPath = false
   private var lastPathStartTick = 0L
   private var approachTarget: BlockPos? = null
@@ -338,8 +349,6 @@ object MiningMacroModule : Module("Mining Macro") {
   private var lanternPlacedForVein = false
   private var lastLanternPlaceTick = 0L
   private var lastLanternRefreshTick = -1L
-  private var pendingLanternRelease = false
-  private var pendingLanternRestoreSlot = -1
   private var goldenGoblinInterruptActive = false
   private var goldenGoblinInterruptOwnedCombat = false
   private var goldenGoblinLastSeenTick = -1L
@@ -384,7 +393,7 @@ object MiningMacroModule : Module("Mining Macro") {
       0
     }
 
-  fun getPrecisionTargetBlock(): BlockPos? = if (enabled.value) currentTarget ?: miningOnTarget else null
+  fun getPrecisionTargetBlock(): BlockPos? = if (enabled.value) miningOnTarget ?: currentTarget else null
 
   fun isUsingPrecisionPoint(): Boolean =
     enabled.value && miningOnTarget != null && miningUsesPrecisionPoint
@@ -408,13 +417,23 @@ object MiningMacroModule : Module("Mining Macro") {
   private const val WARP_POST_TICKS = 6
   private const val LANTERN_PLACE_COOLDOWN_TICKS = 12L
   private const val LANTERN_REFRESH_TICKS = 20L * 60L
-  private const val MAX_MINING_TICKS_PER_BLOCK = 40
+  private const val MIN_MINING_TICKS_PER_BLOCK = 40
+  private const val MINING_TIMEOUT_SCALE = 1.6
+  private const val MINING_TIMEOUT_EXTRA_TICKS = 8
+  private const val FALLBACK_TIMEOUT_MINING_SPEED = 1000.0
   private const val WILL_O_WISP_NAME = "will o wisp"
   private const val REQUIRE_MINE_LOS = true
   private const val SKIP_OCCUPIED_VEINS = true
   private const val NUDGE_RANGE_EXTRA = 2.5   // blocks beyond mineRange to attempt a gentle nudge
-  private const val MAX_WALK_BLOCKS = 4.0      // never walk more than this many blocks to reach a target
-  private const val NEARBY_STEP_MAX_DRIFT = 3.25
+  private const val MAX_WALK_BLOCKS = 5.0      // never walk more than this many blocks to reach a target
+  private const val NEARBY_STEP_RANGE_EXTRA = 0.85
+  private const val NEARBY_STEP_REACH_BUFFER = 0.65
+  private const val BLOCKING_PLAYER_MIN_CLEARANCE = 1.35
+  private const val BLOCKING_PLAYER_BOX_PADDING = 0.18
+  private const val BLOCKING_PLAYER_PENALTY = 9.0
+  private const val BLOCKING_PLAYER_REACT_RANGE = 3.25
+  private const val BLOCKING_PLAYER_SIDESTEP_DISTANCE = 1.1
+  private const val BLOCKING_PLAYER_SIDESTEP_FORWARD = 0.4
   private const val RETURN_TO_ANCHOR_ARRIVAL_DIST = 1.25
   private const val RETURN_TO_ANCHOR_SCAN_RADIUS = 2
   private const val RETURN_TO_ANCHOR_SCAN_VERTICAL = 2
@@ -423,16 +442,6 @@ object MiningMacroModule : Module("Mining Macro") {
 
   @SubscribeEvent
   fun onTick(@Suppress("UNUSED_PARAMETER") event: TickEvent.Start) {
-    if (pendingLanternRelease) {
-      mc.options.keyUse?.setDown(false)
-      pendingLanternRelease = false
-    }
-    if (pendingLanternRestoreSlot >= 0) {
-      mc.options.keyHotbarSlots[pendingLanternRestoreSlot].setDown(true)
-      mc.options.keyHotbarSlots[pendingLanternRestoreSlot].setDown(false)
-      pendingLanternRestoreSlot = -1
-    }
-
     if (toggleKeybind.value.isPressed()) {
       enabled.value = !enabled.value
     }
@@ -467,20 +476,34 @@ object MiningMacroModule : Module("Mining Macro") {
       return
     }
 
-    if (usePathfinding.value) {
-      PathfindingModule.ensureEnabledForAutomation("mining macro")
-    }
-
-    if (startedPath && !nativeActive()) {
+    if (AutoLanternModule.isPlacementInProgress()) {
+      stopMiningKeys()
+      if (startedPath && nativeActive()) {
+        nativeStop()
+      }
       startedPath = false
       lastPathTarget = null
       resetApproachTracking()
       MovementManager.clearForcedMovement()
+      return
     }
-    if (startedPath && nativeActive()) {
-      val cmd = NativePathfinder.tick()
-      if (cmd != null) cmd.applyToPlayer()
-      else MovementManager.clearForcedMovement()
+
+    if (usePathfinding.value) {
+      PathfindingModule.ensureEnabledForAutomation("mining macro")
+    }
+
+    if (!goldenGoblinInterruptActive && !goldenGoblinReturnPending) {
+      if (startedPath && !nativeActive()) {
+        startedPath = false
+        lastPathTarget = null
+        resetApproachTracking()
+        MovementManager.clearForcedMovement()
+      }
+      if (startedPath && nativeActive()) {
+        val cmd = NativePathfinder.tick()
+        if (cmd != null) cmd.applyToPlayer()
+        else MovementManager.clearForcedMovement()
+      }
     }
 
     if (mc.screen != null) {
@@ -557,15 +580,53 @@ object MiningMacroModule : Module("Mining Macro") {
       val nearest = selectNearestBlock(level, player, vein.blocks, vein.targetIds)
       if (nearest != null) {
         val nearestDistSq = distanceToBlockSq(player, nearest)
-        if (nearestDistSq <= MAX_WALK_BLOCKS * MAX_WALK_BLOCKS) {
+        val shortStepLimit = maxNearbyStepDistance()
+        val shortStepAllowed =
+          canStepToNearbyTarget(player, nearest) && nearestDistSq <= shortStepLimit * shortStepLimit
+        if (shortStepAllowed) {
+          val blockingPlayer = findBlockingPlayerForTarget(level, player, nearest)
           if (useInstantTransmission.value && tryStartWarp(player, level, nearest)) {
             return
           }
-          if (usePathfinding.value) {
-            moveToward(level, player, nearest)
+          if (blockingPlayer != null && trySidestepAroundBlockingPlayer(level, player, nearest, blockingPlayer)) {
+            return
+          }
+          when {
+            blockingPlayer != null && usePathfinding.value -> {
+              moveToward(
+                level,
+                player,
+                nearest,
+                forceApproach = true,
+                avoidPlayer = blockingPlayer,
+                maxTravelDistance = shortStepLimit,
+              )
+            }
+            blockingPlayer != null -> {
+              nudgeTowardApproach(level, player, nearest, blockingPlayer)
+              focusApproachTarget(player, nearest)
+            }
+            stepToNearbyBlocks.value -> {
+              if (usePathfinding.value) {
+                moveToward(level, player, nearest, maxTravelDistance = shortStepLimit)
+              } else {
+                nudgeTowardApproach(level, player, nearest)
+                focusApproachTarget(player, nearest)
+              }
+            }
+            usePathfinding.value -> {
+              moveToward(level, player, nearest)
+            }
+            else -> {
+              MovementManager.clearForcedMovement()
+            }
           }
         } else {
-          MovementManager.clearForcedMovement()
+          if (usePathfinding.value && canStepToNearbyTarget(player, nearest)) {
+            moveToward(level, player, nearest)
+          } else {
+            MovementManager.clearForcedMovement()
+          }
         }
       }
       stopMiningKeys()
@@ -590,7 +651,17 @@ object MiningMacroModule : Module("Mining Macro") {
 
       if (crosshairVeinBlock != null) {
         currentTarget = crosshairVeinBlock
-        maybeRefreshLantern(level, player)
+        if (maybeRefreshLantern(level, player)) {
+          stopMiningKeys()
+          if (startedPath && nativeActive()) {
+            nativeStop()
+          }
+          startedPath = false
+          lastPathTarget = null
+          resetApproachTracking()
+          MovementManager.clearForcedMovement()
+          return
+        }
         if (startedPath && nativeActive()) {
           nativeStop()
         }
@@ -604,6 +675,19 @@ object MiningMacroModule : Module("Mining Macro") {
         if (miningActive) {
           mc.options.keyAttack?.setDown(false)
           miningActive = false
+        }
+        val blockingPlayer = findBlockingPlayerForTarget(level, player, target)
+        if (blockingPlayer != null) {
+          if (trySidestepAroundBlockingPlayer(level, player, target, blockingPlayer)) {
+            return
+          }
+          if (usePathfinding.value) {
+            moveToward(level, player, target, forceApproach = true, avoidPlayer = blockingPlayer)
+          } else {
+            nudgeTowardApproach(level, player, target, blockingPlayer)
+            focusApproachTarget(player, target)
+          }
+          return
         }
         val aim = resolveMiningAimPoint(player, target)
         val precisionRotScale =
@@ -623,16 +707,40 @@ object MiningMacroModule : Module("Mining Macro") {
       if (useInstantTransmission.value && tryStartWarp(player, level, target)) {
         return
       }
+      val blockingPlayer = findBlockingPlayerForTarget(level, player, target)
+      if (blockingPlayer != null && trySidestepAroundBlockingPlayer(level, player, target, blockingPlayer)) {
+        return
+      }
       val nudgeThresh = mineRange.value + NUDGE_RANGE_EXTRA
-      if (distSq <= nudgeThresh * nudgeThresh) {
-        // Block is just outside mining range - make a small world-space adjustment toward it.
-        // We project the player->target vector onto the player's local forward/strafe axes so
-        // the movement is independent of camera orientation.
-        nudgeToward(player, target)
-      } else if (usePathfinding.value) {
-        moveToward(level, player, target)
-      } else {
-        MovementManager.clearForcedMovement()
+      val shortStepLimit = maxNearbyStepDistance()
+      val canShortStep =
+        stepToNearbyBlocks.value &&
+          canStepToNearbyTarget(player, target) &&
+          distSq <= nudgeThresh * nudgeThresh
+      when {
+        blockingPlayer != null && usePathfinding.value && canShortStep -> {
+          moveToward(
+            level,
+            player,
+            target,
+            forceApproach = true,
+            avoidPlayer = blockingPlayer,
+            maxTravelDistance = shortStepLimit,
+          )
+        }
+        blockingPlayer != null && usePathfinding.value -> {
+          moveToward(level, player, target, forceApproach = true, avoidPlayer = blockingPlayer)
+        }
+        canShortStep -> {
+          nudgeTowardApproach(level, player, target, blockingPlayer)
+          focusApproachTarget(player, target)
+        }
+        usePathfinding.value -> {
+          moveToward(level, player, target, avoidPlayer = blockingPlayer)
+        }
+        else -> {
+          MovementManager.clearForcedMovement()
+        }
       }
     }
   }
@@ -690,7 +798,7 @@ object MiningMacroModule : Module("Mining Macro") {
     val result = mutableListOf<TypeSelection>()
     for (rawLabel in getSelectedTypesInOrder()) {
       val label = MiningBlockRegistry.normalizeType(rawLabel)
-      val ids =
+      val baseIds =
         if (label.equals("Custom", ignoreCase = true)) {
           val automationId =
             automationCustomBlockId?.takeIf { it.isNotEmpty() && !MiningBlockRegistry.isBlacklisted(it) }
@@ -707,11 +815,21 @@ object MiningMacroModule : Module("Mining Macro") {
         } else {
           MiningBlockRegistry.idsForType(label)
         }
+      val ids = expandSelectionIds(label, baseIds)
       if (ids.isNotEmpty()) {
         result.add(TypeSelection(label, ids))
       }
     }
     return result
+  }
+
+  private fun expandSelectionIds(label: String, ids: Set<String>): Set<String> {
+    if (ids.isEmpty()) return ids
+    if (!label.startsWith("Mithril")) return ids
+
+    val expanded = LinkedHashSet(ids)
+    expanded.addAll(MiningBlockRegistry.idsForType("Titanium"))
+    return expanded
   }
 
   private fun parseSelectedTypes(raw: String): List<String> {
@@ -1242,22 +1360,22 @@ object MiningMacroModule : Module("Mining Macro") {
   }
 
   private fun startMining(player: Player, target: BlockPos) {
-    if (target == miningOnTarget) {
-      miningOnTargetTicks++
-      if (miningOnTargetTicks > MAX_MINING_TICKS_PER_BLOCK) {
-        currentVein?.blocks?.remove(target)
-        miningOnTarget = null
-        miningOnTargetTicks = 0
-        stopMiningKeys()
-        return
-      }
-    } else {
+    if (target != miningOnTarget) {
       miningOnTarget = target
-      miningOnTargetTicks = 1
+      miningOnTargetTicks = 0
       miningLockedTicks = 0
     }
+    miningOnTargetTicks++
     val currentAim = resolveMiningAimPoint(player, target)
     miningUsesPrecisionPoint = currentAim.usesPrecisionPoint
+    val maxTicksForBlock = maxMiningTicksForTarget(target)
+    if (miningOnTargetTicks > maxTicksForBlock) {
+      currentVein?.blocks?.remove(target)
+      miningOnTarget = null
+      miningOnTargetTicks = 0
+      stopMiningKeys()
+      return
+    }
     if (isCrosshairOnTarget(target)) {
       miningLockedTicks++
     }
@@ -1276,6 +1394,24 @@ object MiningMacroModule : Module("Mining Macro") {
     miningActive = true
   }
 
+  private fun maxMiningTicksForTarget(target: BlockPos): Int {
+    val calculatedTicks = MiningModule.getCalculatedLookTicks(includePingDelay = true)
+    if (calculatedTicks > 0.0) {
+      return ceil(calculatedTicks * MINING_TIMEOUT_SCALE + MINING_TIMEOUT_EXTRA_TICKS)
+        .toInt()
+        .coerceAtLeast(MIN_MINING_TICKS_PER_BLOCK)
+    }
+
+    val level = mc.level
+    val blockId = level?.let { blockIdAt(it, target) }
+    val blockType = blockId?.let { MiningBlockRegistry.BLOCK_ID_TO_TYPE[it] }
+    val hardness = blockType?.let { MiningBlockRegistry.BLOCK_HARDNESS[it] }
+    val fallbackTicks = MiningBreakThresholds.getOptimalTicks(blockType, FALLBACK_TIMEOUT_MINING_SPEED, hardness)
+    return ceil(fallbackTicks * MINING_TIMEOUT_SCALE + MINING_TIMEOUT_EXTRA_TICKS)
+      .toInt()
+      .coerceAtLeast(MIN_MINING_TICKS_PER_BLOCK)
+  }
+
   private fun stopMiningKeys() {
     if (miningActive) {
       mc.options.keyAttack?.setDown(false)
@@ -1287,25 +1423,26 @@ object MiningMacroModule : Module("Mining Macro") {
     miningOnTargetTicks = 0
     miningLockedTicks = 0
     miningUsesPrecisionPoint = false
-    precisionRolls.clear()
   }
 
   private fun maybeRefreshLantern(
     level: net.minecraft.world.level.Level,
     player: Player
-  ) {
+  ): Boolean {
     val needsRefresh =
       !lanternPlacedForVein ||
         !AutoLanternModule.isLanternBuffActive() ||
         lastLanternRefreshTick < 0L ||
         level.gameTime - lastLanternRefreshTick >= LANTERN_REFRESH_TICKS
     if (!needsRefresh) {
-      return
+      return false
     }
     if (tryPlaceLantern(level, player)) {
       lanternPlacedForVein = true
       lastLanternRefreshTick = level.gameTime
+      return true
     }
+    return false
   }
 
   private fun tryPlaceLantern(
@@ -1320,19 +1457,14 @@ object MiningMacroModule : Module("Mining Macro") {
     if (lanternSlot !in 0..8) {
       return false
     }
-
-    lastLanternPlaceTick = level.gameTime
-    val previousSlot = player.inventory.selectedSlot
-
-    if (previousSlot != lanternSlot) {
-      mc.options.keyHotbarSlots[lanternSlot].setDown(true)
-      mc.options.keyHotbarSlots[lanternSlot].setDown(false)
+    if (AutoLanternModule.isPlacementInProgress()) {
+      return false
     }
 
-    mc.options.keyUse?.setDown(true)
-    pendingLanternRelease = true
-    pendingLanternRestoreSlot = if (previousSlot != lanternSlot) previousSlot else -1
-    AutoLanternModule.noteLanternUse(level.gameTime, player.blockPosition())
+    if (!AutoLanternModule.tryStartLanternPlacement(lanternSlot)) {
+      return false
+    }
+    lastLanternPlaceTick = level.gameTime
     return true
   }
 
@@ -1366,8 +1498,12 @@ object MiningMacroModule : Module("Mining Macro") {
    * regardless of where the camera is pointing.
    */
   private fun nudgeToward(player: Player, target: BlockPos) {
-    val dx = (target.x + 0.5) - player.x
-    val dz = (target.z + 0.5) - player.z
+    nudgeToward(player, Vec3(target.x + 0.5, player.y, target.z + 0.5))
+  }
+
+  private fun nudgeToward(player: Player, targetPoint: Vec3) {
+    val dx = targetPoint.x - player.x
+    val dz = targetPoint.z - player.z
     val len = sqrt(dx * dx + dz * dz)
     if (len < 0.05) {
       MovementManager.clearForcedMovement()
@@ -1391,21 +1527,181 @@ object MiningMacroModule : Module("Mining Macro") {
     )
   }
 
-  private fun canStepToNearbyTarget(player: Player, target: BlockPos): Boolean {
-    val anchor = veinStartAnchor ?: return true
-    val maxPlayerDriftSq = NEARBY_STEP_MAX_DRIFT * NEARBY_STEP_MAX_DRIFT
-    if (player.blockPosition().distSqr(anchor) > maxPlayerDriftSq) {
+  private fun nudgeTowardApproach(
+    level: net.minecraft.world.level.Level,
+    player: Player,
+    target: BlockPos,
+    avoidPlayer: Player? = null,
+  ) {
+    val shortStepLimit = maxNearbyStepDistance()
+    val approach = findApproach(
+      level,
+      player,
+      target,
+      avoidPlayer = avoidPlayer,
+      preferredStandOff = preferredNearbyStepDistance(),
+      maxTravelDistance = shortStepLimit,
+    )
+    val stepPoint = approach?.let { Vec3(it.x + 0.5, player.y, it.z + 0.5) }
+      ?: resolveNearbyStepPoint(player, target, avoidPlayer)
+    nudgeToward(player, clampNearbyStepPoint(player, stepPoint, shortStepLimit))
+  }
+
+  private fun resolveNearbyStepPoint(
+    player: Player,
+    target: BlockPos,
+    avoidPlayer: Player? = null,
+  ): Vec3 {
+    val centerX = target.x + 0.5
+    val centerZ = target.z + 0.5
+    var dirX = player.x - centerX
+    var dirZ = player.z - centerZ
+    avoidPlayer?.let { blocker ->
+      dirX += (player.x - blocker.x) * 0.9
+      dirZ += (player.z - blocker.z) * 0.9
+    }
+    var len = sqrt(dirX * dirX + dirZ * dirZ)
+    if (len < 1.0e-4) {
+      dirX = 1.0
+      dirZ = 0.0
+      len = 1.0
+    }
+    val scale = preferredNearbyStepDistance() / len
+    return Vec3(centerX + dirX * scale, player.y, centerZ + dirZ * scale)
+  }
+
+  private fun clampNearbyStepPoint(player: Player, point: Vec3, maxDistance: Double): Vec3 {
+    val dx = point.x - player.x
+    val dz = point.z - player.z
+    val distSq = dx * dx + dz * dz
+    if (distSq <= maxDistance * maxDistance) return point
+    val dist = sqrt(distSq)
+    if (dist <= 1.0e-4) return point
+    val scale = maxDistance / dist
+    return Vec3(player.x + dx * scale, player.y, player.z + dz * scale)
+  }
+
+  private fun trySidestepAroundBlockingPlayer(
+    level: net.minecraft.world.level.Level,
+    player: Player,
+    target: BlockPos,
+    blocker: Player,
+  ): Boolean {
+    if (player.distanceToSqr(blocker) > BLOCKING_PLAYER_REACT_RANGE * BLOCKING_PLAYER_REACT_RANGE) {
       return false
     }
 
-    val maxTargetDist = mineRange.value + NUDGE_RANGE_EXTRA + 0.5
+    val sidestepPoint = resolveBlockingPlayerSidestep(level, player, target, blocker) ?: return false
+    stopApproachMovement()
+    nudgeToward(player, sidestepPoint)
+    focusApproachTarget(player, target)
+    return true
+  }
+
+  private fun resolveBlockingPlayerSidestep(
+    level: net.minecraft.world.level.Level,
+    player: Player,
+    target: BlockPos,
+    blocker: Player,
+  ): Vec3? {
+    val targetCenterX = target.x + 0.5
+    val targetCenterZ = target.z + 0.5
+    val towardTargetX = targetCenterX - player.x
+    val towardTargetZ = targetCenterZ - player.z
+    val towardTargetLen = sqrt(towardTargetX * towardTargetX + towardTargetZ * towardTargetZ)
+    if (towardTargetLen < 1.0e-4) {
+      return null
+    }
+
+    val nx = towardTargetX / towardTargetLen
+    val nz = towardTargetZ / towardTargetLen
+    val leftX = -nz
+    val leftZ = nx
+    val rightX = nz
+    val rightZ = -nx
+    val candidates = listOf(
+      Vec3(
+        player.x + leftX * BLOCKING_PLAYER_SIDESTEP_DISTANCE + nx * BLOCKING_PLAYER_SIDESTEP_FORWARD,
+        player.y,
+        player.z + leftZ * BLOCKING_PLAYER_SIDESTEP_DISTANCE + nz * BLOCKING_PLAYER_SIDESTEP_FORWARD,
+      ),
+      Vec3(
+        player.x + rightX * BLOCKING_PLAYER_SIDESTEP_DISTANCE + nx * BLOCKING_PLAYER_SIDESTEP_FORWARD,
+        player.y,
+        player.z + rightZ * BLOCKING_PLAYER_SIDESTEP_DISTANCE + nz * BLOCKING_PLAYER_SIDESTEP_FORWARD,
+      ),
+      Vec3(
+        player.x + leftX * BLOCKING_PLAYER_SIDESTEP_DISTANCE,
+        player.y,
+        player.z + leftZ * BLOCKING_PLAYER_SIDESTEP_DISTANCE,
+      ),
+      Vec3(
+        player.x + rightX * BLOCKING_PLAYER_SIDESTEP_DISTANCE,
+        player.y,
+        player.z + rightZ * BLOCKING_PLAYER_SIDESTEP_DISTANCE,
+      ),
+    )
+
+    var best: Vec3? = null
+    var bestScore = Double.POSITIVE_INFINITY
+    val playerEyeOffset = player.eyeY - player.y
+    val maxTargetDist = mineRange.value + NUDGE_RANGE_EXTRA
+    val preferredTargetDist = preferredNearbyStepDistance()
+
+    for (candidate in candidates) {
+      val candidateBlock = BlockPos.containing(candidate.x, player.y, candidate.z)
+      val resolvedBlock =
+        if (MinecraftPathingRules.isWalkable(level, candidateBlock)) {
+          candidateBlock
+        } else {
+          findNearestWalkableAround(level, candidateBlock, 1, 1)
+        } ?: continue
+
+      val point = Vec3(resolvedBlock.x + 0.5, player.y, resolvedBlock.z + 0.5)
+      val eye = Vec3(point.x, point.y + playerEyeOffset, point.z)
+      val visiblePoint = findVisibleAimPoint(level, player, eye, target) ?: continue
+      val blockerDistSq = horizontalDistSq(point.x, point.z, blocker.x, blocker.z)
+      if (blockerDistSq < BLOCKING_PLAYER_MIN_CLEARANCE * BLOCKING_PLAYER_MIN_CLEARANCE) {
+        continue
+      }
+      val targetDist = sqrt(horizontalDistSq(point.x, point.z, targetCenterX, targetCenterZ))
+      if (targetDist > maxTargetDist) {
+        continue
+      }
+      val moveDistSq = horizontalDistSq(point.x, point.z, player.x, player.z)
+      val targetDistPenalty = abs(targetDist - preferredTargetDist) * 18.0
+      val visibleDistSq = eye.distanceToSqr(visiblePoint)
+      val blockerBonus = blockerDistSq * 0.45
+      val score = moveDistSq + targetDistPenalty * targetDistPenalty + visibleDistSq * 0.03 - blockerBonus
+      if (score < bestScore) {
+        bestScore = score
+        best = point
+      }
+    }
+
+    return best
+  }
+
+  private fun horizontalDistSq(x1: Double, z1: Double, x2: Double, z2: Double): Double {
+    val dx = x1 - x2
+    val dz = z1 - z2
+    return dx * dx + dz * dz
+  }
+
+  private fun canStepToNearbyTarget(player: Player, target: BlockPos): Boolean {
+    if (RoutesModule.isRunning && RoutesModule.routeOwnsMining) return true
+    val anchor = veinStartAnchor ?: return true
+    val r = anchorRadius.value
+    if (player.blockPosition().distSqr(anchor) > r * r) return false
+    val maxTargetDist = r + mineRange.value
     return anchor.distSqr(target) <= maxTargetDist * maxTargetDist
   }
 
   private fun hasDriftedFromVeinStart(player: Player): Boolean {
+    if (RoutesModule.isRunning && RoutesModule.routeOwnsMining) return false
     val anchor = veinStartAnchor ?: return false
-    val maxDriftSq = NEARBY_STEP_MAX_DRIFT * NEARBY_STEP_MAX_DRIFT
-    return player.blockPosition().distSqr(anchor) > maxDriftSq
+    val r = anchorRadius.value
+    return player.blockPosition().distSqr(anchor) > r * r
   }
 
   private fun returnToVeinAnchor(
@@ -1469,13 +1765,25 @@ object MiningMacroModule : Module("Mining Macro") {
     return best
   }
 
+  private fun captureGoldenGoblinReturnSpot(player: Player): Vec3 {
+    val level = mc.level ?: return player.position()
+    val origin = player.blockPosition()
+    val destination =
+      if (MinecraftPathingRules.isWalkable(level, origin)) {
+        origin
+      } else {
+        findNearestWalkableAround(level, origin, RETURN_TO_ANCHOR_SCAN_RADIUS, RETURN_TO_ANCHOR_SCAN_VERTICAL)
+      } ?: return player.position()
+    return Vec3(destination.x + 0.5, destination.y.toDouble(), destination.z + 0.5)
+  }
+
   private fun beginGoldenGoblinInterrupt() {
     if (goldenGoblinInterruptActive) return
 
     goldenGoblinInterruptActive = true
     goldenGoblinInterruptOwnedCombat = true
     goldenGoblinReturnPending = false
-    goldenGoblinReturnPos = mc.player?.position()
+    goldenGoblinReturnPos = mc.player?.let(::captureGoldenGoblinReturnSpot)
     if (startedPath && nativeActive()) {
       nativeStop()
     } else {
@@ -1521,9 +1829,16 @@ object MiningMacroModule : Module("Mining Macro") {
     if (goldenGoblinInterruptOwnedCombat && CombatMacroModule.isActive) {
       CombatMacroModule.stopForAutomation()
     }
+    if (nativeActive()) {
+      nativeStop()
+    }
     goldenGoblinInterruptActive = false
     goldenGoblinInterruptOwnedCombat = false
     goldenGoblinLastSeenTick = -1L
+    startedPath = false
+    lastPathTarget = null
+    lastPathStartTick = 0L
+    resetApproachTracking()
     MovementManager.clearForcedMovement()
     RotationExecutor.stopRotating()
     goldenGoblinReturnPending = goldenGoblinReturnPos != null
@@ -1569,31 +1884,59 @@ object MiningMacroModule : Module("Mining Macro") {
       return
     }
 
-    val destination = BlockPos.containing(returnPos.x, returnPos.y, returnPos.z)
+    PathfindingModule.ensureEnabledForAutomation("golden goblin return")
+    val rawDestination = BlockPos.containing(returnPos.x, returnPos.y, returnPos.z)
+    val destination =
+      if (MinecraftPathingRules.isWalkable(level, rawDestination)) {
+        rawDestination
+      } else {
+        findNearestWalkableAround(level, rawDestination, RETURN_TO_ANCHOR_SCAN_RADIUS, RETURN_TO_ANCHOR_SCAN_VERTICAL)
+      }
+
+    if (destination == null) {
+      nudgeToward(player, Vec3(returnPos.x, player.y, returnPos.z))
+      return
+    }
+
+    if (player.blockPosition().distSqr(destination) <= 1.0) {
+      stopApproachMovement()
+      MovementManager.clearForcedMovement()
+      goldenGoblinReturnPending = false
+      goldenGoblinReturnPos = null
+      ChatUtils.sendMessage("Mining macro: Back at mining spot, resuming vein.")
+      return
+    }
+
     if (!nativeActive() || lastPathTarget == null || lastPathTarget?.distSqr(destination) ?: 0.0 > 1.0) {
       if (level.gameTime - lastPathStartTick < 8L) {
         return
       }
       lastPathStartTick = level.gameTime
-      NativePathfinder.setTarget(returnPos.x, returnPos.y, returnPos.z)
+      NativePathfinder.setTarget(destination.x + 0.5, destination.y.toDouble(), destination.z + 0.5)
       startedPath = true
       lastPathTarget = destination
     }
 
     val cmd = NativePathfinder.tick()
-    if (cmd != null) cmd.applyToPlayer()
-    else MovementManager.clearForcedMovement()
+    if (cmd != null) {
+      cmd.applyToPlayer()
+    } else {
+      nudgeToward(player, Vec3(destination.x + 0.5, player.y, destination.z + 0.5))
+    }
   }
 
   private fun moveToward(
     level: net.minecraft.world.level.Level,
     player: Player,
-    target: BlockPos
+    target: BlockPos,
+    forceApproach: Boolean = false,
+    avoidPlayer: Player? = null,
+    maxTravelDistance: Double = Double.POSITIVE_INFINITY,
   ) {
     PathfindingModule.ensureEnabledForAutomation("mining macro")
     val currentDistance = sqrt(distanceToBlockSq(player, target))
     val holdDistance = preferredApproachDistance()
-    if (currentDistance <= holdDistance) {
+    if (!forceApproach && currentDistance <= holdDistance) {
       stopApproachMovement()
       focusApproachTarget(player, target)
       return
@@ -1611,8 +1954,24 @@ object MiningMacroModule : Module("Mining Macro") {
       return
     }
 
-    val approach = lastPathTarget?.takeIf { isApproachUsable(level, player, it, target) }
-      ?: findApproach(level, player, target) ?: run {
+    val approach = lastPathTarget?.takeIf {
+      isApproachUsable(
+        level,
+        player,
+        it,
+        target,
+        avoidPlayer = avoidPlayer,
+        preferredStandOff = holdDistance,
+        maxTravelDistance = maxTravelDistance,
+      )
+    } ?: findApproach(
+      level,
+      player,
+      target,
+      avoidPlayer = avoidPlayer,
+      preferredStandOff = holdDistance,
+      maxTravelDistance = maxTravelDistance,
+    ) ?: run {
       stopApproachMovement()
       return
     }
@@ -1684,7 +2043,10 @@ object MiningMacroModule : Module("Mining Macro") {
   private fun findApproach(
     level: net.minecraft.world.level.Level,
     player: Player,
-    target: BlockPos
+    target: BlockPos,
+    avoidPlayer: Player? = null,
+    preferredStandOff: Double = preferredApproachDistance(),
+    maxTravelDistance: Double = Double.POSITIVE_INFINITY,
   ): BlockPos? {
     var best: BlockPos? = null
     var bestScore = Double.POSITIVE_INFINITY
@@ -1698,7 +2060,7 @@ object MiningMacroModule : Module("Mining Macro") {
 
     for (off in primary) {
       val candidate = target.offset(off[0], off[1], off[2])
-      val score = approachScore(level, player, candidate, target)
+      val score = approachScore(level, player, candidate, target, avoidPlayer, preferredStandOff, maxTravelDistance)
       if (score < bestScore) {
         bestScore = score
         best = candidate
@@ -1714,7 +2076,8 @@ object MiningMacroModule : Module("Mining Macro") {
         while (dz <= APPROACH_SCAN_RADIUS) {
           if (dx != 0 || dy != 0 || dz != 0) {
             val candidate = target.offset(dx, dy, dz)
-            val score = approachScore(level, player, candidate, target)
+            val score =
+              approachScore(level, player, candidate, target, avoidPlayer, preferredStandOff, maxTravelDistance)
             if (score < bestScore) {
               bestScore = score
               best = candidate
@@ -1735,14 +2098,21 @@ object MiningMacroModule : Module("Mining Macro") {
     level: net.minecraft.world.level.Level,
     player: Player,
     candidate: BlockPos,
-    target: BlockPos
-  ): Boolean = approachScore(level, player, candidate, target).isFinite()
+    target: BlockPos,
+    avoidPlayer: Player? = null,
+    preferredStandOff: Double = preferredApproachDistance(),
+    maxTravelDistance: Double = Double.POSITIVE_INFINITY,
+  ): Boolean =
+    approachScore(level, player, candidate, target, avoidPlayer, preferredStandOff, maxTravelDistance).isFinite()
 
   private fun approachScore(
     level: net.minecraft.world.level.Level,
     player: Player,
     candidate: BlockPos,
-    target: BlockPos
+    target: BlockPos,
+    avoidPlayer: Player? = null,
+    preferredStandOff: Double = preferredApproachDistance(),
+    maxTravelDistance: Double = Double.POSITIVE_INFINITY,
   ): Double {
     if (!MinecraftPathingRules.isWalkable(level, candidate)) {
       return Double.POSITIVE_INFINITY
@@ -1753,9 +2123,9 @@ object MiningMacroModule : Module("Mining Macro") {
     val centerDz = (candidate.z + 0.5) - (target.z + 0.5)
     val targetDistSq = centerDx * centerDx + centerDy * centerDy + centerDz * centerDz
     val targetDist = sqrt(targetDistSq)
-    val preferredStandOff = preferredApproachDistance()
+    val standOff = preferredStandOff.coerceAtLeast(0.5)
     val maxMineDist = (mineRange.value - APPROACH_EDGE_MARGIN).coerceAtLeast(0.5)
-    val minMineDist = (preferredStandOff - APPROACH_EDGE_WINDOW).coerceAtLeast(0.0)
+    val minMineDist = (standOff - APPROACH_EDGE_WINDOW).coerceAtLeast(0.0)
     if (targetDist < minMineDist || targetDist > maxMineDist) {
       return Double.POSITIVE_INFINITY
     }
@@ -1765,13 +2135,34 @@ object MiningMacroModule : Module("Mining Macro") {
     }
 
     val playerDistSq = player.blockPosition().distSqr(candidate).toDouble()
+    if (playerDistSq > maxTravelDistance * maxTravelDistance) {
+      return Double.POSITIVE_INFINITY
+    }
     val verticalPenalty = abs(candidate.y - target.y) * 0.75
-    val edgePenalty = abs(targetDist - preferredStandOff) * 12.0
-    return edgePenalty * edgePenalty + playerDistSq * 0.35 + verticalPenalty
+    val edgePenalty = abs(targetDist - standOff) * 12.0
+    var score = edgePenalty * edgePenalty + playerDistSq * 0.35 + verticalPenalty
+    avoidPlayer?.let { blocker ->
+      val blockerDx = (candidate.x + 0.5) - blocker.x
+      val blockerDz = (candidate.z + 0.5) - blocker.z
+      val blockerDistSq = blockerDx * blockerDx + blockerDz * blockerDz
+      if (blockerDistSq < BLOCKING_PLAYER_MIN_CLEARANCE * BLOCKING_PLAYER_MIN_CLEARANCE) {
+        return Double.POSITIVE_INFINITY
+      }
+      score += BLOCKING_PLAYER_PENALTY / blockerDistSq.coerceAtLeast(0.25)
+    }
+    return score
   }
 
   private fun preferredApproachDistance(): Double {
     return minOf(APPROACH_HOLD_DISTANCE, (mineRange.value - APPROACH_EDGE_MARGIN).coerceAtLeast(0.5))
+  }
+
+  private fun preferredNearbyStepDistance(): Double {
+    return (mineRange.value - NEARBY_STEP_REACH_BUFFER).coerceAtLeast(0.5)
+  }
+
+  private fun maxNearbyStepDistance(): Double {
+    return minOf(MAX_WALK_BLOCKS, mineRange.value + NEARBY_STEP_RANGE_EXTRA)
   }
 
   /** Angular distance in degrees between the player's current look direction and a target block. */
@@ -1815,12 +2206,51 @@ object MiningMacroModule : Module("Mining Macro") {
     return findVisibleAimPoint(level, entity, eye, target) != null
   }
 
-  private fun findVisibleAimPoint(
+  private fun findBlockingPlayer(
     level: net.minecraft.world.level.Level,
-    entity: net.minecraft.world.entity.Entity,
+    player: Player,
     eye: Vec3,
-    target: BlockPos
-  ): Vec3? {
+    point: Vec3,
+  ): Player? {
+    val rayBounds = AABB(eye, point).inflate(BLOCKING_PLAYER_BOX_PADDING)
+    var best: Player? = null
+    var bestDistSq = eye.distanceToSqr(point)
+    for (other in level.players()) {
+      if (other == player) continue
+      if (other.isSpectator || !other.isAlive) continue
+      val hitBox = other.boundingBox.inflate(BLOCKING_PLAYER_BOX_PADDING)
+      if (!rayBounds.intersects(hitBox)) continue
+      val hit = hitBox.clip(eye, point).orElse(null) ?: continue
+      val distSq = eye.distanceToSqr(hit)
+      if (distSq < bestDistSq) {
+        bestDistSq = distSq
+        best = other
+      }
+    }
+    return best
+  }
+
+  private fun findBlockingPlayerForTarget(
+    level: net.minecraft.world.level.Level,
+    player: Player,
+    target: BlockPos,
+  ): Player? {
+    val eye = player.eyePosition
+    var best: Player? = null
+    var bestDistSq = Double.POSITIVE_INFINITY
+    for (point in buildAimSamplePoints(eye, target)) {
+      if (!canSeeAimPoint(level, player, eye, point, target, ignorePlayerObstructions = true)) continue
+      val blocker = findBlockingPlayer(level, player, eye, point) ?: continue
+      val distSq = player.distanceToSqr(blocker)
+      if (distSq < bestDistSq) {
+        bestDistSq = distSq
+        best = blocker
+      }
+    }
+    return best
+  }
+
+  private fun buildAimSamplePoints(eye: Vec3, target: BlockPos): List<Vec3> {
     val cx = target.x + 0.5
     val cy = target.y + 0.5
     val cz = target.z + 0.5
@@ -1829,15 +2259,24 @@ object MiningMacroModule : Module("Mining Macro") {
     val oy = ((eye.y - cy) * 0.49).coerceIn(-0.49, 0.49)
     val oz = ((eye.z - cz) * 0.49).coerceIn(-0.49, 0.49)
     val center = Vec3(cx, cy, cz)
-    val points = listOf(
+    return listOf(
       center,
       Vec3(cx + ox, cy, cz),
       Vec3(cx, cy + oy, cz),
       Vec3(cx, cy, cz + oz),
       Vec3(cx + ox, cy + oy, cz + oz),
     )
-    for (point in points) {
-      if (canSeeAimPoint(level, entity, eye, point, target)) {
+  }
+
+  private fun findVisibleAimPoint(
+    level: net.minecraft.world.level.Level,
+    entity: net.minecraft.world.entity.Entity,
+    eye: Vec3,
+    target: BlockPos,
+    ignorePlayerObstructions: Boolean = false,
+  ): Vec3? {
+    for (point in buildAimSamplePoints(eye, target)) {
+      if (canSeeAimPoint(level, entity, eye, point, target, ignorePlayerObstructions)) {
         return point
       }
     }
@@ -1849,7 +2288,8 @@ object MiningMacroModule : Module("Mining Macro") {
     entity: net.minecraft.world.entity.Entity,
     eye: Vec3,
     point: Vec3,
-    target: BlockPos
+    target: BlockPos,
+    ignorePlayerObstructions: Boolean = false,
   ): Boolean {
     val hit = level.clip(
       net.minecraft.world.level.ClipContext(
@@ -1860,7 +2300,13 @@ object MiningMacroModule : Module("Mining Macro") {
         entity
       )
     )
-    return hit.type == net.minecraft.world.phys.HitResult.Type.BLOCK && hit.blockPos == target
+    if (hit.type != net.minecraft.world.phys.HitResult.Type.BLOCK || hit.blockPos != target) {
+      return false
+    }
+    if (!ignorePlayerObstructions && entity is Player && findBlockingPlayer(level, entity, eye, point) != null) {
+      return false
+    }
+    return true
   }
 
   private fun tryStartWarp(
@@ -1962,15 +2408,24 @@ object MiningMacroModule : Module("Mining Macro") {
     }
   }
 
-  private fun resolveMiningAimPoint(player: Player, target: BlockPos, checkPrecisionChance: Boolean = false): AimTarget {
+  private fun clampAimPointInsideBlock(point: Vec3, target: BlockPos): Vec3 {
+    val inset = 0.02
+    return Vec3(
+      point.x.coerceIn(target.x + inset, target.x + 1.0 - inset),
+      point.y.coerceIn(target.y + inset, target.y + 1.0 - inset),
+      point.z.coerceIn(target.z + inset, target.z + 1.0 - inset),
+    )
+  }
+
+  private fun resolveMiningAimPoint(player: Player, target: BlockPos): AimTarget {
     val level = mc.level
     val eye = player.eyePosition
-    val usePrecision = if (checkPrecisionChance) shouldUsePrecisionPoint(target)
-                       else MiningModule.precisionActive.value
+    val usePrecision = shouldUsePrecisionPoint(target)
     if (level != null && usePrecision) {
-      MiningPrecisionTracker.getPrecisionPointFor(target)?.let { point ->
-        if (canSeeAimPoint(level, player, eye, point, target)) {
-          return AimTarget(point, true)
+      MiningPrecisionTracker.getPrecisionPointFor(target, allowTentative = true)?.let { point ->
+        val clampedPoint = clampAimPointInsideBlock(point, target)
+        if (canSeeAimPoint(level, player, eye, clampedPoint, target) || losCheck(level, player, eye, target)) {
+          return AimTarget(clampedPoint, true)
         }
       }
       // Tracker has no data yet — use the exact face hit point from the crosshair raycast.
@@ -1978,7 +2433,7 @@ object MiningMacroModule : Module("Mining Macro") {
       // rotation scale applies from the very first tick of mining.
       val hit = mc.hitResult
       if (hit is BlockHitResult && hit.type == HitResult.Type.BLOCK && hit.blockPos == target) {
-        return AimTarget(hit.location, true)
+        return AimTarget(clampAimPointInsideBlock(hit.location, target), true)
       }
     }
     if (level != null) {
@@ -2004,18 +2459,27 @@ object MiningMacroModule : Module("Mining Macro") {
     if (preview == target) {
       return currentAim
     }
-    // Use precisionPointChance to decide whether to glide toward the precision point of the next block.
-    return resolveMiningAimPoint(player, preview, checkPrecisionChance = true)
+    return resolveMiningAimPoint(player, preview)
   }
 
   private fun shouldUsePrecisionPoint(target: BlockPos): Boolean {
-    if (!MiningModule.precisionActive.value) {
+    refreshPrecisionPointChanceRolls()
+    val hasLivePrecisionPoint = MiningPrecisionTracker.getPrecisionPointFor(target, allowTentative = true) != null
+    if (!MiningModule.precisionActive.value && !hasLivePrecisionPoint) {
       precisionRolls.clear()
       return false
     }
     return precisionRolls.getOrPut(target.asLong()) {
       val chance = precisionPointChance.value.coerceIn(0.0, 100.0)
       chance >= 100.0 || (chance > 0.0 && Random.nextDouble(100.0) < chance)
+    }
+  }
+
+  private fun refreshPrecisionPointChanceRolls() {
+    val currentChance = precisionPointChance.value.coerceIn(0.0, 100.0)
+    if (currentChance != precisionPointChanceSnapshot) {
+      precisionPointChanceSnapshot = currentChance
+      precisionRolls.clear()
     }
   }
 
