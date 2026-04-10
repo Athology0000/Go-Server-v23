@@ -82,10 +82,10 @@ object MiningCoinPopupModule : Module("Mining Coin Popups") {
 
     @SubscribeEvent
     fun onNvg(@Suppress("UNUSED_PARAMETER") event: NvgEvent) {
-        if (!enabled.value || popups.isEmpty()) return
         val now = System.currentTimeMillis()
         val delta = if (lastNvgMs == 0L) 0f else ((now - lastNvgMs) / 1000f).coerceAtMost(0.1f)
         lastNvgMs = now
+        if (!enabled.value || popups.isEmpty()) return
         val iter = popups.iterator()
         while (iter.hasNext()) {
             val popup = iter.next()
