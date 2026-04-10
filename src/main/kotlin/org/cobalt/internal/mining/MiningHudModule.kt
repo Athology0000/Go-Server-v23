@@ -222,11 +222,12 @@ object MiningHudModule : Module("Mining HUD") {
   }
 
   private fun formatCoinsPerHour(cph: Long): String {
+    val prefix = if (cph < 0) "-" else ""
     val abs = Math.abs(cph)
     return when {
-      abs >= 1_000_000 -> "${"%.1f".format(abs / 1_000_000.0)}M"
-      abs >= 1_000     -> "${"%.1f".format(abs / 1_000.0)}K"
-      else             -> "$abs"
+      abs >= 1_000_000 -> "$prefix${"%.1f".format(abs / 1_000_000.0)}M"
+      abs >= 1_000     -> "$prefix${"%.1f".format(abs / 1_000.0)}K"
+      else             -> "$cph"
     }
   }
 }
