@@ -246,6 +246,7 @@ object MiningMacroModule : Module("Mining Macro") {
 
   init {
     MiningPrecisionTracker.ensureInitialized()
+    MiningProfitTracker.ensureInitialized()
 
     addSetting(
       enabled,
@@ -460,6 +461,7 @@ object MiningMacroModule : Module("Mining Macro") {
     // First tick after enable - try to seed the vein immediately from the player's position.
     if (!wasEnabled) {
       wasEnabled = true
+      MiningProfitTracker.resetSession()
       val selections = resolveTypeSelections()
       if (selections.isEmpty()) {
         ChatUtils.sendMessage("Mining macro: no block types selected, cannot start.")

@@ -10,6 +10,7 @@ import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.decoration.ArmorStand
 import net.minecraft.world.entity.player.Inventory
 import net.minecraft.world.entity.player.Player
+import net.minecraft.world.phys.Vec3
 import org.cobalt.api.event.EventBus
 import org.cobalt.api.event.annotation.SubscribeEvent
 import org.cobalt.api.event.impl.client.ChatEvent
@@ -20,6 +21,7 @@ import org.cobalt.api.pathfinder.minecraft.MinecraftPathingRules
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.InfoSetting
 import org.cobalt.api.module.setting.impl.InfoType
+import org.cobalt.api.module.setting.impl.ModeSetting
 import org.cobalt.api.module.setting.impl.TextSetting
 import org.cobalt.api.util.AngleUtils
 import org.cobalt.api.util.ChatUtils
@@ -46,17 +48,22 @@ object CommissionMacroModule : Module("Commission Macro") {
 
   private val info = InfoSetting(
     "How It Works",
-    "Modes: no AOTV/no pigeon = walk to emissary and walk route points, AOTV/no pigeon = warp dwarves -> Eliza -> warp forge -> route -> warp dwarves, AOTV + pigeon = use Royal Pigeon for claim/read and route with AOTV. Routes without AOTV still walk warp points.",
+    "If Royal Pigeon is available it is used for reading and claiming commissions. Otherwise the dropdown chooses whether emissary access starts from /warp forge or /warp dwarves. Mining commissions always /warp forge before route start, and route warp points are walked if no AOTV/Etherwarp is available.",
     InfoType.INFO
+  )
+
+  private val routeWarpSetting = ModeSetting(
+    "Emissary Warp",
+    "Warp used before heading to the emissary when Royal Pigeon is not available.",
+    0,
+    arrayOf("Warp Forge", "Warp Dwarves")
   )
 
   private val statusText  = TextSetting("Status",     "Current macro state.",  "Idle")
   private val modeText    = TextSetting("Mode",       "Auto-detected commission mode.", "Unknown")
   private val commText    = TextSetting("Commission", "Detected commission.",   "None")
   private val areaText    = TextSetting("Area",       "Detected map area.",     "Unknown")
-  private val elizaXText  = TextSetting("Eliza X",    "Block X coordinate for Emissary Eliza.", "")
-  private val elizaYText  = TextSetting("Eliza Y",    "Block Y coordinate for Emissary Eliza.", "")
-  private val elizaZText  = TextSetting("Eliza Z",    "Block Z coordinate for Emissary Eliza.", "")
+  private val elizaTargetPos = BlockPos(-37, 201, -130)
   private val selectedRoutesText = TextSetting(
     "Commission Routes",
     "Legacy fallback pool of saved route names for commission route matching.",
@@ -153,6 +160,7 @@ object CommissionMacroModule : Module("Commission Macro") {
     val walkPos: BlockPos,
     val interactionEntity: Entity?,
     val label: String,
+    val walkNodes: List<BlockPos> = emptyList(),
   )
 
   // ---- State machine ----
@@ -161,13 +169,23 @@ object CommissionMacroModule : Module("Commission Macro") {
     IDLE,
     OPEN_PIGEON,        // select + right-click Royal Pigeon item; wait for GUI
     WARP_TO_DWARVES,    // /warp dwarves sent; waiting for teleport
-    WALK_TO_EMISSARY,   // pathfind to Emissary Eliza
-    OPEN_EMISSARY,      // face + right-click Emissary Eliza; wait for GUI
+    WARP_TO_FORGE_EMISSARY, // /warp forge sent; waiting before following the forge emissary path
+    WALK_TO_EMISSARY,   // pathfind to the selected emissary target
+    OPEN_EMISSARY,      // face + right-click the selected emissary; wait for GUI
     READ_GUI,           // GUI open: scrape book lore for commissions
     CLAIM_GUI,          // GUI open: click the claim button on a complete commission
-    WARP_TO_FORGE,      // /warp forge sent; waiting for teleport before route start
+    WARP_TO_ROUTE_START, // selected route warp sent; waiting for teleport before route start
     MINING,             // MiningMacroModule (or CombatMacroModule) is active
     RETURN_TO_DWARVES,  // commission done; warp back to Eliza to claim
+  }
+
+  private enum class RouteWarpDestination(
+    val command: String,
+    val statusLabel: String,
+    val areaLabel: String,
+  ) {
+    FORGE("warp forge", "forge", "Forge"),
+    DWARVES("warp dwarves", "dwarves", "Dwarven Mines"),
   }
 
   private var state     = State.IDLE
@@ -183,6 +201,16 @@ object CommissionMacroModule : Module("Commission Macro") {
   private var claimAttempts      = 0
   private var readAttempts       = 0
   private var lastEmissaryPathTarget: BlockPos? = null
+  private var activeEmissaryWalkNodeIndex = -1
+  private val forgeEmissaryWalkNodes = listOf(
+    BlockPos(8, 148, -66),
+    BlockPos(11, 148, -61),
+    BlockPos(11, 148, -51),
+    BlockPos(4, 146, -43),
+    BlockPos(10, 144, -15),
+    BlockPos(41, 135, 17),
+    BlockPos(42, 134, 21),
+  )
 
   // ---- Known areas and ore->zone mapping ----
 
@@ -395,13 +423,11 @@ object CommissionMacroModule : Module("Commission Macro") {
     addSetting(
       enabled,
       info,
+      routeWarpSetting,
       statusText,
       modeText,
       commText,
       areaText,
-      elizaXText,
-      elizaYText,
-      elizaZText,
       selectedRoutesText,
       royalRouteText,
       cliffsideRouteText,
@@ -442,11 +468,12 @@ object CommissionMacroModule : Module("Commission Macro") {
       }
       State.OPEN_PIGEON     -> handleOpenPigeon(player)
       State.WARP_TO_DWARVES -> handleWarpToDwarves()
+      State.WARP_TO_FORGE_EMISSARY -> handleWarpToForgeEmissary()
       State.WALK_TO_EMISSARY -> handleWalkToEmissary(player)
       State.OPEN_EMISSARY   -> handleOpenEmissary(player)
       State.READ_GUI        -> handleReadGui()
       State.CLAIM_GUI       -> handleClaimGui()
-      State.WARP_TO_FORGE   -> handleWarpToForge()
+      State.WARP_TO_ROUTE_START -> handleWarpToRouteStart()
       State.MINING          -> handleMining()
       State.RETURN_TO_DWARVES -> handleReturnToDwarves()
     }
@@ -471,6 +498,7 @@ object CommissionMacroModule : Module("Commission Macro") {
         val destination =
           when {
             mode.usesPigeon -> "Royal Pigeon"
+            shouldUseForgeEmissaryRoute(mode) -> "emissary"
             mode.usesWarps -> "Emissary Eliza"
             else -> "emissary"
           }
@@ -526,15 +554,26 @@ object CommissionMacroModule : Module("Commission Macro") {
   // ---- State: WARP_TO_DWARVES ----
 
   private fun handleWarpToDwarves() {
+    val mode = refreshMode(mc.player)
     if (stateTick == 1L) {
       (mc.player as? LocalPlayer)?.connection?.sendCommand("warp dwarves")
       areaText.value = "Dwarven Mines"
       setStatus("Warping to dwarves...")
     }
     if (stateTick >= 100L) {
-      openAttempts = 0
-      readAttempts = 0
-      transition(State.WALK_TO_EMISSARY)
+      transitionToCommissionSource(mode, alreadyAtSource = false, allowDwarvenWarp = false, allowForgeWarp = false)
+    }
+  }
+
+  private fun handleWarpToForgeEmissary() {
+    val mode = refreshMode(mc.player)
+    if (stateTick == 1L) {
+      (mc.player as? LocalPlayer)?.connection?.sendCommand("warp forge")
+      areaText.value = "Forge"
+      setStatus("Warping to forge emissary...")
+    }
+    if (stateTick >= 100L) {
+      transitionToCommissionSource(mode, alreadyAtSource = false, allowDwarvenWarp = false, allowForgeWarp = false)
     }
   }
 
@@ -561,12 +600,28 @@ object CommissionMacroModule : Module("Commission Macro") {
       return
     }
 
-    val walkTarget = target.walkPos
-    if (lastEmissaryPathTarget != walkTarget || !nativePathActive() || stateTick % 40L == 1L) {
-      PathfindingModule.ensureEnabledForAutomation("commission macro")
-      PathfindingModule.startTo(walkTarget.x + 0.5, walkTarget.y.toDouble(), walkTarget.z + 0.5)
-      lastEmissaryPathTarget = walkTarget
+    val walkTarget = resolveEmissaryNavigationTarget(player, target)
+    val pathTarget = findWalkTargetNear(walkTarget)
+    if (walkTarget == target.walkPos && player.blockPosition().distSqr(pathTarget) <= 2.25) {
+      stopEmissaryNavigation()
+      transition(State.OPEN_EMISSARY)
+      return
     }
+
+    if (lastEmissaryPathTarget != pathTarget || !nativePathActive() || stateTick % 40L == 1L) {
+      startEmissaryNavigation(pathTarget)
+    }
+
+    val cmd = NativePathfinder.tick()
+    if (cmd != null) {
+      cmd.applyToPlayer()
+      applyEmissaryWalkCameraRotation(player)
+      ensureEmissaryWalkMovement(player, pathTarget)
+    } else if (lastEmissaryPathTarget != null) {
+      applyEmissaryWalkCameraRotation(player)
+      applyEmissaryWalkFallbackMovement(player, pathTarget)
+    }
+    syncEmissaryWalkKeys()
     setStatus("Walking to ${target.label}...")
   }
 
@@ -621,9 +676,9 @@ object CommissionMacroModule : Module("Commission Macro") {
     setStatus("Opening ${target.label}... (attempt $openAttempts)")
   }
 
-  // ---- State: WARP_TO_FORGE ----
+  // ---- State: WARP_TO_ROUTE_START ----
 
-  private fun handleWarpToForge() {
+  private fun handleWarpToRouteStart() {
     if (stateTick == 1L) {
       (mc.player as? LocalPlayer)?.connection?.sendCommand("warp forge")
       areaText.value = "Forge"
@@ -676,8 +731,8 @@ object CommissionMacroModule : Module("Commission Macro") {
       mc.player?.closeContainer()
       openAttempts = 0
       setStatus("Commission: ${selected.label}")
-      if (mode.usesWarps) {
-        transition(State.WARP_TO_FORGE)
+      if (selected.type == CommissionType.MINING) {
+        transition(State.WARP_TO_ROUTE_START)
       } else {
         transition(State.MINING)
       }
@@ -738,6 +793,24 @@ object CommissionMacroModule : Module("Commission Macro") {
 
     if (!workModuleIsActive(c)) {
       stopEmissaryNavigation()
+
+      // Navigation route just finished — hand off to the mining/combat macro instead of
+      // restarting the route from point 0, which caused an infinite restart loop where the
+      // player was walked backward and mining never started.
+      if (activeMiningRouteName != null && !RoutesModule.isRunning) {
+        val routeCompletionAnchor = RoutesModule.getLastAutomationCompletionPos() ?: player?.blockPosition()
+        activeMiningRouteName = null
+        when (c.type) {
+          CommissionType.MINING ->
+            MiningMacroModule.startForAutomation(preferredMiningMacroMineTypes(c), anchor = routeCompletionAnchor)
+          CommissionType.COMBAT -> CombatMacroModule.startForAutomation(c.target)
+        }
+        val action = if (c.type == CommissionType.MINING) "Mining" else "Combat"
+        setStatus("$action: ${c.label}")
+        ChatUtils.sendMessage("Commission Macro: route complete, starting ${action.lowercase()} - ${c.label}")
+        return
+      }
+
       startWorkModule(c)
       val action = if (c.type == CommissionType.MINING) "Mining" else "Combat"
       setStatus("$action: ${c.label}")
@@ -749,7 +822,7 @@ object CommissionMacroModule : Module("Commission Macro") {
 
   private fun handleReturnToDwarves() {
     val mode = refreshMode(mc.player)
-    if (!mode.usesWarps || mode.usesPigeon) {
+    if (mode.usesPigeon) {
       transitionToTurnIn(mode)
       return
     }
@@ -759,10 +832,7 @@ object CommissionMacroModule : Module("Commission Macro") {
       setStatus("Returning to Emissary Eliza...")
     }
     if (stateTick >= 100L) {
-      openAttempts = 0
-      readAttempts = 0
-      claimAttempts = 0
-      transition(State.WALK_TO_EMISSARY)
+      transitionToCommissionSource(mode, alreadyAtSource = false, allowDwarvenWarp = false)
     }
   }
 
@@ -784,25 +854,15 @@ object CommissionMacroModule : Module("Commission Macro") {
   private fun ensureCommissionSourceAvailable(player: Player, mode: CommissionMode): Boolean {
     if (mode.usesPigeon) return true
     if (resolveEmissaryTarget(player, mode) != null) return true
-    disableForMissingEmissaryTarget()
+    if (shouldWarpToForgeForEmissary(mode, alreadyAtSource = false)) return true
+    if (shouldWarpToDwarvesForEmissary(mode, alreadyAtSource = false)) return true
+    disableForMissingEmissaryTarget(mode)
     return false
   }
 
   private fun transitionToLoopStart(mode: CommissionMode) {
-    when {
-      mode.usesPigeon -> {
-        setStatus("Opening Royal Pigeon...")
-        transition(State.OPEN_PIGEON)
-      }
-      mode.usesWarps -> {
-        setStatus("Warping to dwarves...")
-        transition(State.WARP_TO_DWARVES)
-      }
-      else -> {
-        setStatus("Walking to emissary...")
-        transition(State.WALK_TO_EMISSARY)
-      }
-    }
+    MiningProfitTracker.resetSession()
+    transitionToCommissionSource(mode, alreadyAtSource = false, allowDwarvenWarp = true)
   }
 
   private fun transitionToTurnIn(mode: CommissionMode) {
@@ -814,18 +874,26 @@ object CommissionMacroModule : Module("Commission Macro") {
         setStatus("Opening Royal Pigeon...")
         transition(State.OPEN_PIGEON)
       }
-      mode.usesWarps -> {
+      shouldWarpToForgeForEmissary(mode, alreadyAtSource = false) -> {
+        setStatus("Returning to forge emissary...")
+        transition(State.WARP_TO_FORGE_EMISSARY)
+      }
+      shouldWarpToDwarvesForEmissary(mode, alreadyAtSource = false) -> {
         setStatus("Returning to Emissary Eliza...")
         transition(State.RETURN_TO_DWARVES)
       }
       else -> {
-        setStatus("Walking to emissary...")
-        transition(State.WALK_TO_EMISSARY)
+        transitionToCommissionSource(mode, alreadyAtSource = false, allowDwarvenWarp = false, allowForgeWarp = false)
       }
     }
   }
 
-  private fun transitionToCommissionSource(mode: CommissionMode, alreadyAtSource: Boolean) {
+  private fun transitionToCommissionSource(
+    mode: CommissionMode,
+    alreadyAtSource: Boolean,
+    allowDwarvenWarp: Boolean = true,
+    allowForgeWarp: Boolean = true,
+  ) {
     openAttempts = 0
     readAttempts = 0
     claimAttempts = 0
@@ -834,29 +902,96 @@ object CommissionMacroModule : Module("Commission Macro") {
         setStatus("Opening Royal Pigeon...")
         transition(State.OPEN_PIGEON)
       }
+      allowForgeWarp && shouldWarpToForgeForEmissary(mode, alreadyAtSource) -> {
+        setStatus("Warping to forge emissary...")
+        transition(State.WARP_TO_FORGE_EMISSARY)
+      }
+      allowDwarvenWarp && shouldWarpToDwarvesForEmissary(mode, alreadyAtSource) -> {
+        setStatus("Warping to dwarves...")
+        transition(State.WARP_TO_DWARVES)
+      }
       alreadyAtSource -> {
+        setStatus("Opening ${configuredEmissaryDisplayName(mode)}...")
         transition(State.OPEN_EMISSARY)
       }
       else -> {
+        setStatus("Walking to emissary...")
         transition(State.WALK_TO_EMISSARY)
       }
     }
   }
 
-  private fun getElizaTargetPos(): BlockPos? {
-    val x = elizaXText.value.trim().toDoubleOrNull() ?: return null
-    val y = elizaYText.value.trim().toDoubleOrNull() ?: return null
-    val z = elizaZText.value.trim().toDoubleOrNull() ?: return null
-    return BlockPos.containing(x, y, z)
+  private fun shouldWarpToDwarvesForEmissary(
+    mode: CommissionMode,
+    alreadyAtSource: Boolean
+  ): Boolean {
+    if (getEmissaryWarpDestination(mode) != RouteWarpDestination.DWARVES) return false
+    if (mode.usesPigeon || alreadyAtSource) return false
+    val player = mc.player ?: return true
+    val target = resolveEmissaryTarget(player, mode) ?: return true
+    target.interactionEntity?.let { entity ->
+      if (player.distanceToSqr(entity) <= 36.0) return false
+    }
+    return player.blockPosition().distSqr(target.walkPos) > 36.0
   }
 
-  private fun disableForMissingEmissaryTarget() {
+  private fun shouldWarpToForgeForEmissary(
+    mode: CommissionMode,
+    alreadyAtSource: Boolean
+  ): Boolean {
+    if (getEmissaryWarpDestination(mode) != RouteWarpDestination.FORGE) return false
+    if (mode.usesPigeon || alreadyAtSource) return false
+    val player = mc.player ?: return true
+    val target = resolveEmissaryTarget(player, mode) ?: return true
+    target.interactionEntity?.let { entity ->
+      if (player.distanceToSqr(entity) <= 36.0) return false
+    }
+    return player.blockPosition().distSqr(target.walkPos) > 36.0
+  }
+
+  private fun getEmissaryWarpDestination(mode: CommissionMode): RouteWarpDestination? =
+    when {
+      mode.usesPigeon -> null
+      else -> getRouteWarpDestination()
+    }
+
+  private fun configuredEmissaryDisplayName(mode: CommissionMode): String =
+    if (shouldUseForgeEmissaryRoute(mode)) "emissary" else "Emissary Eliza"
+
+  private fun getRouteWarpDestination(): RouteWarpDestination =
+    when (routeWarpSetting.value) {
+      1 -> RouteWarpDestination.DWARVES
+      else -> RouteWarpDestination.FORGE
+    }
+
+  private fun getElizaTargetPos(): BlockPos = elizaTargetPos
+
+  private fun disableForMissingEmissaryTarget(mode: CommissionMode = currentMode) {
     setStatus("Missing emissary target")
-    ChatUtils.sendMessage("Commission Macro: configure Eliza X/Y/Z or stand near a loaded emissary before starting. Disabling.")
+    val detail =
+      if (shouldUseForgeEmissaryRoute(mode)) "the configured forge emissary path"
+      else "hard-coded Eliza coords -37 201 -130"
+    ChatUtils.sendMessage("Commission Macro: no emissary target found near $detail. Disabling.")
     enabled.value = false
   }
 
   private fun resolveEmissaryTarget(player: Player, mode: CommissionMode): EmissaryTarget? {
+    if (shouldUseForgeEmissaryRoute(mode)) {
+      val nearestLoaded =
+        findNearestLoadedEmissaryInteractionEntity(player)
+          ?.takeIf { entity ->
+            forgeEmissaryWalkNodes.lastOrNull()?.let { end ->
+              entity.blockPosition().distSqr(end) <= 256.0
+            } ?: false
+          }
+      val walkPos =
+        nearestLoaded?.blockPosition()?.let(::findWalkTargetNear)
+          ?: forgeEmissaryWalkNodes.lastOrNull()?.let(::findWalkTargetNear)
+          ?: return null
+      val label = nearestLoaded?.let(::formatEmissaryLabel) ?: "Emissary"
+      return EmissaryTarget(walkPos, nearestLoaded, label, forgeEmissaryWalkNodes)
+    }
+
     if (!mode.usesWarps) {
       val nearestLoaded = findNearestLoadedEmissaryInteractionEntity(player)
       if (nearestLoaded != null) {
@@ -864,8 +999,51 @@ object CommissionMacroModule : Module("Commission Macro") {
       }
     }
 
-    val elizaPos = getElizaTargetPos() ?: return null
+    val elizaPos = getElizaTargetPos()
     return EmissaryTarget(findWalkTargetNear(elizaPos), findEmissaryInteractionEntity(elizaPos), "Emissary Eliza")
+  }
+
+  private fun shouldUseForgeEmissaryRoute(mode: CommissionMode): Boolean =
+    !mode.usesPigeon && getRouteWarpDestination() == RouteWarpDestination.FORGE
+
+  private fun resolveEmissaryNavigationTarget(player: Player, target: EmissaryTarget): BlockPos {
+    val finalNode = target.walkNodes.lastOrNull()
+    target.interactionEntity?.let { entity ->
+      val canDirectToEntity =
+        finalNode == null ||
+          player.blockPosition().distSqr(finalNode) <= 144.0 ||
+          player.distanceToSqr(entity) <= 100.0
+      if (canDirectToEntity) {
+        return findWalkTargetNear(entity.blockPosition())
+      }
+    }
+
+    if (target.walkNodes.isEmpty()) return target.walkPos
+
+    val node =
+      resolveNextEmissaryWalkNode(player, target.walkNodes)
+        ?: return target.walkPos
+    return findWalkTargetNear(node)
+  }
+
+  private fun resolveNextEmissaryWalkNode(player: Player, nodes: List<BlockPos>): BlockPos? {
+    if (nodes.isEmpty()) return null
+
+    val playerPos = player.blockPosition()
+    if (activeEmissaryWalkNodeIndex !in nodes.indices) {
+      activeEmissaryWalkNodeIndex =
+        nodes.indices.minByOrNull { index ->
+          playerPos.distSqr(nodes[index])
+        } ?: 0
+    }
+
+    while (activeEmissaryWalkNodeIndex < nodes.lastIndex) {
+      val currentNode = nodes[activeEmissaryWalkNodeIndex]
+      if (playerPos.distSqr(currentNode) > 9.0) break
+      activeEmissaryWalkNodeIndex++
+    }
+
+    return nodes[activeEmissaryWalkNodeIndex.coerceIn(0, nodes.lastIndex)]
   }
 
   private fun findEmissaryInteractionEntity(targetPos: BlockPos): Entity? {
@@ -990,11 +1168,137 @@ object CommissionMacroModule : Module("Commission Macro") {
   private fun nativePathActive(): Boolean =
     NativePathfinder.status.let { it != PathStatus.IDLE && it != PathStatus.ARRIVED && it != PathStatus.FAILED }
 
+  private fun startEmissaryNavigation(target: BlockPos) {
+    PathfindingModule.ensureEnabledForAutomation("commission macro")
+    NativePathfinder.stop()
+    MovementManager.setMovementLock(false)
+    NativePathfinder.setTarget(target.x + 0.5, target.y.toDouble(), target.z + 0.5)
+    lastEmissaryPathTarget = target
+  }
+
+  private fun ensureEmissaryWalkMovement(player: Player, target: BlockPos) {
+    if (
+      MovementManager.forcedForward ||
+      MovementManager.forcedBackward ||
+      MovementManager.forcedLeft ||
+      MovementManager.forcedRight ||
+      MovementManager.forcedJump
+    ) {
+      return
+    }
+    applyEmissaryWalkFallbackMovement(player, target)
+  }
+
+  private fun applyEmissaryWalkFallbackMovement(player: Player, target: BlockPos) {
+    val dx = (target.x + 0.5) - player.x
+    val dz = (target.z + 0.5) - player.z
+    val len = kotlin.math.sqrt(dx * dx + dz * dz)
+    if (len < 0.05) {
+      MovementManager.clearForcedMovement()
+      return
+    }
+
+    val nx = dx / len
+    val nz = dz / len
+    val yawRad = Math.toRadians(player.yRot.toDouble())
+    val sinYaw = kotlin.math.sin(yawRad)
+    val cosYaw = kotlin.math.cos(yawRad)
+    val fwd = (-nx * sinYaw + nz * cosYaw).toFloat()
+    val str = (nx * cosYaw + nz * sinYaw).toFloat()
+    val threshold = 0.2f
+
+    MovementManager.setMovementLock(true)
+    MovementManager.setForcedMovement(
+      forward = fwd > threshold,
+      backward = fwd < -threshold,
+      left = str < -threshold,
+      right = str > threshold,
+      jump = player.onGround() && player.horizontalCollision,
+      shift = false,
+      sprint = false
+    )
+  }
+
+  private fun applyEmissaryWalkCameraRotation(player: Player) {
+    val lookPoint = resolveEmissaryWalkLookPoint(player) ?: return
+    val rotation = AngleUtils.getRotation(player.eyePosition, lookPoint)
+    player.setYRot(rotation.yaw)
+    player.setXRot(rotation.pitch)
+    player.yHeadRot = rotation.yaw
+    player.yBodyRot = rotation.yaw
+  }
+
+  private fun resolveEmissaryWalkLookPoint(player: Player): Vec3? {
+    val nodes = NativePathfinder.cachedPathNodes
+    if (nodes.isNotEmpty()) {
+      val nearestIndex = nearestEmissaryWalkNodeIndex(player, nodes)
+      if (nearestIndex >= 0) {
+        val guideIndex = (nearestIndex + 2).coerceAtMost(nodes.lastIndex)
+        val guideNode = nodes[guideIndex]
+        return Vec3(guideNode.x, maxOf(guideNode.y + 0.6, player.eyePosition.y), guideNode.z)
+      }
+    }
+
+    val target = lastEmissaryPathTarget ?: return null
+    return Vec3(target.x + 0.5, target.y + 0.6, target.z + 0.5)
+  }
+
+  private fun nearestEmissaryWalkNodeIndex(player: Player, nodes: List<Vec3>): Int {
+    var nearestIndex = -1
+    var nearestDistSq = Double.POSITIVE_INFINITY
+    for (index in nodes.indices) {
+      val node = nodes[index]
+      val dx = node.x - player.x
+      val dz = node.z - player.z
+      val distSq = dx * dx + dz * dz
+      if (distSq < nearestDistSq) {
+        nearestDistSq = distSq
+        nearestIndex = index
+      }
+    }
+    return nearestIndex
+  }
+
   private fun stopEmissaryNavigation() {
     if (nativePathActive()) {
-      PathfindingModule.stopPath()
+      NativePathfinder.stop()
     }
+    MovementManager.clearForcedMovement()
+    MovementManager.setMovementLock(false)
+    setEmissaryWalkKeys(false, false, false, false, false, false, false)
     lastEmissaryPathTarget = null
+    activeEmissaryWalkNodeIndex = -1
+  }
+
+  private fun syncEmissaryWalkKeys() {
+    val hasForcedMovement = MovementManager.hasForcedMovement
+    setEmissaryWalkKeys(
+      forward = hasForcedMovement && MovementManager.forcedForward,
+      backward = hasForcedMovement && MovementManager.forcedBackward,
+      left = hasForcedMovement && MovementManager.forcedLeft,
+      right = hasForcedMovement && MovementManager.forcedRight,
+      jump = hasForcedMovement && MovementManager.forcedJump,
+      shift = hasForcedMovement && MovementManager.forcedShift,
+      sprint = hasForcedMovement && MovementManager.forcedSprint,
+    )
+  }
+
+  private fun setEmissaryWalkKeys(
+    forward: Boolean,
+    backward: Boolean,
+    left: Boolean,
+    right: Boolean,
+    jump: Boolean,
+    shift: Boolean,
+    sprint: Boolean,
+  ) {
+    mc.options.keyUp?.setDown(forward)
+    mc.options.keyDown?.setDown(backward)
+    mc.options.keyLeft?.setDown(left)
+    mc.options.keyRight?.setDown(right)
+    mc.options.keyJump?.setDown(jump)
+    mc.options.keyShift?.setDown(shift)
+    mc.options.keySprint?.setDown(sprint)
   }
 
   /** Parse active commissions from the open GUI, prioritising exact known commission names first. */
@@ -1262,7 +1566,14 @@ object CommissionMacroModule : Module("Commission Macro") {
     when (c.type) {
       CommissionType.MINING -> {
         val routeName = findMatchingRouteName(c)
-        if (routeName != null && RoutesModule.loadAndStartAutomationRoute(routeName, startNearest = false)) {
+        if (
+          routeName != null &&
+            RoutesModule.loadAndStartAutomationRoute(
+              routeName,
+              startNearest = false,
+              automationSource = "commission automation",
+            )
+        ) {
           activeMiningRouteName = routeName
           ChatUtils.sendMessage("Commission Macro: using route \"$routeName\" for ${c.label}.")
           return
@@ -1273,7 +1584,7 @@ object CommissionMacroModule : Module("Commission Macro") {
           ChatUtils.sendMessage("Commission Macro: no route assigned or matched for ${c.label}. Falling back to mining macro.")
         }
         activeMiningRouteName = null
-        MiningMacroModule.startForAutomation(c.mineTypes)
+        MiningMacroModule.startForAutomation(preferredMiningMacroMineTypes(c))
       }
       CommissionType.COMBAT -> {
         activeMiningRouteName = null
@@ -1400,6 +1711,14 @@ object CommissionMacroModule : Module("Commission Macro") {
       }
       "Mithril (Gray)", "Mithril (Dark)", "Mithril (Hot)" -> dwarvenMithrilTypes
       else -> requiredTypes
+    }
+  }
+
+  private fun preferredMiningMacroMineTypes(c: Commission): String {
+    return when (c.target) {
+      "Titanium", "Mithril (Gray)", "Mithril (Dark)", "Mithril (Hot)" ->
+        "Mithril (Gray), Mithril (Dark), Mithril (Hot)"
+      else -> c.mineTypes
     }
   }
 
