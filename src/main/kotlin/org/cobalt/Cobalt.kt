@@ -28,24 +28,31 @@ import org.cobalt.internal.mining.FairyModule
 import org.cobalt.internal.mining.RoutesModule
 import org.cobalt.internal.mining.MiningMacroModule
 import org.cobalt.internal.mining.MiningHudModule
+import org.cobalt.internal.mining.MiningCoinPopupModule
 import org.cobalt.internal.mining.CommissionMacroModule
+import org.cobalt.internal.mining.AutoForgeModule
 import org.cobalt.internal.mining.VeinDirectionModule
 import org.cobalt.internal.mining.AutoLanternModule
 import org.cobalt.internal.pathfinding.PathfindingModule
 import org.cobalt.internal.pathfinding.PatrolWaypointStore
 import org.cobalt.internal.qol.AutoStashModule
+import org.cobalt.internal.qol.ItemLockingModule
+import org.cobalt.internal.qol.PriceTooltipModule
 import org.cobalt.internal.qol.QolModule
+import org.cobalt.internal.stats.MacroTimeTracker
 import org.cobalt.internal.visual.BlockOverlayModule
 import org.cobalt.internal.visual.BlockOutlineModule
 import org.cobalt.internal.visual.DarkModeModule
 import org.cobalt.internal.visual.FreecamModule
 import org.cobalt.internal.visual.FullBrightModule
+import org.cobalt.internal.visual.SkyboxChangerModule
 import org.cobalt.internal.rotation.RotationsModule
 import org.cobalt.internal.visual.DeployableHudModule
 import org.cobalt.internal.visual.HotbarOverlayModule
 import org.cobalt.internal.visual.OrbitFreecamModule
 import org.cobalt.internal.visual.PetDisplayModule
 import org.cobalt.internal.visual.TitleScreenRenderer
+import org.cobalt.internal.garden.GardenAnalyzerModule
 import org.cobalt.internal.garden.GardenMacroModule
 import org.cobalt.internal.farming.FarmingMacroModule
 import org.cobalt.internal.pig.PigMacroModule
@@ -67,10 +74,12 @@ object Cobalt : ClientModInitializer {
         InventoryHudModule(),
         MiningModule,
         MiningHudModule,
+        MiningCoinPopupModule,
         FairyModule,
         RoutesModule,
         MiningMacroModule,
         CommissionMacroModule,
+        AutoForgeModule,
         VeinDirectionModule,
         AutoLanternModule,
         CombatMacroModule,
@@ -81,6 +90,7 @@ object Cobalt : ClientModInitializer {
         LeftClickEtherwarpModule,
         PathfindingModule,
         FullBrightModule,
+        SkyboxChangerModule,
         DarkModeModule,
         FreecamModule,
         DeployableHudModule,
@@ -88,10 +98,13 @@ object Cobalt : ClientModInitializer {
         BlockOverlayModule,
         BlockOutlineModule,
         QolModule,
+        ItemLockingModule,
+        PriceTooltipModule,
         AutoStashModule,
         RotationsModule,
         HotbarOverlayModule,
         PetDisplayModule,
+        GardenAnalyzerModule,
         GardenMacroModule,
         FarmingMacroModule,
         PigMacroModule,
@@ -111,13 +124,15 @@ object Cobalt : ClientModInitializer {
 
     CommandManager.register(MainCommand)
     CommandManager.dispatchAll()
+    MacroTimeTracker.load()
 
     listOf(
       TickScheduler, MainCommand, NotificationManager,
-      RotationExecutor, HudModuleManager, TitleScreenRenderer,
+      RotationExecutor, HudModuleManager, TitleScreenRenderer, MacroTimeTracker,
     ).forEach { EventBus.register(it) }
     NativePathfinder.init()
     Config.loadModulesConfig()
+    ItemLockingModule.loadPersistedState()
     WardrobeModule.loadFavorites()
     PatrolWaypointStore.load()
     EventBus.register(this)
