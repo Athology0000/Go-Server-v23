@@ -1,0 +1,68 @@
+/*
+ * Decompiled with CFR 0.152.
+ * 
+ * Could not load the following classes:
+ *  net.fabricmc.api.EnvType
+ *  net.fabricmc.api.Environment
+ *  net.minecraft.resources.Identifier
+ *  net.minecraft.tags.EntityTypeTags
+ *  net.minecraft.world.entity.EquipmentSlot
+ *  net.minecraft.world.entity.LivingEntity
+ *  net.minecraft.world.entity.animal.equine.AbstractHorse
+ *  net.minecraft.world.entity.animal.equine.Llama
+ *  net.minecraft.world.entity.player.Inventory
+ *  net.minecraft.world.inventory.HorseInventoryMenu
+ *  org.jspecify.annotations.Nullable
+ */
+package net.minecraft.client.gui.screens.inventory;
+
+import net.fabricmc.api.EnvType;
+import net.fabricmc.api.Environment;
+import net.minecraft.client.gui.screens.inventory.AbstractMountInventoryScreen;
+import net.minecraft.resources.Identifier;
+import net.minecraft.tags.EntityTypeTags;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.animal.equine.AbstractHorse;
+import net.minecraft.world.entity.animal.equine.Llama;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.inventory.HorseInventoryMenu;
+import org.jspecify.annotations.Nullable;
+
+@Environment(value=EnvType.CLIENT)
+public class HorseInventoryScreen
+extends AbstractMountInventoryScreen<HorseInventoryMenu> {
+    private static final Identifier SLOT_SPRITE = Identifier.withDefaultNamespace((String)"container/slot");
+    private static final Identifier CHEST_SLOTS_SPRITE = Identifier.withDefaultNamespace((String)"container/horse/chest_slots");
+    private static final Identifier HORSE_INVENTORY_LOCATION = Identifier.withDefaultNamespace((String)"textures/gui/container/horse.png");
+
+    public HorseInventoryScreen(HorseInventoryMenu horseInventoryMenu, Inventory inventory, AbstractHorse abstractHorse, int i) {
+        super(horseInventoryMenu, inventory, abstractHorse.getDisplayName(), i, (LivingEntity)abstractHorse);
+    }
+
+    @Override
+    protected Identifier getBackgroundTextureLocation() {
+        return HORSE_INVENTORY_LOCATION;
+    }
+
+    @Override
+    protected Identifier getSlotSpriteLocation() {
+        return SLOT_SPRITE;
+    }
+
+    @Override
+    protected @Nullable Identifier getChestSlotsSpriteLocation() {
+        return CHEST_SLOTS_SPRITE;
+    }
+
+    @Override
+    protected boolean shouldRenderSaddleSlot() {
+        return this.mount.canUseSlot(EquipmentSlot.SADDLE) && this.mount.getType().is(EntityTypeTags.CAN_EQUIP_SADDLE);
+    }
+
+    @Override
+    protected boolean shouldRenderArmorSlot() {
+        return this.mount.canUseSlot(EquipmentSlot.BODY) && (this.mount.getType().is(EntityTypeTags.CAN_WEAR_HORSE_ARMOR) || this.mount instanceof Llama);
+    }
+}
+

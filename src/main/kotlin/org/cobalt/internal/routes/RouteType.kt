@@ -17,10 +17,12 @@ enum class SubRouteKey(val label: String, val icon: String) {
 }
 
 enum class RoutePointType(val id: String, val label: String, val icon: String) {
-    WALK("walk", "Walk", "\uD83D\uDEB6"),   // 🚶
-    WARP("warp", "Warp", "\u26A1"),         // ⚡
-    MINE("mine", "Mine", "\u26CF"),         // ⛏
-    KILL("kill", "Kill", "\u2694");         // ⚔
+    WALK("walk", "Walk", "\uD83D\uDEB6"),       // 🚶
+    WARP("warp", "Warp", "\u26A1"),             // ⚡
+    MINE("mine", "Anchor", "\u26CF"),           // ⛏  (mine anchor point)
+    VEIN("vein", "Vein", "\uD83D\uDCA0"),       // 💠  (vein mining point)
+    LANTERN("lantern", "Lantern", "\uD83D\uDD6F"), // 🕯  (auto-lantern placement)
+    KILL("kill", "Kill", "\u2694");             // ⚔
 
     companion object {
         fun fromId(id: String?): RoutePointType =
@@ -32,7 +34,7 @@ enum class RoutePointType(val id: String, val label: String, val icon: String) {
 fun allowedPointTypes(type: RouteType, sub: SubRouteKey): List<RoutePointType> = when (type) {
     RouteType.ORE_MINER -> when (sub) {
         SubRouteKey.TRAVEL -> listOf(RoutePointType.WALK, RoutePointType.WARP)
-        SubRouteKey.LOOP   -> listOf(RoutePointType.WARP, RoutePointType.MINE)
+        SubRouteKey.LOOP   -> listOf(RoutePointType.WARP, RoutePointType.MINE, RoutePointType.VEIN, RoutePointType.LANTERN)
         else -> emptyList()
     }
     RouteType.COMMISSION -> when (sub) {
@@ -45,11 +47,11 @@ fun allowedPointTypes(type: RouteType, sub: SubRouteKey): List<RoutePointType> =
         else -> emptyList()
     }
     RouteType.GEMSTONE -> when (sub) {
-        SubRouteKey.POINTS -> listOf(RoutePointType.WARP, RoutePointType.MINE)
+        SubRouteKey.POINTS -> listOf(RoutePointType.WARP, RoutePointType.MINE, RoutePointType.VEIN, RoutePointType.LANTERN)
         else -> emptyList()
     }
     RouteType.TUNNEL -> when (sub) {
-        SubRouteKey.POINTS -> listOf(RoutePointType.WALK, RoutePointType.WARP, RoutePointType.MINE)
+        SubRouteKey.POINTS -> listOf(RoutePointType.WALK, RoutePointType.WARP, RoutePointType.MINE, RoutePointType.VEIN, RoutePointType.LANTERN)
         else -> emptyList()
     }
 }

@@ -1,5 +1,9 @@
 package org.cobalt.internal.ui.panel.panels
 
+import org.cobalt.api.addon.Addon
+import org.cobalt.api.addon.AddonMetadata
+import org.cobalt.api.module.Module
+import org.cobalt.api.module.ModuleManager
 import net.minecraft.client.Minecraft
 import org.cobalt.api.ui.theme.ThemeManager
 import org.cobalt.api.util.ui.NVGRenderer
@@ -32,6 +36,26 @@ internal class UISidebar : UIPanel(
     UIConfig.swapBodyPanel(UIThemeSelector())
   }
 
+  private val routesButton = UIButton("/assets/cobalt/textures/ui/routes.svg", "Routes") {
+    UIConfig.swapBodyPanel(UIRoutesPanel())
+  }
+
+  private val macrosButton = UIButton("/assets/cobalt/textures/ui/macros.svg", "Macros") {
+    openQuickModules(
+      "cobalt-quick-macros",
+      "Macros",
+      ModuleManager.getModules().filter { it.name.contains("macro", ignoreCase = true) }
+    )
+  }
+
+  private val navButtons = listOf(
+    moduleButton,
+    hudButton,
+    designButton,
+    routesButton,
+    macrosButton
+  )
+
   private val steveIcon = NVGRenderer.createImage("/assets/cobalt/textures/steve.png")
   private var cachedProfileId = Minecraft.getInstance().user.profileId.toString()
   private var userIcon = loadUserIcon(cachedProfileId)
@@ -42,9 +66,7 @@ internal class UISidebar : UIPanel(
   )
 
   init {
-    components.addAll(
-      listOf(moduleButton, hudButton, designButton)
-    )
+    components.addAll(navButtons)
   }
 
   override fun render() {
@@ -52,20 +74,15 @@ internal class UISidebar : UIPanel(
     NVGRenderer.rect(x, y, width, height, ThemeManager.currentTheme.background, 10F)
     NVGRenderer.text("cb", x + width / 2F - 15F, y + 25F, 25F, ThemeManager.currentTheme.text)
 
-    moduleButton
-      .setSelected(true)
-      .updateBounds(x + (width / 2F) - (moduleButton.width / 2F), y + 75F)
-      .render()
+    navButtons.forEachIndexed { index, button ->
+      val buttonX = x + (width / 2F) - (button.width / 2F)
+      val buttonY = y + 75F + index * NAV_BUTTON_GAP
 
-    hudButton
-      .setSelected(isHoveringOver(x + (width / 2F) - (hudButton.width / 2F), y + 75F + 35F, hudButton.width, hudButton.height))
-      .updateBounds(x + (width / 2F) - (hudButton.width / 2F), y + 75F + 35F)
-      .render()
-
-    designButton
-      .setSelected(isHoveringOver(x + (width / 2F) - (designButton.width / 2F), y + 75F + 70F, designButton.width, designButton.height))
-      .updateBounds(x + (width / 2F) - (designButton.width / 2F), y + 75F + 70F)
-      .render()
+      button
+        .setSelected(index == 0 || isHoveringOver(buttonX, buttonY, button.width, button.height))
+        .updateBounds(buttonX, buttonY)
+        .render()
+    }
 
     val userIconX = x + (width / 2F) - 16F
     val userIconY = y + height - 32F - 20F
@@ -107,6 +124,25 @@ internal class UISidebar : UIPanel(
     } catch (_: Exception) {
       steveIcon
     }
+  }
+
+  private fun openQuickModules(
+    id: String,
+    name: String,
+    modules: List<Module>,
+  ) {
+    if (modules.isEmpty()) return
+
+    UIConfig.swapBodyPanel(
+      UIModuleList(
+        AddonMetadata(id, name, "builtin", emptyList(), emptyList()),
+        object : Addon() {
+          override fun onLoad() {}
+          override fun onUnload() {}
+          override fun getModules(): List<Module> = modules
+        }
+      )
+    )
   }
 
   private class UIButton(
@@ -151,6 +187,10 @@ internal class UISidebar : UIPanel(
       return false
     }
 
+  }
+
+  companion object {
+    private const val NAV_BUTTON_GAP = 35F
   }
 
 }

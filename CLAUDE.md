@@ -11,10 +11,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Run Minecraft client with the mod loaded (development)
 ./gradlew runClient
 
-# Build output is in build/libs/
+# Build and deploy directly to Prism Launcher mods folder
+./gradlew deployMod
+
+# Build the native pathfinder DLL (Windows, requires VS + CMake build dir already configured)
+./gradlew buildNative
+# Or rebuild + copy into resources in one step:
+./gradlew copyNativeDll
+
+# First-time native setup (run once from the natives/ directory)
+# cmake -S . -B build
+# then ./gradlew buildNative
 ```
 
-There are no unit tests in this project.
+Build output is in `build/libs/`. There are no unit tests in this project.
 
 ## Project Overview
 
@@ -37,7 +47,8 @@ src/main/
       hud/             # HudElement, HudModuleManager, hudElement() DSL
       module/          # Module base class, ModuleManager, Setting system
       notification/    # NotificationManager
-      pathfinder/      # A* pathfinder, nodes, path execution, movement rules
+      pathfinder/      # A* pathfinder, JNI bridge, movement rules
+        jni/           # NativePathfinder, WorldBufferSerializer, PathCommand, etc.
       rotation/        # RotationExecutor, IRotationStrategy, strategies
       ui/theme/        # Theme system (ThemeManager, ThemePalette, presets)
       util/            # ChatUtils, AngleUtils, NVGRenderer, MovementManager, etc.
@@ -52,13 +63,17 @@ src/main/
       helper/          # Config (save/load), WalkbackBridge
       loader/          # AddonLoader — discovers and loads addon JARs
       mining/          # MiningModule, MiningMacroModule, RoutesModule, etc.
-      pathfinding/     # DuskPathfinder, HeadRotationModule, path profiles
+      pathfinding/     # PathfindingModule (UI), HeadRotationModule, path profiles
       pig/             # PigMacroModule
       qol/             # QolModule
       rotation/        # RotationsModule
       spotify/         # SpotifyModule
       ui/              # All NanoVG UI — panels, components, HUD editor, themes
       visual/          # FullBright, DarkMode, BlockOverlay, Freecam, etc.
+natives/               # C++20 JNI pathfinder DLL (cobalt_pathfinder.dll)
+  include/Types.h      # Shared enums/structs (PathStatus, ActionType, MovementProfile, Vec3*)
+  src/engine/          # AStarPlanner, PathExecutor, MovementExpander, RotationController, StuckDetector
+  CMakeLists.txt       # CMake build (MSVC, /O2)
 ```
 
 ## Core Systems
@@ -110,8 +125,23 @@ Settings and HUD positions are serialized automatically to `config/cobalt/addons
 ### Rotation System
 `RotationExecutor` applies GCD-aware rotation smoothing each render frame (`WorldRenderEvent.Last`). Call `RotationExecutor.rotateTo(endRot, strategy)` with an `IRotationStrategy`. Built-in strategies: `BezierTrackingRotationStrategy`, `TimedEaseStrategy`, `TrackingRotationStrategy`, `HeadRotationStrategy`.
 
-### Pathfinding
-`DuskPathfinder` (internal) wraps the `AStarPathfinder` from the API. `PathfindingModule` is the user-facing control surface. `PathPlanProfiles` defines preconfigured `PathfinderConfiguration` instances for different movement profiles.
+### Native Pathfinder (JNI)
+The primary pathfinder is a C++ DLL loaded via JNI (`cobalt_pathfinder.dll`, built from `natives/`). The Kotlin `api/pathfinder` A* is a secondary/addon-facing API.
+
+**Data flow each tick:**
+1. `WorldBufferSerializer.serialize()` produces a `96×40×96` byte array centred on the player (block types: 0=AIR, 1=SOLID, 2=WATER, 3=LAVA, 4=LADDER, 5=STEP). The serializer caches aggressively — same-block returns the old buffer; single-block moves do incremental slice updates (~4k reads instead of ~369k).
+2. `NativePathfinder.tick()` passes the buffer + player state to `NativePathfinderBridge.update()`, which returns an `int[10]` packed result.
+3. The returned `PathCommand` is applied via `PathCommand.applyToPlayer()`, which resolves rotation and strafe inputs from a lookahead guide point along the node list.
+
+`NativePathfinder` is a singleton (`object`). Key methods: `setTarget`, `setTargetWithRadius`, `setRoute`, `stop`, `tick`, `onLevelChange` (call when player changes dimension to flush caches). `cachedPathNodes` (List<Vec3>) is updated on EXECUTING transitions and used by `PathCommand` for lookahead.
+
+`MovementProfile` values: `DEFAULT`, `MINING`, `COMBAT`, `GROUND_ONLY`. Pass via `NativePathfinder.setRoute(waypoints, loop, profile)`.
+
+### Movement Control
+`MovementManager` (singleton) holds `@Volatile` flags intercepted by mixins. Use `setMovementLock(true)` + `setForcedMovement(...)` to take over player inputs; call `setMovementLock(false)` or `clearForcedMovement()` to release. `forcedActionsEnabled` must be set explicitly to control attack/use keys.
+
+### TickScheduler
+`TickScheduler.schedule(delayTicks, action)` queues a `Runnable` to fire after `delayTicks` game ticks. It is a singleton already registered with `EventBus` at startup — do not register it again.
 
 ### Theme System
 `ThemeManager.currentTheme` provides color tokens used throughout NVG rendering (e.g., `theme.accent`, `theme.panel`, `theme.overlay`). Built-in: `DarkTheme`, `LightTheme`. Custom themes are serialized as `CustomTheme`.

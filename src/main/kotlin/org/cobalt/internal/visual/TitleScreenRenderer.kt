@@ -1,363 +1,426 @@
 package org.cobalt.internal.visual
 
-import kotlin.math.*
+import kotlin.math.PI
+import kotlin.math.max
 import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.GuiGraphics
 import net.minecraft.client.gui.screens.TitleScreen
 import org.cobalt.api.event.EventBus
 import org.cobalt.api.event.annotation.SubscribeEvent
 import org.cobalt.api.event.impl.render.NvgEvent
 import org.cobalt.api.util.ui.NVGRenderer
 import org.cobalt.api.util.ui.helper.Gradient
+import org.cobalt.internal.ui.animation.RiseAnimation
+import org.cobalt.internal.ui.animation.RiseEasing
+import org.cobalt.render.TitleBackgroundRenderer
+import org.cobalt.render.rise.GlowButton
+import org.cobalt.render.rise.RenderTarget
+import org.cobalt.render.rise.ShaderRegistry
+import org.cobalt.render.rise.UiShaderDrawHelper
+import org.lwjgl.opengl.GL11
+import org.lwjgl.opengl.GL30
 
 object TitleScreenRenderer {
 
+  private const val TITLE_TEXT = "Dutt Client"
+
   private val mc = Minecraft.getInstance()
+
   private var mouseGuiX = 0
   private var mouseGuiY = 0
+  private var wasTitleScreen = false
 
-  init { EventBus.register(this) }
+  private val introAnimation = RiseAnimation(0.0)
+  private val hoverAnimations = hashMapOf<String, RiseAnimation>()
 
-  fun setMousePos(x: Int, y: Int) { mouseGuiX = x; mouseGuiY = y }
+  private val glowMaskTarget = RenderTarget()
+  private val glowOutlineTarget = RenderTarget()
+  private val glowBlurTargetA = RenderTarget()
+  private val glowBlurTargetB = RenderTarget()
+  private val titleGlowMaskTarget = RenderTarget(true)
+  private val titleGlowBlurTargetA = RenderTarget()
+  private val titleGlowBlurTargetB = RenderTarget()
 
-  @SubscribeEvent
-  fun onNvg(event: NvgEvent) {
-    if (mc.screen !is TitleScreen) return
-    val sw = mc.window.screenWidth.toFloat()
-    val sh = mc.window.screenHeight.toFloat()
-    val sc = mc.window.guiScale.toFloat()
-    val gw = mc.window.guiScaledWidth.toFloat()
-    val gh = mc.window.guiScaledHeight.toFloat()
-    val t  = System.currentTimeMillis() / 1000.0
+  init {
+    EventBus.register(this)
+  }
 
-    NVGRenderer.beginFrame(sw, sh)
-    drawBackground(sw, sh, t)
-    drawStars(sw, sh, t)
-    drawLightningNodes(sw, sh, t)
-    drawTitle(sw, sh, sc, t)
-    drawButtons(gw, gh, sc, t)
+  fun setMousePos(x: Int, y: Int) {
+    mouseGuiX = x
+    mouseGuiY = y
+  }
+
+  fun render(@Suppress("UNUSED_PARAMETER") guiGraphics: GuiGraphics, mouseX: Int, mouseY: Int, @Suppress("UNUSED_PARAMETER") partialTick: Float) {
+    setMousePos(mouseX, mouseY)
+
+    if (mc.screen !is TitleScreen) {
+      resetState()
+      return
+    }
+
+    if (!wasTitleScreen) {
+      wasTitleScreen = true
+      introAnimation.snap(0.0)
+      introAnimation.run(1.0, 520L, RiseEasing.EASE_OUT_EXPO)
+    }
+
+    val screenWidth = mc.window.screenWidth.toFloat()
+    val screenHeight = mc.window.screenHeight.toFloat()
+    val guiScale = mc.window.guiScale.toFloat()
+    val guiWidth = mc.window.guiScaledWidth.toFloat()
+    val guiHeight = mc.window.guiScaledHeight.toFloat()
+    val timeSeconds = (System.currentTimeMillis() % 1_000_000L) / 1000.0f
+    val intro = introAnimation.getValue().toFloat().coerceIn(0f, 1f)
+    val buttons = buildButtons(guiWidth, guiHeight, guiScale, intro)
+
+    NVGRenderer.beginFrame(screenWidth, screenHeight)
+    TitleBackgroundRenderer.renderToScreen(screenWidth.toInt(), screenHeight.toInt(), timeSeconds)
+    NVGRenderer.endFrame()
+    renderTitleLightBleed(screenWidth.toInt(), screenHeight.toInt(), guiScale, timeSeconds, intro)
+    NVGRenderer.beginFrame(screenWidth, screenHeight)
+    renderHoverBloom(buttons, screenWidth.toInt(), screenHeight.toInt())
+    renderButtons(buttons, screenHeight.toInt(), guiScale, timeSeconds, intro)
+    drawTitleText(screenWidth, screenHeight, guiScale, intro)
+    drawButtonLabels(buttons, guiScale, timeSeconds, intro)
     NVGRenderer.endFrame()
   }
 
-  // ---- Noise helpers ----
-
-  /**
-   * Domain-warped FBM using 4 octaves of sin harmonics.
-   * Domain warping distorts the input coords with a lower-frequency noise field first,
-   * producing organic non-repeating cloud shapes. The t offsets make the field drift over time.
-   */
-  private fun fbm(px: Float, py: Float, t: Double): Float {
-    val tx = t * 7.0
-    val ty = t * 4.5
-    // Domain warp: shift coords by another noise pass
-    val wx = (sin(px * 0.0030 + tx * 0.34) * 88.0 + cos(py * 0.0038 + ty * 0.27) * 62.0).toFloat()
-    val wy = (sin(py * 0.0034 - tx * 0.27) * 72.0 + cos(px * 0.0027 - ty * 0.31) * 55.0).toFloat()
-    val x  = px + wx
-    val y  = py + wy
-    // FBM
-    var v = sin(x * 0.0052 + tx * 0.07) * sin(y * 0.0060 + ty * 0.09) * 0.5000
-    v    += sin(x * 0.0107 - tx * 0.05 + 1.57) * sin(y * 0.0114 + ty * 0.11 + 0.79) * 0.2500
-    v    += sin(x * 0.0218 + tx * 0.09 + 2.36) * sin(y * 0.0230 - ty * 0.07 + 1.18) * 0.1250
-    v    += sin(x * 0.0441 - tx * 0.07 + 4.12) * sin(y * 0.0457 + ty * 0.10 + 3.24) * 0.0625
-    return ((v / 0.9375) * 0.5 + 0.5).toFloat().coerceIn(0f, 1f)
-  }
-
-  /** Radial vignette weight - bright near the upper-centre, dark at edges. */
-  private fun cloudVignette(fx: Float, fy: Float): Float {
-    val cx = fx - 0.50f
-    val cy = fy - 0.38f
-    return (1f - (cx * cx * 2.8f + cy * cy * 2.2f)).coerceIn(0f, 1f)
-  }
-
-  // ---- Background (noise cloud field) ----
-
-  private fun drawBackground(sw: Float, sh: Float, t: Double) {
-    NVGRenderer.rect(0f, 0f, sw, sh, 0xFF050810.toInt(), 0f)
-
-    val cols = 42; val rows = 26
-    val cw = sw / cols; val ch = sh / rows
-
-    // Pass 1 - wide soft glow halo (large radius, very low alpha)
-    // Gives the "lit-from-within" bloom around every cloud mass.
-    for (row in 0 until rows) {
-      for (col in 0 until cols) {
-        val px = (col + 0.5f) * cw
-        val py = (row + 0.5f) * ch
-        val n  = fbm(px, py, t)
-        if (n < 0.28f) continue
-        val intensity = ((n - 0.28f) / 0.72f).coerceIn(0f, 1f)
-        val vign  = cloudVignette(px / sw, py / sh)
-        val alpha = (intensity * vign * 22).toInt().coerceIn(0, 22)
-        if (alpha < 2) continue
-        NVGRenderer.circle(px, py, cw * 3.8f, (alpha shl 24) or 0x102888)
-      }
-    }
-
-    // Pass 2 - dense cloud body (tighter radius, moderate alpha)
-    for (row in 0 until rows) {
-      for (col in 0 until cols) {
-        val px = (col + 0.5f) * cw
-        val py = (row + 0.5f) * ch
-        val n  = fbm(px, py, t)
-        if (n < 0.46f) continue
-        val intensity = ((n - 0.46f) / 0.54f).coerceIn(0f, 1f)
-        val vign  = cloudVignette(px / sw, py / sh)
-        val alpha = (intensity.pow(1.3f) * vign * 52).toInt().coerceIn(0, 52)
-        if (alpha < 2) continue
-        val rgb = when {
-          intensity > 0.65f -> 0x1840B0
-          intensity > 0.35f -> 0x102E80
-          else              -> 0x0B2262
-        }
-        NVGRenderer.circle(px, py, cw * 1.5f, (alpha shl 24) or rgb)
-      }
-    }
-
-    // Pass 3 - bright electric core at density peaks
-    for (row in 0 until rows) {
-      for (col in 0 until cols) {
-        val px = (col + 0.5f) * cw
-        val py = (row + 0.5f) * ch
-        val n  = fbm(px, py, t)
-        if (n < 0.68f) continue
-        val intensity = ((n - 0.68f) / 0.32f).coerceIn(0f, 1f)
-        val vign  = cloudVignette(px / sw, py / sh)
-        val alpha = (intensity.pow(1.6f) * vign * 38).toInt().coerceIn(0, 38)
-        if (alpha < 2) continue
-        NVGRenderer.circle(px, py, cw * 0.8f, (alpha shl 24) or 0x2858CC)
-      }
-    }
-
-    // Aurora-like horizontal bands
-    for (i in 0..2) {
-      val bandY  = sh * (0.18f + i * 0.20f)
-      val bandH  = sh * 0.14f
-      val drift  = (sin(t * 0.15 + i * 2.1) * sh * 0.03).toFloat()
-      val aAlpha = ((sin(t * 0.28 + i * 1.7) * 0.4 + 0.4) * 14).toInt()
-      NVGRenderer.gradientRect(0f, bandY + drift, sw, bandH, 0x00000000, (aAlpha shl 24) or 0x1840A0, Gradient.TopToBottom, 0f)
-      NVGRenderer.gradientRect(0f, bandY + drift + bandH, sw, bandH, (aAlpha shl 24) or 0x1840A0, 0x00000000, Gradient.TopToBottom, 0f)
-    }
-
-    // Edge vignette
-    NVGRenderer.gradientRect(0f, 0f, sw * 0.22f, sh, 0x88000000.toInt(), 0x00000000, Gradient.LeftToRight, 0f)
-    NVGRenderer.gradientRect(sw * 0.78f, 0f, sw * 0.22f, sh, 0x00000000, 0x88000000.toInt(), Gradient.LeftToRight, 0f)
-    NVGRenderer.gradientRect(0f, sh * 0.65f, sw, sh * 0.35f, 0x00000000, 0xCC000000.toInt(), Gradient.TopToBottom, 0f)
-    NVGRenderer.gradientRect(0f, 0f, sw, sh * 0.10f, 0x66000000.toInt(), 0x00000000, Gradient.TopToBottom, 0f)
-  }
-
-  /** Soft gaussian blob - used only for orb halos and title glow. */
-  private fun drawNebulaBlob(cx: Float, cy: Float, maxR: Float, rgb: Int, peakAlpha: Int, layers: Int = 30) {
-    for (i in 0..layers) {
-      val frac  = i.toFloat() / layers
-      val r     = maxR * (1f - frac * 0.90f)
-      val gauss = exp(-4.2 * (1.0 - frac) * (1.0 - frac)).toFloat()
-      val alpha = (peakAlpha * gauss).toInt().coerceIn(0, peakAlpha)
-      NVGRenderer.circle(cx, cy, r, (alpha shl 24) or rgb)
+  @SubscribeEvent
+  fun onNvg(@Suppress("UNUSED_PARAMETER") event: NvgEvent) {
+    if (mc.screen !is TitleScreen) {
+      resetState()
     }
   }
 
-  // ---- Stars ----
-
-  private fun drawStars(sw: Float, sh: Float, t: Double) {
-    val rng = java.util.Random(99887L)
-    repeat(180) { i ->
-      val sx = rng.nextFloat() * sw
-      val sy = rng.nextFloat() * sh
-      val b  = rng.nextFloat()
-      val twinkle = (sin(t * (0.3 + b * 1.8) + i) * 0.35 + 0.65).toFloat()
-      val r = (0.3f + b * 1.6f) * (sw / 1920f).coerceAtLeast(1f)
-      NVGRenderer.circle(sx, sy, r, ((b * twinkle * 200).toInt() shl 24) or 0xCCD8F0)
+  private fun resetState() {
+    if (!wasTitleScreen) {
+      return
     }
-    val rng2 = java.util.Random(55443L)
-    repeat(18) { i ->
-      val sx    = rng2.nextFloat() * sw
-      val sy    = rng2.nextFloat() * sh
-      val pulse = (sin(t * 0.6 + i * 1.1) * 0.4 + 0.6).toFloat()
-      val r = (1.5f + rng2.nextFloat() * 1.5f) * (sw / 1920f).coerceAtLeast(1f)
-      NVGRenderer.circle(sx, sy, r, ((pulse * 200).toInt() shl 24) or 0xEEF4FF)
-    }
+    wasTitleScreen = false
+    hoverAnimations.clear()
+    introAnimation.snap(0.0)
   }
 
-  // ---- Lightning nodes + bolts ----
-
-  private data class OrbDef(val fx: Float, val fy: Float, val phase: Double)
-
-  private val orbDefs = listOf(
-    OrbDef(0.15f, 0.22f, 0.0),
-    OrbDef(0.73f, 0.16f, 2.3),
-    OrbDef(0.55f, 0.45f, 4.8),
-    OrbDef(0.88f, 0.35f, 1.6),
-    OrbDef(0.32f, 0.52f, 3.5),
-    OrbDef(0.62f, 0.28f, 6.1),
-  )
-
-  private val connections = listOf(0 to 1, 1 to 5, 5 to 2, 2 to 4, 4 to 0, 1 to 2, 3 to 5, 0 to 3)
-
-  private fun drawLightningNodes(sw: Float, sh: Float, t: Double) {
-    val pos = orbDefs.map { o ->
-      val x = o.fx * sw + (sin(t * 0.2 + o.phase) * sw * 0.04).toFloat()
-      val y = o.fy * sh + (cos(t * 0.15 + o.phase) * sh * 0.03).toFloat()
-      Triple(x, y, o.phase)
-    }
-
-    // One bolt at a time - each connection holds for BOLT_SLOT_SEC then fades out.
-    val slotProgress = (t % BOLT_SLOT_SEC) / BOLT_SLOT_SEC  // 0..1 within current slot
-    val slotIdx      = (t / BOLT_SLOT_SEC).toLong()
-    val (a, b)       = connections[(slotIdx % connections.size).toInt()]
-    val boltSeed     = slotIdx * 131L + a * 31L + b * 17L
-
-    // Quick fade-in (first 12%), hold, slow fade-out (last 25%)
-    val alpha = when {
-      slotProgress < 0.12 -> (slotProgress / 0.12 * 85).toInt()
-      slotProgress > 0.75 -> ((1.0 - (slotProgress - 0.75) / 0.25) * 85).toInt()
-      else                -> 85
-    }.coerceIn(0, 85)
-
-    if (alpha > 4) {
-      drawLightningBolt(pos[a].first, pos[a].second,
-                        pos[b].first, pos[b].second,
-                        alpha, boltSeed, sw)
-    }
-
-    for ((x, y, phase) in pos) {
-      val pulse = (sin(t * 0.5 + phase) * 0.35 + 0.65).toFloat()
-      drawNebulaBlob(x, y, sw * 0.016f, 0x1E50C0, (pulse * 55).toInt(), 18)
-      NVGRenderer.circle(x, y, sw * 0.003f * pulse, ((pulse * 230).toInt() shl 24) or 0xAADDFF)
-    }
-  }
-
-  private const val BOLT_SLOT_SEC = 3.5
-
-  /**
-   * Jagged lightning bolt via midpoint displacement.
-   * Seed is quantized so the bolt snaps to a new random shape ~8x per second (flickering).
-   */
-  private fun drawLightningBolt(
-    x1: Float, y1: Float, x2: Float, y2: Float,
-    alpha: Int, seed: Long, sw: Float
-  ) {
-    val rng = java.util.Random(seed)
-    val pts = arrayListOf(floatArrayOf(x1, y1), floatArrayOf(x2, y2))
-    repeat(4) {
-      val next = arrayListOf<FloatArray>()
-      for (i in 0 until pts.size - 1) {
-        next.add(pts[i])
-        val mx  = (pts[i][0] + pts[i + 1][0]) / 2f
-        val my  = (pts[i][1] + pts[i + 1][1]) / 2f
-        val dx  = pts[i + 1][0] - pts[i][0]
-        val dy  = pts[i + 1][1] - pts[i][1]
-        val len = sqrt(dx * dx + dy * dy)
-        if (len > 0f) {
-          val jitter = (rng.nextFloat() - 0.5f) * len * 0.90f
-          next.add(floatArrayOf(mx + (-dy / len) * jitter, my + (dx / len) * jitter))
-        } else {
-          next.add(floatArrayOf(mx, my))
-        }
-      }
-      next.add(pts.last())
-      pts.clear(); pts.addAll(next)
-    }
-
-    val glowW  = sw * 0.0015f
-    val coreW  = sw * 0.0004f
-    val gAlpha = (alpha * 0.14f).toInt()
-
-    for (i in 0 until pts.size - 1) {
-      val ax = pts[i][0]; val ay = pts[i][1]
-      val bx = pts[i + 1][0]; val by = pts[i + 1][1]
-      val dx = bx - ax; val dy = by - ay
-      val len = sqrt(dx * dx + dy * dy)
-      if (len < 0.5f) continue
-      val angle = atan2(dy.toDouble(), dx.toDouble()).toFloat()
-      NVGRenderer.push()
-      NVGRenderer.translate(ax, ay)
-      NVGRenderer.rotate(angle)
-      NVGRenderer.rect(0f, -glowW, len, glowW * 2f, (gAlpha shl 24) or 0x4477BB, 0f)
-      NVGRenderer.rect(0f, -coreW, len, coreW * 2f, (alpha shl 24) or 0xBBDDFF, 0f)
-      NVGRenderer.pop()
-    }
-  }
-
-  // ---- Title ----
-
-  private fun drawTitle(sw: Float, sh: Float, sc: Float, t: Double) {
-    val title   = "Dutt Client"
-    val titleSz = 32f * sc
-    val titleW  = NVGRenderer.textWidth(title, titleSz)
-    val titleX  = sw / 2f - titleW / 2f
-    val titleY  = sh * 0.23f
-    val pulse   = (sin(t * 0.8) * 0.08 + 0.92).toFloat()
-    drawNebulaBlob(sw / 2f, titleY + titleSz * 0.5f, titleSz * 2.5f, 0x1840A0, (pulse * 40).toInt(), 24)
-    val titleAlpha = (pulse * 255).toInt().coerceIn(180, 255)
-    NVGRenderer.text(title, titleX, titleY, titleSz, (titleAlpha shl 24) or 0xEEF2FF)
-  }
-
-  // ---- Buttons ----
-
-  private data class Btn(val label: String, val gx: Float, val gy: Float, val gw: Float, val gh: Float = 20f)
-
-  private fun drawButtons(gw: Float, gh: Float, sc: Float, t: Double) {
-    val cx = gw / 2f
-    val buttons = listOf(
-      Btn("Singleplayer", cx - 100f, gh / 4f + 48f,  200f),
-      Btn("Multiplayer",  cx - 100f, gh / 4f + 72f,  200f),
-      Btn("Options",      cx - 100f, gh / 4f + 132f,  98f),
-      Btn("Quit",         cx + 2f,   gh / 4f + 132f,  98f),
+  private fun buildButtons(guiWidth: Float, guiHeight: Float, scale: Float, intro: Float): List<GlowButton> {
+    val centerX = guiWidth / 2f
+    val specs = listOf(
+      ButtonSpec("Singleplayer", centerX - 100f, guiHeight / 4f + 48f, 200f),
+      ButtonSpec("Multiplayer", centerX - 100f, guiHeight / 4f + 72f, 200f),
+      ButtonSpec("Options", centerX - 100f, guiHeight / 4f + 132f, 98f),
+      ButtonSpec("Quit", centerX + 2f, guiHeight / 4f + 132f, 98f),
     )
 
-    for ((label, gx, gy, btnGw, btnGh) in buttons) {
-      val hovered = mouseGuiX >= gx && mouseGuiX <= gx + btnGw &&
-                    mouseGuiY >= gy && mouseGuiY <= gy + btnGh
-      val sx  = gx * sc;  val sy  = gy * sc
-      val bwS = btnGw * sc; val bhS = btnGh * sc
-      val rad = 6f * sc
+    return specs.map { spec ->
+      val hovered =
+        mouseGuiX >= spec.x && mouseGuiX <= spec.x + spec.width &&
+          mouseGuiY >= spec.y && mouseGuiY <= spec.y + spec.height
+      val hoverAnimation = hoverAnimations.getOrPut(spec.label) { RiseAnimation(0.0) }
+      hoverAnimation.run(if (hovered) 1.0 else 0.0, 160L, RiseEasing.EASE_OUT_CUBIC)
+      val hover = hoverAnimation.getValue().toFloat().coerceIn(0f, 1f)
+      val introOffset = (1f - intro) * 18f
 
-      val fillAlpha   = if (hovered) 0x55 else 0x28
-      val borderAlpha = if (hovered) 0xA0 else 0x44
-      NVGRenderer.rect(sx, sy, bwS, bhS, (fillAlpha shl 24) or 0x7A90B8, rad)
-      NVGRenderer.gradientRect(sx + rad, sy, bwS - rad * 2f, bhS * 0.38f,
-        0x1EAACCEE.toInt(), 0x00AACCEE, Gradient.TopToBottom, rad)
-      NVGRenderer.hollowRect(sx, sy, bwS, bhS, sc * 0.85f, (borderAlpha shl 24) or 0x99BBDD, rad)
+      GlowButton(
+        spec.label,
+        spec.x * scale,
+        (spec.y + introOffset) * scale,
+        spec.width * scale,
+        spec.height * scale,
+        7f * scale,
+        hover,
+      )
+    }
+  }
 
-      if (label == "Options") {
-        // Gear icon + text side by side
-        val textSz  = 9f * sc
-        val gearR   = bhS * 0.30f
-        val tw      = NVGRenderer.textWidth("Options", textSz)
-        val gap     = 4f * sc
-        val totalW  = gearR * 2f + gap + tw
-        val startX  = sx + (bwS - totalW) / 2f
-        val tcol    = if (hovered) 0xFFEEF4FF.toInt() else 0xAABBCCFF.toInt()
-        drawGearIcon(startX + gearR, sy + bhS / 2f, gearR, t, hovered)
-        NVGRenderer.text("Options", startX + gearR * 2f + gap,
-          sy + (bhS - textSz) / 2f + sc * 0.5f, textSz, tcol)
-      } else {
-        val textSz  = 9f * sc
-        val tw      = NVGRenderer.textWidth(label, textSz)
-        val tcol    = if (hovered) 0xFFEEF4FF.toInt() else 0xAABBCCFF.toInt()
-        NVGRenderer.text(label, sx + (bwS - tw) / 2f,
-          sy + (bhS - textSz) / 2f + sc * 0.5f, textSz, tcol)
+  private fun renderHoverBloom(buttons: List<GlowButton>, screenWidth: Int, screenHeight: Int) {
+    val hoveredButtons = buttons.filter { it.hoverProgress > 0.03f }
+    if (hoveredButtons.isEmpty()) {
+      return
+    }
+
+    val previousFramebuffer = GL11.glGetInteger(GL30.GL_FRAMEBUFFER_BINDING)
+    val previousViewport = IntArray(4)
+    GL11.glGetIntegerv(GL11.GL_VIEWPORT, previousViewport)
+
+    glowMaskTarget.ensureSize(screenWidth, screenHeight)
+    glowOutlineTarget.ensureSize(screenWidth, screenHeight)
+    glowBlurTargetA.ensureSize(screenWidth, screenHeight)
+    glowBlurTargetB.ensureSize(screenWidth, screenHeight)
+
+    GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, previousFramebuffer)
+    GL11.glViewport(previousViewport[0], previousViewport[1], previousViewport[2], previousViewport[3])
+
+    try {
+      glowMaskTarget.clear(0f, 0f, 0f, 0f)
+      hoveredButtons.forEach { button ->
+        val hover = button.hoverProgress
+        val bloomAlpha = (88f + 132f * hover).toInt()
+        UiShaderDrawHelper.drawRoundedRect(
+          button.x - 3f,
+          button.y - 3f,
+          button.width + 6f,
+          button.height + 6f,
+          button.radius + 3f,
+          withAlpha(0x9FDBFF, bloomAlpha),
+          screenHeight,
+        )
+      }
+    } finally {
+      GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, previousFramebuffer)
+      GL11.glViewport(previousViewport[0], previousViewport[1], previousViewport[2], previousViewport[3])
+    }
+
+    ShaderRegistry.OUTLINE.render(glowMaskTarget, glowOutlineTarget, 2.0f, 0x6FB8FFFF)
+    ShaderRegistry.BLOOM.render(glowOutlineTarget, glowBlurTargetA, glowBlurTargetB, 8)
+    ShaderRegistry.SCREEN_SPACE.renderTextureAdditive(glowBlurTargetB.textureId, 1.0f)
+    ShaderRegistry.SCREEN_SPACE.renderTextureAdditive(glowOutlineTarget.textureId, 0.72f)
+  }
+
+  private fun renderButtons(buttons: List<GlowButton>, screenHeight: Int, scale: Float, timeSeconds: Float, intro: Float) {
+    buttons.forEach { button ->
+      val hover = button.hoverProgress
+      val baseAlpha = (92f + 38f * intro).toInt()
+      val fillAlpha = (74f + 52f * hover + 24f * intro).toInt()
+      val sheenAlpha = (12f + 38f * hover + 18f * intro).toInt()
+      val borderAlpha = (72f + 88f * hover + 28f * intro).toInt()
+
+      UiShaderDrawHelper.drawRoundedRect(
+        button.x + 2f * scale,
+        button.y + 3f * scale,
+        button.width,
+        button.height,
+        button.radius,
+        withAlpha(0x02060C, (26f + 22f * intro).toInt()),
+        screenHeight,
+      )
+      UiShaderDrawHelper.drawGradientRoundedRect(
+        button.x,
+        button.y,
+        button.width,
+        button.height,
+        button.radius,
+        withAlpha(0x111A29, baseAlpha),
+        withAlpha(0x0A111B, fillAlpha),
+        Gradient.TopToBottom,
+        screenHeight,
+      )
+      UiShaderDrawHelper.drawAnimatedGradientRoundedRect(
+        button.x + 1f * scale,
+        button.y + 1f * scale,
+        button.width - 2f * scale,
+        button.height * (0.56f + hover * 0.08f),
+        max(0f, button.radius - 1f * scale),
+        withAlpha(0x64D4FF, sheenAlpha),
+        withAlpha(0xBE8EFF, (sheenAlpha * 0.85f).toInt()),
+        Gradient.LeftToRight,
+        timeSeconds,
+        screenHeight,
+      )
+      UiShaderDrawHelper.drawGradientOutline(
+        button.x,
+        button.y,
+        button.width,
+        button.height,
+        button.radius,
+        max(1f, 1.05f * scale),
+        withAlpha(0x73C4FF, borderAlpha),
+        withAlpha(0xB78DFF, (borderAlpha * 0.92f).toInt()),
+        Gradient.LeftToRight,
+        screenHeight,
+      )
+      if (hover > 0.02f) {
+        UiShaderDrawHelper.drawRoundedOutline(
+          button.x + 1.5f * scale,
+          button.y + 1.5f * scale,
+          button.width - 3f * scale,
+          button.height - 3f * scale,
+          max(0f, button.radius - 1.5f * scale),
+          max(1f, 1.0f * scale),
+          withAlpha(0xE2F6FF, (18f + 46f * hover).toInt()),
+          screenHeight,
+        )
       }
     }
   }
 
-  private fun drawGearIcon(cx: Float, cy: Float, outerR: Float, t: Double, hovered: Boolean) {
-    val numTeeth   = 8
-    val rot        = (t * 0.55).toFloat()
-    val discR      = outerR * 0.66f
-    val toothW     = outerR * 0.32f
-    val toothStart = discR - outerR * 0.08f
-    val toothLen   = outerR - toothStart
-    val col        = if (hovered) 0xFFEEF4FF.toInt() else 0xAABBCCFF.toInt()
+  private fun renderTitleLightBleed(screenWidth: Int, screenHeight: Int, scale: Float, timeSeconds: Float, intro: Float) {
+    if (intro <= 0f) {
+      return
+    }
 
-    repeat(numTeeth) { i ->
-      val angle = rot + i * (2f * PI.toFloat() / numTeeth)
+    val titleSize = 31f * scale
+    val titleWidth = NVGRenderer.textWidth(TITLE_TEXT, titleSize)
+    val titleX = screenWidth / 2f - titleWidth / 2f
+    val baseY = screenHeight * 0.197f - (1f - intro) * 18f * scale
+    val pulse = kotlin.math.sin(timeSeconds * 1.12f) * 0.5f + 0.5f
+    val tightSpread = (0.85f + pulse * 0.18f) * scale
+    val wideSpread = (1.55f + pulse * 0.32f) * scale
+    val tightAlpha = ((96f + pulse * 20f) * intro).toInt().coerceIn(0, 255)
+    val wideAlpha = ((34f + pulse * 14f) * intro).toInt().coerceIn(0, 255)
+    val coreAlpha = ((142f + pulse * 18f) * intro).toInt().coerceIn(0, 255)
+    val compositeAlpha = (0.34f + pulse * 0.08f) * intro
+    val tightOffsets =
+      arrayOf(
+        floatArrayOf(-1f, 0f),
+        floatArrayOf(1f, 0f),
+        floatArrayOf(0f, -1f),
+        floatArrayOf(0f, 1f),
+        floatArrayOf(-0.72f, -0.72f),
+        floatArrayOf(0.72f, -0.72f),
+        floatArrayOf(-0.72f, 0.72f),
+        floatArrayOf(0.72f, 0.72f),
+      )
+    val wideOffsets =
+      arrayOf(
+        floatArrayOf(-1f, 0f),
+        floatArrayOf(1f, 0f),
+        floatArrayOf(0f, -1f),
+        floatArrayOf(0f, 1f),
+        floatArrayOf(-0.82f, -0.82f),
+        floatArrayOf(0.82f, -0.82f),
+        floatArrayOf(-0.82f, 0.82f),
+        floatArrayOf(0.82f, 0.82f),
+      )
+    val previousFramebuffer = GL11.glGetInteger(GL30.GL_FRAMEBUFFER_BINDING)
+    val previousViewport = IntArray(4)
+    GL11.glGetIntegerv(GL11.GL_VIEWPORT, previousViewport)
+
+    titleGlowMaskTarget.ensureSize(screenWidth, screenHeight)
+    titleGlowBlurTargetA.ensureSize(screenWidth, screenHeight)
+    titleGlowBlurTargetB.ensureSize(screenWidth, screenHeight)
+
+    try {
+      titleGlowMaskTarget.clear(0f, 0f, 0f, 0f)
+      NVGRenderer.beginFrame(
+        screenWidth.toFloat(),
+        screenHeight.toFloat(),
+        titleGlowMaskTarget.fboId,
+        titleGlowMaskTarget.width,
+        titleGlowMaskTarget.height,
+      )
+      wideOffsets.forEach { offset ->
+        NVGRenderer.text(
+          TITLE_TEXT,
+          titleX + offset[0] * wideSpread,
+          baseY + offset[1] * wideSpread,
+          titleSize,
+          withAlpha(0xFFFFFF, wideAlpha),
+        )
+      }
+      tightOffsets.forEach { offset ->
+        NVGRenderer.text(
+          TITLE_TEXT,
+          titleX + offset[0] * tightSpread,
+          baseY + offset[1] * tightSpread,
+          titleSize,
+          withAlpha(0xFFFFFF, tightAlpha),
+        )
+      }
+      NVGRenderer.text(TITLE_TEXT, titleX, baseY, titleSize, withAlpha(0xFFFFFF, coreAlpha))
+      NVGRenderer.endFrame()
+    } finally {
+      GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, previousFramebuffer)
+      GL11.glViewport(previousViewport[0], previousViewport[1], previousViewport[2], previousViewport[3])
+    }
+
+    ShaderRegistry.BLOOM.render(titleGlowMaskTarget, titleGlowBlurTargetA, titleGlowBlurTargetB, 10)
+    ShaderRegistry.SCREEN_SPACE.renderTextureAdditive(titleGlowBlurTargetB.textureId, compositeAlpha)
+    ShaderRegistry.SCREEN_SPACE.renderTextureAdditive(titleGlowMaskTarget.textureId, compositeAlpha * 0.26f)
+  }
+
+  private fun drawTitleText(screenWidth: Float, screenHeight: Float, scale: Float, intro: Float) {
+    val titleSize = 31f * scale
+    val titleWidth = NVGRenderer.textWidth(TITLE_TEXT, titleSize)
+    val titleX = screenWidth / 2f - titleWidth / 2f
+    val baseY = screenHeight * 0.197f - (1f - intro) * 18f * scale
+    val titleAlpha = (255f * intro).toInt().coerceIn(0, 255)
+    val shadowAlpha = (124f * intro).toInt().coerceIn(0, 255)
+    val farShadowAlpha = (42f * intro).toInt().coerceIn(0, 255)
+
+    NVGRenderer.text(
+      TITLE_TEXT,
+      titleX,
+      baseY + 5.1f * scale,
+      titleSize,
+      withAlpha(0x02040A, farShadowAlpha),
+    )
+    NVGRenderer.text(
+      TITLE_TEXT,
+      titleX,
+      baseY + 2.4f * scale,
+      titleSize,
+      withAlpha(0x04070C, shadowAlpha),
+    )
+
+    NVGRenderer.text(TITLE_TEXT, titleX, baseY, titleSize, withAlpha(0xFFFFFF, titleAlpha))
+  }
+
+  private fun drawButtonLabels(buttons: List<GlowButton>, scale: Float, timeSeconds: Float, intro: Float) {
+    buttons.forEach { button ->
+      val textSize = 9.2f * scale
+      val hover = button.hoverProgress
+      val textAlpha = (176f + 62f * intro + 18f * hover).toInt().coerceIn(0, 255)
+      val textColor = withAlpha(0xEAF4FF, textAlpha)
+
+      if (button.label == "Options") {
+        val gearRadius = button.height * 0.28f
+        val labelWidth = NVGRenderer.textWidth(button.label, textSize)
+        val gap = 4f * scale
+        val totalWidth = gearRadius * 2f + gap + labelWidth
+        val startX = button.x + (button.width - totalWidth) / 2f
+        val gearX = startX + gearRadius
+        val gearY = button.y + button.height / 2f
+        drawGearIcon(gearX, gearY, gearRadius, timeSeconds.toDouble(), hover)
+        NVGRenderer.text(
+          button.label,
+          startX + gearRadius * 2f + gap,
+          button.y + (button.height - textSize) / 2f + 0.5f * scale,
+          textSize,
+          textColor,
+        )
+      } else {
+        val labelWidth = NVGRenderer.textWidth(button.label, textSize)
+        NVGRenderer.text(
+          button.label,
+          button.x + (button.width - labelWidth) / 2f,
+          button.y + (button.height - textSize) / 2f + 0.5f * scale,
+          textSize,
+          textColor,
+        )
+      }
+    }
+  }
+
+  private fun drawGearIcon(cx: Float, cy: Float, outerRadius: Float, time: Double, hover: Float) {
+    val teeth = 8
+    val rotation = (time * (0.42 + hover * 0.18)).toFloat()
+    val discRadius = outerRadius * 0.66f
+    val toothWidth = outerRadius * 0.32f
+    val toothStart = discRadius - outerRadius * 0.08f
+    val toothLength = outerRadius - toothStart
+    val color = withAlpha(0xEDF4FF, (194f + 42f * hover).toInt())
+
+    repeat(teeth) { index ->
+      val angle = rotation + index * (2f * PI.toFloat() / teeth)
       NVGRenderer.push()
       NVGRenderer.translate(cx, cy)
       NVGRenderer.rotate(angle)
-      NVGRenderer.rect(-toothW / 2f, toothStart, toothW, toothLen, col, toothW * 0.22f)
+      NVGRenderer.rect(-toothWidth / 2f, toothStart, toothWidth, toothLength, color, toothWidth * 0.24f)
       NVGRenderer.pop()
     }
-    NVGRenderer.circle(cx, cy, discR, col)
-    NVGRenderer.circle(cx, cy, discR * 0.40f, 0xEE050810.toInt())
+
+    NVGRenderer.circle(cx, cy, discRadius, color)
+    NVGRenderer.circle(cx, cy, discRadius * 0.42f, 0xEA060A12.toInt())
   }
+
+  private fun withAlpha(rgb: Int, alpha: Int): Int {
+    return (alpha.coerceIn(0, 255) shl 24) or (rgb and 0x00FFFFFF)
+  }
+
+  private data class ButtonSpec(
+    val label: String,
+    val x: Float,
+    val y: Float,
+    val width: Float,
+    val height: Float = 20f,
+  )
 }

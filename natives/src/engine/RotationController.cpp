@@ -37,10 +37,32 @@ float RotationController::angleDiff(float a, float b) const {
 }
 
 float RotationController::lookAheadYaw(double px, double py, double pz) const {
-    int ahead = std::min(currentIdx_ + 2, (int)path_.size() - 1);
-    if (ahead < 0 || path_.empty()) return smoothYaw_;
-    const auto& t = path_[ahead];
-    double dx = t.x + 0.5 - px, dz = t.z + 0.5 - pz;
+    if (path_.empty()) return smoothYaw_;
+    // Average the direction to the next 4 nodes rather than targeting a single far node.
+    //
+    // Single-node lookahead at +2 → target yaw flips every step on zigzag diagonal paths
+    // (E→N→E→N), causing visible left/right oscillation.
+    //
+    // Single-node lookahead at +6 → fixes oscillation BUT looking too far ahead on a
+    // sharp turn means the player faces the wrong direction, runs past the current node,
+    // can't reach it (NODE_DIST = 0.6), and circles indefinitely; also causes 180° snaps.
+    //
+    // Averaging 4 nodes: zigzag E,N,E,N → centroid is NE → stable heading ✓
+    //                    sharp turn after 3 nodes → centroid shifts smoothly toward the
+    //                    turn as nodes advance → responsive ✓
+    const int LOOKAHEAD = 4;
+    double sumX = 0.0, sumZ = 0.0;
+    int count = 0;
+    for (int i = 1; i <= LOOKAHEAD; i++) {
+        int idx = std::min(currentIdx_ + i, (int)path_.size() - 1);
+        sumX += path_[idx].x + 0.5;
+        sumZ += path_[idx].z + 0.5;
+        ++count;
+    }
+    if (count == 0) return smoothYaw_;
+    double dx = sumX / count - px;
+    double dz = sumZ / count - pz;
+    if (dx * dx + dz * dz < 0.01) return smoothYaw_;
     return (float)(std::atan2(-dx, dz) * 180.0 / PI);
 }
 

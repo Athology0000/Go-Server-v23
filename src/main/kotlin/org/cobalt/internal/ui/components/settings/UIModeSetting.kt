@@ -20,11 +20,22 @@ internal class UIModeSetting(private val setting: ModeSetting) : UIComponent(
   private var isExpanded = false
   private val scrollHandler = ScrollHandler()
 
+  private fun selectedIndex(): Int {
+    if (setting.options.isEmpty()) {
+      return 0
+    }
+    val safeIndex = setting.value.coerceIn(0, setting.options.lastIndex)
+    if (setting.value != safeIndex) {
+      setting.value = safeIndex
+    }
+    return safeIndex
+  }
+
   private val needsScroll: Boolean
     get() = setting.options.size > 5
 
   private val buttonWidth: Float
-    get() = maxOf(NVGRenderer.textWidth(setting.options[setting.value], 13F) + 50F, 120F)
+    get() = maxOf(NVGRenderer.textWidth(setting.options[selectedIndex()], 13F) + 50F, 120F)
 
   private val dropdownWidth: Float
     get() {
@@ -70,7 +81,7 @@ internal class UIModeSetting(private val setting: ModeSetting) : UIComponent(
 
     NVGRenderer.rect(buttonX, buttonY, currentButtonWidth, 30F, bgColor, 5F)
     NVGRenderer.hollowRect(buttonX, buttonY, currentButtonWidth, 30F, 2F, borderColor, 5F)
-    NVGRenderer.text(setting.options[setting.value], buttonX + 10F, buttonY + 9F, 13F, textColor)
+    NVGRenderer.text(setting.options[selectedIndex()], buttonX + 10F, buttonY + 9F, 13F, textColor)
 
     val caretX = buttonX + currentButtonWidth - 22.5F
     val caretY = buttonY + 7F
@@ -107,7 +118,7 @@ internal class UIModeSetting(private val setting: ModeSetting) : UIComponent(
     val scrollOffset = scrollHandler.getOffset()
     setting.options.forEachIndexed { index, option ->
       val optionY = dropdownY + 5F + index * 28F - scrollOffset
-      val isSelected = index == setting.value
+      val isSelected = index == selectedIndex()
       val isHovering =
         isHoveringOver(dropdownX + 2F, optionY, currentDropdownWidth - 4F - (if (needsScroll) 8F else 0F), 25F)
 

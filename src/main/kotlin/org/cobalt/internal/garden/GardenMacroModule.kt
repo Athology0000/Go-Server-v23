@@ -17,6 +17,7 @@ import org.cobalt.internal.garden.managers.BoosterCookieManager
 import org.cobalt.internal.garden.managers.CropFeverManager
 import org.cobalt.internal.garden.managers.DynamicRestManager
 import org.cobalt.internal.garden.managers.EquipmentManager
+import org.cobalt.internal.garden.managers.FlightManager
 import org.cobalt.internal.garden.managers.GearManager
 import org.cobalt.internal.garden.managers.GeorgeManager
 import org.cobalt.internal.garden.managers.JunkManager
@@ -37,6 +38,7 @@ import org.cobalt.internal.garden.managers.WardrobeManager
 object GardenMacroModule : Module("Garden Macro") {
 
     private val mc = Minecraft.getInstance()
+    val isActive: Boolean get() = enabledSetting.value
 
     // -- State -----------------------------------------------------------------
     @Volatile var state = GardenState.OFF
@@ -44,6 +46,7 @@ object GardenMacroModule : Module("Garden Macro") {
     @Volatile var sessionStartTime = System.currentTimeMillis()
     @Volatile var autosellingManager: String? = null
     @Volatile private var wasConnected = true
+    @Volatile private var autoRestartQueued = false
     /** System.currentTimeMillis() deadline before which tickFarming skips all automated triggers. */
     @Volatile private var startupGraceUntilMs = 0L
 
@@ -61,6 +64,7 @@ object GardenMacroModule : Module("Garden Macro") {
     private val pestScriptSetting    = TextSetting("Pest Script",    "Taunahi script name for pest cleaning.",                "misc:pestCleaner").inGroup("Scripts")
     private val returnScriptSetting  = TextSetting("Return Script",  "Taunahi script name to run after pest clean.",          "misc:visitor").inGroup("Scripts")
     private val visitorScriptSetting = TextSetting("Visitor Script", "Taunahi script name for visitors.",                    "misc:visitor").inGroup("Scripts")
+    private val autoRestartStoppedScriptSetting = CheckboxSetting("Auto Restart", "Restart the active Taunahi script if it stops because the equipment menu opened.", false).inGroup("Scripts")
 
     // Pest
     private val pestThresholdSetting      = SliderSetting("Pest Threshold",       "Alive pest count to trigger cleaning.",           4.0,  1.0, 8.0,   step = 1.0).inGroup("Pest")
@@ -175,7 +179,7 @@ object GardenMacroModule : Module("Garden Macro") {
         addSetting(
             enabledSetting,
             // Scripts
-            farmScriptSetting, pestScriptSetting, returnScriptSetting, visitorScriptSetting,
+            farmScriptSetting, pestScriptSetting, returnScriptSetting, visitorScriptSetting, autoRestartStoppedScriptSetting,
             // Pest
             pestThresholdSetting, triggerPestOnChatSetting, pestChatTriggerDelaySetting,
             aotvEnabledSetting, roofPitchSetting, aotvRoofPitchHumanizationSetting,
@@ -216,6 +220,7 @@ object GardenMacroModule : Module("Garden Macro") {
         GardenConfig.pestScript   = pestScriptSetting.value
         GardenConfig.returnScript = returnScriptSetting.value
         GardenConfig.visitorScript = visitorScriptSetting.value
+        GardenConfig.autoRestartStoppedScript = autoRestartStoppedScriptSetting.value
 
         // Pest
         GardenConfig.pestThreshold            = pestThresholdSetting.value.toInt()
@@ -369,6 +374,7 @@ object GardenMacroModule : Module("Garden Macro") {
             }
         }
 
+        handleUnexpectedScriptStop(msg)
         CropFeverManager.onChatMessage(msg)
         PestCleaningSequencer.onChatMessage(msg)
         RestartManager.onChatMessage(msg) { stopMacro() }
@@ -434,31 +440,155 @@ object GardenMacroModule : Module("Garden Macro") {
             PestPrepSwapManager.markActive()
         }
 
-        // Pest prep-swap check - triggers at cooldown <= 60s before pests spawn,
-        // or after 30 s if the cooldown was never parsed from the tab list.
+        // Pest prep flow - at the 140-second spawn window, swap to pest gear,
+        // rod swap, set spawn while flying, then return to farming gear.
         if (prepSwapSetting.value && !PestPrepSwapManager.swapDone &&
             System.currentTimeMillis() >= PestManager.cleaningCooldownUntil) {
-            if (PestPrepSwapManager.shouldPrepSwap(PestManager.lastCooldownSeconds)) {
-                PestPrepSwapManager.markDone()
+            if (PestPrepSwapManager.shouldPrepSwap(PestManager.lastCooldownSeconds) &&
+                PestPrepSwapManager.markStarted()) {
                 GardenWorkerThread.submit("prep-swap") {
-                    // Stop farming script before opening /eq so Taunahi doesn't cancel it
-                    mc.execute { ScriptBridge.stopScript() }
-                    Thread.sleep((20L..40L).random() + 300L)
-                    GearManager.swapForPest()
-                    // Resume farming after swap
-                    mc.execute { ScriptBridge.startFarming(GardenConfig.farmScript) }
+                    var prepCompleted = false
+                    try {
+                        mc.execute { ScriptBridge.stopScript() }
+                        Thread.sleep((20L..40L).random() + 300L)
+
+                        if (GardenConfig.autoWardrobeEnabled || GardenConfig.autoEquipment) {
+                            GearManager.swapForPest()
+                            Thread.sleep((10L..30L).random() + 350L)
+                        }
+
+                        if (GardenConfig.autoRodPestCd) {
+                            RodManager.useRod(force = true)
+                            Thread.sleep((10L..30L).random() + 200L)
+                        }
+
+                        FlightManager.startFlying()
+                        Thread.sleep((10L..30L).random() + 150L)
+                        mc.execute { ScriptBridge.setSpawn() }
+                        Thread.sleep((10L..30L).random() + 250L)
+                        FlightManager.stopFlying()
+                        Thread.sleep((10L..30L).random() + 150L)
+
+                        if (GardenConfig.autoWardrobeEnabled || GardenConfig.autoEquipment) {
+                            GearManager.swapForFarming()
+                            Thread.sleep((10L..30L).random() + 350L)
+                        }
+
+                        prepCompleted = true
+                    } catch (_: InterruptedException) {
+                        Thread.currentThread().interrupt()
+                    } finally {
+                        if (prepCompleted) {
+                            PestPrepSwapManager.markDone()
+                            mc.execute { ScriptBridge.startFarming(GardenConfig.farmScript) }
+                        } else {
+                            PestPrepSwapManager.markFailed()
+                        }
+                    }
                 }
             }
         }
 
         // Pest cleaning trigger
         val cropFeverDelay = GardenConfig.delayPestForCropFever && CropFeverManager.shouldDelay()
-        if (!cropFeverDelay && pestShouldClean) {
+        val pestSpawnedAfterPrep = prepSwapSetting.value &&
+            PestPrepSwapManager.swapDone &&
+            PestManager.lastAliveCount > 0
+        if (!cropFeverDelay && !PestPrepSwapManager.isRunning() &&
+            (pestShouldClean || pestSpawnedAfterPrep)) {
             setState(GardenState.CLEANING)
             PestCleaningSequencer.startSequence {
                 setState(GardenState.FARMING)
                 ScriptBridge.startFarming(GardenConfig.farmScript)
             }
+        }
+    }
+
+    private fun handleUnexpectedScriptStop(message: String) {
+        if (!GardenConfig.autoRestartStoppedScript || !enabledSetting.value || state == GardenState.OFF) return
+
+        val lower = message.lowercase()
+        if (!lower.contains("taunahi") ||
+            !lower.contains("script stopped") ||
+            !lower.contains("menu opened (your equipment and stats)")) {
+            return
+        }
+        if (ScriptBridge.wasIntentionalStopRecently()) return
+
+        queueUnexpectedScriptRestart()
+    }
+
+    private fun queueUnexpectedScriptRestart() {
+        if (autoRestartQueued) return
+        if (resolveUnexpectedStopRestartAction() == null) return
+
+        autoRestartQueued = true
+        GardenWorkerThread.submit("auto-script-restart") {
+            try {
+                val deadline = System.currentTimeMillis() + AUTO_RESTART_WAIT_TIMEOUT_MS
+                var menuClosedAt = 0L
+                while (System.currentTimeMillis() < deadline) {
+                    if (Thread.currentThread().isInterrupted) return@submit
+                    if (mc.connection == null || mc.player == null) {
+                        menuClosedAt = 0L
+                        Thread.sleep(AUTO_RESTART_POLL_MS)
+                        continue
+                    }
+
+                    if (mc.screen != null) {
+                        menuClosedAt = 0L
+                        mc.execute {
+                            if (mc.screen != null) {
+                                mc.player?.closeContainer()
+                                if (mc.screen != null) mc.setScreen(null)
+                            }
+                        }
+                        Thread.sleep(AUTO_RESTART_POLL_MS)
+                        continue
+                    }
+
+                    if (menuClosedAt == 0L) {
+                        menuClosedAt = System.currentTimeMillis()
+                    }
+                    if (System.currentTimeMillis() - menuClosedAt >= AUTO_RESTART_AFTER_MENU_CLOSE_DELAY_MS) {
+                        break
+                    }
+                    Thread.sleep(AUTO_RESTART_POLL_MS)
+                }
+
+                if (mc.connection == null || mc.player == null || mc.screen != null) return@submit
+                resolveUnexpectedStopRestartAction()?.invoke()
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+            } finally {
+                autoRestartQueued = false
+            }
+        }
+    }
+
+    private fun resolveUnexpectedStopRestartAction(): (() -> Unit)? {
+        if (!enabledSetting.value || state == GardenState.OFF) return null
+        if (RestartManager.restartDetected || RecoveryManager.isRecovering || DynamicRestManager.isResting) return null
+        if (autosellingManager != null || state == GardenState.AUTOSELLING) return null
+        if (PestPrepSwapManager.isRunning()) return null
+        if (ScriptBridge.hasLastStartedScript()) {
+            return { ScriptBridge.restartLastScript() }
+        }
+
+        return when {
+            PestReturnManager.isReturning && GardenConfig.returnScript.isNotBlank() -> {
+                { ScriptBridge.startReturnScript(GardenConfig.returnScript) }
+            }
+            (VisitorManager.isHandlingVisitor || state == GardenState.VISITING) && GardenConfig.visitorScript.isNotBlank() -> {
+                { ScriptBridge.startVisitorScript(GardenConfig.visitorScript) }
+            }
+            (PestCleaningSequencer.isRunning || state == GardenState.CLEANING) && GardenConfig.pestScript.isNotBlank() -> {
+                { ScriptBridge.startPestScript(GardenConfig.pestScript) }
+            }
+            state == GardenState.FARMING && GardenConfig.farmScript.isNotBlank() -> {
+                { ScriptBridge.startFarming(GardenConfig.farmScript) }
+            }
+            else -> null
         }
     }
 
@@ -482,6 +612,7 @@ object GardenMacroModule : Module("Garden Macro") {
         ).forEach { it() }
         autosellingManager = null
         wasConnected = true
+        autoRestartQueued = false
         // Stop any running script first, then start farming after a small delay
         GardenWorkerThread.submit("macro-start") {
             mc.execute { ScriptBridge.stopScript() }
@@ -491,8 +622,13 @@ object GardenMacroModule : Module("Garden Macro") {
     }
 
     private fun stopMacro() {
+        autoRestartQueued = false
         GardenWorkerThread.shutdown()
         ScriptBridge.stopScript()
         state = GardenState.OFF
     }
+
+    private const val AUTO_RESTART_WAIT_TIMEOUT_MS = 8_000L
+    private const val AUTO_RESTART_POLL_MS = 100L
+    private const val AUTO_RESTART_AFTER_MENU_CLOSE_DELAY_MS = 140L
 }

@@ -123,7 +123,6 @@ object BlockOverlayModule : Module("Block Overlay") {
       TAG
     )
 
-    OverlayRenderEngine.render(event.context)
   }
 
   private fun toOverlayColor(argb: Int): OverlayRenderEngine.Color {

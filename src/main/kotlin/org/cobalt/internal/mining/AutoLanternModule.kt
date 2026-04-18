@@ -18,14 +18,23 @@ import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.InfoSetting
 import org.cobalt.api.module.setting.impl.InfoType
 import org.cobalt.api.module.setting.impl.SliderSetting
-import org.cobalt.api.rotation.EasingType
+import org.cobalt.api.rotation.strategy.BezierTrackingRotationStrategy
 import org.cobalt.api.rotation.RotationExecutor
-import org.cobalt.api.rotation.strategy.TimedEaseStrategy
+import org.cobalt.api.util.AngleUtils
+import org.cobalt.api.util.InventoryUtils
+import org.cobalt.api.util.MouseUtils
 import org.cobalt.api.util.helper.Rotation
 import org.cobalt.internal.pathfinding.OverlayRenderEngine
 import org.cobalt.internal.visual.DeployableHudModule
 
 object AutoLanternModule : Module("Auto Lantern") {
+
+  private enum class LanternPlacementPhase {
+    TURN_TO_PLACE,
+    WAIT_BEFORE_USE,
+    WAIT_AFTER_USE,
+    TURN_BACK,
+  }
 
   private val mc: Minecraft = Minecraft.getInstance()
 
@@ -63,8 +72,26 @@ object AutoLanternModule : Module("Auto Lantern") {
     48.0
   )
 
+  private val preUseDelayTicks = SliderSetting(
+    "Pre-Use Delay",
+    "Ticks to wait after swapping to the lantern before using it.",
+    3.0,
+    0.0,
+    10.0,
+    1.0
+  )
+
+  private val postUseDelayTicks = SliderSetting(
+    "Post-Use Delay",
+    "Ticks to wait after using the lantern before restoring your slot.",
+    3.0,
+    0.0,
+    10.0,
+    1.0
+  )
+
   init {
-    addSetting(enabled, info, requireMacro, cooldownTicks, reUseDistance)
+    addSetting(enabled, info, requireMacro, cooldownTicks, reUseDistance, preUseDelayTicks, postUseDelayTicks)
     EventBus.register(this)
   }
 
@@ -79,13 +106,52 @@ object AutoLanternModule : Module("Auto Lantern") {
   private var lastUsePos: BlockPos? = null
   private var lanternBuffActive = false
 
-  private var pendingUseRelease = false
-  private var pendingRestoreSlot = -1
+  private var pendingOriginalSlot = -1
   private var pendingLanternSlot = -1
-  private var lookDownTicks = 0
-  private val lanternLookDownStrategy = TimedEaseStrategy(EasingType.LINEAR, EasingType.LINEAR, 300L)
+  private var pendingPlaceRotation: Rotation? = null
+  private var pendingReturnRotation: Rotation? = null
+  private var pendingPlacementPhase: LanternPlacementPhase? = null
+  private var pendingPlacementTicks = 0
+  private val lanternPlaceStrategy = BezierTrackingRotationStrategy(
+    maxYawStep = 17f,
+    maxPitchStep = 11f,
+    curveIn = 0.18f,
+    curveOut = 0.9f,
+    minScale = 0.24f,
+    snapThreshold = 0.45f,
+  )
+  private val lanternReturnStrategy = BezierTrackingRotationStrategy(
+    maxYawStep = 15f,
+    maxPitchStep = 9f,
+    curveIn = 0.18f,
+    curveOut = 0.9f,
+    minScale = 0.22f,
+    snapThreshold = 0.45f,
+  )
+
+  private const val LANTERN_PLACE_PITCH = 82f
+  private const val LANTERN_TURN_TIMEOUT_TICKS = 18
+  private const val LANTERN_RETURN_TIMEOUT_TICKS = 16
+  private const val LANTERN_ROTATION_SNAP_YAW = 4.5f
+  private const val LANTERN_ROTATION_SNAP_PITCH = 3.5f
 
   fun isLanternBuffActive(): Boolean = lanternBuffActive
+  fun isPlacementInProgress(): Boolean = pendingPlacementPhase != null || pendingLanternSlot >= 0
+
+  fun tryStartLanternPlacement(slot: Int): Boolean {
+    val player = mc.player ?: return false
+    if (mc.screen != null) return false
+    if (slot !in 0..8 || isPlacementInProgress()) return false
+
+    pendingOriginalSlot = player.inventory.selectedSlot
+    pendingLanternSlot = slot
+    pendingPlaceRotation = Rotation(AngleUtils.normalizeAngle(player.yRot + 180f), LANTERN_PLACE_PITCH)
+    pendingReturnRotation = Rotation(player.yRot, player.xRot)
+    pendingPlacementPhase = LanternPlacementPhase.TURN_TO_PLACE
+    pendingPlacementTicks = 0
+    pendingPlaceRotation?.let { RotationExecutor.rotateTo(it, lanternPlaceStrategy) }
+    return true
+  }
 
   fun getLanternBuffStatus(): String =
     DeployableHudModule.getLanternStatusLabel()
@@ -99,34 +165,8 @@ object AutoLanternModule : Module("Auto Lantern") {
 
   @SubscribeEvent
   fun onTick(@Suppress("UNUSED_PARAMETER") event: TickEvent.Start) {
-    if (pendingUseRelease) {
-      mc.options.keyUse?.setDown(false)
-      pendingUseRelease = false
-    }
-    if (pendingRestoreSlot >= 0) {
-      mc.options.keyHotbarSlots[pendingRestoreSlot].setDown(true)
-      mc.options.keyHotbarSlots[pendingRestoreSlot].setDown(false)
-      pendingRestoreSlot = -1
-    }
-
-    // Handle look-down -> use lantern sequence.
-    if (pendingLanternSlot >= 0) {
-      val pendingPlayer = mc.player
-      val pendingLevel = mc.level
-      if (pendingPlayer == null || pendingLevel == null) {
-        pendingLanternSlot = -1
-        lookDownTicks = 0
-        RotationExecutor.stopRotating()
-      } else if (lookDownTicks > 0) {
-        lookDownTicks--
-        val behindYaw = pendingPlayer.yRot + 180f
-        RotationExecutor.rotateTo(Rotation(behindYaw, 80f), lanternLookDownStrategy)
-      } else {
-        val slot = pendingLanternSlot
-        pendingLanternSlot = -1
-        RotationExecutor.stopRotating()
-        useLantern(pendingPlayer, pendingLevel, slot)
-      }
+    if (pendingPlacementPhase != null) {
+      handlePlacementSequence()
       return
     }
 
@@ -150,9 +190,7 @@ object AutoLanternModule : Module("Auto Lantern") {
     val slot = findLanternSlot(player)
     if (slot !in 0..8) return
 
-    // Look down before placing so the lantern lands at the player's feet.
-    pendingLanternSlot = slot
-    lookDownTicks = 4
+    tryStartLanternPlacement(slot)
   }
 
   private fun resolveLanternBuffState(player: Player): Boolean {
@@ -177,7 +215,7 @@ object AutoLanternModule : Module("Auto Lantern") {
       resolveTabEntries(connection).any { entry ->
         val raw = resolveEntryDisplayName(entry) ?: return@any false
         val stripped = ChatFormatting.stripFormatting(raw)?.lowercase(Locale.ROOT) ?: return@any false
-        stripped.contains("mining speed") && !stripped.contains("speed boost")
+        LANTERN_NAMES.any { stripped.contains(it) } || stripped.contains("will-o'-wisp")
       }
     } catch (_: Exception) {
       false
@@ -263,45 +301,162 @@ object AutoLanternModule : Module("Auto Lantern") {
   private fun normalizeName(raw: String): String =
     (ChatFormatting.stripFormatting(raw) ?: raw).lowercase(Locale.ROOT).replace(Regex("[^a-z0-9]+"), " ").trim()
 
-  private fun useLantern(player: Player, level: net.minecraft.world.level.Level, slot: Int) {
-    val previousSlot = player.inventory.selectedSlot
-
-    if (previousSlot != slot) {
-      mc.options.keyHotbarSlots[slot].setDown(true)
-      mc.options.keyHotbarSlots[slot].setDown(false)
+  private fun handlePlacementSequence() {
+    val player = mc.player
+    val level = mc.level
+    if (player == null || level == null || mc.screen != null) {
+      cancelPlacementSequence()
+      return
     }
 
-    mc.options.keyUse?.setDown(true)
+    when (pendingPlacementPhase) {
+      LanternPlacementPhase.TURN_TO_PLACE -> {
+        val target = pendingPlaceRotation ?: run {
+          cancelPlacementSequence()
+          return
+        }
+        pendingPlacementTicks++
+        RotationExecutor.rotateTo(target, lanternPlaceStrategy)
+        if (hasReachedRotation(player, target) || pendingPlacementTicks >= LANTERN_TURN_TIMEOUT_TICKS) {
+          val slot = pendingLanternSlot
+          if (slot !in 0..8) {
+            cancelPlacementSequence()
+            return
+          }
+          if (player.inventory.selectedSlot != slot) {
+            InventoryUtils.holdHotbarSlot(slot)
+          }
+          pendingPlacementPhase = LanternPlacementPhase.WAIT_BEFORE_USE
+          pendingPlacementTicks = 0
+        }
+      }
 
-    pendingUseRelease = true
-    pendingRestoreSlot = if (previousSlot != slot) previousSlot else -1
+      LanternPlacementPhase.WAIT_BEFORE_USE -> {
+        val slot = pendingLanternSlot
+        if (slot !in 0..8) {
+          cancelPlacementSequence()
+          return
+        }
+        if (player.inventory.selectedSlot != slot) {
+          InventoryUtils.holdHotbarSlot(slot)
+        }
+        if (pendingPlacementTicks < preUseDelayTicks.value.toInt()) {
+          pendingPlacementTicks++
+          return
+        }
+        useLantern(player, level)
+        pendingPlacementPhase = LanternPlacementPhase.WAIT_AFTER_USE
+        pendingPlacementTicks = 0
+      }
+
+      LanternPlacementPhase.WAIT_AFTER_USE -> {
+        if (pendingPlacementTicks < postUseDelayTicks.value.toInt()) {
+          pendingPlacementTicks++
+          return
+        }
+        restorePendingSlot(player)
+        val target = pendingReturnRotation
+        if (target != null && !hasReachedRotation(player, target)) {
+          pendingPlacementPhase = LanternPlacementPhase.TURN_BACK
+          pendingPlacementTicks = 0
+          RotationExecutor.rotateTo(target, lanternReturnStrategy)
+        } else {
+          finishPlacementSequence()
+        }
+      }
+
+      LanternPlacementPhase.TURN_BACK -> {
+        val target = pendingReturnRotation ?: run {
+          finishPlacementSequence()
+          return
+        }
+        pendingPlacementTicks++
+        RotationExecutor.rotateTo(target, lanternReturnStrategy)
+        if (hasReachedRotation(player, target) || pendingPlacementTicks >= LANTERN_RETURN_TIMEOUT_TICKS) {
+          finishPlacementSequence()
+        }
+      }
+
+      null -> return
+    }
+  }
+
+  private fun hasReachedRotation(player: Player, target: Rotation): Boolean {
+    val yawError = abs(AngleUtils.getRotationDelta(player.yRot, target.yaw))
+    val pitchError = abs(target.pitch - player.xRot)
+    return yawError <= LANTERN_ROTATION_SNAP_YAW && pitchError <= LANTERN_ROTATION_SNAP_PITCH
+  }
+
+  private fun finishPlacementSequence() {
+    mc.player?.let(::restorePendingSlot)
+    pendingPlacementPhase = null
+    pendingPlacementTicks = 0
+    pendingPlaceRotation = null
+    pendingReturnRotation = null
+    pendingOriginalSlot = -1
+    pendingLanternSlot = -1
+    RotationExecutor.stopRotating()
+  }
+
+  private fun cancelPlacementSequence() {
+    mc.options.keyUse.setDown(false)
+    finishPlacementSequence()
+  }
+
+  private fun restorePendingSlot(player: Player) {
+    val originalSlot = pendingOriginalSlot
+    if (originalSlot in 0..8 && player.inventory.selectedSlot != originalSlot) {
+      InventoryUtils.holdHotbarSlot(originalSlot)
+    }
+    pendingOriginalSlot = -1
+  }
+
+  private fun useLantern(player: Player, level: net.minecraft.world.level.Level) {
+    mc.options.keyUse.setDown(false)
+    MouseUtils.rightClick()
 
     noteLanternUse(level.gameTime, player.blockPosition())
   }
 
   @SubscribeEvent
   fun onRender(event: WorldRenderEvent.Last) {
-    if (!enabled.value) return
+    if (!enabled.value && !MiningMacroModule.isActive) return
     if (!lanternBuffActive) return
     val pos = lastUsePos ?: return
     val level = mc.level ?: return
-    val player = mc.player ?: return
-    if (!isNearLastPlacement(player)) return
 
     val cx = pos.x + 0.5
     val cy = pos.y + 0.5
     val cz = pos.z + 0.5
-    val radius = 15.0
-    val segments = 48
+    val radius = reUseDistance.value
+    val glowRadius = radius + 0.18
+    val segments = 72
 
     val now = System.currentTimeMillis()
-    // Pulse: alpha oscillates between 80 and 200 over 2 s
-    val pulse = (sin(now / 1000.0 * Math.PI) * 0.5 + 0.5).toFloat()
-    val baseAlpha = (80 + (pulse * 120).toInt()).coerceIn(0, 255)
-    // Rotating bright arc: 1/6 of the circle, one full spin every 3 s
+    val pulse = (sin(now / 920.0 * Math.PI) * 0.5 + 0.5).toFloat()
+    val glowPulse = (sin(now / 650.0 * Math.PI) * 0.5 + 0.5).toFloat()
+    val baseAlpha = (92 + (pulse * 108).toInt()).coerceIn(0, 255)
     val rotAngle = (now % 3000L).toDouble() / 3000.0 * Math.PI * 2.0
-    val arcHalfSpan = Math.PI / 6.0  // +/-30 deg around the highlight centre
+    val arcHalfSpan = Math.PI / 6.0
 
+    drawLanternRing(level, cx, cy, cz, glowRadius, segments, rotAngle, arcHalfSpan, baseAlpha, glowPulse, 0.9f, true)
+    drawLanternRing(level, cx, cy, cz, radius, segments, rotAngle, arcHalfSpan, baseAlpha + 24, pulse, 1.25f, false)
+  }
+
+  private fun drawLanternRing(
+    level: net.minecraft.world.level.Level,
+    cx: Double,
+    cy: Double,
+    cz: Double,
+    radius: Double,
+    segments: Int,
+    rotAngle: Double,
+    arcHalfSpan: Double,
+    baseAlpha: Int,
+    pulse: Float,
+    widthScale: Float,
+    halo: Boolean,
+  ) {
     var prevX = cx + cos(0.0) * radius
     var prevZ = cz + sin(0.0) * radius
     for (i in 1..segments) {
@@ -312,10 +467,10 @@ object AutoLanternModule : Module("Auto Lantern") {
       val segMid = ((i - 0.5) / segments) * Math.PI * 2.0
       val diff = abs(((segMid - rotAngle + Math.PI * 3.0) % (Math.PI * 2.0)) - Math.PI)
       val inArc = diff < arcHalfSpan
-      val alpha = if (inArc) 255 else baseAlpha
-      val r = if (inArc) 160 else 80
-      val g = if (inArc) 235 else 200
-      val width = if (inArc) 2.5f else 1.5f
+      val alpha = if (inArc) 255 else (baseAlpha + (pulse * if (halo) 30f else 18f).toInt()).coerceIn(0, 255)
+      val r = if (inArc) 166 else if (halo) 104 else 82
+      val g = if (inArc) 244 else if (halo) 220 else 204
+      val width = if (inArc) 2.8f * widthScale else 1.4f * widthScale
       OverlayRenderEngine.addLine(
         level, prevX, cy, prevZ, nextX, cy, nextZ,
         OverlayRenderEngine.Color(r, g, 255, alpha), width, 2, "lantern-radius", true
@@ -323,7 +478,5 @@ object AutoLanternModule : Module("Auto Lantern") {
       prevX = nextX
       prevZ = nextZ
     }
-
-    OverlayRenderEngine.render(event.context)
   }
 }

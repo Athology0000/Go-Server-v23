@@ -1,0 +1,73 @@
+<h2>Point Recording — How to pick Walk / Warp / Mine?</h2>
+<p class="subtitle">When you right-click a block to record a point, how does the type get chosen?</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">A — Popup on every right-click (current behaviour)</div>
+    <div class="mockup-body" style="padding:16px;font-family:monospace;font-size:12px;position:relative;min-height:220px;">
+      <p style="color:#888;font-size:11px;">You right-click a block → popup appears, you pick the type for that one point.</p>
+
+      <!-- Simulated MC-style HUD popup -->
+      <div style="margin:18px auto;width:200px;background:#111;border:2px solid #4de2c5;border-radius:8px;padding:12px;text-align:center;">
+        <p style="color:#4de2c5;font-size:11px;margin:0 0 10px;">Add point at (120, 64, 88)?</p>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <button class="mock-button" style="width:100%;font-size:11px;">🚶 Walk</button>
+          <button class="mock-button" style="width:100%;font-size:11px;">⚡ Warp</button>
+          <button class="mock-button" style="width:100%;font-size:11px;">⛏ Mine</button>
+          <button class="mock-button" style="width:100%;font-size:11px;color:#ff6b6b;">✕ Cancel</button>
+        </div>
+      </div>
+
+      <div class="pros-cons" style="font-size:10px;">
+        <div class="pros"><h4>Pros</h4><ul><li>Explicit — no mistakes</li><li>Works as-is today</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>3 extra clicks per point</li><li>Slow for long routes</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">B — Sticky mode: set once, right-click records that type</div>
+    <div class="mockup-body" style="padding:16px;font-family:monospace;font-size:12px;min-height:220px;">
+      <p style="color:#888;font-size:11px;">A HUD in the corner shows the current mode. Toggle it with a key or click. Right-click just records — no popup.</p>
+
+      <!-- Simulated corner HUD -->
+      <div style="margin:0 auto 12px;width:210px;background:#111;border:1px solid #333;border-radius:6px;padding:8px 10px;display:flex;align-items:center;gap:8px;">
+        <span style="color:#888;font-size:10px;">Recording Mode:</span>
+        <div style="display:flex;gap:4px;">
+          <button class="mock-button" style="font-size:10px;padding:2px 7px;background:#4de2c5;color:#000;font-weight:bold;">🚶 Walk</button>
+          <button class="mock-button" style="font-size:10px;padding:2px 7px;opacity:0.5;">⚡ Warp</button>
+          <button class="mock-button" style="font-size:10px;padding:2px 7px;opacity:0.5;">⛏ Mine</button>
+        </div>
+      </div>
+      <div style="text-align:center;color:#666;font-size:10px;margin-bottom:12px;">Right-click any block → records a <span style="color:#4de2c5;">Walk</span> point instantly. Switch mode when needed.</div>
+
+      <!-- Point list preview -->
+      <div style="background:#0d1a0d;border:1px solid #333;border-radius:4px;padding:6px 8px;font-size:10px;color:#aaa;">
+        <div style="color:#4de2c5;">✓ Walk (120, 64, 88)</div>
+        <div style="color:#4de2c5;">✓ Walk (115, 64, 91)</div>
+        <div style="color:#ffa24f;">✓ Warp (108, 64, 97)</div>
+        <div style="color:#fff;opacity:0.4;">│ right-clicking...</div>
+      </div>
+
+      <div class="pros-cons" style="font-size:10px;margin-top:10px;">
+        <div class="pros"><h4>Pros</h4><ul><li>Fast — 1 click per point</li><li>Great for long routes</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Must remember to switch mode</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="options" style="margin-top:16px;">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content"><h3>Popup every time</h3><p>Right-click → choose type for each point.</p></div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content"><h3>Sticky mode</h3><p>Set mode once in the HUD, right-click records that type until you switch.</p></div>
+  </div>
+  <div class="option" data-choice="both" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content"><h3>Both</h3><p>Sticky mode by default, but hold Shift while right-clicking to get the popup.</p></div>
+  </div>
+</div>

@@ -1,4 +1,5 @@
 #include "MovementExpander.h"
+#include <algorithm>
 #include <cmath>
 
 static const int DX4[] = {1,-1,0,0};
@@ -6,6 +7,14 @@ static const int DZ4[] = {0,0,1,-1};
 static const int DX_DIAGONAL[] = {1, 1, -1, -1};
 static const int DZ_DIAGONAL[] = {1, -1, 1, -1};
 static constexpr float DIAGONAL_COST_SCALE = 1.41421356f;
+static constexpr float LOW_CEILING_PENALTY = 0.10f;
+static constexpr float ADJACENT_WALL_PENALTY = 0.24f;
+static constexpr float ADJACENT_CORNER_PENALTY = 0.16f;
+static constexpr float SECOND_RING_WALL_PENALTY = 0.08f;
+static constexpr float SECOND_RING_CORNER_PENALTY = 0.045f;
+static constexpr float TIGHT_PASSAGE_PENALTY = 0.18f;
+static constexpr float TIGHT_CORNER_PENALTY = 0.12f;
+static constexpr float DIAGONAL_SIDE_CLEARANCE_SCALE = 0.65f;
 
 MovementExpander::MovementExpander(const WorldAccessor& w, const MovementCosts& c)
     : world_(w), costs_(c) {}
@@ -20,18 +29,65 @@ float MovementExpander::adjacentCost(const Vec3i& pos) const {
 }
 
 float MovementExpander::clearanceCost(const Vec3i& pos) const {
-    int open = 0;
-    for (int i = 0; i < 4; i++) {
-        if (world_.getBlock(pos.x + DX4[i], pos.y, pos.z + DZ4[i]) == BT_AIR) open++;
+    float penalty = 0.0f;
+
+    for (int headOffset = 0; headOffset <= 1; headOffset++) {
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dz = -2; dz <= 2; dz++) {
+                if (dx == 0 && dz == 0) continue;
+
+                if (!hasBlockingCollision(pos.x + dx, pos.y + headOffset, pos.z + dz)) continue;
+
+                const int absX = std::abs(dx);
+                const int absZ = std::abs(dz);
+                const int chebyshev = absX > absZ ? absX : absZ;
+                const bool axial = absX == 0 || absZ == 0;
+
+                float basePenalty = SECOND_RING_CORNER_PENALTY;
+                if (chebyshev <= 1 && axial) {
+                    basePenalty = ADJACENT_WALL_PENALTY;
+                } else if (chebyshev <= 1) {
+                    basePenalty = ADJACENT_CORNER_PENALTY;
+                } else if (axial) {
+                    basePenalty = SECOND_RING_WALL_PENALTY;
+                }
+
+                penalty += headOffset == 0 ? basePenalty : basePenalty * 0.85f;
+            }
+        }
     }
-    // Penalty by lateral clearance: open air neighbors at same Y
-    // open=0 dead-end: +0.7, open=1: +0.5, open=2: +0.3, open=3: +0.1, open=4 free: +0.0
-    static const float penalty[5] = {0.7f, 0.5f, 0.3f, 0.1f, 0.0f};
-    return penalty[open];
+
+    for (int dy = 2; dy <= 3; dy++) {
+        if (hasBlockingCollision(pos.x, pos.y + dy, pos.z)) {
+            penalty += LOW_CEILING_PENALTY / static_cast<float>(dy - 1);
+        }
+    }
+
+    const bool blockPosX =
+        hasBlockingCollision(pos.x + 1, pos.y, pos.z) || hasBlockingCollision(pos.x + 1, pos.y + 1, pos.z);
+    const bool blockNegX =
+        hasBlockingCollision(pos.x - 1, pos.y, pos.z) || hasBlockingCollision(pos.x - 1, pos.y + 1, pos.z);
+    const bool blockPosZ =
+        hasBlockingCollision(pos.x, pos.y, pos.z + 1) || hasBlockingCollision(pos.x, pos.y + 1, pos.z + 1);
+    const bool blockNegZ =
+        hasBlockingCollision(pos.x, pos.y, pos.z - 1) || hasBlockingCollision(pos.x, pos.y + 1, pos.z - 1);
+
+    if ((blockPosX && blockNegX) || (blockPosZ && blockNegZ)) {
+        penalty += TIGHT_PASSAGE_PENALTY;
+    }
+    if ((blockPosX || blockNegX) && (blockPosZ || blockNegZ)) {
+        penalty += TIGHT_CORNER_PENALTY;
+    }
+
+    return penalty;
 }
 
 bool MovementExpander::clearanceOk(int x, int y, int z) const {
     return world_.isPassable(x, y, z) && world_.isPassable(x, y+1, z);
+}
+
+bool MovementExpander::hasBlockingCollision(int x, int y, int z) const {
+    return world_.isSolid(x, y, z);
 }
 
 void MovementExpander::addWalkSprint(const Vec3i& from, std::vector<PathNode>& out) const {
@@ -76,7 +132,13 @@ void MovementExpander::addWalkSprint(const Vec3i& from, std::vector<PathNode>& o
         bool lowCeiling = !world_.isPassable(nx, from.y + 2, nz);
         ActionType act = lowCeiling ? ActionType::WALK : ActionType::SPRINT;
         float base = (lowCeiling ? costs_.walk : costs_.sprint) * DIAGONAL_COST_SCALE;
-        out.push_back({{nx, from.y, nz}, act, base + adjacentCost({nx, from.y, nz}) + clearanceCost({nx, from.y, nz})});
+        const Vec3i destination{nx, from.y, nz};
+        const Vec3i sideA{sideAX, from.y, sideAZ};
+        const Vec3i sideB{sideBX, from.y, sideBZ};
+        const float destinationClearance = clearanceCost(destination);
+        const float diagonalWallPenalty =
+            std::max(clearanceCost(sideA), clearanceCost(sideB)) * DIAGONAL_SIDE_CLEARANCE_SCALE;
+        out.push_back({destination, act, base + adjacentCost(destination) + destinationClearance + diagonalWallPenalty});
     }
 }
 
@@ -107,8 +169,10 @@ void MovementExpander::addJumps(const Vec3i& from, std::vector<PathNode>& out) c
             bool gapClear = true;
             for (int d = 1; d < dist && gapClear; d++) {
                 int mx = from.x + DX4[i]*d, mz = from.z + DZ4[i]*d;
-                // Check both feet and head clearance through the mid-gap columns.
-                gapClear = world_.isPassable(mx, from.y, mz) && world_.isPassable(mx, from.y + 1, mz);
+                // Feet may pass over lava mid-arc (player is airborne — lava-cost penalty still applies
+                // at landing via adjacentCost). Head column must still be fully clear.
+                const bool feetClear = world_.isPassable(mx, from.y, mz) || world_.isLava(mx, from.y, mz);
+                gapClear = feetClear && world_.isPassable(mx, from.y + 1, mz);
             }
             if (!gapClear) break;
             float c = (float)dist + costs_.sprintJump + adjacentCost({nx, from.y, nz});

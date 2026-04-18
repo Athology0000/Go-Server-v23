@@ -44,22 +44,25 @@ vec3 ca(sampler2D t, vec2 UV, vec4 sampl){
 
 void main()
 {
-    const float brightness = 1.0;
+    const float brightness = 0.78;
     vec2 pp = gl_TexCoord[0].st;
     vec2 p = 1.-2.*pp;
     p.y *= u_texelSize.x/u_texelSize.y;
     vec4 sampl = texture2D(u_texture, pp);
     vec3 color = ca(u_texture, pp, sampl).rgb;
-    float vignette = 1.25 / (1.1 + 1.1*dot(p, p));
+    float vignette = 1.12 / (1.18 + 1.45*dot(p, p));
     vignette *= vignette;
-    vignette = mix(1.0, smoothstep(0.1, 1.1, vignette), 0.25);
+    vignette = mix(0.72, smoothstep(0.08, 1.04, vignette), 0.60);
     float noise = .012*vec3(hash(length(p)*u_time)).x;
     color = color*vignette+noise;
     color = filmic_reinhard(brightness*color);
     color = smoothstep(-0.025, 1.0,color);
-    color.r = color.b;
-    color.b = .53;
-    color.rgb *= 1.2;
+    float luma = dot(color, vec3(0.299, 0.587, 0.114));
+    color = mix(vec3(luma), color, 0.84);
+    color.r = mix(color.r, color.b, 0.22);
+    color.g *= 0.93;
+    color.b *= 0.68;
+    color.rgb *= vec3(0.96, 0.93, 0.88);
     color = pow(color, vec3(1.0/2.2));
     gl_FragColor = vec4(color, 1.0);
 }

@@ -48,7 +48,7 @@ object AngleUtils {
   fun getRotation(to: Entity): Rotation {
     return getRotation(
       player!!.eyePosition,
-      to.position().add(0.0, ((to.bbHeight * 0.85) + (Math.random() * 0.3 - 0.15)).coerceAtMost(1.7), 0.0)
+      to.position().add(0.0, (to.bbHeight * 0.85).coerceAtMost(1.7), 0.0)
     )
   }
 

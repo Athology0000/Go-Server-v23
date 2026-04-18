@@ -7,18 +7,18 @@ import (
 )
 
 type Session struct {
-	ID                   string
-	SessionTokenHash     string
-	DeviceID             string
-	AccountID            string
-	PlanTier             string
-	EnabledModules       []string
-	EnabledFeatures      []string
-	EntitlementExpiresAt *time.Time
-	ExpiresAt            time.Time
-	Revoked              bool
-	LastSeenIP           *string
-	CreatedAt            time.Time
+	ID                   string     `json:"id"`
+	SessionTokenHash     string     `json:"-"`
+	DeviceID             string     `json:"device_id"`
+	AccountID            string     `json:"account_id"`
+	PlanTier             string     `json:"plan_tier"`
+	EnabledModules       []string   `json:"enabled_modules"`
+	EnabledFeatures      []string   `json:"enabled_features"`
+	EntitlementExpiresAt *time.Time `json:"entitlement_expires_at"`
+	ExpiresAt            time.Time  `json:"expires_at"`
+	Revoked              bool       `json:"revoked"`
+	LastSeenIP           *string    `json:"last_seen_ip"`
+	CreatedAt            time.Time  `json:"created_at"`
 }
 
 func CreateSession(ctx context.Context, pool *pgxpool.Pool, tokenHash, deviceID, accountID, planTier string,

@@ -1,0 +1,55 @@
+<h2>How should each wardrobe set look in the GUI?</h2>
+<p class="subtitle">SkyHanni renders a full 3D player. Cobalt uses NanoVG — so we'd draw using item icons instead. Pick the slot card style you like most.</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#1a1a2e;border-radius:8px;padding:12px;display:inline-block;min-width:80px">
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:center">
+          <div style="background:#2d2d4e;border:1px solid #444;border-radius:4px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:18px">⛑</div>
+          <div style="background:#2d2d4e;border:1px solid #444;border-radius:4px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:18px">🦺</div>
+          <div style="background:#2d2d4e;border:1px solid #444;border-radius:4px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:18px">👖</div>
+          <div style="background:#2d2d4e;border:1px solid #444;border-radius:4px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:18px">👟</div>
+        </div>
+        <div style="color:#aaa;font-size:11px;text-align:center;margin-top:6px">Set 1</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Vertical Stack</h3>
+      <p>4 armor item icons in a column (helmet → boots). Compact, tall card. Closest to SkyHanni's player render area shape.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#1a1a2e;border-radius:8px;padding:12px;display:inline-block;min-width:80px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+          <div style="background:#2d2d4e;border:1px solid #444;border-radius:4px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:18px">⛑</div>
+          <div style="background:#2d2d4e;border:1px solid #444;border-radius:4px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:18px">🦺</div>
+          <div style="background:#2d2d4e;border:1px solid #444;border-radius:4px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:18px">👖</div>
+          <div style="background:#2d2d4e;border:1px solid #444;border-radius:4px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:18px">👟</div>
+        </div>
+        <div style="color:#aaa;font-size:11px;text-align:center;margin-top:6px">Set 1</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — 2×2 Grid</h3>
+      <p>4 armor items in a 2×2 square. More compact horizontally, allows more sets per row on screen.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#1a1a2e;border-radius:8px;padding:14px 20px;display:inline-block;min-width:80px">
+        <div style="background:#2d2d4e;border:1px solid #5a5af0;border-radius:6px;padding:10px 18px;text-align:center">
+          <div style="color:#fff;font-size:14px;font-weight:bold">Set 1</div>
+          <div style="color:#888;font-size:11px;margin-top:3px">Equipped ✓</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Named Button</h3>
+      <p>No item icons — just a labeled button with the slot number and equipped status. Simplest to implement, least visual info.</p>
+    </div>
+  </div>
+</div>

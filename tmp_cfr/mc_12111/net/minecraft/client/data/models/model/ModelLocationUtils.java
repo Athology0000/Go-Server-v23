@@ -1,0 +1,52 @@
+/*
+ * Decompiled with CFR 0.152.
+ * 
+ * Could not load the following classes:
+ *  net.fabricmc.api.EnvType
+ *  net.fabricmc.api.Environment
+ *  net.minecraft.core.registries.BuiltInRegistries
+ *  net.minecraft.resources.Identifier
+ *  net.minecraft.world.item.Item
+ *  net.minecraft.world.level.block.Block
+ */
+package net.minecraft.client.data.models.model;
+
+import net.fabricmc.api.EnvType;
+import net.fabricmc.api.Environment;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.block.Block;
+
+@Environment(value=EnvType.CLIENT)
+public class ModelLocationUtils {
+    @Deprecated
+    public static Identifier decorateBlockModelLocation(String string) {
+        return Identifier.withDefaultNamespace((String)("block/" + string));
+    }
+
+    public static Identifier decorateItemModelLocation(String string) {
+        return Identifier.withDefaultNamespace((String)("item/" + string));
+    }
+
+    public static Identifier getModelLocation(Block block, String string) {
+        Identifier identifier = BuiltInRegistries.BLOCK.getKey((Object)block);
+        return identifier.withPath(string2 -> "block/" + string2 + string);
+    }
+
+    public static Identifier getModelLocation(Block block) {
+        Identifier identifier = BuiltInRegistries.BLOCK.getKey((Object)block);
+        return identifier.withPrefix("block/");
+    }
+
+    public static Identifier getModelLocation(Item item) {
+        Identifier identifier = BuiltInRegistries.ITEM.getKey((Object)item);
+        return identifier.withPrefix("item/");
+    }
+
+    public static Identifier getModelLocation(Item item, String string) {
+        Identifier identifier = BuiltInRegistries.ITEM.getKey((Object)item);
+        return identifier.withPath(string2 -> "item/" + string2 + string);
+    }
+}
+

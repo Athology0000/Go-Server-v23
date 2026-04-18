@@ -46,6 +46,8 @@ import org.cobalt.api.util.player.MovementManager
 import org.cobalt.internal.combat.CombatMacroModule
 import org.cobalt.internal.pathfinding.PathfindingModule
 import org.cobalt.internal.rotation.RotationsModule
+import org.cobalt.internal.routes.RoutePickerSetting
+import org.cobalt.internal.routes.RouteType
 import org.cobalt.internal.ui.panel.panels.UIModuleList
 
 object MiningMacroModule : Module("Mining Macro") {
@@ -244,6 +246,13 @@ object MiningMacroModule : Module("Mining Macro") {
     10.0
   )
 
+  val oreMinerRoutePicker = RoutePickerSetting(
+    "Ore Miner Route",
+    "ORE_MINER route to follow during the mining macro.",
+    RouteType.ORE_MINER,
+    "mining:ore",
+  )
+
   init {
     MiningPrecisionTracker.ensureInitialized()
     MiningProfitTracker.ensureInitialized()
@@ -252,6 +261,7 @@ object MiningMacroModule : Module("Mining Macro") {
       enabled,
       toggleKeybind,
       info,
+      oreMinerRoutePicker,
       useMiningModuleType,
       blockTypes,
       blockTypesPicker,
@@ -321,7 +331,7 @@ object MiningMacroModule : Module("Mining Macro") {
   private var currentVein: Vein? = null
   private var veinStartAnchor: BlockPos? = null
   private var automationScanAnchor: BlockPos? = null
-  private var automationCustomBlockId: String? = null
+  private var automationCustomBlockIds: Set<String> = emptySet()
   private var currentTarget: BlockPos? = null
   private var currentTargetNoLosTicks = 0
   private var currentDirectionalFlow: VeinDirectionModule.VeinFlow? = null
@@ -338,6 +348,9 @@ object MiningMacroModule : Module("Mining Macro") {
   private var miningOnTargetTicks = 0
   private var miningLockedTicks = 0
   private var miningOnTarget: BlockPos? = null
+  private var cachedPreviewTarget: BlockPos? = null
+  private var previewCacheTick = -1L
+  private var lastPruneTick = 0L
   private var miningUsesPrecisionPoint = false
   private val precisionRolls = HashMap<Long, Boolean>()
   private var precisionPointChanceSnapshot = precisionPointChance.value
@@ -361,14 +374,21 @@ object MiningMacroModule : Module("Mining Macro") {
   fun startForAutomation(
     blockTypeNames: String,
     anchor: BlockPos? = null,
-    customBlockId: String? = null
+    customBlockId: String? = null,
+    customBlockIds: Set<String> = emptySet(),
   ) {
     blockTypes.value = blockTypeNames
     automationScanAnchor = anchor?.immutable()
-    automationCustomBlockId =
-      customBlockId
-        ?.trim()
-        ?.takeIf { it.isNotEmpty() && !MiningBlockRegistry.isBlacklisted(it) }
+    val combined = linkedSetOf<String>()
+    customBlockId
+      ?.trim()
+      ?.takeIf { it.isNotEmpty() && !MiningBlockRegistry.isBlacklisted(it) }
+      ?.let { combined.add(it) }
+    for (id in customBlockIds) {
+      val trimmed = id.trim()
+      if (trimmed.isNotEmpty() && !MiningBlockRegistry.isBlacklisted(trimmed)) combined.add(trimmed)
+    }
+    automationCustomBlockIds = combined
     val firstName = blockTypeNames.split(",").firstOrNull()?.trim().orEmpty()
     val idx = MiningBlockRegistry.BLOCK_TYPES.indexOf(firstName)
     if (idx >= 0) MiningModule.blockType.value = idx
@@ -377,7 +397,7 @@ object MiningMacroModule : Module("Mining Macro") {
 
   fun stopForAutomation() {
     automationScanAnchor = null
-    automationCustomBlockId = null
+    automationCustomBlockIds = emptySet()
     enabled.value = false
   }
 
@@ -551,7 +571,11 @@ object MiningMacroModule : Module("Mining Macro") {
       return
     }
 
-    pruneVein(level, player, vein)
+    val gameTime = level.gameTime
+    if (gameTime - lastPruneTick >= 20L) {
+      pruneVein(level, player, vein)
+      lastPruneTick = gameTime
+    }
     sanitizeActiveTargets(level, player, vein)
     if (vein.blocks.isEmpty()) {
       currentVein = null
@@ -675,7 +699,7 @@ object MiningMacroModule : Module("Mining Macro") {
       } else {
         // Not on a vein block yet — release attack and keep rotating toward selected target.
         if (miningActive) {
-          mc.options.keyAttack?.setDown(false)
+          setMiningAttackDown(false)
           miningActive = false
         }
         val blockingPlayer = findBlockingPlayerForTarget(level, player, target)
@@ -719,24 +743,27 @@ object MiningMacroModule : Module("Mining Macro") {
         stepToNearbyBlocks.value &&
           canStepToNearbyTarget(player, target) &&
           distSq <= nudgeThresh * nudgeThresh
-      when {
-        blockingPlayer != null && usePathfinding.value && canShortStep -> {
-          moveToward(
-            level,
-            player,
+        when {
+          blockingPlayer != null && usePathfinding.value && canShortStep -> {
+            moveToward(
+              level,
+              player,
             target,
             forceApproach = true,
             avoidPlayer = blockingPlayer,
             maxTravelDistance = shortStepLimit,
           )
         }
-        blockingPlayer != null && usePathfinding.value -> {
-          moveToward(level, player, target, forceApproach = true, avoidPlayer = blockingPlayer)
-        }
-        canShortStep -> {
-          nudgeTowardApproach(level, player, target, blockingPlayer)
-          focusApproachTarget(player, target)
-        }
+          blockingPlayer != null && usePathfinding.value -> {
+            moveToward(level, player, target, forceApproach = true, avoidPlayer = blockingPlayer)
+          }
+          canShortStep && usePathfinding.value -> {
+            moveToward(level, player, target, maxTravelDistance = shortStepLimit)
+          }
+          canShortStep -> {
+            nudgeTowardApproach(level, player, target, blockingPlayer)
+            focusApproachTarget(player, target)
+          }
         usePathfinding.value -> {
           moveToward(level, player, target, avoidPlayer = blockingPlayer)
         }
@@ -802,10 +829,12 @@ object MiningMacroModule : Module("Mining Macro") {
       val label = MiningBlockRegistry.normalizeType(rawLabel)
       val baseIds =
         if (label.equals("Custom", ignoreCase = true)) {
-          val automationId =
-            automationCustomBlockId?.takeIf { it.isNotEmpty() && !MiningBlockRegistry.isBlacklisted(it) }
-          if (automationId != null) {
-            linkedSetOf(automationId)
+          val automationIds = automationCustomBlockIds
+            .asSequence()
+            .filter { it.isNotEmpty() && !MiningBlockRegistry.isBlacklisted(it) }
+            .toCollection(linkedSetOf())
+          if (automationIds.isNotEmpty()) {
+            automationIds
           } else {
             val detected = MiningModule.getDetectedBlockId()?.trim().orEmpty()
             if (useDetectedBlock.value && detected.isNotEmpty() && !MiningBlockRegistry.isBlacklisted(detected)) {
@@ -815,7 +844,18 @@ object MiningMacroModule : Module("Mining Macro") {
             }
           }
         } else {
-          MiningBlockRegistry.idsForType(label)
+          val idsForLabel = MiningBlockRegistry.idsForType(label).toMutableSet()
+          // Fold any automation-detected IDs whose type matches this label so the vein
+          // flood-fill includes every nearby ore variant even when they aren't in the
+          // static registry for this label (e.g. deepslate variants, mixed veins).
+          for (id in automationCustomBlockIds) {
+            if (id.isEmpty() || MiningBlockRegistry.isBlacklisted(id)) continue
+            val mappedType = MiningBlockRegistry.BLOCK_ID_TO_TYPE[id] ?: continue
+            if (MiningBlockRegistry.normalizeType(mappedType).equals(label, ignoreCase = true)) {
+              idsForLabel.add(id)
+            }
+          }
+          idsForLabel
         }
       val ids = expandSelectionIds(label, baseIds)
       if (ids.isNotEmpty()) {
@@ -1392,8 +1432,16 @@ object MiningMacroModule : Module("Mining Macro") {
     frameRotPitchStep  = (RotationsModule.sample(RotationsModule.miningPitchStep.value) * precisionRotScale).toFloat()
     frameRotMaxSpeed   = (RotationsModule.sample(RotationsModule.miningMaxSpeed.value) * precisionRotScale).toFloat()
     frameRotMaxAccel   = (RotationsModule.sample(RotationsModule.miningMaxAccel.value) * precisionRotScale).toFloat()
-    mc.options.keyAttack?.setDown(true)
+    setMiningAttackDown(true)
     miningActive = true
+  }
+
+  private fun setMiningAttackDown(attack: Boolean) {
+    mc.options.keyAttack?.setDown(attack)
+    mc.options.keyUse?.setDown(false)
+    MovementManager.forcedActionsEnabled = attack
+    MovementManager.forcedAttack = attack
+    MovementManager.forcedUse = false
   }
 
   private fun maxMiningTicksForTarget(target: BlockPos): Int {
@@ -1416,8 +1464,10 @@ object MiningMacroModule : Module("Mining Macro") {
 
   private fun stopMiningKeys() {
     if (miningActive) {
-      mc.options.keyAttack?.setDown(false)
+      setMiningAttackDown(false)
       miningActive = false
+    } else {
+      setMiningAttackDown(false)
     }
     frameRotTarget = null
     frameRotSnapThreshold = 0f
@@ -1737,10 +1787,7 @@ object MiningMacroModule : Module("Mining Macro") {
       startedPath = true
       lastPathTarget = destination
     }
-
-    val cmd = NativePathfinder.tick()
-    if (cmd != null) cmd.applyToPlayer()
-    else MovementManager.clearForcedMovement()
+    // Ticking is handled by the early path block in onTick to avoid double-ticking.
   }
 
   private fun findNearestWalkableAround(
@@ -1859,8 +1906,8 @@ object MiningMacroModule : Module("Mining Macro") {
       .mapNotNull { it as? LivingEntity }
       .filter { it.isAlive && it.health > 0f && it !== player }
       .firstOrNull { entity ->
-        val name = ChatFormatting.stripFormatting(entity.name.string)?.lowercase().orEmpty()
-        name.contains(GOLDEN_GOBLIN_NAME) && player.distanceToSqr(entity) <= maxDistSq
+        player.distanceToSqr(entity) <= maxDistSq &&
+          CombatMacroModule.matchesAutomationTarget(entity, GOLDEN_GOBLIN_NAME)
       }
   }
 
@@ -1938,7 +1985,11 @@ object MiningMacroModule : Module("Mining Macro") {
     PathfindingModule.ensureEnabledForAutomation("mining macro")
     val currentDistance = sqrt(distanceToBlockSq(player, target))
     val holdDistance = preferredApproachDistance()
-    if (!forceApproach && currentDistance <= holdDistance) {
+    // Only skip stepping when we're already in an ideal spot: close AND with LOS.
+    // Without the LOS check, a block that sits within 4 blocks but is occluded (corners,
+    // ceiling ores, short walls) would never trigger a step to a visible position.
+    if (!forceApproach && currentDistance <= holdDistance &&
+        (!REQUIRE_MINE_LOS || hasLineOfSight(level, player, target))) {
       stopApproachMovement()
       focusApproachTarget(player, target)
       return
@@ -1989,9 +2040,7 @@ object MiningMacroModule : Module("Mining Macro") {
       startedPath = true
       lastPathTarget = approach
     }
-    val cmd = NativePathfinder.tick()
-    if (cmd != null) cmd.applyToPlayer()
-    else MovementManager.clearForcedMovement()
+    // Ticking is handled by the early path block in onTick to avoid double-ticking.
   }
 
   private fun abandonApproachTarget(target: BlockPos) {
@@ -2521,10 +2570,16 @@ object MiningMacroModule : Module("Mining Macro") {
     }
 
     val active = miningOnTarget
-    val preview = resolvePreviewTarget(level, mc.player ?: run {
+    val player = mc.player ?: run {
       OverlayRenderEngine.clearTag(OVERLAY_TAG)
       return
-    })
+    }
+    val gameTime = level.gameTime
+    if (gameTime != previewCacheTick) {
+      cachedPreviewTarget = resolvePreviewTarget(level, player)
+      previewCacheTick = gameTime
+    }
+    val preview = cachedPreviewTarget
     val returnPos = goldenGoblinReturnPos
 
     OverlayRenderEngine.clearTag(OVERLAY_TAG)
@@ -2560,7 +2615,6 @@ object MiningMacroModule : Module("Mining Macro") {
     if (returnPos != null) {
       renderReturnSpotMarker(level, returnPos, returnOutline)
     }
-    OverlayRenderEngine.render(event.context)
   }
 
   private fun renderReturnSpotMarker(
@@ -2628,6 +2682,7 @@ object MiningMacroModule : Module("Mining Macro") {
       player.xRot = targetRotation.pitch.coerceIn(-89.9f, 89.9f)
       return 0.0 to 0.0
     }
+    val easeMode = RotationsModule.currentMiningEase()
     val yawDelta = AngleUtils.getRotationDelta(player.yRot, targetRotation.yaw)
     val yawStep  = HeadRotationModule.computeTurnDelta(
       yawDelta,
@@ -2635,6 +2690,7 @@ object MiningMacroModule : Module("Mining Macro") {
       accelScale    = accelScale,
       maxTurnSpeed  = maxTurnSpeed,
       maxTurnAccel  = maxTurnAccel,
+      easeMode      = easeMode,
     )
     player.yRot     = AngleUtils.normalizeAngle(player.yRot + yawStep)
     player.yHeadRot = player.yRot
@@ -2647,6 +2703,7 @@ object MiningMacroModule : Module("Mining Macro") {
       accelScale    = accelScale,
       maxPitchSpeed = maxPitchStep * 20f,
       maxPitchAccel = maxPitchStep * 60f,
+      easeMode      = easeMode,
     )
     player.xRot = (player.xRot + pitchStep).coerceIn(-89.9f, 89.9f)
 
@@ -2792,6 +2849,9 @@ object MiningMacroModule : Module("Mining Macro") {
     currentTargetNoLosTicks = 0
     currentDirectionalFlow = null
     lastPathTarget = null
+    cachedPreviewTarget = null
+    previewCacheTick = -1L
+    lastPruneTick = 0L
     resetApproachTracking()
     lanternPlacedForVein = false
     lastLanternRefreshTick = -1L
@@ -2807,6 +2867,6 @@ object MiningMacroModule : Module("Mining Macro") {
     goldenGoblinReturnPending = false
     goldenGoblinReturnPos = null
     automationScanAnchor = null
-    automationCustomBlockId = null
+    automationCustomBlockIds = emptySet()
   }
 }

@@ -14,6 +14,7 @@ import org.cobalt.api.module.Module
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.util.ui.NVGRenderer
 import org.cobalt.api.util.ui.helper.Gradient
+import org.cobalt.internal.qol.ItemLockingModule
 
 object HotbarOverlayModule : Module("Liquid Hotbar") {
 
@@ -120,9 +121,12 @@ object HotbarOverlayModule : Module("Liquid Hotbar") {
     // Items rendered after fills so they sit on top of the glass
     for (slot in 0..8) {
       val stack = player.inventory.getItem(slot)
-      if (stack.isEmpty) continue
-      event.graphics.renderItem(stack, gx + 1 + slot * 20 + 2, gy + 3)
-      event.graphics.renderItemDecorations(mc.font, stack, gx + 1 + slot * 20 + 2, gy + 3)
+      val slotX = gx + 1 + slot * 20
+      if (!stack.isEmpty) {
+        event.graphics.renderItem(stack, slotX + 2, gy + 3)
+        event.graphics.renderItemDecorations(mc.font, stack, slotX + 2, gy + 3)
+      }
+      ItemLockingModule.renderHotbarSlotOverlay(event.graphics, slot, slotX, gy + 1)
     }
 
     if (!offhand.isEmpty) {

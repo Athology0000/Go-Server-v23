@@ -7,16 +7,16 @@ import (
 )
 
 type LicenseKey struct {
-	ID           string
-	KeyHash      string
-	PlanTier     string
-	Status       string
-	RedeemedBy   *string
-	RedeemedAt   *time.Time
-	EnrollmentIP *string
-	CreatedBy    string
-	Notes        *string
-	CreatedAt    time.Time
+	ID           string     `json:"id"`
+	KeyHash      string     `json:"-"`
+	PlanTier     string     `json:"plan_tier"`
+	Status       string     `json:"status"`
+	RedeemedBy   *string    `json:"redeemed_by"`
+	RedeemedAt   *time.Time `json:"redeemed_at"`
+	EnrollmentIP *string    `json:"enrollment_ip"`
+	CreatedBy    string     `json:"created_by"`
+	Notes        *string    `json:"notes"`
+	CreatedAt    time.Time  `json:"created_at"`
 }
 
 func GetLicenseKeyByHash(ctx context.Context, pool *pgxpool.Pool, keyHash string) (*LicenseKey, error) {

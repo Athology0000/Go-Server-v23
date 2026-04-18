@@ -25,6 +25,7 @@ import org.cobalt.internal.rotation.RotationsModule
 object DianaMacroModule : Module("Diana Macro") {
 
     private val mc = Minecraft.getInstance()
+    val isActive: Boolean get() = enabledSetting.value
 
     // -- State -----------------------------------------------------------------
 

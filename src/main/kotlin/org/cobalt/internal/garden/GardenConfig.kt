@@ -8,6 +8,7 @@ object GardenConfig {
     @Volatile var pestScript: String = "misc:pestCleaner"
     @Volatile var returnScript: String = "misc:visitor"
     @Volatile var visitorScript: String = "misc:visitor"
+    @Volatile var autoRestartStoppedScript: Boolean = false
 
     // Pest
     @Volatile var pestThreshold: Int = 4

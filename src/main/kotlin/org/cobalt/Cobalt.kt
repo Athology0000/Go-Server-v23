@@ -18,23 +18,28 @@ import org.cobalt.internal.combat.CombatHudModule
 import org.cobalt.internal.combat.CombatMacroModule
 import org.cobalt.internal.combat.CombatPatrolModule
 import org.cobalt.internal.command.MainCommand
+import org.cobalt.internal.dungeons.BloodCampHelperModule
+import org.cobalt.internal.dungeons.DungeonMapModule
+import org.cobalt.internal.dungeons.DungeonRoutesModule
 import org.cobalt.internal.dungeons.DungeonsModule
 import org.cobalt.internal.etherwarp.EtherwarpHelperModule
 import org.cobalt.internal.etherwarp.LeftClickEtherwarpModule
+import org.cobalt.internal.etherwarp.SmoothAotvModule
 import org.cobalt.internal.helper.Config
 import org.cobalt.internal.loader.AddonLoader
 import org.cobalt.internal.mining.MiningModule
 import org.cobalt.internal.mining.FairyModule
 import org.cobalt.internal.mining.RoutesModule
 import org.cobalt.internal.mining.MiningMacroModule
-import org.cobalt.internal.mining.MiningHudModule
+import org.cobalt.api.hud.modules.MiningHudModule
 import org.cobalt.internal.mining.MiningCoinPopupModule
-import org.cobalt.internal.mining.CommissionMacroModule
+import org.cobalt.api.hud.modules.CommissionMacroModule
 import org.cobalt.internal.mining.AutoForgeModule
 import org.cobalt.internal.mining.VeinDirectionModule
 import org.cobalt.internal.mining.AutoLanternModule
+import org.cobalt.internal.mining.NoFrillsMiningModule
+import org.cobalt.internal.mining.CommissionHudModule
 import org.cobalt.internal.pathfinding.PathfindingModule
-import org.cobalt.internal.pathfinding.PatrolWaypointStore
 import org.cobalt.internal.qol.AutoStashModule
 import org.cobalt.internal.qol.ItemLockingModule
 import org.cobalt.internal.qol.PriceTooltipModule
@@ -49,9 +54,11 @@ import org.cobalt.internal.visual.SkyboxChangerModule
 import org.cobalt.internal.rotation.RotationsModule
 import org.cobalt.internal.visual.DeployableHudModule
 import org.cobalt.internal.visual.HotbarOverlayModule
+import org.cobalt.internal.visual.MobEspModule
 import org.cobalt.internal.visual.OrbitFreecamModule
 import org.cobalt.internal.visual.PetDisplayModule
 import org.cobalt.internal.visual.TitleScreenRenderer
+import org.cobalt.internal.visual.WitherImpactOverlayModule
 import org.cobalt.internal.garden.GardenAnalyzerModule
 import org.cobalt.internal.garden.GardenMacroModule
 import org.cobalt.internal.farming.FarmingMacroModule
@@ -62,6 +69,8 @@ import org.cobalt.internal.diana.DianaMacroModule
 import org.cobalt.internal.diana.DianaHelperModule
 import org.cobalt.internal.wardrobe.WardrobeModule
 import org.cobalt.internal.garden.GardenHudModule
+import org.cobalt.internal.routes.RouteEditMode
+import org.cobalt.internal.routes.RouteStore
 
 @Suppress("UNUSED")
 object Cobalt : ClientModInitializer {
@@ -79,15 +88,21 @@ object Cobalt : ClientModInitializer {
         RoutesModule,
         MiningMacroModule,
         CommissionMacroModule,
+        CommissionHudModule,
         AutoForgeModule,
         VeinDirectionModule,
         AutoLanternModule,
+        NoFrillsMiningModule,
         CombatMacroModule,
         CombatPatrolModule,
         CombatHudModule,
         DungeonsModule,
+        BloodCampHelperModule,
+        DungeonMapModule,
+        DungeonRoutesModule,
         EtherwarpHelperModule,
         LeftClickEtherwarpModule,
+        SmoothAotvModule,
         PathfindingModule,
         FullBrightModule,
         SkyboxChangerModule,
@@ -97,6 +112,8 @@ object Cobalt : ClientModInitializer {
         OrbitFreecamModule,
         BlockOverlayModule,
         BlockOutlineModule,
+        MobEspModule,
+        WitherImpactOverlayModule,
         QolModule,
         ItemLockingModule,
         PriceTooltipModule,
@@ -129,12 +146,14 @@ object Cobalt : ClientModInitializer {
     listOf(
       TickScheduler, MainCommand, NotificationManager,
       RotationExecutor, HudModuleManager, TitleScreenRenderer, MacroTimeTracker,
+      RouteEditMode,
     ).forEach { EventBus.register(it) }
     NativePathfinder.init()
     Config.loadModulesConfig()
+    RouteStore.migrate()
+    RouteStore.loadAssignments()
     ItemLockingModule.loadPersistedState()
     WardrobeModule.loadFavorites()
-    PatrolWaypointStore.load()
     EventBus.register(this)
     println("Dutt Client Initialized")
   }

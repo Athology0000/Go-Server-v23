@@ -48,6 +48,14 @@ object RotationExecutor {
     isRotating = false
   }
 
+  fun stopIfUsing(strategy: IRotationStrategy) {
+    if (currStrat === strategy) {
+      stopRotating()
+    }
+  }
+
+  fun isUsing(strategy: IRotationStrategy): Boolean = currStrat === strategy
+
   fun isRotating(): Boolean {
     return isRotating
   }

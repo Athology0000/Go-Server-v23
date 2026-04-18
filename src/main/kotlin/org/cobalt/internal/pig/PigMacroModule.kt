@@ -17,7 +17,6 @@ import org.cobalt.api.event.EventBus
 import org.cobalt.api.event.annotation.SubscribeEvent
 import org.cobalt.api.event.impl.client.ChatEvent
 import org.cobalt.api.event.impl.client.TickEvent
-import org.cobalt.api.event.impl.render.WorldRenderEvent
 import org.cobalt.api.hud.HudAnchor
 import org.cobalt.api.hud.hudElement
 import org.cobalt.api.module.Module
@@ -40,6 +39,7 @@ import org.cobalt.internal.pathfinding.OverlayRenderEngine
 object PigMacroModule : Module("Pig Macro") {
 
     private val mc = Minecraft.getInstance()
+    val isActive: Boolean get() = enabledSetting.value
 
     // -- State -----------------------------------------------------------------
 
@@ -208,11 +208,6 @@ object PigMacroModule : Module("Pig Macro") {
     }
 
     // -- Tick ------------------------------------------------------------------
-
-    @SubscribeEvent
-    fun onRender(event: WorldRenderEvent.Last) {
-        if (state == State.HERDING) OverlayRenderEngine.render(event.context)
-    }
 
     @SubscribeEvent
     fun onTick(@Suppress("UNUSED_PARAMETER") event: TickEvent.Start) {

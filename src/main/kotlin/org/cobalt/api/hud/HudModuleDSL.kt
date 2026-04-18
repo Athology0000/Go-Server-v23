@@ -76,6 +76,7 @@ class HudElementBuilder(
 
   /** Maximum allowed render scale for this HUD element. */
   var maxScale: Float = 3.0f
+  private var preRenderLambda: ((Float, Float, Float) -> Unit)? = null
   private var renderLambda: ((Float, Float, Float) -> Unit)? = null
   private var postRenderLambda: ((Float, Float, Float) -> Unit)? = null
 
@@ -112,6 +113,11 @@ class HudElementBuilder(
     return setting
   }
 
+  /** Sets a pre-render callback, called before NVG rendering begins. */
+  fun preRender(block: (screenX: Float, screenY: Float, scale: Float) -> Unit) {
+    preRenderLambda = block
+  }
+
   /** Sets the render callback, called every frame when this element is enabled. */
   fun render(block: (screenX: Float, screenY: Float, scale: Float) -> Unit) {
     renderLambda = block
@@ -133,6 +139,7 @@ class HudElementBuilder(
     val capturedScale = scale
     val capturedMinScale = minScale
     val capturedMaxScale = maxScale
+    val capturedPreRender = preRenderLambda
     val capturedPostRender = postRenderLambda
 
     return object : HudElement(id, name, description) {
@@ -150,6 +157,9 @@ class HudElementBuilder(
 
       override fun getBaseWidth(): Float = capturedWidth()
       override fun getBaseHeight(): Float = capturedHeight()
+      override fun renderPre(screenX: Float, screenY: Float, scale: Float) {
+        capturedPreRender?.invoke(screenX, screenY, scale)
+      }
       override fun render(screenX: Float, screenY: Float, scale: Float) {
         capturedRender(screenX, screenY, scale)
       }

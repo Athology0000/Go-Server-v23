@@ -4,8 +4,10 @@ import kotlin.random.Random
 import org.cobalt.api.module.Module
 import org.cobalt.api.module.setting.impl.InfoSetting
 import org.cobalt.api.module.setting.impl.InfoType
+import org.cobalt.api.module.setting.impl.ModeSetting
 import org.cobalt.api.module.setting.impl.RangeSetting
 import org.cobalt.api.module.setting.impl.SliderSetting
+import org.cobalt.internal.pathfinding.HeadRotationModule
 
 object RotationsModule : Module("Rotations") {
 
@@ -39,13 +41,46 @@ object RotationsModule : Module("Rotations") {
 
   // --- Routes ---
 
-  private val headerRoutes = InfoSetting("Routes", "Rotation step ranges for route walking.", InfoType.INFO)
+  private val headerRoutes = InfoSetting("Routes", "Bezier step ranges for route module actions other than walk-following.", InfoType.INFO)
 
   val routeYawStep = RangeSetting(
-    "Route Yaw Step", "Max yaw degrees per frame for route walking.", Pair(7.0, 11.0), 1.0, 30.0
+    "Route Yaw Step", "Max yaw degrees per frame for route action rotations.", Pair(7.0, 11.0), 1.0, 30.0
   )
   val routePitchStep = RangeSetting(
-    "Route Pitch Step", "Max pitch degrees per frame for route walking.", Pair(5.0, 9.0), 1.0, 30.0
+    "Route Pitch Step", "Max pitch degrees per frame for route action rotations.", Pair(5.0, 9.0), 1.0, 30.0
+  )
+
+  private val headerRouteFollow = InfoSetting("Route Follow", "Frame-based head smoothing while the route walker is moving.", InfoType.INFO)
+
+  val routeFollowMaxSpeed = SliderSetting(
+    "Route Max Speed", "Max yaw turn speed in degrees per second while following a route.", 140.0, 20.0, 360.0, 1.0
+  )
+  val routeFollowMaxAccel = SliderSetting(
+    "Route Max Accel", "Max yaw turn acceleration in degrees per second squared while following a route.", 320.0, 40.0, 900.0, 5.0
+  )
+  val routeFollowSpeedScale = SliderSetting(
+    "Route Speed Scale", "Multiplier applied to route head turn speed.", 1.0, 0.1, 2.0, 0.01
+  )
+  val routeFollowAccelScale = SliderSetting(
+    "Route Accel Scale", "Multiplier applied to route head turn acceleration.", 1.0, 0.1, 2.0, 0.01
+  )
+  val routeFollowPitchStep = SliderSetting(
+    "Route Pitch Step", "Pitch step budget for frame-based route smoothing.", 4.0, 0.5, 15.0, 0.1
+  )
+  val routeFollowSnapThreshold = SliderSetting(
+    "Route Snap Threshold", "Snap instantly when yaw and pitch errors are below this many degrees.", 0.35, 0.0, 5.0, 0.05
+  )
+  val routeFollowLookHeight = SliderSetting(
+    "Route Look Height", "Vertical look offset above the current route node or target.", 0.6, 0.0, 1.8, 0.05
+  )
+  val routeFollowLookaheadNodes = SliderSetting(
+    "Route Lookahead", "How many path nodes ahead the route head tracker aims.", 2.0, 1.0, 6.0, 1.0
+  )
+  val routeFollowEasing = ModeSetting(
+    "Route Easing",
+    "Easing curve used by frame-based route head smoothing.",
+    0,
+    arrayOf("Tanh (Default)", "Sine Out", "Sine In/Out", "Cubic In/Out", "Linear"),
   )
 
   // --- Mining Macro ---
@@ -67,6 +102,12 @@ object RotationsModule : Module("Rotations") {
   val miningPitchStep = RangeSetting(
     "Mining Pitch Step", "Max pitch step per frame while mining.", Pair(2.5, 4.5), 0.5, 15.0
   )
+  val miningEasing = ModeSetting(
+    "Mining Easing",
+    "Easing curve used when the mining macro rotates the head toward the next block.",
+    0,
+    arrayOf("Tanh (Default)", "Sine Out", "Sine In/Out", "Cubic In/Out", "Linear"),
+  )
 
   // --- Warp ---
 
@@ -87,9 +128,16 @@ object RotationsModule : Module("Rotations") {
       combatYawStep, combatPitchStep,
       headerRoutes,
       routeYawStep, routePitchStep,
+      headerRouteFollow,
+      routeFollowMaxSpeed, routeFollowMaxAccel,
+      routeFollowSpeedScale, routeFollowAccelScale,
+      routeFollowPitchStep, routeFollowSnapThreshold,
+      routeFollowLookHeight, routeFollowLookaheadNodes,
+      routeFollowEasing,
       headerMining,
       miningMaxSpeed, miningMaxAccel,
       miningSpeedScale, miningAccelScale, miningPitchStep,
+      miningEasing,
       headerWarp,
       warpSpeedScale, warpAccelScale,
     )
@@ -99,4 +147,21 @@ object RotationsModule : Module("Rotations") {
   fun sample(range: Pair<Double, Double>): Double =
     if (range.first >= range.second) range.first
     else range.first + Random.nextDouble() * (range.second - range.first)
+
+  /** Resolve the currently-selected mining easing mode for [HeadRotationModule]. */
+  fun currentMiningEase(): HeadRotationModule.EaseMode = when (miningEasing.value) {
+    1 -> HeadRotationModule.EaseMode.SINE_OUT
+    2 -> HeadRotationModule.EaseMode.SINE_IN_OUT
+    3 -> HeadRotationModule.EaseMode.CUBIC_IN_OUT
+    4 -> HeadRotationModule.EaseMode.LINEAR
+    else -> HeadRotationModule.EaseMode.TANH
+  }
+
+  fun currentRouteEase(): HeadRotationModule.EaseMode = when (routeFollowEasing.value) {
+    1 -> HeadRotationModule.EaseMode.SINE_OUT
+    2 -> HeadRotationModule.EaseMode.SINE_IN_OUT
+    3 -> HeadRotationModule.EaseMode.CUBIC_IN_OUT
+    4 -> HeadRotationModule.EaseMode.LINEAR
+    else -> HeadRotationModule.EaseMode.TANH
+  }
 }

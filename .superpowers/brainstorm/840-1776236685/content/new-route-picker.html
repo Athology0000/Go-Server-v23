@@ -1,0 +1,91 @@
+<h2>New Route — Type Picker</h2>
+<p class="subtitle">Does this feel right for the route creation screen? Click any card to select it.</p>
+
+<div class="mockup">
+  <div class="mockup-header">+ New Route</div>
+  <div class="mockup-body" style="padding:16px;">
+    <p style="color:#aaa;font-size:12px;margin-bottom:14px;font-family:monospace;">Choose a route type to get started. You can rename it after.</p>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-family:monospace;">
+
+      <!-- Ore Miner -->
+      <div style="background:#1a2a1a;border:1px solid #4de2c5;border-radius:8px;padding:12px;cursor:pointer;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <span style="background:#4de2c5;color:#000;font-size:9px;padding:2px 6px;border-radius:3px;font-weight:bold;">ORE MINER</span>
+        </div>
+        <p style="color:#ddd;font-size:11px;margin:0;">Travel to a mining area, then loop between veins — warping and mining each vein until done.</p>
+        <div style="margin-top:8px;font-size:10px;color:#666;">
+          <span style="color:#4de2c5;">⟶ Travel Route</span> + <span style="color:#4de2c5;">⟳ Loop Route</span>
+        </div>
+      </div>
+
+      <!-- Commission -->
+      <div style="background:#1a2018;border:1px solid #ffa24f;border-radius:8px;padding:12px;cursor:pointer;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <span style="background:#ffa24f;color:#000;font-size:9px;padding:2px 6px;border-radius:3px;font-weight:bold;">COMMISSION</span>
+        </div>
+        <p style="color:#ddd;font-size:11px;margin:0;">Starts at /warpforge. Walks or warps to a mining spot and mines the vein until the commission is complete.</p>
+        <div style="margin-top:8px;font-size:10px;color:#666;">
+          <span style="color:#ffa24f;">⟶ Single Route</span>
+        </div>
+      </div>
+
+      <!-- Patrol -->
+      <div style="background:#1a1828;border:1px solid #ff6b8a;border-radius:8px;padding:12px;cursor:pointer;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <span style="background:#ff6b8a;color:#000;font-size:9px;padding:2px 6px;border-radius:3px;font-weight:bold;">PATROL</span>
+        </div>
+        <p style="color:#ddd;font-size:11px;margin:0;">Travel route to reach the area, then patrol between kill zones — area-to-area combat with the highest enemy density.</p>
+        <div style="margin-top:8px;font-size:10px;color:#666;">
+          <span style="color:#ff6b8a;">⟶ Travel Route</span> + <span style="color:#ff6b8a;">⚔ Patrol Area</span>
+        </div>
+      </div>
+
+      <!-- Gemstone -->
+      <div style="background:#1a1528;border:1px solid #9e7cff;border-radius:8px;padding:12px;cursor:pointer;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <span style="background:#9e7cff;color:#fff;font-size:9px;padding:2px 6px;border-radius:3px;font-weight:bold;">GEMSTONE</span>
+        </div>
+        <p style="color:#ddd;font-size:11px;margin:0;">Warp to a specific block, mine it, then warp to the next. Simple warp-and-mine loop.</p>
+        <div style="margin-top:8px;font-size:10px;color:#666;">
+          <span style="color:#9e7cff;">⟳ Warp + Mine Loop</span>
+        </div>
+      </div>
+
+      <!-- Tunnel — full width -->
+      <div style="background:#18202a;border:1px solid #60a5fa;border-radius:8px;padding:12px;cursor:pointer;grid-column:1/-1;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <span style="background:#60a5fa;color:#000;font-size:9px;padding:2px 6px;border-radius:3px;font-weight:bold;">TUNNEL</span>
+        </div>
+        <p style="color:#ddd;font-size:11px;margin:0;">/warpcamp → walk/warp into the tunnels → mine tungsten, umber, or gemstone nodes at anchor points → /warpcamp and repeat.</p>
+        <div style="margin-top:8px;font-size:10px;color:#666;">
+          <span style="color:#60a5fa;">⌂ /warpcamp</span> → <span style="color:#60a5fa;">⟳ Mine Loop</span> → <span style="color:#60a5fa;">⌂ /warpcamp</span>
+        </div>
+      </div>
+
+    </div>
+
+    <div style="margin-top:14px;display:flex;gap:8px;align-items:center;">
+      <div class="mock-input" style="flex:1;font-size:11px;padding:5px 8px;font-family:monospace;" placeholder="Route name...">iron_veins_v2</div>
+      <button class="mock-button" style="background:#4de2c5;color:#000;font-weight:bold;padding:5px 14px;">Create →</button>
+      <button class="mock-button" style="opacity:0.5;padding:5px 10px;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="options" style="margin-top:16px;">
+  <div class="option" data-choice="looks-right" onclick="toggleSelect(this)">
+    <div class="letter">✓</div>
+    <div class="content">
+      <h3>Looks right</h3>
+      <p>These 5 types cover everything I need.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="changes" onclick="toggleSelect(this)">
+    <div class="letter">✎</div>
+    <div class="content">
+      <h3>Needs changes</h3>
+      <p>Something is missing or described wrong.</p>
+    </div>
+  </div>
+</div>

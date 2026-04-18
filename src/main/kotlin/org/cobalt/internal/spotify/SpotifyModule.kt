@@ -37,6 +37,7 @@ object SpotifyModule : Module("Spotify") {
     private val glowSetting       = CheckboxSetting("Glow",        "Animated glow border.",                 true)
     private val particlesSetting  = CheckboxSetting("Particles",   "Sparkle particle effects.",             true)
     private val showTimeSetting   = CheckboxSetting("Show Time",   "Show elapsed / total time.",            true)
+    private val waveformSetting   = CheckboxSetting("Waveform",    "Show a Spotify audio-reactive waveform.", true)
 
     // -- Derived colors --------------------------------------------------------
 
@@ -91,6 +92,13 @@ object SpotifyModule : Module("Spotify") {
     private var titleScrollX     = 0f
     private var titleScrollDir   = 1f
     private var titleScrollPause = 0f
+    private val waveformHistory  = FloatArray(WAVE_BARS)
+    private var waveformSampleTimer = 0f
+    private var waveformEnvelope = 0f
+    private var waveformPeak = 0f
+    private var waveformBeatPulse = 0f
+    private var waveformMotionTime = 0f
+    private var waveformAdaptivePeak = 0.08f
 
     // -- Layout constants ------------------------------------------------------
     //
@@ -108,6 +116,15 @@ object SpotifyModule : Module("Spotify") {
     private const val BTN_H          = 18f
     private const val BTN_Y_L        = 54f      // local Y of control buttons (used in onMouseClick)
     private const val BAR_Y          = 76f      // bar always at same Y; art ends at y+68, 8px gap
+    private const val WAVE_W         = 82f
+    private const val WAVE_H         = 26f
+    private const val WAVE_Y         = 16f
+    private const val WAVE_GAP       = 8f
+    private const val WAVE_BARS      = 18
+    private const val WAVE_SAMPLE_S  = 0.045f
+    private const val WAVE_NOISE_FLOOR = 0.00005f
+    private const val WAVE_RENDER_SAMPLES = 38
+    private const val WAVE_BEAT_TRIGGER = 0.12f
 
     // -- HUD -------------------------------------------------------------------
 
@@ -131,6 +148,7 @@ object SpotifyModule : Module("Spotify") {
     @SubscribeEvent
     fun onNvg(event: NvgEvent) {
         if (mc.screen == null) return
+        if (mc.level == null) return
         if (!spotifyHud.enabled) return
 
         val window  = mc.window
@@ -153,6 +171,7 @@ object SpotifyModule : Module("Spotify") {
     @SubscribeEvent
     fun onMouseClick(event: MouseEvent.LeftClick) {
         if (mc.screen == null) return
+        if (mc.level == null) return
         if (!spotifyHud.enabled) return
         SpotifyPoller.current ?: return
 
@@ -190,7 +209,7 @@ object SpotifyModule : Module("Spotify") {
         addSetting(
             color1Setting, color2Setting,
             gradientDirectionSetting, autoColorSetting,
-            glowSetting, particlesSetting, showTimeSetting,
+            glowSetting, particlesSetting, showTimeSetting, waveformSetting,
         )
         EventBus.register(this)
     }
@@ -211,6 +230,7 @@ object SpotifyModule : Module("Spotify") {
         val now  = System.currentTimeMillis()
         val dt   = ((now - lastRenderMs) / 1000f).coerceIn(0f, 0.1f)
         lastRenderMs = now
+        waveformMotionTime = (waveformMotionTime + dt).let { if (it >= 10_000f) it - 10_000f else it }
 
         val c1    = color1
         val c2    = color2
@@ -226,8 +246,11 @@ object SpotifyModule : Module("Spotify") {
         if (track == null) {
             NVGRenderer.text("Open Spotify and play something",
                 x + TEXT_X, y + H / 2f - 5f, 10f, dimColor)
+            updateWaveformState(dt, false, 0f)
             return
         }
+
+        updateWaveformState(dt, track.isPlaying, SpotifyPoller.audioLevel)
 
         // Reset scroll + burst particles on track change
         if (track.name != lastTrackName) {
@@ -235,22 +258,35 @@ object SpotifyModule : Module("Spotify") {
             titleScrollX     = 0f
             titleScrollDir   = 1f
             titleScrollPause = 1.5f
+            waveformHistory.fill(0f)
+            waveformSampleTimer = 0f
+            waveformEnvelope = 0f
+            waveformPeak = 0f
+            waveformBeatPulse = 0f
+            waveformMotionTime = 0f
+            waveformAdaptivePeak = 0.08f
             if (particlesSetting.value) {
                 SpotifyParticles.burst(x + PAD, y + BAR_Y, W - PAD * 2f, c1, c2)
             }
         }
 
+        val waveformReservedW = if (waveformSetting.value) WAVE_W + WAVE_GAP else 0f
+        val textMaxW = (W - TEXT_X - PAD - waveformReservedW).coerceAtLeast(60f)
+
         // Title row - full width of text area (no time here)
-        val nameMaxW = W - TEXT_X - PAD
-        drawScrollingTitle(track.name, x + TEXT_X, y + 18f, nameMaxW, 12f, textColor, dt)
+        drawScrollingTitle(track.name, x + TEXT_X, y + 18f, textMaxW, 12f, textColor, dt)
 
         // Artist row
-        NVGRenderer.text(truncate(track.artist, W - TEXT_X - PAD, 10f), x + TEXT_X, y + 33f, 10f, dimColor)
+        NVGRenderer.text(truncate(track.artist, textMaxW, 10f), x + TEXT_X, y + 33f, 10f, dimColor)
 
         // Time row - below artist
         if (showTimeSetting.value) {
             val timeStr = "${formatMs(track.currentProgressMs)} / ${formatMs(track.durationMs)}"
             NVGRenderer.text(timeStr, x + TEXT_X, y + 46f, 9f, dimColor)
+        }
+
+        if (waveformSetting.value) {
+            drawWaveform(x + W - PAD - WAVE_W, y + WAVE_Y, WAVE_W, WAVE_H, c1, c2, track.isPlaying)
         }
 
         // Control buttons - only when a screen is open
@@ -378,6 +414,184 @@ object SpotifyModule : Module("Spotify") {
             NVGRenderer.circle(tipX, barY + barH / 2f, barH * 0.7f, (0x88 shl 24) or (c1 and 0x00FFFFFF))
             NVGRenderer.circle(tipX, barY + barH / 2f, barH * 0.38f, 0xCCFFFFFF.toInt())
         }
+    }
+
+    private fun updateWaveformState(dt: Float, isPlaying: Boolean, audioLevel: Float) {
+        val rawLevel = if (isPlaying) audioLevel.coerceIn(0f, 1f) else 0f
+        val cleanedLevel =
+            if (rawLevel <= WAVE_NOISE_FLOOR) {
+                0f
+            } else {
+                ((rawLevel - WAVE_NOISE_FLOOR) / (1f - WAVE_NOISE_FLOOR)).coerceIn(0f, 1f)
+            }
+        val adaptiveDecay = if (isPlaying) 0.22f else 0.5f
+        waveformAdaptivePeak =
+            when {
+                cleanedLevel > waveformAdaptivePeak -> cleanedLevel
+                else -> max(cleanedLevel, waveformAdaptivePeak - dt * adaptiveDecay)
+            }.coerceIn(0.035f, 1f)
+        val normalizedLevel =
+            if (cleanedLevel <= 0f) {
+                0f
+            } else {
+                (cleanedLevel / waveformAdaptivePeak).coerceIn(0f, 1f)
+            }
+        val target =
+            if (normalizedLevel <= 0f) {
+                0f
+            } else {
+                (
+                    normalizedLevel.pow(0.48f) * 0.92f +
+                        cleanedLevel.pow(0.26f) * 0.32f
+                    ).coerceIn(0f, 1f)
+            }
+        val response = if (target > waveformEnvelope) 1f - exp(-18f * dt) else 1f - exp(-5.5f * dt)
+        val previousEnvelope = waveformEnvelope
+        waveformEnvelope += (target - waveformEnvelope) * response
+        val transient = (target - previousEnvelope).coerceAtLeast(0f)
+        if (transient >= WAVE_BEAT_TRIGGER) {
+            waveformBeatPulse = 1f
+        }
+        waveformBeatPulse = (waveformBeatPulse - dt * 1.9f).coerceAtLeast(0f)
+        waveformPeak = max(target, waveformPeak - dt * 0.85f)
+        waveformSampleTimer += dt
+
+        while (waveformSampleTimer >= WAVE_SAMPLE_S) {
+            waveformSampleTimer -= WAVE_SAMPLE_S
+            val shaped =
+                if (waveformEnvelope <= 0.002f) {
+                    0f
+                } else {
+                    (
+                        waveformEnvelope.pow(0.34f) * 0.92f +
+                            transient.coerceIn(0f, 1f) * 0.42f +
+                            waveformBeatPulse * 0.18f
+                        ).coerceIn(0f, 1f)
+                }
+            pushWaveformSample(shaped)
+        }
+
+        if (!isPlaying && rawLevel <= 0f) {
+            for (i in waveformHistory.indices) {
+                waveformHistory[i] *= 0.86f
+                if (waveformHistory[i] < 0.01f) {
+                    waveformHistory[i] = 0f
+                }
+            }
+            waveformEnvelope *= 0.84f
+            waveformPeak *= 0.9f
+            waveformAdaptivePeak = max(0.08f, waveformAdaptivePeak * 0.92f)
+        }
+    }
+
+    private fun pushWaveformSample(value: Float) {
+        for (i in 0 until WAVE_BARS - 1) {
+            waveformHistory[i] = waveformHistory[i + 1]
+        }
+        waveformHistory[WAVE_BARS - 1] = value
+    }
+
+    private fun drawWaveform(x: Float, y: Float, w: Float, h: Float, c1: Int, c2: Int, isPlaying: Boolean) {
+        val midY = y + h / 2f
+        val now = waveformMotionTime
+        val activity = if (isPlaying) 1f else 0.48f
+        val centerColor = lerpColor(c1, c2, 0.5f)
+        val baseAlpha = ((0x18 + waveformPeak * 0x28) * activity).toInt().coerceIn(0, 0x48)
+        val pulseAlpha = ((0x10 + waveformBeatPulse * 0x36) * activity).toInt().coerceIn(0, 0x54)
+        val layers = arrayOf(
+            WaveLayerSpec(shiftHue(c1, -16f), -0.95f, 0.82f, 0.95f, 0.25f),
+            WaveLayerSpec(c1, -0.25f, 1.08f, 1.12f, 0.42f),
+            WaveLayerSpec(centerColor, 0.45f, 1.36f, 1.32f, 0.56f),
+            WaveLayerSpec(c2, 1.05f, 1.68f, 1.06f, 0.38f),
+            WaveLayerSpec(shiftHue(c2, 16f), 1.55f, 2.02f, 0.88f, 0.22f),
+        )
+
+        NVGRenderer.line(x + 2f, midY, x + w - 2f, midY, 1f, withAlpha(centerColor, baseAlpha))
+        if (pulseAlpha > 0) {
+            NVGRenderer.line(x + 6f, midY, x + w - 6f, midY, 2.3f, withAlpha(centerColor, pulseAlpha / 2))
+        }
+
+        for ((index, layer) in layers.withIndex()) {
+            val alphaScale = if (index == 2) 1f else 0.78f
+            drawWaveformLayer(
+                x = x,
+                midY = midY,
+                w = w,
+                h = h,
+                now = now,
+                spec = layer,
+                activity = activity,
+                alphaScale = alphaScale,
+                beatAlpha = pulseAlpha,
+            )
+        }
+    }
+
+    private data class WaveLayerSpec(
+        val color: Int,
+        val phaseOffset: Float,
+        val frequency: Float,
+        val amplitudeScale: Float,
+        val shimmerScale: Float,
+    )
+
+    private fun drawWaveformLayer(
+        x: Float,
+        midY: Float,
+        w: Float,
+        h: Float,
+        now: Float,
+        spec: WaveLayerSpec,
+        activity: Float,
+        alphaScale: Float,
+        beatAlpha: Int,
+    ) {
+        val samples = WAVE_RENDER_SAMPLES
+        val glowAlpha = ((0x16 + waveformPeak * 0x42) * activity * alphaScale).toInt().coerceIn(0, 0x54)
+        val coreAlpha = ((0x46 + waveformEnvelope * 0x98 + waveformBeatPulse * 0x36) * activity * alphaScale).toInt().coerceIn(0, 0xFF)
+        val accentAlpha = ((0x10 + beatAlpha * 0.3f) * alphaScale).toInt().coerceIn(0, 0x32)
+        var prevX = x
+        var prevY = midY
+
+        for (sample in 0..samples) {
+            val t = sample / samples.toFloat()
+            val energy = sampleWaveform(t)
+            val edge = sin(t * Math.PI.toFloat()).pow(0.92f)
+            val ripple =
+                sin(t * Math.PI.toFloat() * spec.frequency - now * (2.6f + spec.frequency * 0.45f) + spec.phaseOffset)
+            val detail =
+                sin(t * Math.PI.toFloat() * (spec.frequency * 1.9f + 0.8f) + now * (1.4f + spec.shimmerScale) - spec.phaseOffset * 0.7f)
+            val sway =
+                sin(now * (0.85f + spec.shimmerScale * 0.6f) + t * Math.PI.toFloat() * 2.3f + spec.phaseOffset) * 0.12f
+            val heightScale =
+                (0.08f + energy * (0.52f + spec.amplitudeScale * 0.18f) + waveformBeatPulse * 0.08f) *
+                    edge *
+                    activity
+            val displacement =
+                (ripple * 0.72f + detail * 0.22f + sway) *
+                    (h * spec.amplitudeScale * heightScale)
+            val px = x + t * w
+            val py = midY + displacement
+
+            if (sample > 0) {
+                NVGRenderer.line(prevX, prevY, px, py, 4.6f, withAlpha(spec.color, glowAlpha))
+                NVGRenderer.line(prevX, prevY, px, py, 2.15f, withAlpha(spec.color, coreAlpha))
+                if (accentAlpha > 0 && sample % 6 == 0) {
+                    NVGRenderer.circle(px, py, 1.3f, withAlpha(0xFFFFFFFF.toInt(), accentAlpha))
+                }
+            }
+
+            prevX = px
+            prevY = py
+        }
+    }
+
+    private fun sampleWaveform(t: Float): Float {
+        val scaled = t.coerceIn(0f, 1f) * (WAVE_BARS - 1)
+        val start = scaled.toInt().coerceIn(0, WAVE_BARS - 1)
+        val end = (start + 1).coerceAtMost(WAVE_BARS - 1)
+        val mix = smoothStep(scaled - start)
+        return (waveformHistory[start] + (waveformHistory[end] - waveformHistory[start]) * mix).coerceIn(0f, 1f)
     }
 
     // -- Art cache + dominant color refresh ------------------------------------
@@ -515,6 +729,42 @@ object SpotifyModule : Module("Spotify") {
         var t = text
         while (t.isNotEmpty() && NVGRenderer.textWidth("$t...", size) > maxW) t = t.dropLast(1)
         return "$t..."
+    }
+
+    private fun lerpColor(from: Int, to: Int, t: Float): Int {
+        val clamped = t.coerceIn(0f, 1f)
+        val fa = (from ushr 24) and 0xFF
+        val fr = (from ushr 16) and 0xFF
+        val fg = (from ushr 8) and 0xFF
+        val fb = from and 0xFF
+        val ta = (to ushr 24) and 0xFF
+        val tr = (to ushr 16) and 0xFF
+        val tg = (to ushr 8) and 0xFF
+        val tb = to and 0xFF
+
+        val a = (fa + ((ta - fa) * clamped)).toInt().coerceIn(0, 255)
+        val r = (fr + ((tr - fr) * clamped)).toInt().coerceIn(0, 255)
+        val g = (fg + ((tg - fg) * clamped)).toInt().coerceIn(0, 255)
+        val b = (fb + ((tb - fb) * clamped)).toInt().coerceIn(0, 255)
+        return (a shl 24) or (r shl 16) or (g shl 8) or b
+    }
+
+    private fun smoothStep(t: Float): Float {
+        val clamped = t.coerceIn(0f, 1f)
+        return clamped * clamped * (3f - 2f * clamped)
+    }
+
+    private fun shiftHue(color: Int, degrees: Float): Int {
+        return shiftHue(
+            (color ushr 16) and 0xFF,
+            (color ushr 8) and 0xFF,
+            color and 0xFF,
+            degrees,
+        )
+    }
+
+    private fun withAlpha(color: Int, alpha: Int): Int {
+        return ((alpha.coerceIn(0, 255)) shl 24) or (color and 0x00FFFFFF)
     }
 
     private fun formatMs(ms: Long): String {

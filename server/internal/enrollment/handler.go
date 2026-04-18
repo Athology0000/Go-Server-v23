@@ -2,8 +2,10 @@ package enrollment
 
 import (
 	"errors"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/redis/go-redis/v9"
 	"github.com/cobalt/server/internal/middleware"
 )
 
@@ -18,9 +20,12 @@ type handshakeRequest struct {
 	HWID     string `json:"hwid"`
 }
 
-func RegisterRoutes(app *fiber.App, svc *Service) {
-	app.Post("/enroll/redeem", handleRedeem(svc))
-	app.Post("/enroll/handshake", handleHandshake(svc))
+func RegisterRoutes(app *fiber.App, svc *Service, rdb *redis.Client) {
+	// 5 attempts per minute per IP — enrollment is a one-time operation
+	enrollLimit := middleware.RateLimit(rdb, 5, time.Minute, middleware.IPKey("enroll"))
+
+	app.Post("/enroll/redeem", enrollLimit, handleRedeem(svc))
+	app.Post("/enroll/handshake", enrollLimit, handleHandshake(svc))
 }
 
 func handleRedeem(svc *Service) fiber.Handler {

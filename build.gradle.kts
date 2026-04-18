@@ -1,4 +1,7 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.gradle.api.GradleException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 plugins {
   alias(libs.plugins.kotlin)
@@ -9,8 +12,41 @@ plugins {
 val baseGroup: String by project
 val modVersion: String by project
 val modName: String by project
+val gradlePropertiesFile = rootProject.file("gradle.properties")
 
-version = modVersion
+fun shouldAutoBumpBuildVersion(): Boolean =
+  gradle.startParameter.taskNames.any { taskName ->
+    taskName.substringAfterLast(':') == "build"
+  }
+
+fun incrementMinorVersion(version: String): String {
+  val parts = version.split('.')
+  if (parts.size !in 2..3 || parts.any { it.toIntOrNull() == null }) {
+    throw GradleException("modVersion must use numeric major.minor or major.minor.patch format, found \"$version\".")
+  }
+
+  val major = parts[0].toInt()
+  val minor = parts[1].toInt() + 1
+  return if (parts.size == 3) "$major.$minor.0" else "$major.$minor"
+}
+
+fun persistModVersion(nextVersion: String) {
+  val content = gradlePropertiesFile.readText()
+  val pattern = Regex("""(?m)^modVersion=.*$""")
+  if (!pattern.containsMatchIn(content)) {
+    throw GradleException("Could not find modVersion in ${gradlePropertiesFile.path}.")
+  }
+  gradlePropertiesFile.writeText(content.replaceFirst(pattern, "modVersion=$nextVersion"))
+}
+
+val resolvedModVersion =
+  if (shouldAutoBumpBuildVersion()) {
+    incrementMinorVersion(modVersion).also(::persistModVersion)
+  } else {
+    modVersion
+  }
+
+version = resolvedModVersion
 group = baseGroup
 
 base {
@@ -107,15 +143,28 @@ tasks.named("processResources") {
 // ── Deploy JAR to Prism mods folder ──────────────────────────────────────────
 val modsDir = file("C:/Users/aeare/AppData/Roaming/PrismLauncher/instances/1.21.11(1)/minecraft/mods")
 
-tasks.register<Copy>("deployMod") {
+tasks.register("deployMod") {
   group = "build"
   description = "Copies the built JAR to the Prism Launcher mods folder."
   dependsOn("build")
-  from(layout.buildDirectory.dir("libs")) {
-    include("${modName}-${version}.jar")
+  doLast {
+    val sourceJar = layout.buildDirectory.file("libs/${modName}-${version}.jar").get().asFile.toPath()
+    val targetJar = modsDir.toPath().resolve("${modName}-${version}.jar")
+    val tempJar = modsDir.toPath().resolve("${modName}-${version}.jar.tmp")
+
+    Files.createDirectories(modsDir.toPath())
+    Files.copy(sourceJar, tempJar, StandardCopyOption.REPLACE_EXISTING)
+    runCatching {
+      Files.move(
+        tempJar,
+        targetJar,
+        StandardCopyOption.REPLACE_EXISTING,
+        StandardCopyOption.ATOMIC_MOVE
+      )
+    }.getOrElse {
+      Files.move(tempJar, targetJar, StandardCopyOption.REPLACE_EXISTING)
+    }
   }
-  into(modsDir)
-  duplicatesStrategy = DuplicatesStrategy.INCLUDE
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

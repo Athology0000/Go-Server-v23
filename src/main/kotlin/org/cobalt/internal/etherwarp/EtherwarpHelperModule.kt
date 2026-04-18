@@ -107,8 +107,6 @@ object EtherwarpHelperModule : Module("Etherwarp") {
       else ->
         OverlayRenderEngine.addBox(level, minX, minY, minZ, maxX, maxY, maxZ, fill, outline, lineWidth, 2, TAG)
     }
-
-    OverlayRenderEngine.render(event.context)
   }
 
   private fun toOverlayColor(argb: Int): OverlayRenderEngine.Color {

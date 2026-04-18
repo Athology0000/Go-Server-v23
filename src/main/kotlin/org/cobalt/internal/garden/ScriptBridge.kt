@@ -5,14 +5,33 @@ import net.minecraft.client.Minecraft
 object ScriptBridge {
 
     private val mc get() = Minecraft.getInstance()
+    @Volatile private var intentionalStopUntilMs = 0L
+    @Volatile private var lastStartedScriptCommand: String? = null
 
     // Taunahi scripts - sent as chat messages (Taunahi intercepts .ez- prefix)
-    fun startFarming(script: String)       { if (script.isNotBlank()) sendChat(".ez-startscript $script") }
-    fun startPestScript(script: String)    { if (script.isNotBlank()) sendChat(".ez-startscript $script") }
-    fun startVisitorScript(script: String) { if (script.isNotBlank()) sendChat(".ez-startscript $script") }
-    fun startReturnScript(script: String)  { if (script.isNotBlank()) sendChat(".ez-startscript $script") }
+    fun startFarming(script: String)       = startScript(script)
+    fun startPestScript(script: String)    = startScript(script)
+    fun startVisitorScript(script: String) = startScript(script)
+    fun startReturnScript(script: String)  = startScript(script)
+
+    fun hasLastStartedScript(): Boolean {
+        return !lastStartedScriptCommand.isNullOrBlank()
+    }
+
+    fun restartLastScript() {
+        lastStartedScriptCommand?.takeIf { it.isNotBlank() }?.let(::sendChat)
+    }
+
+    fun markIntentionalStop(graceMs: Long = 8_000L) {
+        intentionalStopUntilMs = System.currentTimeMillis() + graceMs.coerceAtLeast(0L)
+    }
+
+    fun wasIntentionalStopRecently(): Boolean {
+        return System.currentTimeMillis() < intentionalStopUntilMs
+    }
 
     fun stopScript() {
+        markIntentionalStop()
         // Release held keys before stopping (mirrors ihanuat behaviour)
         mc.execute {
             mc.options.keyUp.isDown    = false
@@ -28,6 +47,13 @@ object ScriptBridge {
     // Server slash commands
     fun setSpawn()    = sendCommand("setspawn")
     fun warpGarden()  = sendCommand("warp garden")
+
+    private fun startScript(script: String) {
+        if (script.isBlank()) return
+        val command = ".ez-startscript $script"
+        lastStartedScriptCommand = command
+        sendChat(command)
+    }
 
     private fun sendChat(msg: String) {
         mc.execute { mc.player?.connection?.sendChat(msg) }

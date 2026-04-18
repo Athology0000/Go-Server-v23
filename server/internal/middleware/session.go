@@ -10,7 +10,9 @@ import (
 	"github.com/cobalt/server/internal/db"
 )
 
-func SessionAuth(pool *pgxpool.Pool) fiber.Handler {
+// SessionAuth validates the bearer token. When strictIP is true, the request
+// source IP must match the IP recorded at session creation (auth finish IP).
+func SessionAuth(pool *pgxpool.Pool, strictIP bool) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		header := c.Get("Authorization")
 		if !strings.HasPrefix(header, "Bearer ") {
@@ -23,6 +25,9 @@ func SessionAuth(pool *pgxpool.Pool) fiber.Handler {
 		}
 		session, err := db.GetSessionByTokenHash(c.Context(), pool, hash)
 		if err != nil || session.Revoked || time.Now().After(session.ExpiresAt) {
+			return c.Status(401).JSON(fiber.Map{"error": "authentication_failed"})
+		}
+		if strictIP && (session.LastSeenIP == nil || *session.LastSeenIP != GetRealIP(c)) {
 			return c.Status(401).JSON(fiber.Map{"error": "authentication_failed"})
 		}
 		c.Locals("session", session)

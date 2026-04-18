@@ -31,16 +31,26 @@ object PestCleaningSequencer {
             try {
                 mc.execute { ScriptBridge.stopScript() }
                 Thread.sleep((20L..40L).random() + 300L)
-                mc.execute { ScriptBridge.setSpawn() }
-                Thread.sleep((10L..30L).random() + 200L)
 
-                // Equip pest gear for cleaning.
-                // If prep-swap already equipped it, just continue. Otherwise equip now.
-                if ((GardenConfig.autoWardrobeEnabled || GardenConfig.autoEquipment) &&
-                    !PestPrepSwapManager.swapDone) {
+                // If the pre-spawn prep did not already run, do the spawn prep here so
+                // cleaning can still recover cleanly when prep-swap is disabled or missed.
+                if (!PestPrepSwapManager.swapDone) {
+                    FlightManager.startFlying()
+                    Thread.sleep((10L..30L).random() + 150L)
+                    mc.execute { ScriptBridge.setSpawn() }
+                    Thread.sleep((10L..30L).random() + 250L)
+                    FlightManager.stopFlying()
+                    Thread.sleep((10L..30L).random() + 150L)
+                }
+
+                if (GardenConfig.autoWardrobeEnabled || GardenConfig.autoEquipment) {
                     GearManager.swapForPest()
-                    PestPrepSwapManager.markDone()   // mark so post-clean knows to swap back
                     Thread.sleep((10L..30L).random() + 1500L)
+                }
+
+                if (GardenConfig.autoRodPestSpawn) {
+                    RodManager.useRod(force = true)
+                    Thread.sleep((10L..30L).random() + 200L)
                 }
 
                 if (GardenConfig.aotvEnabled) {
@@ -82,13 +92,18 @@ object PestCleaningSequencer {
                 // Minimum 3 s so the warp fully completes before any gear swap or script start
                 Thread.sleep(GardenConfig.gardenWarpDelayMs.coerceAtLeast(3000L))
 
-                // Swap back to farming gear now that cleaning is done
-                if ((GardenConfig.autoWardrobeEnabled || GardenConfig.autoEquipment) &&
-                    PestPrepSwapManager.swapDone) {
+                // Swap back to farming gear now that cleaning is done.
+                if (GardenConfig.autoWardrobeEnabled || GardenConfig.autoEquipment) {
                     GearManager.swapForFarming()
-                    PestPrepSwapManager.reset()
                     Thread.sleep((10L..30L).random() + 500L)
                 }
+
+                if (GardenConfig.autoRodReturnToFarm) {
+                    RodManager.useRod(force = true)
+                    Thread.sleep((10L..30L).random() + 200L)
+                }
+
+                PestPrepSwapManager.reset()
             } catch (_: InterruptedException) {
                 Thread.currentThread().interrupt()
             } finally {

@@ -73,7 +73,6 @@ object GrottoRouteRenderer {
       OverlayRenderEngine.clearTag(TAG_BLOCKS)
       return
     }
-    OverlayRenderEngine.render(event.context)
     renderGradientLines(event.context)
     renderPointOutlines(event.context)
     renderLabels(event.context)

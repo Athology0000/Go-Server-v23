@@ -66,6 +66,12 @@ abstract class HudElement(
   abstract fun getBaseHeight(): Float
 
   /**
+   * Called before NVG rendering begins. Use this for raw GL background passes that should sit
+   * underneath the HUD element (for example framebuffer blur).
+   */
+  open fun renderPre(screenX: Float, screenY: Float, scale: Float) {}
+
+  /**
    * Called every frame when this element is [enabled].
    * Draw using [NVGRenderer][org.cobalt.api.util.ui.NVGRenderer] - coordinates are pre-translated,
    * so draw relative to (0, 0).

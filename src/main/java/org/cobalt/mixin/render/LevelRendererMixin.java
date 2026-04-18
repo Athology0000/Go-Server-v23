@@ -8,12 +8,16 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Camera;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.renderer.SkyRenderer;
 import net.minecraft.client.renderer.RenderBuffers;
 import net.minecraft.client.renderer.culling.Frustum;
+import net.minecraft.client.renderer.state.SkyRenderState;
 import net.minecraft.client.renderer.state.LevelRenderState;
 import net.minecraft.util.profiling.ProfilerFiller;
 import org.cobalt.api.event.impl.render.WorldRenderContext;
 import org.cobalt.api.event.impl.render.WorldRenderEvent;
+import org.cobalt.internal.pathfinding.OverlayRenderEngine;
+import org.cobalt.internal.visual.SkyboxChangerModule;
 import org.joml.Matrix4f;
 import org.joml.Vector4f;
 import org.spongepowered.asm.mixin.Final;
@@ -51,12 +55,20 @@ public class LevelRendererMixin {
   @Inject(method = "method_62214", at = @At("RETURN"))
   private void postRender(GpuBufferSlice gpuBufferSlice, LevelRenderState levelRenderState, ProfilerFiller profilerFiller, Matrix4f matrix4f, ResourceHandle resourceHandle, ResourceHandle resourceHandle2, boolean bl, ResourceHandle resourceHandle3, ResourceHandle resourceHandle4, CallbackInfo callbackInfo) {
     new WorldRenderEvent.Last(ctx).post();
+    OverlayRenderEngine.INSTANCE.render(ctx);
   }
 
   @ModifyExpressionValue(method = "method_62214", at = @At(value = "NEW", target = "()Lcom/mojang/blaze3d/vertex/PoseStack;"))
   private PoseStack setInternalStack(PoseStack original) {
     ctx.setMatrixStack(original);
     return original;
+  }
+
+  @Inject(method = "method_62215", at = @At("HEAD"), cancellable = true)
+  private static void renderImportedSkybox(GpuBufferSlice fogBuffer, SkyRenderState skyRenderState, SkyRenderer skyRenderer, CallbackInfo callbackInfo) {
+    if (SkyboxChangerModule.renderCustomSky(fogBuffer)) {
+      callbackInfo.cancel();
+    }
   }
 
 }

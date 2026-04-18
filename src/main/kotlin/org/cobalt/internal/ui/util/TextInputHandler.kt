@@ -5,10 +5,11 @@ import kotlin.math.min
 import org.cobalt.api.util.ui.NVGRenderer
 
 internal class TextInputHandler(
-  private var text: String = "",
-  private val maxLength: Int = 256,
+  initialText: String = "",
+  private val maxLength: Int = Int.MAX_VALUE,
 ) {
 
+  private var text: String = limitText(initialText)
   private var cursorPos = text.length
   private var selectionStart = -1
   private var selectionEnd = -1
@@ -18,7 +19,7 @@ internal class TextInputHandler(
   fun getText(): String = text
 
   fun setText(value: String) {
-    text = value.take(maxLength)
+    text = limitText(value)
     cursorPos = text.length
     clearSelection()
   }
@@ -26,7 +27,7 @@ internal class TextInputHandler(
   fun insertText(input: String) {
     if (hasSelection()) deleteSelection()
 
-    val toInsert = input.take(maxLength - text.length)
+    val toInsert = input.take((maxLength - text.length).coerceAtLeast(0))
     if (toInsert.isEmpty()) return
 
     text = text.substring(0, cursorPos) + toInsert + text.substring(cursorPos)
@@ -123,8 +124,9 @@ internal class TextInputHandler(
   }
 
   fun renderCursor(x: Float, y: Float, height: Float, color: Int) {
+    normalizeState()
     if ((System.currentTimeMillis() - cursorBlinkTime) % 1000 < 500) {
-      val cursorX = x + NVGRenderer.textWidth(text.substring(0, cursorPos), height) - textOffset
+      val cursorX = x + NVGRenderer.textWidth(textPrefix(cursorPos), height) - textOffset
       NVGRenderer.rect(cursorX, y, 1F, height, color)
     }
   }
@@ -134,14 +136,15 @@ internal class TextInputHandler(
 
     val start = min(selectionStart, selectionEnd)
     val end = max(selectionStart, selectionEnd)
-    val startX = x + NVGRenderer.textWidth(text.substring(0, start), fontSize) - textOffset
-    val endX = x + NVGRenderer.textWidth(text.substring(0, end), fontSize) - textOffset
+    val startX = x + NVGRenderer.textWidth(textPrefix(start), fontSize) - textOffset
+    val endX = x + NVGRenderer.textWidth(textPrefix(end), fontSize) - textOffset
 
     NVGRenderer.rect(startX, y, endX - startX, height, color)
   }
 
   fun updateScroll(viewWidth: Float, fontSize: Float) {
-    val cursorX = NVGRenderer.textWidth(text.substring(0, cursorPos), fontSize)
+    normalizeState()
+    val cursorX = NVGRenderer.textWidth(textPrefix(cursorPos), fontSize)
     val padding = 10f
 
     textOffset = when {
@@ -153,7 +156,10 @@ internal class TextInputHandler(
 
   fun getTextOffset(): Float = textOffset
 
-  private fun hasSelection(): Boolean = selectionStart >= 0 && selectionEnd >= 0 && selectionStart != selectionEnd
+  private fun hasSelection(): Boolean {
+    normalizeState()
+    return selectionStart >= 0 && selectionEnd >= 0 && selectionStart != selectionEnd
+  }
 
   private fun deleteSelection() {
     if (!hasSelection()) return
@@ -170,6 +176,30 @@ internal class TextInputHandler(
   private fun clearSelection() {
     selectionStart = -1
     selectionEnd = -1
+  }
+
+  private fun limitText(value: String): String {
+    return value.take(maxLength.coerceAtLeast(0))
+  }
+
+  private fun clampIndex(index: Int): Int {
+    return index.coerceIn(0, text.length)
+  }
+
+  private fun normalizeState() {
+    cursorPos = clampIndex(cursorPos)
+
+    if (selectionStart < 0 || selectionEnd < 0) {
+      clearSelection()
+      return
+    }
+
+    selectionStart = clampIndex(selectionStart)
+    selectionEnd = clampIndex(selectionEnd)
+  }
+
+  private fun textPrefix(index: Int): String {
+    return text.substring(0, clampIndex(index))
   }
 
   private fun getCursorPosFromX(x: Float, textX: Float, fontSize: Float): Int {

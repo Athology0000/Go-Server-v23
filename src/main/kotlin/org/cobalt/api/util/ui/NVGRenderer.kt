@@ -95,21 +95,32 @@ object NVGRenderer {
   }
 
   fun beginFrame(width: Float, height: Float) {
+    val framebuffer = mc.mainRenderTarget
+    val glFramebuffer = (framebuffer.colorTexture as GlTexture).getFbo(
+      (RenderSystem.getDevice() as GlDevice).directStateAccess(),
+      null
+    )
+    beginFrame(width, height, glFramebuffer, framebuffer.width, framebuffer.height)
+  }
+
+  @JvmStatic
+  fun beginFrame(
+    width: Float,
+    height: Float,
+    framebufferId: Int,
+    framebufferWidth: Int,
+    framebufferHeight: Int,
+  ) {
     check(!drawing) { "[NVGRenderer] Already drawing, but called beginFrame" }
 
     prevFramebuffer = GL33C.glGetInteger(GL30.GL_FRAMEBUFFER_BINDING)
     GL33C.glGetIntegerv(GL33C.GL_VIEWPORT, prevViewport)
     prevActiveTexture = GL33C.glGetInteger(GL13C.GL_ACTIVE_TEXTURE)
     prevBoundTexture2D = GL33C.glGetInteger(GL11C.GL_TEXTURE_BINDING_2D)
-    val framebuffer = mc.mainRenderTarget
-    val glFramebuffer = (framebuffer.colorTexture as GlTexture).getFbo(
-      (RenderSystem.getDevice() as GlDevice).directStateAccess(),
-      null
-    )
 
     scissor = null
-    GlStateManager._glBindFramebuffer(GL30.GL_FRAMEBUFFER, glFramebuffer)
-    GlStateManager._viewport(0, 0, framebuffer.width, framebuffer.height)
+    GlStateManager._glBindFramebuffer(GL30.GL_FRAMEBUFFER, framebufferId)
+    GlStateManager._viewport(0, 0, framebufferWidth, framebufferHeight)
     GlStateManager._activeTexture(GL30.GL_TEXTURE0)
 
     prevSampler0 = GL33C.glGetInteger(GL33C.GL_SAMPLER_BINDING)
@@ -155,6 +166,24 @@ object NVGRenderer {
     )
     scissor = null
     drawing = false
+  }
+
+  /**
+   * Draws a raw GL texture fullscreen inside the current NVG frame.
+   * Y is flipped to correct for OpenGL's bottom-left vs NVG's top-left origin.
+   * Must be called between beginFrame / endFrame.
+   */
+  @JvmStatic
+  fun drawRawTexture(texId: Int, width: Float, height: Float) {
+    val imgId = nvglCreateImageFromHandle(vg, texId, width.toInt(), height.toInt(),
+      NVG_IMAGE_NEAREST or NVG_IMAGE_NODELETE)
+    // origin at (0, height) with negative height flips the texture vertically
+    nvgImagePattern(vg, 0f, height, width, -height, 0f, imgId, 1f, nvgPaint)
+    nvgBeginPath(vg)
+    nvgRect(vg, 0f, 0f, width, height)
+    nvgFillPaint(vg, nvgPaint)
+    nvgFill(vg)
+    nvgDeleteImage(vg, imgId)
   }
 
   @JvmStatic

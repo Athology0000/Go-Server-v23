@@ -2,8 +2,10 @@ package auth
 
 import (
 	"errors"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/redis/go-redis/v9"
 	"github.com/cobalt/server/internal/middleware"
 )
 
@@ -21,9 +23,12 @@ type finishRequest struct {
 	MinecraftUsername string `json:"minecraft_username"`
 }
 
-func RegisterRoutes(app *fiber.App, svc *Service) {
-	app.Post("/auth/start", handleStart(svc))
-	app.Post("/auth/finish", handleFinish(svc))
+func RegisterRoutes(app *fiber.App, svc *Service, rdb *redis.Client) {
+	// 10 attempts per minute per IP+username to resist brute-force
+	authLimit := middleware.RateLimit(rdb, 10, time.Minute, middleware.IPAndUsernameKey("auth"))
+
+	app.Post("/auth/start", authLimit, handleStart(svc))
+	app.Post("/auth/finish", authLimit, handleFinish(svc))
 }
 
 func handleStart(svc *Service) fiber.Handler {
@@ -64,14 +69,16 @@ func handleFinish(svc *Service) fiber.Handler {
 			return c.JSON(fiber.Map{"authenticated": true, "authorized": false, "reason": result.Reason})
 		}
 		return c.JSON(fiber.Map{
-			"authenticated":    true,
-			"authorized":       true,
-			"session_token":    result.SessionToken,
-			"expires_in":       result.ExpiresIn,
-			"plan_tier":        result.PlanTier,
-			"enabled_modules":  result.Modules,
-			"enabled_features": result.Features,
-			"manifest_url":     result.ManifestURL,
+			"authenticated":          true,
+			"authorized":             true,
+			"session_token":          result.SessionToken,
+			"expires_in":             result.ExpiresIn,
+			"plan_tier":              result.PlanTier,
+			"enabled_modules":        result.Modules,
+			"enabled_features":       result.Features,
+			"entitlement_expires_at": result.EntitlementExpiresAt,
+			"manifest_url":           result.ManifestURL,
+			"manifest_signature":     result.ManifestSignature,
 		})
 	}
 }

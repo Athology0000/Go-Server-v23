@@ -6,9 +6,10 @@ import org.cobalt.api.module.setting.Setting
 import org.cobalt.api.module.setting.impl.*
 import org.cobalt.api.ui.theme.ThemeManager
 import org.cobalt.api.util.ui.NVGRenderer
-import org.cobalt.internal.mining.CommissionMacroModule
+import org.cobalt.internal.combat.SlayerLoadoutSetting
 import org.cobalt.internal.mining.MiningMacroModule
 import org.cobalt.internal.mining.MiningModule
+import org.cobalt.internal.routes.RoutePickerSetting
 import org.cobalt.internal.ui.UIComponent
 import org.cobalt.internal.ui.components.UIBackButton
 import org.cobalt.internal.ui.components.UIModule
@@ -104,6 +105,7 @@ internal class UIModuleList(
         settings = emptyList()
         settingsTabs = emptyList()
         tabHitboxes = emptyList()
+        UIConfig.clearAuxPanel()
       }
     }
   }
@@ -158,11 +160,11 @@ internal class UIModuleList(
     val settingsViewY = if (showTabs) startY else startY - 35F
     val settingsViewHeight = if (showTabs) visibleHeight else visibleHeight + 35F
 
-    settingsScroll.setMaxScroll(settingsLayout.contentHeight(settings.size) - 15F, settingsViewHeight)
+    settingsScroll.setMaxScroll(settingsContentHeight() - 15F, settingsViewHeight)
     NVGRenderer.pushScissor(settingsStartX, settingsViewY, settingsRegionWidth, settingsViewHeight)
 
     val settingsScrollOffset = settingsScroll.getOffset()
-    settingsLayout.layout(settingsStartX, settingsViewY - settingsScrollOffset, settings)
+    layoutSettings(settingsStartX, settingsViewY - settingsScrollOffset)
     settings.forEach(UIComponent::render)
 
     NVGRenderer.popScissor()
@@ -171,6 +173,7 @@ internal class UIModuleList(
       when (setting) {
         is UIModeSetting -> setting.renderDropdown()
         is UIColorSetting -> setting.drawColorPicker()
+        is UIRoutePickerSetting -> setting.renderDropdown()
       }
     }
   }
@@ -226,9 +229,7 @@ internal class UIModuleList(
   }
 
   private fun updateAuxPanel(module: org.cobalt.api.module.Module) {
-    if (module === CommissionMacroModule) {
-      UIConfig.setAuxPanel(UICommissionRoutesPanel())
-    } else if (module === MiningModule || module === MiningMacroModule) {
+    if (module === MiningModule || module === MiningMacroModule) {
       UIConfig.setAuxPanel(UIMiningStatsPanel())
     } else {
       UIConfig.clearAuxPanel()
@@ -289,10 +290,30 @@ internal class UIModuleList(
       is ColorSetting -> UIColorSetting(setting)
       is InfoSetting -> UIInfoSetting(setting)
       is KeyBindSetting -> UIKeyBindSetting(setting)
+      is SlayerLoadoutSetting -> UISlayerLoadoutSetting(setting)
       is ModeSetting -> UIModeSetting(setting)
       is RangeSetting -> UIRangeSetting(setting)
+      is RoutePickerSetting -> UIRoutePickerSetting(setting)
       is SliderSetting -> UISliderSetting(setting)
       else -> UITextSetting(setting as TextSetting)
+    }
+  }
+
+  private fun settingsContentHeight(): Float {
+    if (settings.isEmpty()) return 0F
+    var total = 0F
+    settings.forEachIndexed { index, component ->
+      total += component.height
+      if (index < settings.lastIndex) total += SETTINGS_ITEM_GAP
+    }
+    return total
+  }
+
+  private fun layoutSettings(startX: Float, startY: Float) {
+    var currentY = startY
+    settings.forEach { component ->
+      component.updateBounds(startX, currentY)
+      currentY += component.height + SETTINGS_ITEM_GAP
     }
   }
 
@@ -336,5 +357,6 @@ internal class UIModuleList(
     private const val TAB_TEXT_SIZE = 12F
     private const val TAB_TEXT_Y = 5F
     private const val TAB_BAR_GAP = 8F
+    private const val SETTINGS_ITEM_GAP = 10F
   }
 }

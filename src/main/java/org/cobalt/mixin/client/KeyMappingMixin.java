@@ -13,14 +13,26 @@ public class KeyMappingMixin {
 
   @Inject(method = "isDown", at = @At("HEAD"), cancellable = true)
   private void cobalt$lockMovement(CallbackInfoReturnable<Boolean> cir) {
-    if (!MovementManager.isMovementLocked) {
-      return;
-    }
     Minecraft mc = Minecraft.getInstance();
     if (mc == null || mc.options == null) {
       return;
     }
     KeyMapping self = (KeyMapping) (Object) this;
+    if (self == mc.options.keyAttack) {
+      if (MovementManager.forcedActionsEnabled) {
+        cir.setReturnValue(MovementManager.forcedAttack);
+      }
+      return;
+    }
+    if (self == mc.options.keyUse) {
+      if (MovementManager.forcedActionsEnabled) {
+        cir.setReturnValue(MovementManager.forcedUse);
+      }
+      return;
+    }
+    if (!MovementManager.isMovementLocked) {
+      return;
+    }
     if (self == mc.options.keyUp) {
       cir.setReturnValue(MovementManager.hasForcedMovement && MovementManager.forcedForward);
       return;
@@ -50,18 +62,6 @@ public class KeyMappingMixin {
     }
     if (self == mc.options.keySprint) {
       cir.setReturnValue(MovementManager.hasForcedMovement && MovementManager.forcedSprint);
-      return;
-    }
-    if (self == mc.options.keyAttack) {
-      if (MovementManager.forcedActionsEnabled) {
-        cir.setReturnValue(MovementManager.hasForcedMovement && MovementManager.forcedAttack);
-      }
-      return;
-    }
-    if (self == mc.options.keyUse) {
-      if (MovementManager.forcedActionsEnabled) {
-        cir.setReturnValue(MovementManager.hasForcedMovement && MovementManager.forcedUse);
-      }
       return;
     }
   }

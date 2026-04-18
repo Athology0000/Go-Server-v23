@@ -19,6 +19,8 @@ type Config struct {
 	PublicPort         string
 	AdminPort          string
 	ContentDir         string
+	BaseURL            string
+	StrictSessionIP    bool
 }
 
 func Load() (*Config, error) {
@@ -47,6 +49,8 @@ func Load() (*Config, error) {
 		PublicPort:         getEnvOr("PUBLIC_PORT", "8080"),
 		AdminPort:          getEnvOr("ADMIN_PORT", "8081"),
 		ContentDir:         getEnvOr("CONTENT_DIR", "./content"),
+		BaseURL:            getEnvOr("BASE_URL", "http://localhost:8080"),
+		StrictSessionIP:    getEnvOr("STRICT_SESSION_IP", "true") == "true",
 	}
 	return cfg, nil
 }

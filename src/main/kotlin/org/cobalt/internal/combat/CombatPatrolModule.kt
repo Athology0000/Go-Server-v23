@@ -13,7 +13,6 @@ import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.Vec3
-import org.cobalt.internal.ui.hud.PatrolPointPopup
 import org.cobalt.api.util.render.Render3D
 import org.cobalt.api.event.annotation.SubscribeEvent
 import org.cobalt.api.event.impl.client.MouseEvent
@@ -37,6 +36,10 @@ import org.cobalt.api.util.InventoryUtils
 import org.cobalt.api.util.player.MovementManager
 import org.cobalt.internal.etherwarp.EtherwarpLogic
 import org.cobalt.internal.pathfinding.PathfindingModule
+import org.cobalt.internal.routes.RoutePoint
+import org.cobalt.internal.routes.RouteStore
+import org.cobalt.internal.routes.RouteType
+import org.cobalt.internal.routes.SavedRoute
 
 enum class CombatPatrolPointType(val id: String) {
     WALK("walk"), WARP("warp"), KILL("kill");
@@ -65,6 +68,7 @@ object CombatPatrolModule : Module("Combat Patrol") {
         private set
 
     private var patrolRunning = false
+    private var automationRouteLoaded = false
     private var routeIndex = 0
     private var killZoneClearTicks = 0
     private var killZoneClearedThisTick = false
@@ -124,7 +128,6 @@ object CombatPatrolModule : Module("Combat Patrol") {
         )
         statusInfo.value = "Idle"
         org.cobalt.api.event.EventBus.register(this)
-        org.cobalt.api.event.EventBus.register(PatrolPointPopup)
     }
 
     @SubscribeEvent
@@ -275,12 +278,12 @@ object CombatPatrolModule : Module("Combat Patrol") {
 
     @SubscribeEvent
     fun onRightClick(event: MouseEvent.RightClick) {
-        if (!enabled.value || !recordOnRightClick.value) return
+        if (!enabled.value || !recordOnRightClick.value || automationRouteLoaded) return
         val hit = mc.hitResult
         if (hit is BlockHitResult && hit.type == HitResult.Type.BLOCK) {
             event.setCancelled(true)
             pendingClickPos = hit.blockPos
-            PatrolPointPopup.open()
+            applyPickedType(currentPointType())
         }
     }
 
@@ -364,19 +367,53 @@ object CombatPatrolModule : Module("Combat Patrol") {
         }
         patrolPoints.clear()
         patrolPoints.addAll(loaded)
+        automationRouteLoaded = false
         updatePointsInfo()
         ChatUtils.sendMessage("Loaded patrol route \"$name\" (${patrolPoints.size} points).")
+    }
+
+    fun loadSavedRoute(route: SavedRoute, automationManaged: Boolean = false): Boolean {
+        if (route.type != RouteType.PATROL) return false
+        val loaded = (route.travelRoute + route.loopOrArea).map(::toPatrolPoint)
+        if (loaded.isEmpty()) return false
+        if (patrolRunning) stopPatrol()
+        patrolPoints.clear()
+        patrolPoints.addAll(loaded)
+        automationRouteLoaded = automationManaged
+        routeName.value = route.name
+        RouteStore.setLoaded(route)
+        updatePointsInfo()
+        return true
+    }
+
+    fun loadRouteByName(name: String): Boolean {
+        val normalizedName = name.trim()
+        if (normalizedName.isEmpty()) return false
+        val route =
+            RouteStore
+                .listByType(RouteType.PATROL)
+                .firstOrNull { it.name.equals(normalizedName, ignoreCase = true) }
+                ?: return false
+        return loadSavedRoute(route, automationManaged = false)
+    }
+
+    fun clearPatrolRoute(stopIfRunning: Boolean = true) {
+        if (stopIfRunning) stopPatrol()
+        patrolPoints.clear()
+        automationRouteLoaded = false
+        RouteStore.clearLoaded(RouteType.PATROL)
+        updatePointsInfo()
     }
 
     internal fun updatePointsInfo() {
         pointsInfo.value = "${patrolPoints.size} points"
     }
 
-    fun startPatrol() {
+    fun startPatrol(startNearestOverride: Boolean? = null) {
         if (patrolPoints.isEmpty()) { ChatUtils.sendMessage("No patrol points. Add some first."); return }
         if (!enabled.value) enabled.value = true
         PathfindingModule.ensureEnabledForAutomation("combat-patrol")
-        routeIndex = if (startFromNearest.value) findNearestIndex() else 0
+        routeIndex = if (startNearestOverride ?: startFromNearest.value) findNearestIndex() else 0
         patrolRunning = true
         killZoneClearTicks = 0
         navigateTo(patrolPoints[routeIndex])
@@ -397,6 +434,17 @@ object CombatPatrolModule : Module("Combat Patrol") {
     }
 
     val isPatrolRunning: Boolean get() = patrolRunning
+
+    fun hasPointWithin(player: Player, radius: Double): Boolean {
+        if (patrolPoints.isEmpty()) return false
+        val radiusSq = radius * radius
+        return patrolPoints.any { point ->
+            val dx = player.x - (point.x + 0.5)
+            val dy = player.y - point.y.toDouble()
+            val dz = player.z - (point.z + 0.5)
+            dx * dx + dy * dy + dz * dz <= radiusSq
+        }
+    }
 
     private fun advanceAndNavigate() {
         routeIndex++
@@ -473,6 +521,18 @@ object CombatPatrolModule : Module("Combat Patrol") {
         get() = if (patrolState == PatrolState.AT_KILL_ZONE) patrolPoints.getOrNull(routeIndex) else null
 
     val killZoneRadiusValue: Double get() = killZoneRadius.value
+
+    private fun toPatrolPoint(point: RoutePoint): CombatPatrolPoint =
+        CombatPatrolPoint(
+            point.x,
+            point.y,
+            point.z,
+            when (point.type) {
+                org.cobalt.internal.routes.RoutePointType.WARP -> CombatPatrolPointType.WARP
+                org.cobalt.internal.routes.RoutePointType.KILL -> CombatPatrolPointType.KILL
+                else -> CombatPatrolPointType.WALK
+            }
+        )
 
     // -- warp sub-machine ---------------------------------------------------
 

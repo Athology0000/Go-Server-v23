@@ -21,5 +21,5 @@ internal class InfoSetting(
 }
 
 enum class InfoType {
-  INFO, WARNING, SUCCESS, ERROR
+  INFO, WARNING, SUCCESS, ERROR, SEPARATOR
 }

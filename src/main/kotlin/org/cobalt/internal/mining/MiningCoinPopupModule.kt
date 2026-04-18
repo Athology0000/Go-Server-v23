@@ -75,8 +75,8 @@ object MiningCoinPopupModule : Module("Mining Coin Popups") {
         val price = MiningProfitTracker.getPriceForKey(bazaarKey) ?: return
         if (price <= 0.0) return
         val mc = Minecraft.getInstance()
-        val x = mc.window.guiScaledWidth / 2f + (Random.nextFloat() * 120f - 60f)
-        val y = mc.window.guiScaledHeight * 0.8f
+        val x = mc.window.screenWidth / 2f + (Random.nextFloat() * 120f - 60f)
+        val y = mc.window.screenHeight * 0.8f
         popups.add(CoinPopup(formatValue(price), x, y, System.currentTimeMillis()))
     }
 
@@ -86,6 +86,11 @@ object MiningCoinPopupModule : Module("Mining Coin Popups") {
         val delta = if (lastNvgMs == 0L) 0f else ((now - lastNvgMs) / 1000f).coerceAtMost(0.1f)
         lastNvgMs = now
         if (!enabled.value || popups.isEmpty()) return
+
+        val window = Minecraft.getInstance().window
+        val screenWidth = window.screenWidth.toFloat()
+        val screenHeight = window.screenHeight.toFloat()
+        NVGRenderer.beginFrame(screenWidth, screenHeight)
         val iter = popups.iterator()
         while (iter.hasNext()) {
             val popup = iter.next()
@@ -96,6 +101,7 @@ object MiningCoinPopupModule : Module("Mining Coin Popups") {
             val color = (alpha shl 24) or 0x004CFF72
             NVGRenderer.text(popup.label, popup.startX, popup.y, fontSize.value.toFloat(), color)
         }
+        NVGRenderer.endFrame()
     }
 
     private fun formatValue(coins: Double): String = when {

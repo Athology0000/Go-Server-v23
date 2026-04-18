@@ -7,20 +7,20 @@ import (
 )
 
 type Device struct {
-	ID                    string
-	AccountID             string
-	BindingStatus         string
-	HWIDHash              *string
-	MinecraftUsername     *string
-	EnrollmentIP          *string
-	DeviceSecretEncrypted []byte
-	FailedAttempts        int
-	LastSeenIP            *string
-	LastLoginAt           *time.Time
-	BindingResetAt        *time.Time
-	BindingResetBy        *string
-	CreatedAt             time.Time
-	UpdatedAt             time.Time
+	ID                    string     `json:"id"`
+	AccountID             string     `json:"account_id"`
+	BindingStatus         string     `json:"binding_status"`
+	HWIDHash              *string    `json:"-"`
+	MinecraftUsername     *string    `json:"minecraft_username"`
+	EnrollmentIP          *string    `json:"enrollment_ip"`
+	DeviceSecretEncrypted []byte     `json:"-"`
+	FailedAttempts        int        `json:"failed_attempts"`
+	LastSeenIP            *string    `json:"last_seen_ip"`
+	LastLoginAt           *time.Time `json:"last_login_at"`
+	BindingResetAt        *time.Time `json:"binding_reset_at"`
+	BindingResetBy        *string    `json:"binding_reset_by"`
+	CreatedAt             time.Time  `json:"created_at"`
+	UpdatedAt             time.Time  `json:"updated_at"`
 }
 
 type scannable interface {

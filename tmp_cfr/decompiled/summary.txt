@@ -1,0 +1,211 @@
+Summary for C:\Users\aeare\Desktop\cobalt-1.2.0.jar
+Decompiled with CFR 0.152
+
+
+org.cobalt.api.hud.modules.CommissionMacroModule
+----------------------------
+
+refreshMode(net.minecraft.class_1657 )
+  Unable to fully structure code
+ensureSafeRoyalPigeonLook(net.minecraft.class_1657 )
+  Unable to fully structure code
+buildGuiTextLines(net.minecraft.class_1799 )
+  Unable to fully structure code
+
+
+org.cobalt.internal.account.AccountManagerService
+----------------------------
+
+authenticate(java.lang.String org.cobalt.internal.account.AccountManagerService$ManagedAccount )
+  Unable to fully structure code
+
+
+org.cobalt.internal.chat.ChatFilterModule
+----------------------------
+
+shouldCancel(java.lang.String )
+  Exception : org.benf.cfr.reader.util.ConfusedCFRException: Can't sort instructions [@NONE, blocks:[5] lbl34 : CaseStatement: default:
+, @NONE, blocks:[5] lbl34 : CaseStatement: default:
+]
+
+
+org.cobalt.internal.combat.CombatMacroModule
+----------------------------
+
+onTick(org.cobalt.api.event.impl.client.TickEvent$Start )
+  Unable to fully structure code
+  Could not resolve type clashes
+applyQuestProgressDetection(java.lang.String long )
+  Unable to fully structure code
+parseSlayerQuestProgress(java.lang.String )
+  Unable to fully structure code
+readScoreboardSidebarLines(net.minecraft.class_638 )
+  Unable to fully structure code
+applyEndermanLaserPhaseMovement(net.minecraft.class_1657 )
+  Unable to fully structure code
+
+
+org.cobalt.internal.combat.CombatPatrolModule
+----------------------------
+
+navigateTo$cobalt(org.cobalt.internal.combat.CombatPatrolPoint )
+  Unable to fully structure code
+
+
+org.cobalt.internal.diana.DianaMacroModule
+----------------------------
+
+onTick(org.cobalt.api.event.impl.client.TickEvent$Start )
+  Unable to fully structure code
+
+
+org.cobalt.internal.dungeons.DungeonRoutesModule
+----------------------------
+
+onTick(org.cobalt.api.event.impl.client.TickEvent$End )
+  Unable to fully structure code
+
+
+org.cobalt.internal.etherwarp.SmoothAotvModule
+----------------------------
+
+resolveTeleport(net.minecraft.class_1799 boolean )
+  Unable to fully structure code
+
+
+org.cobalt.internal.garden.GardenAnalyzerModule
+----------------------------
+
+keyOf(java.lang.Object )
+  Ignored method signature, as it can't be verified against descriptor
+
+
+org.cobalt.internal.garden.managers.BookCombineManager
+----------------------------
+
+shouldCombine()
+  Unable to fully structure code
+startCombine$lambda$0$1(net.minecraft.class_310 )
+  Unable to fully structure code
+  Could not resolve type clashes
+
+
+org.cobalt.internal.garden.managers.GeorgeManager
+----------------------------
+
+findTargetPets()
+  Unable to fully structure code
+
+
+org.cobalt.internal.garden.managers.PestTabListParser
+----------------------------
+
+parse()
+  Unable to fully structure code
+  Could not resolve type clashes
+
+
+org.cobalt.internal.mining.MiningMacroModule
+----------------------------
+
+onTick(org.cobalt.api.event.impl.client.TickEvent$Start )
+  Unable to fully structure code
+  Could not resolve type clashes
+
+
+org.cobalt.internal.mining.MiningModule
+----------------------------
+
+resolveHoveredSlotField(net.minecraft.class_465<?> )
+  Unable to fully structure code
+buildTooltipContext(java.lang.Class<?> net.minecraft.class_1937 )
+  Could not resolve type clashes
+  Unable to fully structure code
+
+
+org.cobalt.internal.mining.MiningNukerController
+----------------------------
+
+choosePowderChestTarget(net.minecraft.class_2338 )
+  Unable to fully structure code
+  Could not resolve type clashes
+
+
+org.cobalt.internal.mining.NoFrillsMiningModule
+----------------------------
+
+keyOf(java.lang.Object )
+  Ignored method signature, as it can't be verified against descriptor
+
+
+org.cobalt.internal.mining.RoutesModule
+----------------------------
+
+createRoutePoint(net.minecraft.class_2338 org.cobalt.internal.mining.RoutesModule$RoutePointType )
+  Unable to fully structure code
+  Could not resolve type clashes
+buildSavedRouteInfo(java.lang.String java.util.List<org.cobalt.internal.mining.RoutesModule$RoutePoint> )
+  Unable to fully structure code
+  Could not resolve type clashes
+resolveMineBlockIdNearAnchor(net.minecraft.class_1937 net.minecraft.class_1657 net.minecraft.class_2338 java.lang.String )
+  Unable to fully structure code
+
+
+org.cobalt.internal.pig.PigMacroModule
+----------------------------
+
+onTick(org.cobalt.api.event.impl.client.TickEvent$Start )
+  Unable to fully structure code
+  Could not resolve type clashes
+
+
+org.cobalt.internal.ui.components.settings.UIColorSetting
+----------------------------
+
+charTyped(net.minecraft.class_11905 )
+  Unable to fully structure code
+
+
+org.cobalt.internal.ui.panel.panels.UIAccountManagerPanel
+----------------------------
+
+filteredAccounts()
+  Unable to fully structure code
+
+
+org.cobalt.internal.ui.panel.panels.UIHudList
+----------------------------
+
+_init_$lambda$0(org.cobalt.internal.ui.panel.panels.UIHudList java.lang.String )
+  Unable to fully structure code
+
+
+org.cobalt.internal.ui.panel.panels.UIModuleList
+----------------------------
+
+filteredSettings()
+  Unable to fully structure code
+_init_$lambda$0(org.cobalt.internal.ui.panel.panels.UIModuleList java.lang.String )
+  Unable to fully structure code
+
+
+org.cobalt.internal.visual.PetDisplayModule
+----------------------------
+
+petHud$lambda$0$2(org.cobalt.api.hud.HudElementBuilder float float float )
+  Unable to fully structure code
+
+
+org.cobalt.internal.visual.SkyboxChangerModule
+----------------------------
+
+listImageFiles(java.nio.file.Path )
+  Unable to fully structure code
+
+
+org.cobalt.internal.wardrobe.WardrobeStateKt
+----------------------------
+
+displayName(org.cobalt.internal.wardrobe.WardrobeSet )
+  Unable to fully structure code
+  Could not resolve type clashes

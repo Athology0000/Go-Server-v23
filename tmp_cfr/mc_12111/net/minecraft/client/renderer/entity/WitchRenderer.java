@@ -1,0 +1,72 @@
+/*
+ * Decompiled with CFR 0.152.
+ * 
+ * Could not load the following classes:
+ *  net.fabricmc.api.EnvType
+ *  net.fabricmc.api.Environment
+ *  net.minecraft.resources.Identifier
+ *  net.minecraft.world.entity.LivingEntity
+ *  net.minecraft.world.entity.monster.Witch
+ *  net.minecraft.world.item.ItemStack
+ *  net.minecraft.world.item.Items
+ */
+package net.minecraft.client.renderer.entity;
+
+import net.fabricmc.api.EnvType;
+import net.fabricmc.api.Environment;
+import net.minecraft.client.model.geom.ModelLayers;
+import net.minecraft.client.model.monster.witch.WitchModel;
+import net.minecraft.client.renderer.entity.EntityRendererProvider;
+import net.minecraft.client.renderer.entity.MobRenderer;
+import net.minecraft.client.renderer.entity.layers.WitchItemLayer;
+import net.minecraft.client.renderer.entity.state.EntityRenderState;
+import net.minecraft.client.renderer.entity.state.HoldingEntityRenderState;
+import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
+import net.minecraft.client.renderer.entity.state.WitchRenderState;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.monster.Witch;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+
+@Environment(value=EnvType.CLIENT)
+public class WitchRenderer
+extends MobRenderer<Witch, WitchRenderState, WitchModel> {
+    private static final Identifier WITCH_LOCATION = Identifier.withDefaultNamespace((String)"textures/entity/witch.png");
+
+    public WitchRenderer(EntityRendererProvider.Context context) {
+        super(context, new WitchModel(context.bakeLayer(ModelLayers.WITCH)), 0.5f);
+        this.addLayer(new WitchItemLayer(this));
+    }
+
+    @Override
+    public Identifier getTextureLocation(WitchRenderState witchRenderState) {
+        return WITCH_LOCATION;
+    }
+
+    @Override
+    public WitchRenderState createRenderState() {
+        return new WitchRenderState();
+    }
+
+    @Override
+    public void extractRenderState(Witch witch, WitchRenderState witchRenderState, float f) {
+        super.extractRenderState(witch, witchRenderState, f);
+        HoldingEntityRenderState.extractHoldingEntityRenderState((LivingEntity)witch, witchRenderState, this.itemModelResolver);
+        witchRenderState.entityId = witch.getId();
+        ItemStack itemStack = witch.getMainHandItem();
+        witchRenderState.isHoldingItem = !itemStack.isEmpty();
+        witchRenderState.isHoldingPotion = itemStack.is(Items.POTION);
+    }
+
+    @Override
+    public /* synthetic */ Identifier getTextureLocation(LivingEntityRenderState livingEntityRenderState) {
+        return this.getTextureLocation((WitchRenderState)livingEntityRenderState);
+    }
+
+    @Override
+    public /* synthetic */ EntityRenderState createRenderState() {
+        return this.createRenderState();
+    }
+}
+

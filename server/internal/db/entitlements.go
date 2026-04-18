@@ -7,25 +7,25 @@ import (
 )
 
 type Entitlement struct {
-	PlanTier         string
-	EnabledFeatures  []string
-	EnabledModules   []string
-	NativeComponents []string
-	ContentChannel   string
-	UpdatedAt        time.Time
+	PlanTier         string    `json:"plan_tier"`
+	EnabledFeatures  []string  `json:"enabled_features"`
+	EnabledModules   []string  `json:"enabled_modules"`
+	NativeComponents []string  `json:"native_components"`
+	ContentChannel   string    `json:"content_channel"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }
 
 type PlanOverride struct {
-	ID                 string
-	AccountID          string
-	AdditionalModules  []string
-	RemovedModules     []string
-	AdditionalFeatures []string
-	RemovedFeatures    []string
-	Notes              *string
-	CreatedBy          string
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
+	ID                 string    `json:"id"`
+	AccountID          string    `json:"account_id"`
+	AdditionalModules  []string  `json:"additional_modules"`
+	RemovedModules     []string  `json:"removed_modules"`
+	AdditionalFeatures []string  `json:"additional_features"`
+	RemovedFeatures    []string  `json:"removed_features"`
+	Notes              *string   `json:"notes"`
+	CreatedBy          string    `json:"created_by"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 func GetEntitlement(ctx context.Context, pool *pgxpool.Pool, planTier string) (*Entitlement, error) {

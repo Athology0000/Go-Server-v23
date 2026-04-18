@@ -7,13 +7,25 @@ import (
 )
 
 type Account struct {
-	ID           string
-	Username     string
-	PasswordHash string
-	Email        *string
-	Status       string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID           string    `json:"id"`
+	Username     string    `json:"username"`
+	PasswordHash string    `json:"-"`
+	Email        *string   `json:"email"`
+	Status       string    `json:"status"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+func GetAccountByID(ctx context.Context, pool *pgxpool.Pool, id string) (*Account, error) {
+	row := pool.QueryRow(ctx,
+		`SELECT id, username, password_hash, email, status, created_at, updated_at
+		 FROM accounts WHERE id = $1`, id)
+	a := &Account{}
+	err := row.Scan(&a.ID, &a.Username, &a.PasswordHash, &a.Email, &a.Status, &a.CreatedAt, &a.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return a, nil
 }
 
 func GetAccountByUsername(ctx context.Context, pool *pgxpool.Pool, username string) (*Account, error) {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/cobalt/server/internal/audit"
 	"github.com/cobalt/server/internal/crypto"
 	"github.com/cobalt/server/internal/db"
 )
@@ -23,24 +24,27 @@ var (
 
 type Service struct {
 	pool      *pgxpool.Pool
+	auditSvc  *audit.Service
 	masterKey []byte
 	pepper    []byte
 }
 
-func New(pool *pgxpool.Pool, masterKey, pepper []byte) *Service {
-	return &Service{pool: pool, masterKey: masterKey, pepper: pepper}
+func New(pool *pgxpool.Pool, auditSvc *audit.Service, masterKey, pepper []byte) *Service {
+	return &Service{pool: pool, auditSvc: auditSvc, masterKey: masterKey, pepper: pepper}
 }
 
 func (s *Service) Redeem(ctx context.Context, rawKey, accountID, sourceIP string) error {
 	keyHash := crypto.HashLicenseKey(rawKey)
 	key, err := db.GetLicenseKeyByHash(ctx, s.pool, keyHash)
 	if errors.Is(err, pgx.ErrNoRows) {
+		s.auditSvc.Log("enroll.redeem.fail", &accountID, nil, nil, &sourceIP, map[string]any{"reason": "key_not_found"})
 		return ErrKeyNotFound
 	}
 	if err != nil {
 		return err
 	}
 	if key.Status != "available" {
+		s.auditSvc.Log("enroll.redeem.fail", &accountID, nil, nil, &sourceIP, map[string]any{"reason": "key_not_available", "status": key.Status})
 		return ErrKeyNotAvailable
 	}
 	secret := make([]byte, 32)
@@ -54,29 +58,39 @@ func (s *Service) Redeem(ctx context.Context, rawKey, accountID, sourceIP string
 	if _, err := db.CreateDevice(ctx, s.pool, accountID, sourceIP, encrypted); err != nil {
 		return err
 	}
-	return db.RedeemLicenseKey(ctx, s.pool, keyHash, accountID, sourceIP)
+	if err := db.RedeemLicenseKey(ctx, s.pool, keyHash, accountID, sourceIP); err != nil {
+		return err
+	}
+	s.auditSvc.Log("enroll.redeem.success", &accountID, nil, nil, &sourceIP, map[string]any{"plan_tier": key.PlanTier})
+	return nil
 }
 
 func (s *Service) Handshake(ctx context.Context, username, password, rawHWID, sourceIP string) (string, error) {
 	account, err := db.GetAccountByUsername(ctx, s.pool, normalize(username))
 	if err != nil {
+		s.auditSvc.Log("enroll.handshake.fail", nil, nil, nil, &sourceIP, map[string]any{"reason": "account_not_found", "username": username})
 		return "", ErrBadCredentials
 	}
 	if account.Status != "active" {
+		s.auditSvc.Log("enroll.handshake.fail", &account.ID, nil, nil, &sourceIP, map[string]any{"reason": "account_blocked"})
 		return "", ErrBadCredentials
 	}
 	ok, err := crypto.VerifyPassword(password, account.PasswordHash)
 	if err != nil || !ok {
+		s.auditSvc.Log("enroll.handshake.fail", &account.ID, nil, nil, &sourceIP, map[string]any{"reason": "bad_credentials"})
 		return "", ErrBadCredentials
 	}
 	device, err := db.GetDeviceByAccountID(ctx, s.pool, account.ID)
 	if err != nil {
+		s.auditSvc.Log("enroll.handshake.fail", &account.ID, nil, nil, &sourceIP, map[string]any{"reason": "device_not_found"})
 		return "", ErrBadCredentials
 	}
 	if device.BindingStatus != "unbound" {
+		s.auditSvc.Log("enroll.handshake.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{"reason": "device_already_bound", "status": device.BindingStatus})
 		return "", ErrBadCredentials
 	}
 	if device.EnrollmentIP == nil || *device.EnrollmentIP != sourceIP {
+		s.auditSvc.Log("enroll.handshake.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{"reason": "ip_mismatch"})
 		return "", ErrIPMismatch
 	}
 	hwidHash := crypto.HMACHash(s.pepper, []byte(normalizeHWID(rawHWID)))
@@ -87,6 +101,7 @@ func (s *Service) Handshake(ctx context.Context, username, password, rawHWID, so
 	if err != nil {
 		return "", err
 	}
+	s.auditSvc.Log("enroll.handshake.success", &account.ID, &device.ID, nil, &sourceIP, nil)
 	return base64.StdEncoding.EncodeToString(plain), nil
 }
 

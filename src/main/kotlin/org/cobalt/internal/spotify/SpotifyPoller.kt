@@ -1,6 +1,7 @@
 package org.cobalt.internal.spotify
 
 import java.io.File
+import kotlin.math.pow
 
 data class SpotifyTrack(
     val name: String,
@@ -21,6 +22,7 @@ data class SpotifyTrack(
 object SpotifyPoller {
 
     @Volatile var current: SpotifyTrack? = null
+    @Volatile var audioLevel: Float = 0f
 
     /** Absolute path to the cached album-art image, or "" if not yet available. */
     @Volatile var currentArtPath: String = ""
@@ -30,6 +32,8 @@ object SpotifyPoller {
     private const val POLL_MS = 2_000L
     @Volatile private var lastPollMs = 0L
     @Volatile private var polling = false
+    @Volatile private var meterReaderStarted = false
+    @Volatile private var meterProcess: Process? = null
 
     private var lastArtTrack = ""
     private var artFileCounter = 0
@@ -40,6 +44,12 @@ object SpotifyPoller {
     private val scriptFile: File by lazy {
         File(System.getProperty("java.io.tmpdir"), "cobalt_spotify_smtc.ps1").also { f ->
             f.writeText(PS_SCRIPT)
+        }
+    }
+
+    private val meterScriptFile: File by lazy {
+        File(System.getProperty("java.io.tmpdir"), "cobalt_spotify_meter.ps1").also { f ->
+            f.writeText(PS_METER_SCRIPT)
         }
     }
 
@@ -93,6 +103,7 @@ try {
     /** Call from tick - kicks off an async poll when the interval has elapsed. */
     fun update() {
         if (!isWindows) return
+        ensureMeterReader()
         val now = System.currentTimeMillis()
         if (now - lastPollMs < POLL_MS || polling) return
         lastPollMs = now
@@ -164,6 +175,9 @@ CobaltKbd::keybd_event($vkCode, 0, 2, 0)
             } else t
         }
         current = track
+        if (track == null || !track.isPlaying) {
+            audioLevel *= 0.6f
+        }
 
         // Update album art when the track changes
         val trackKey = track?.let { "${it.name}|${it.artist}" } ?: ""
@@ -233,4 +247,273 @@ CobaltKbd::keybd_event($vkCode, 0, 2, 0)
             )
         }.getOrNull()
     }
+
+    private fun ensureMeterReader() {
+        if (meterReaderStarted) return
+        synchronized(this) {
+            if (meterReaderStarted) return
+            meterReaderStarted = true
+        }
+
+        Thread({
+            while (isWindows) {
+                try {
+                    val proc = ProcessBuilder(
+                        "powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                        "-File", meterScriptFile.absolutePath
+                    ).redirectErrorStream(true).start()
+                    meterProcess = proc
+
+                    proc.inputStream.bufferedReader().useLines { lines ->
+                        lines.forEach { line ->
+                            val raw = line.trim()
+                            val parsed = raw.replace(',', '.').toFloatOrNull()?.coerceIn(0f, 1f) ?: 0f
+                            val leveled =
+                                if (parsed <= 0.00005f) {
+                                    0f
+                                } else {
+                                    val normalized = ((parsed - 0.00005f) / (1f - 0.00005f)).coerceIn(0f, 1f)
+                                    val curved = normalized.toDouble().pow(0.34).toFloat()
+                                    (normalized * 0.38f + curved * 0.96f).coerceIn(0f, 1f)
+                                }
+                            val prev = audioLevel
+                            val blend =
+                                when {
+                                    leveled > prev -> 0.9f
+                                    leveled > prev * 0.6f -> 0.48f
+                                    else -> 0.24f
+                                }
+                            audioLevel = prev + (leveled - prev) * blend
+                        }
+                    }
+
+                    proc.waitFor()
+                } catch (_: Exception) {
+                    audioLevel = 0f
+                } finally {
+                    meterProcess = null
+                }
+
+                try {
+                    Thread.sleep(900L)
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    return@Thread
+                }
+            }
+        }, "spotify-meter").also { it.isDaemon = true }.start()
+    }
+
+    private val PS_METER_SCRIPT = """
+Add-Type -Language CSharp -TypeDefinition @'
+using System;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+
+[ComImport]
+[Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]
+public class MMDeviceEnumeratorComObject {}
+
+public enum EDataFlow {
+    eRender,
+    eCapture,
+    eAll
+}
+
+public enum ERole {
+    eConsole,
+    eMultimedia,
+    eCommunications
+}
+
+[Flags]
+public enum CLSCTX : uint {
+    INPROC_SERVER = 0x1,
+    INPROC_HANDLER = 0x2,
+    LOCAL_SERVER = 0x4,
+    REMOTE_SERVER = 0x10,
+    ALL = INPROC_SERVER | INPROC_HANDLER | LOCAL_SERVER | REMOTE_SERVER
+}
+
+[ComImport]
+[Guid("A95664D2-9614-4F35-A746-DE8DB63617E6")]
+[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+public interface IMMDeviceEnumerator {
+    int EnumAudioEndpoints(EDataFlow dataFlow, uint dwStateMask, out IntPtr ppDevices);
+    int GetDefaultAudioEndpoint(EDataFlow dataFlow, ERole role, out IMMDevice ppDevice);
+    int GetDevice(string pwstrId, out IMMDevice ppDevice);
+    int RegisterEndpointNotificationCallback(IntPtr pClient);
+    int UnregisterEndpointNotificationCallback(IntPtr pClient);
+}
+
+[ComImport]
+[Guid("D666063F-1587-4E43-81F1-B948E807363F")]
+[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+public interface IMMDevice {
+    int Activate(ref Guid iid, CLSCTX dwClsCtx, IntPtr pActivationParams, [MarshalAs(UnmanagedType.IUnknown)] out object ppInterface);
+    int OpenPropertyStore(int stgmAccess, out IntPtr ppProperties);
+    int GetId([MarshalAs(UnmanagedType.LPWStr)] out string ppstrId);
+    int GetState(out int pdwState);
+}
+
+[ComImport]
+[Guid("77AA99A0-1BD6-484F-8BC7-2C654C9A9B6F")]
+[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+public interface IAudioSessionManager2 {
+    int GetAudioSessionControl(IntPtr AudioSessionGuid, uint StreamFlags, out IntPtr SessionControl);
+    int GetSimpleAudioVolume(IntPtr AudioSessionGuid, uint StreamFlags, out IntPtr AudioVolume);
+    int GetSessionEnumerator(out IAudioSessionEnumerator SessionEnum);
+    int RegisterSessionNotification(IntPtr SessionNotification);
+    int UnregisterSessionNotification(IntPtr SessionNotification);
+    int RegisterDuckNotification(string sessionID, IntPtr duckNotification);
+    int UnregisterDuckNotification(IntPtr duckNotification);
+}
+
+[ComImport]
+[Guid("E2F5BB11-0570-40CA-ACDD-3AA01277DEE8")]
+[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+public interface IAudioSessionEnumerator {
+    int GetCount(out int SessionCount);
+    int GetSession(int SessionCount, out IAudioSessionControl Session);
+}
+
+[ComImport]
+[Guid("F4B1A599-7266-4319-A8CA-E70ACB11E8CD")]
+[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+public interface IAudioSessionControl {
+    int GetState(out int pRetVal);
+    int GetDisplayName([MarshalAs(UnmanagedType.LPWStr)] out string pRetVal);
+    int SetDisplayName([MarshalAs(UnmanagedType.LPWStr)] string Value, ref Guid EventContext);
+    int GetIconPath([MarshalAs(UnmanagedType.LPWStr)] out string pRetVal);
+    int SetIconPath([MarshalAs(UnmanagedType.LPWStr)] string Value, ref Guid EventContext);
+    int GetGroupingParam(out Guid pRetVal);
+    int SetGroupingParam(ref Guid Override, ref Guid EventContext);
+    int RegisterAudioSessionNotification(IntPtr NewNotifications);
+    int UnregisterAudioSessionNotification(IntPtr NewNotifications);
+}
+
+[ComImport]
+[Guid("bfb7ff88-7239-4fc9-8fa2-07c950be9c6d")]
+[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+public interface IAudioSessionControl2 : IAudioSessionControl {
+    int GetSessionIdentifier([MarshalAs(UnmanagedType.LPWStr)] out string pRetVal);
+    int GetSessionInstanceIdentifier([MarshalAs(UnmanagedType.LPWStr)] out string pRetVal);
+    int GetProcessId(out uint pRetVal);
+    int IsSystemSoundsSession();
+    int SetDuckingPreference(bool optOut);
+}
+
+[ComImport]
+[Guid("C02216F6-8C67-4B5B-9D00-D008E73E0064")]
+[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+public interface IAudioMeterInformation {
+    int GetPeakValue(out float pfPeak);
+    int GetMeteringChannelCount(out int pnChannelCount);
+    int GetChannelsPeakValues(int u32ChannelCount, [Out, MarshalAs(UnmanagedType.LPArray, SizeParamIndex = 0)] float[] afPeakValues);
+    int QueryHardwareSupport(out int pdwHardwareSupportMask);
+}
+
+public static class SpotifyAudioMeter {
+    public static float GetSpotifyPeak() {
+        IMMDeviceEnumerator enumerator = null;
+        IMMDevice device = null;
+        object managerObj = null;
+        IAudioSessionEnumerator sessions = null;
+        try {
+            enumerator = (IMMDeviceEnumerator)new MMDeviceEnumeratorComObject();
+            Marshal.ThrowExceptionForHR(enumerator.GetDefaultAudioEndpoint(EDataFlow.eRender, ERole.eMultimedia, out device));
+
+            Guid iid = typeof(IAudioSessionManager2).GUID;
+            Marshal.ThrowExceptionForHR(device.Activate(ref iid, CLSCTX.ALL, IntPtr.Zero, out managerObj));
+            var manager = (IAudioSessionManager2)managerObj;
+
+            Marshal.ThrowExceptionForHR(manager.GetSessionEnumerator(out sessions));
+            int count;
+            Marshal.ThrowExceptionForHR(sessions.GetCount(out count));
+
+            float bestPeak = 0f;
+
+            for (int i = 0; i < count; i++) {
+                IAudioSessionControl session = null;
+                try {
+                    Marshal.ThrowExceptionForHR(sessions.GetSession(i, out session));
+                    var session2 = session as IAudioSessionControl2;
+                    if (session2 == null) {
+                        continue;
+                    }
+
+                    uint pid;
+                    if (session2.GetProcessId(out pid) != 0 || pid == 0) {
+                        continue;
+                    }
+
+                    Process process;
+                    try {
+                        process = Process.GetProcessById((int)pid);
+                    } catch {
+                        continue;
+                    }
+
+                    string processName = process.ProcessName ?? string.Empty;
+                    string sessionDisplayName = string.Empty;
+                    string sessionIdentifier = string.Empty;
+                    try { session.GetDisplayName(out sessionDisplayName); } catch {}
+                    try { session2.GetSessionIdentifier(out sessionIdentifier); } catch {}
+
+                    bool isSpotifySession =
+                        processName.IndexOf("spotify", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        sessionDisplayName.IndexOf("spotify", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        sessionIdentifier.IndexOf("spotify", StringComparison.OrdinalIgnoreCase) >= 0;
+
+                    if (!isSpotifySession) {
+                        continue;
+                    }
+
+                    var meter = session as IAudioMeterInformation;
+                    if (meter == null) {
+                        continue;
+                    }
+
+                    float peak;
+                    if (meter.GetPeakValue(out peak) == 0 && peak > bestPeak) {
+                        bestPeak = peak;
+                    }
+                } catch {
+                } finally {
+                    Release(session);
+                }
+            }
+
+            return bestPeak;
+        } catch {
+            return 0f;
+        } finally {
+            Release(sessions);
+            Release(managerObj);
+            Release(device);
+            Release(enumerator);
+        }
+    }
+
+    private static void Release(object obj) {
+        try {
+            if (obj != null && Marshal.IsComObject(obj)) {
+                Marshal.ReleaseComObject(obj);
+            }
+        } catch {
+        }
+    }
+}
+'@
+
+while (${'$'}true) {
+    try {
+        ${'$'}peak = [SpotifyAudioMeter]::GetSpotifyPeak()
+        [Console]::WriteLine(${'$'}peak.ToString([System.Globalization.CultureInfo]::InvariantCulture))
+    } catch {
+        [Console]::WriteLine("0")
+    }
+    Start-Sleep -Milliseconds 125
+}
+    """.trimIndent()
 }

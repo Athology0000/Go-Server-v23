@@ -54,6 +54,7 @@ object OverlayRenderEngine {
 
   private val lines = ArrayList<Line>()
   private val boxes = ArrayList<Box>()
+  private var lastPruneTick = Long.MIN_VALUE
 
   fun setEnabled(value: Boolean) {
     enabled = value
@@ -204,8 +205,11 @@ object OverlayRenderEngine {
     if (!enabled) return
     val level = Minecraft.getInstance().level ?: return
     val now = level.gameTime
-    lines.removeIf { it.expiresAt < now }
-    boxes.removeIf { it.expiresAt < now }
+    if (now != lastPruneTick) {
+      lastPruneTick = now
+      lines.removeIf { it.expiresAt < now }
+      boxes.removeIf { it.expiresAt < now }
+    }
 
     if (lines.isEmpty() && boxes.isEmpty()) return
 
@@ -239,12 +243,12 @@ object OverlayRenderEngine {
   private fun renderLine(context: WorldRenderContext, line: Line) {
     if (!line.forceRender && !FrustumUtils.isVisible(
         context.frustum,
-        minOf(line.start.x, line.end.x),
+        minOf(line.start.x, line.end.x) - 0.5,
         minOf(line.start.y, line.end.y),
-        minOf(line.start.z, line.end.z),
-        maxOf(line.start.x, line.end.x),
-        maxOf(line.start.y, line.end.y) + 1.0, // pad to avoid degenerate zero-height AABB for flat lines
-        maxOf(line.start.z, line.end.z)
+        minOf(line.start.z, line.end.z) - 0.5,
+        maxOf(line.start.x, line.end.x) + 0.5,
+        maxOf(line.start.y, line.end.y) + 1.0,
+        maxOf(line.start.z, line.end.z) + 0.5
       )
     ) return
 

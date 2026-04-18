@@ -117,7 +117,7 @@ void AStarPlanner::startAsync(Vec3i start, Vec3i goal,
 
         AStarResult res;
         int iters = 0;
-        const int MAX_ITER = 150000;
+        const int MAX_ITER = std::max(150000, BUF_SIZE);
         constexpr float STALE_F_EPS = 1e-4f;
 
         Vec3i bestFrontierNode = start;

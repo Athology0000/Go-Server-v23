@@ -2,6 +2,7 @@ package org.cobalt.api.util
 
 import net.minecraft.client.Minecraft
 import net.minecraft.world.inventory.ClickType
+import org.cobalt.internal.qol.ItemLockingModule
 
 object InventoryUtils {
 
@@ -41,6 +42,7 @@ object InventoryUtils {
   @JvmStatic
   fun swapSlotWithHotbar(slot: Int, hotbarSlot: Int) {
     if (hotbarSlot !in 0..8) return
+    if (ItemLockingModule.isBlockedHotbarSlot(hotbarSlot)) return
     val player = player ?: return
     val handler = player.containerMenu
 

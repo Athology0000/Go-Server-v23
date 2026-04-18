@@ -3,6 +3,7 @@ package org.cobalt.internal.mining
 import kotlin.math.cos
 import org.cobalt.api.hud.HudAnchor
 import org.cobalt.api.hud.hudElement
+import org.cobalt.api.hud.modules.CommissionMacroModule
 import org.cobalt.api.module.Module
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.ui.theme.ThemeManager
@@ -25,8 +26,7 @@ object CommissionHudModule : Module("Commission HUD") {
     "Status"     to CommissionMacroModule.statusDisplay,
     "Mode"       to CommissionMacroModule.modeDisplay,
     "Commission" to CommissionMacroModule.commissionDisplay,
-    "Zone"       to CommissionMacroModule.currentZoneDisplay,
-    "Target"     to CommissionMacroModule.targetZoneDisplay,
+    "Area"       to CommissionMacroModule.currentZoneDisplay,
   )
 
   val commissionHud = hudElement("commission-hud", "Commission HUD", "Tracks commission macro status") {

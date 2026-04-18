@@ -1,6 +1,9 @@
 package org.cobalt.internal.pathfinding
 
+import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlin.math.tanh
 
 object HeadRotationModule {
@@ -10,6 +13,38 @@ object HeadRotationModule {
 	private const val MIN_DELTA_EPS = 1.0e-4f
 	private const val MAX_DT_SEC = 0.10f
 	private const val MIN_DT_SEC = 1f / 240f
+
+	/**
+	 * Easing curve applied to the normalised angular delta before scaling by maxTurnSpeed.
+	 * Controls how the head ramps toward top speed as the remaining angle changes:
+	 *  - TANH: hyperbolic (default) — smooth ramp, never quite saturating.
+	 *  - SINE_OUT: fast start, decelerates into the target.
+	 *  - SINE_IN_OUT: slow ease in, slow ease out.
+	 *  - CUBIC_IN_OUT: stronger in/out with a quick middle.
+	 *  - LINEAR: constant-rate ramp, caps at maxTurnSpeed.
+	 */
+	enum class EaseMode { TANH, SINE_OUT, SINE_IN_OUT, CUBIC_IN_OUT, LINEAR }
+
+	private fun easeCurve(absDelta: Float, mode: EaseMode, scale: Float = TURN_HYPERBOLIC_SCALE.toFloat()): Float {
+		val t = (absDelta / scale).coerceAtLeast(0f)
+		return when (mode) {
+			EaseMode.TANH -> tanh(t.toDouble()).toFloat()
+			EaseMode.LINEAR -> t.coerceAtMost(1f)
+			EaseMode.SINE_OUT -> {
+				val tc = t.coerceAtMost(1f)
+				sin(tc * (PI / 2.0)).toFloat()
+			}
+			EaseMode.SINE_IN_OUT -> {
+				val tc = t.coerceAtMost(1f)
+				((1.0 - cos(tc * PI)) * 0.5).toFloat()
+			}
+			EaseMode.CUBIC_IN_OUT -> {
+				val tc = t.coerceAtMost(1f)
+				if (tc < 0.5f) (4f * tc * tc * tc)
+				else 1f - ((-2f * tc + 2f).let { it * it * it }) / 2f
+			}
+		}
+	}
 
 	private var yawVelocity = 0f
 	private var yawLastTimeNs = 0L
@@ -30,6 +65,7 @@ object HeadRotationModule {
 		accelScale: Float = 1f,
 		maxTurnSpeed: Float = MAX_TURN_SPEED_PER_SEC,
 		maxTurnAccel: Float = MAX_TURN_ACCEL_PER_SEC2,
+		easeMode: EaseMode = EaseMode.TANH,
 	): Float {
 		val absDelta = abs(yawDelta)
 		if (absDelta < MIN_DELTA_EPS) {
@@ -47,10 +83,8 @@ object HeadRotationModule {
 			}
 		yawLastTimeNs = now
 
-		// Hyperbolic easing: near-zero deltas ease slowly, large deltas approach max speed.
 		val speedPerSec =
-			(maxTurnSpeed * tanh(absDelta / TURN_HYPERBOLIC_SCALE)).toFloat() *
-				maxSpeedScale
+			maxTurnSpeed * easeCurve(absDelta, easeMode) * maxSpeedScale
 		val desiredSpeed = if (yawDelta >= 0f) speedPerSec else -speedPerSec
 		val maxAccel = maxTurnAccel * accelScale
 		val speedDelta = desiredSpeed - yawVelocity
@@ -76,6 +110,7 @@ object HeadRotationModule {
 		accelScale: Float = 1f,
 		maxPitchSpeed: Float = MAX_TURN_SPEED_PER_SEC,
 		maxPitchAccel: Float = MAX_TURN_ACCEL_PER_SEC2,
+		easeMode: EaseMode = EaseMode.TANH,
 	): Float {
 		val absDelta = abs(pitchDelta)
 		if (absDelta < MIN_DELTA_EPS) {
@@ -94,8 +129,7 @@ object HeadRotationModule {
 		pitchLastTimeNs = now
 
 		val speedPerSec =
-			(maxPitchSpeed * tanh(absDelta / TURN_HYPERBOLIC_SCALE)).toFloat() *
-				maxSpeedScale
+			maxPitchSpeed * easeCurve(absDelta, easeMode) * maxSpeedScale
 		val desiredSpeed = if (pitchDelta >= 0f) speedPerSec else -speedPerSec
 		val maxAccel = maxPitchAccel * accelScale
 		val speedDelta = desiredSpeed - pitchVelocity

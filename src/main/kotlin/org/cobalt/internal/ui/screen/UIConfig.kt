@@ -12,7 +12,6 @@ import org.cobalt.internal.ui.UIScreen
 import org.cobalt.internal.ui.animation.BounceAnimation
 import org.cobalt.internal.ui.components.tooltips.TooltipManager
 import org.cobalt.internal.ui.panel.UIPanel
-import org.cobalt.internal.ui.hud.WalkbackRoutePickerPopup
 import org.cobalt.internal.ui.panel.panels.UIAddonList
 import org.cobalt.internal.ui.panel.panels.UISidebar
 
@@ -109,9 +108,6 @@ internal object UIConfig : UIScreen() {
     horizontalAmount: Double,
     verticalAmount: Double,
   ): Boolean {
-    if (WalkbackRoutePickerPopup.isVisible()) {
-      return WalkbackRoutePickerPopup.mouseScrolled(horizontalAmount, verticalAmount)
-    }
     return auxPanel?.mouseScrolled(horizontalAmount, verticalAmount) == true ||
       body.mouseScrolled(horizontalAmount, verticalAmount) ||
       super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount)

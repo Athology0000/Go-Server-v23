@@ -27,7 +27,7 @@ struct PathCommand {
 };
 
 // World buffer constants
-static constexpr int BUF_W = 64, BUF_H = 32, BUF_D = 64;
+static constexpr int BUF_W = 96, BUF_H = 40, BUF_D = 96;
 static constexpr int BUF_SIZE = BUF_W * BUF_H * BUF_D;
 static constexpr int BUF_STRIDE_Z = BUF_W;           // z-stride: skip one row of X
 static constexpr int BUF_STRIDE_Y = BUF_W * BUF_D;  // y-stride: skip one XZ plane

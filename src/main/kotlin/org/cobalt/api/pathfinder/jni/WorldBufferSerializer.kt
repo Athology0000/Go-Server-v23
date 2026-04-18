@@ -8,12 +8,12 @@ import net.minecraft.world.level.Level
 import net.minecraft.world.level.block.state.BlockState
 
 /**
- * Serializes a 64x32x64 block region centred on the player into a flat byte[].
+ * Serializes a 96x40x96 block region centred on the player into a flat byte[].
  *
  * Buffer layout (matches Types.h constants):
  *   index(x,y,z) = (y-by)*BUF_STRIDE_Y + (z-bz)*BUF_STRIDE_Z + (x-bx)
- *   BUF_W=64, BUF_H=32, BUF_D=64
- *   BUF_STRIDE_Z=64, BUF_STRIDE_Y=64*64=4096
+ *   BUF_W=96, BUF_H=40, BUF_D=96
+ *   BUF_STRIDE_Z=96, BUF_STRIDE_Y=96*96=9216
  *
  * Block type byte values (must match WorldAccessor.h):
  *   0 = AIR, 1 = SOLID, 2 = WATER, 3 = LAVA, 4 = LADDER, 5 = STEP
@@ -22,16 +22,16 @@ import net.minecraft.world.level.block.state.BlockState
  *   - If the player's block position is unchanged the previous buffer is returned
  *     as-is (0 block reads - critical during the PLANNING phase when the player is frozen).
  *   - If the buffer origin shifts by at most +/-1 per axis the buffer is updated
- *     incrementally: only the newly exposed slice(s) are read (~2k blocks vs 131k).
+ *     incrementally: only the newly exposed slice(s) are read (~4k blocks vs 369k).
  *   - Per-BlockState collision-shape results are cached so decorative blocks
  *     (flowers, carpets, torches...) are classified via a single HashMap lookup
  *     after the first encounter.
  */
 object WorldBufferSerializer {
 
-    private const val BUF_W = 64
-    private const val BUF_H = 32
-    private const val BUF_D = 64
+    private const val BUF_W = 96
+    private const val BUF_H = 40
+    private const val BUF_D = 96
     private const val BUF_STRIDE_Z = BUF_W
     private const val BUF_STRIDE_Y = BUF_W * BUF_D
 
@@ -65,7 +65,7 @@ object WorldBufferSerializer {
         val player = mc.player ?: return null
 
         val bx = player.blockX - BUF_W / 2
-        val by = player.blockY - 8
+        val by = player.blockY - 10
         val bz = player.blockZ - BUF_D / 2
 
         // Fast path: player didn't move to a new block - return cached buffer unchanged.

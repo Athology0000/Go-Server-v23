@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
+	"github.com/cobalt/server/internal/audit"
 	"github.com/cobalt/server/internal/cache"
 	"github.com/cobalt/server/internal/crypto"
 	"github.com/cobalt/server/internal/db"
@@ -33,44 +34,50 @@ type StartResult struct {
 }
 
 type FinishResult struct {
-	Authenticated bool
-	Authorized    bool
-	Reason        string
-	SessionToken  string
-	ExpiresIn     int
-	PlanTier      string
-	Modules       []string
-	Features      []string
-	ManifestURL   string
+	Authenticated        bool
+	Authorized           bool
+	Reason               string
+	SessionToken         string
+	ExpiresIn            int
+	PlanTier             string
+	Modules              []string
+	Features             []string
+	ManifestURL          string
+	ManifestSignature    string
+	EntitlementExpiresAt *time.Time
 }
 
 type Service struct {
 	pool      *pgxpool.Pool
 	rdb       *redis.Client
 	entSvc    *entitlement.Service
+	auditSvc  *audit.Service
 	masterKey []byte
 	pepper    []byte
 	baseURL   string
 }
 
-func New(pool *pgxpool.Pool, rdb *redis.Client, entSvc *entitlement.Service, masterKey, pepper []byte, baseURL string) *Service {
-	return &Service{pool: pool, rdb: rdb, entSvc: entSvc, masterKey: masterKey, pepper: pepper, baseURL: baseURL}
+func New(pool *pgxpool.Pool, rdb *redis.Client, entSvc *entitlement.Service, auditSvc *audit.Service, masterKey, pepper []byte, baseURL string) *Service {
+	return &Service{pool: pool, rdb: rdb, entSvc: entSvc, auditSvc: auditSvc, masterKey: masterKey, pepper: pepper, baseURL: baseURL}
 }
 
 func (s *Service) Start(ctx context.Context, username, rawHWID, minecraftUsername, sourceIP string) (*StartResult, error) {
 	account, err := db.GetAccountByUsername(ctx, s.pool, normalize(username))
 	if errors.Is(err, pgx.ErrNoRows) {
+		s.auditSvc.Log("auth.start.fail", nil, nil, nil, &sourceIP, map[string]any{"reason": "account_not_found", "username": username})
 		return nil, ErrNotFound
 	}
 	if err != nil {
 		return nil, err
 	}
 	if account.Status != "active" {
+		s.auditSvc.Log("auth.start.fail", &account.ID, nil, nil, &sourceIP, map[string]any{"reason": "account_blocked"})
 		return nil, ErrDeviceBlocked
 	}
 
 	device, err := db.GetDeviceByAccountID(ctx, s.pool, account.ID)
 	if errors.Is(err, pgx.ErrNoRows) {
+		s.auditSvc.Log("auth.start.fail", &account.ID, nil, nil, &sourceIP, map[string]any{"reason": "device_not_found"})
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -78,15 +85,18 @@ func (s *Service) Start(ctx context.Context, username, rawHWID, minecraftUsernam
 	}
 
 	if device.BindingStatus == "suspended" || device.BindingStatus == "banned" {
+		s.auditSvc.Log("auth.start.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{"reason": "device_blocked", "status": device.BindingStatus})
 		return nil, ErrDeviceBlocked
 	}
 	if device.BindingStatus != "hwid_pending" && device.BindingStatus != "fully_bound" {
+		s.auditSvc.Log("auth.start.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{"reason": "device_not_enrolled"})
 		return nil, ErrNotFound
 	}
 
 	// IP must match enrollment_ip until fully_bound
 	if device.BindingStatus == "hwid_pending" {
 		if device.EnrollmentIP == nil || *device.EnrollmentIP != sourceIP {
+			s.auditSvc.Log("auth.start.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{"reason": "ip_mismatch"})
 			return nil, ErrIPMismatch
 		}
 	}
@@ -94,12 +104,14 @@ func (s *Service) Start(ctx context.Context, username, rawHWID, minecraftUsernam
 	// HWID check
 	hwidHash := crypto.HMACHash(s.pepper, []byte(normalizeHWID(rawHWID)))
 	if device.HWIDHash == nil || *device.HWIDHash != hwidHash {
+		s.auditSvc.Log("auth.start.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{"reason": "hwid_mismatch"})
 		return nil, ErrHWIDMismatch
 	}
 
 	// Minecraft username check (only after fully bound)
 	if device.BindingStatus == "fully_bound" {
 		if device.MinecraftUsername == nil || !strings.EqualFold(*device.MinecraftUsername, minecraftUsername) {
+			s.auditSvc.Log("auth.start.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{"reason": "username_mismatch"})
 			return nil, ErrUsernameMismatch
 		}
 	}
@@ -116,12 +128,14 @@ func (s *Service) Start(ctx context.Context, username, rawHWID, minecraftUsernam
 		return nil, err
 	}
 
+	s.auditSvc.Log("auth.start.success", &account.ID, &device.ID, nil, &sourceIP, nil)
 	return &StartResult{Challenge: challengeB64, ExpiresIn: 30}, nil
 }
 
 func (s *Service) Finish(ctx context.Context, username, proofHex, sourceIP, minecraftUsername string) (*FinishResult, error) {
 	account, err := db.GetAccountByUsername(ctx, s.pool, normalize(username))
 	if errors.Is(err, pgx.ErrNoRows) {
+		s.auditSvc.Log("auth.finish.fail", nil, nil, nil, &sourceIP, map[string]any{"reason": "account_not_found", "username": username})
 		return nil, ErrNotFound
 	}
 	if err != nil {
@@ -130,18 +144,22 @@ func (s *Service) Finish(ctx context.Context, username, proofHex, sourceIP, mine
 
 	device, err := db.GetDeviceByAccountID(ctx, s.pool, account.ID)
 	if err != nil {
+		s.auditSvc.Log("auth.finish.fail", &account.ID, nil, nil, &sourceIP, map[string]any{"reason": "device_not_found"})
 		return nil, ErrNotFound
 	}
 
 	ch, err := cache.GetChallenge(ctx, s.rdb, device.ID)
 	if err != nil || ch.Used {
+		s.auditSvc.Log("auth.finish.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{"reason": "no_challenge_or_expired"})
 		return nil, ErrNoChallenge
 	}
 	if ch.SourceIP != sourceIP {
+		s.auditSvc.Log("auth.finish.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{"reason": "ip_mismatch", "expected": ch.SourceIP})
+		cache.DeleteChallenge(ctx, s.rdb, device.ID)
 		return nil, ErrIPMismatch
 	}
 
-	// Delete challenge immediately — single use, enforced before proof verification result is returned
+	// Delete challenge immediately — single use
 	cache.DeleteChallenge(ctx, s.rdb, device.ID)
 
 	plain, err := crypto.DecryptAESGCM(s.masterKey, device.DeviceSecretEncrypted)
@@ -153,7 +171,9 @@ func (s *Service) Finish(ctx context.Context, username, proofHex, sourceIP, mine
 		count, _ := db.IncrementFailedAttempts(ctx, s.pool, device.ID)
 		if count >= 5 {
 			db.SuspendDevice(ctx, s.pool, device.ID)
+			s.auditSvc.Log("auth.device.suspended", &account.ID, &device.ID, nil, &sourceIP, map[string]any{"reason": "too_many_failed_attempts"})
 		}
+		s.auditSvc.Log("auth.finish.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{"reason": "bad_proof", "failed_attempts": count})
 		return nil, ErrBadProof
 	}
 
@@ -170,6 +190,7 @@ func (s *Service) Finish(ctx context.Context, username, proofHex, sourceIP, mine
 		return nil, err
 	}
 	if !ent.Authorized {
+		s.auditSvc.Log("auth.finish.entitlement_denied", &account.ID, &device.ID, nil, &sourceIP, map[string]any{"reason": ent.Reason})
 		return &FinishResult{Authenticated: true, Authorized: false, Reason: ent.Reason}, nil
 	}
 
@@ -187,20 +208,27 @@ func (s *Service) Finish(ctx context.Context, username, proofHex, sourceIP, mine
 
 	// Get latest manifest for this channel
 	manifestURL := ""
+	manifestSig := ""
 	manifest, err := db.GetLatestManifest(ctx, s.pool, ent.ContentChannel)
 	if err == nil {
 		manifestURL = s.baseURL + "/content/manifest/" + manifest.ID
+		manifestSig = manifest.Signature
 	}
 
+	s.auditSvc.Log("auth.finish.success", &account.ID, &device.ID, nil, &sourceIP,
+		map[string]any{"plan_tier": ent.PlanTier})
+
 	return &FinishResult{
-		Authenticated: true,
-		Authorized:    true,
-		SessionToken:  rawToken,
-		ExpiresIn:     3600,
-		PlanTier:      ent.PlanTier,
-		Modules:       ent.EnabledModules,
-		Features:      ent.EnabledFeatures,
-		ManifestURL:   manifestURL,
+		Authenticated:        true,
+		Authorized:           true,
+		SessionToken:         rawToken,
+		ExpiresIn:            3600,
+		PlanTier:             ent.PlanTier,
+		Modules:              ent.EnabledModules,
+		Features:             ent.EnabledFeatures,
+		ManifestURL:          manifestURL,
+		ManifestSignature:    manifestSig,
+		EntitlementExpiresAt: ent.EntitlementExpiresAt,
 	}, nil
 }
 

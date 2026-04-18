@@ -44,4 +44,5 @@ private:
     float adjacentCost(const Vec3i& pos) const;
     float clearanceCost(const Vec3i& pos) const;
     bool clearanceOk(int x, int y, int z) const;
+    bool hasBlockingCollision(int x, int y, int z) const;
 };

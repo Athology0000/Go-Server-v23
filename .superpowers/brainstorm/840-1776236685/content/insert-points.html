@@ -1,0 +1,95 @@
+<h2>Insert Point Flow</h2>
+<p class="subtitle">Here's how the insert flow would work — does this match what you had in mind?</p>
+
+<div class="mockup">
+  <div class="mockup-header">Insert Point into: iron_veins_v2 › Loop Route</div>
+  <div class="mockup-body" style="padding:14px;font-family:monospace;font-size:12px;">
+
+    <p style="color:#888;font-size:11px;margin-bottom:12px;">Step 1 — Choose where to insert. The new point will go between the two you pick.</p>
+
+    <!-- Point list with gaps highlighted -->
+    <div style="display:flex;gap:10px;">
+      <div style="flex:1;background:#0d1a0d;border:1px solid #333;border-radius:6px;padding:8px;font-size:11px;">
+        <div style="color:#666;font-size:10px;margin-bottom:6px;">Current points:</div>
+
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
+          <span style="color:#555;width:16px;">1</span>
+          <span style="background:#1a2a1a;border:1px solid #444;border-radius:3px;padding:3px 7px;color:#aaa;flex:1;">Walk (120, 64, 88)</span>
+        </div>
+
+        <!-- Insert gap -->
+        <div style="display:flex;align-items:center;gap:6px;margin:2px 0;">
+          <span style="color:#555;width:16px;"></span>
+          <div style="flex:1;border:1px dashed #4de2c5;border-radius:3px;padding:3px 7px;color:#4de2c5;font-size:10px;background:#0a1a12;cursor:pointer;">
+            ← insert between 1 and 2
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
+          <span style="color:#555;width:16px;">2</span>
+          <span style="background:#1a2a1a;border:1px solid #444;border-radius:3px;padding:3px 7px;color:#aaa;flex:1;">Warp (108, 64, 97)</span>
+        </div>
+
+        <!-- Insert gap (selected) -->
+        <div style="display:flex;align-items:center;gap:6px;margin:2px 0;">
+          <span style="color:#555;width:16px;"></span>
+          <div style="flex:1;border:2px solid #4de2c5;border-radius:3px;padding:3px 7px;color:#fff;font-size:10px;background:#1a3a2a;cursor:pointer;font-weight:bold;">
+            ✓ insert between 2 and 3  ← selected
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
+          <span style="color:#555;width:16px;">3</span>
+          <span style="background:#1a2a1a;border:1px solid #444;border-radius:3px;padding:3px 7px;color:#aaa;flex:1;">Mine (103, 64, 100)</span>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:6px;margin:2px 0;">
+          <span style="color:#555;width:16px;"></span>
+          <div style="flex:1;border:1px dashed #333;border-radius:3px;padding:3px 7px;color:#555;font-size:10px;cursor:pointer;">
+            ← insert between 3 and 4
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="color:#555;width:16px;">4</span>
+          <span style="background:#1a2a1a;border:1px solid #444;border-radius:3px;padding:3px 7px;color:#aaa;flex:1;">Warp (95, 64, 105)</span>
+        </div>
+      </div>
+
+      <div style="width:160px;">
+        <div style="background:#111;border:1px solid #4de2c5;border-radius:6px;padding:10px;font-size:11px;text-align:center;">
+          <p style="color:#4de2c5;margin:0 0 8px;">Inserting at gap 2→3</p>
+          <p style="color:#888;font-size:10px;margin:0 0 10px;">Now right-click a block in-world to set position, then pick type:</p>
+          <div style="display:flex;flex-direction:column;gap:5px;">
+            <button class="mock-button" style="font-size:10px;">🚶 Walk</button>
+            <button class="mock-button" style="font-size:10px;">⚡ Warp</button>
+            <button class="mock-button" style="font-size:10px;">⛏ Mine</button>
+          </div>
+        </div>
+
+        <div style="margin-top:8px;background:#1a1a1a;border:1px solid #333;border-radius:6px;padding:8px;font-size:10px;color:#666;text-align:center;">
+          After inserting:<br>
+          <span style="color:#aaa;">1 → 2 → </span><span style="color:#4de2c5;font-weight:bold;">NEW(3)</span><span style="color:#aaa;"> → 4 → 5</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="options" style="margin-top:16px;">
+  <div class="option" data-choice="yes" onclick="toggleSelect(this)">
+    <div class="letter">✓</div>
+    <div class="content">
+      <h3>Yes, that's it</h3>
+      <p>Click the gap slot → right-click block → pick type → inserts and renumbers.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="no" onclick="toggleSelect(this)">
+    <div class="letter">✎</div>
+    <div class="content">
+      <h3>Not quite</h3>
+      <p>Something about the flow is different.</p>
+    </div>
+  </div>
+</div>

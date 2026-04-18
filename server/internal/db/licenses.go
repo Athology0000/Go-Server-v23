@@ -7,17 +7,17 @@ import (
 )
 
 type License struct {
-	ID             string
-	AccountID      string
-	PlanTier       string
-	Status         string
-	StartsAt       time.Time
-	ExpiresAt      *time.Time
-	GraceExpiresAt *time.Time
-	MaxDevices     *int
-	Notes          *string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ID             string     `json:"id"`
+	AccountID      string     `json:"account_id"`
+	PlanTier       string     `json:"plan_tier"`
+	Status         string     `json:"status"`
+	StartsAt       time.Time  `json:"starts_at"`
+	ExpiresAt      *time.Time `json:"expires_at"`
+	GraceExpiresAt *time.Time `json:"grace_expires_at"`
+	MaxDevices     *int       `json:"max_devices"`
+	Notes          *string    `json:"notes"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
 }
 
 func GetLicenseByAccountID(ctx context.Context, pool *pgxpool.Pool, accountID string) (*License, error) {

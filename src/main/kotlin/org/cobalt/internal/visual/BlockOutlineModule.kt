@@ -126,7 +126,6 @@ object BlockOutlineModule : Module("Block Outline") {
     val radius = blurRadius.value.toFloat().coerceIn(1f, 16f)
     val minAlpha = (baseColor.a * threshold.value).roundToInt().coerceIn(0, 255)
     if (!outlineEnabled.value) {
-      OverlayRenderEngine.render(event.context)
       return
     }
 
@@ -153,7 +152,6 @@ object BlockOutlineModule : Module("Block Outline") {
       )
     }
 
-    OverlayRenderEngine.render(event.context)
   }
 
   private fun toOverlayColor(argb: Int): OverlayRenderEngine.Color {

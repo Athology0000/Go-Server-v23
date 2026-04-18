@@ -28,10 +28,16 @@ object HudModuleManager {
     val window = mc.window
     val screenWidth = window.screenWidth.toFloat()
     val screenHeight = window.screenHeight.toFloat()
+    val enabledElements = getElements().filter { it.enabled }
+
+    enabledElements.forEach { element ->
+      val (screenX, screenY) = element.getScreenPosition(screenWidth, screenHeight)
+      element.renderPre(screenX, screenY, element.scale)
+    }
 
     NVGRenderer.beginFrame(screenWidth, screenHeight)
 
-    getElements().filter { it.enabled }.forEach { element ->
+    enabledElements.forEach { element ->
       val (screenX, screenY) = element.getScreenPosition(screenWidth, screenHeight)
 
       NVGRenderer.push()
@@ -42,7 +48,7 @@ object HudModuleManager {
     }
 
     NVGRenderer.endFrame()
-    getElements().filter { it.enabled }.forEach { element ->
+    enabledElements.forEach { element ->
       val (screenX, screenY) = element.getScreenPosition(screenWidth, screenHeight)
       element.renderPost(screenX, screenY, element.scale)
     }

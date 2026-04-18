@@ -7,14 +7,14 @@ import (
 )
 
 type AdminToken struct {
-	ID            string
-	TokenHash     string
-	AdminUsername string
-	Role          string
-	ExpiresAt     time.Time
-	Revoked       bool
-	LastUsedAt    *time.Time
-	CreatedAt     time.Time
+	ID            string     `json:"id"`
+	TokenHash     string     `json:"-"`
+	AdminUsername string     `json:"admin_username"`
+	Role          string     `json:"role"`
+	ExpiresAt     time.Time  `json:"expires_at"`
+	Revoked       bool       `json:"revoked"`
+	LastUsedAt    *time.Time `json:"last_used_at"`
+	CreatedAt     time.Time  `json:"created_at"`
 }
 
 func CreateAdminToken(ctx context.Context, pool *pgxpool.Pool, tokenHash, adminUsername, role string, expiresAt time.Time) (*AdminToken, error) {

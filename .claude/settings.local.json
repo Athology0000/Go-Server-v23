@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3:*)",
+      "Bash(FILE=\"C:/Users/aeare/Desktop/duskv2/Cobalt/src/main/kotlin/org/cobalt/internal/pathfinding/DuskPathfinder.kt\")",
+      "Bash(sed -i 's/val \\(targetYaw, targetPitch\\) = computeYawPitch\\(player\\\\.x, eyeY, player\\\\.z, waypointX, eyeY, waypointZ\\)/val \\(targetYaw, targetPitch\\) = computeYawPitch\\(player.x, eyeY, player.z, waypointX, waypointY + 0.62, waypointZ\\)/' \"$FILE\")",
+      "Bash(sed -i 's/val \\(lookYaw, lookPitch\\) = computeYawPitch\\(player\\\\.x, eyeY, player\\\\.z, targetX, eyeY, targetZ\\)/val \\(lookYaw, lookPitch\\) = computeYawPitch\\(player.x, eyeY, player.z, targetX, targetY + 0.62, targetZ\\)/' \"$FILE\")",
+      "Bash(FILE=\"C:/Users/aeare/Desktop/duskv2/Cobalt/src/main/kotlin/org/cobalt/internal/pathfinding/DuskPathfinder.kt\" perl -i -pe 's/\\\\\\\\t\\\\\\\\tif \\\\\\(!recovering && !directMode/\\\\t\\\\tif \\(!recovering \\\\&\\\\& !directMode/' \"$FILE\" sed -n '629p' \"$FILE\")",
+      "Bash(xxd)",
+      "Bash(FILE=\"C:/Users/aeare/Desktop/duskv2/Cobalt/src/main/kotlin/org/cobalt/internal/pathfinding/DuskPathfinder.kt\" perl -i -pe 'if \\($. == 629\\) { s/\\\\\\\\t\\\\\\\\t/\\\\t\\\\t/ }' \"$FILE\" sed -n '629p' \"$FILE\")",
+      "Bash(FILE=\"C:/Users/aeare/Desktop/duskv2/Cobalt/src/main/kotlin/org/cobalt/internal/pathfinding/DuskPathfinder.kt\" perl -i -pe 'if \\($. == 629\\) { s/\\\\\\\\\\\\\\\\t\\\\\\\\\\\\\\\\t/\\\\t\\\\t/ }' \"$FILE\" sed -n '629p' \"$FILE\")",
+      "Bash(perl -i -pe ':*)",
+      "Read(//c/Users/aeare/Desktop/duskv2/Cobalt/**)"
+    ]
+  }
+}

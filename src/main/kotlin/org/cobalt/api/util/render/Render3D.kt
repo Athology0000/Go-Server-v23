@@ -1,6 +1,11 @@
 package org.cobalt.api.util.render
 
 import java.awt.Color
+import com.mojang.blaze3d.opengl.GlStateManager
+import com.mojang.blaze3d.vertex.PoseStack
+import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.Font
+import net.minecraft.client.renderer.LightTexture
 import net.minecraft.gizmos.GizmoStyle
 import net.minecraft.gizmos.Gizmos
 import net.minecraft.util.ARGB
@@ -67,6 +72,54 @@ object Render3D {
 
     if (esp) {
       props.setAlwaysOnTop()
+    }
+  }
+
+  /**
+   * Renders a billboard text label in world space, visible through blocks.
+   * The label always faces the camera.
+   */
+  @JvmStatic
+  fun drawWorldLabel(context: WorldRenderContext, worldPos: Vec3, text: String, color: Color) {
+    val mc = Minecraft.getInstance()
+    val camera = context.camera
+    val cam = camera.position()
+    val matrices = context.matrixStack ?: PoseStack()
+    val font = mc.font
+    val buffer = mc.renderBuffers().bufferSource()
+    val textWidth = font.width(text).toFloat()
+    val scale = 0.025f
+
+    try {
+      GlStateManager._enableBlend()
+      GlStateManager._blendFuncSeparate(770, 771, 1, 771)
+      GlStateManager._disableDepthTest()
+      GlStateManager._depthMask(false)
+
+      matrices.pushPose()
+      matrices.translate(worldPos.x - cam.x, worldPos.y - cam.y, worldPos.z - cam.z)
+      matrices.mulPose(camera.rotation())
+      matrices.scale(-scale, -scale, scale)
+
+      font.drawInBatch(
+        text,
+        -textWidth / 2f,
+        0f,
+        color.rgb,
+        false,
+        matrices.last().pose(),
+        buffer,
+        Font.DisplayMode.SEE_THROUGH,
+        0,
+        LightTexture.FULL_BRIGHT,
+      )
+
+      matrices.popPose()
+      buffer.endBatch()
+    } finally {
+      GlStateManager._depthMask(true)
+      GlStateManager._enableDepthTest()
+      GlStateManager._disableBlend()
     }
   }
 

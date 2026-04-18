@@ -12,6 +12,7 @@ import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 import net.minecraft.core.BlockPos
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.network.chat.Component
+import net.minecraft.network.protocol.game.ClientboundLevelParticlesPacket
 import net.minecraft.network.protocol.game.ServerboundChatCommandPacket
 import net.minecraft.network.protocol.game.ServerboundChatCommandSignedPacket
 import net.minecraft.world.inventory.Slot
@@ -21,6 +22,7 @@ import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.HitResult
 import org.cobalt.api.event.EventBus
 import org.cobalt.api.event.annotation.SubscribeEvent
+import org.cobalt.api.event.impl.client.BlockChangeEvent
 import org.cobalt.api.event.impl.client.ChatEvent
 import org.cobalt.api.event.impl.client.PacketEvent
 import org.cobalt.api.event.impl.client.TickEvent
@@ -148,6 +150,65 @@ object MiningModule : Module("Mining") {
     "0"
   )
 
+  val nukerEnabled = CheckboxSetting(
+    "Nuker Active",
+    "Mine nearby blocks using a recovered Jasper-style nuker pass.",
+    false
+  )
+
+  val powderChestCollector = CheckboxSetting(
+    "Powder Chest Aura",
+    "Right-click nearby powder chests while the nuker is active.",
+    false
+  )
+
+  val nukerRange = SliderSetting(
+    "Nuker Range",
+    "Horizontal and vertical range used by the nearby block nuker.",
+    4.0,
+    1.0,
+    8.0,
+    step = 1.0,
+  )
+
+  val nukerCooldownMs = SliderSetting(
+    "Nuker Cooldown MS",
+    "Delay between recovered nuker bursts.",
+    100.0,
+    10.0,
+    500.0,
+    step = 5.0,
+  )
+
+  val nukerBlocksPerTick = SliderSetting(
+    "Nuker Blocks/Tick",
+    "Maximum nearby blocks to start breaking each burst.",
+    1.0,
+    1.0,
+    8.0,
+    step = 1.0,
+  )
+
+  val nukerTargetMode = ModeSetting(
+    "Nuker Target Mode",
+    "Recovered nuker target filter.",
+    0,
+    arrayOf("Exposed Only", "Exposed Or Soft", "Custom")
+  )
+
+  val nukerToolMode = ModeSetting(
+    "Nuker Tool Mode",
+    "Tool family required before the nuker fires.",
+    0,
+    arrayOf("Stone", "Soft", "Custom")
+  )
+
+  val nukerCustomMatchers = TextSetting(
+    "Nuker Custom Matchers",
+    "Comma/newline-separated block ids or raw ids. Examples: minecraft:stone, 1, 1:5.",
+    ""
+  )
+
   internal val scrapeAll = ActionSetting(
     "Scrape All",
     "Equip drill, scrape /stats, then auto-scrape /hotm after.",
@@ -223,6 +284,14 @@ object MiningModule : Module("Mining") {
     pingText.uiGroup           = side
     lookTicksText.uiGroup      = side
     lookCountdownText.uiGroup  = side
+    nukerEnabled.uiGroup       = side
+    powderChestCollector.uiGroup = side
+    nukerRange.uiGroup         = side
+    nukerCooldownMs.uiGroup    = side
+    nukerBlocksPerTick.uiGroup = side
+    nukerTargetMode.uiGroup    = side
+    nukerToolMode.uiGroup      = side
+    nukerCustomMatchers.uiGroup = side
     scrapeAll.uiGroup          = side
 
     addSetting(
@@ -242,6 +311,14 @@ object MiningModule : Module("Mining") {
       pingText,
       lookTicksText,
       lookCountdownText,
+      nukerEnabled,
+      powderChestCollector,
+      nukerRange,
+      nukerCooldownMs,
+      nukerBlocksPerTick,
+      nukerTargetMode,
+      nukerToolMode,
+      nukerCustomMatchers,
       scrapeAll,
       exportHotm,
     )
@@ -252,6 +329,7 @@ object MiningModule : Module("Mining") {
   fun onTick(@Suppress("UNUSED_PARAMETER") event: TickEvent.Start) {
     if (mc.player == null || mc.level == null) {
       miningSpeedBoostBuffActive = false
+      MiningNukerController.reset(clearCounts = true)
     }
 
     if (pendingSpeedBoostRelease) {
@@ -284,7 +362,7 @@ object MiningModule : Module("Mining") {
       captureHotmPerks(screen)
     }
 
-    val trackingActive = enabled.value || MiningMacroModule.isActive
+    val trackingActive = enabled.value || MiningMacroModule.isActive || nukerEnabled.value
     if (!trackingActive) {
       lookCountdownText.value = "0"
       return
@@ -295,18 +373,28 @@ object MiningModule : Module("Mining") {
     updateBlockDetection()
 
     updateLookTicks()
+
+    if (nukerEnabled.value && !MiningMacroModule.isActive) {
+      MiningNukerController.tick(buildNukerConfig())
+    } else if (!nukerEnabled.value) {
+      MiningNukerController.reset()
+    }
   }
 
   @SubscribeEvent
   fun onChat(event: ChatEvent.Receive) {
     val message = event.message ?: return
-    when (stripFormatting(message).trim()) {
+    val stripped = stripFormatting(message).trim()
+    when (stripped) {
       MINING_SPEED_BOOST_USED -> miningSpeedBoostBuffActive = true
       MINING_SPEED_BOOST_EXPIRED -> miningSpeedBoostBuffActive = false
       MINING_SPEED_BOOST_READY -> {
         miningSpeedBoostBuffActive = false
         if (autoActivateSpeedBoost.value) pendingSpeedBoostUse = true
       }
+    }
+    if (nukerEnabled.value) {
+      MiningNukerController.onChatMessage(stripped)
     }
   }
 
@@ -500,6 +588,19 @@ object MiningModule : Module("Mining") {
     }
     val baseTicks = resolveBaseMineTicks(effectiveSpeed).toDouble()
     return if (includePingDelay) baseTicks + computePingDelayTicks() else baseTicks
+  }
+
+  @SubscribeEvent
+  fun onIncomingPacket(event: PacketEvent.Incoming) {
+    if (!nukerEnabled.value || !powderChestCollector.value) return
+    val packet = event.packet as? ClientboundLevelParticlesPacket ?: return
+    MiningNukerController.onParticlePacket(packet)
+  }
+
+  @SubscribeEvent
+  fun onBlockChange(event: BlockChangeEvent) {
+    if (!nukerEnabled.value || !powderChestCollector.value) return
+    MiningNukerController.onBlockChange(event.pos, event.oldBlock, event.newBlock)
   }
 
   private fun computePingDelayTicks(): Double {
@@ -905,6 +1006,28 @@ object MiningModule : Module("Mining") {
     NotificationManager.queue("Mining", message, 2000L)
   }
 
+  private fun buildNukerConfig(): MiningNukerController.Config {
+    return MiningNukerController.Config(
+      range = nukerRange.value.toInt(),
+      cooldownMs = nukerCooldownMs.value.toInt(),
+      blocksPerTick = nukerBlocksPerTick.value.toInt(),
+      targetMode =
+        when (nukerTargetMode.value) {
+          1 -> MiningNukerController.TargetMode.EXPOSED_OR_SOFT
+          2 -> MiningNukerController.TargetMode.CUSTOM
+          else -> MiningNukerController.TargetMode.EXPOSED_ONLY
+        },
+      toolMode =
+        when (nukerToolMode.value) {
+          1 -> MiningNukerController.ToolMode.SOFT
+          2 -> MiningNukerController.ToolMode.CUSTOM
+          else -> MiningNukerController.ToolMode.STONE
+        },
+      customMatchers = MiningNukerController.parseCustomMatchers(nukerCustomMatchers.value),
+      powderChestCollector = powderChestCollector.value,
+    )
+  }
+
   private val NUMBER_PATTERN = Pattern.compile("([0-9][0-9,]*)")
   private val LEVEL_PATTERN = Pattern.compile("Level\\s+([0-9]+)")
   private val ROMAN_PATTERN = Pattern.compile("(?:Tier|Level)\\s+([IVX]+)", Pattern.CASE_INSENSITIVE)
@@ -962,8 +1085,8 @@ object MiningModule : Module("Mining") {
     }
   }
 
-  fun buildOverlayRows(): List<String> =
-    listOf(
+  fun buildOverlayRows(): List<String> {
+    val rows = mutableListOf(
       "Type:     ${getMiningCategory()}",
       "Block:    ${detectedBlockText.value}",
       "Hardness: ${formatNumber(resolveBlockStrength())}",
@@ -972,10 +1095,22 @@ object MiningModule : Module("Mining") {
       "Delay:    ${formatRange(pingDelay.value)} ticks",
       "LookCalc: ${lookTicksText.value} ticks",
       "LookLeft: ${lookCountdownText.value} ticks",
-    ) + MiningPrecisionTracker.buildOverlayRows()
+    )
+    if (nukerEnabled.value) {
+      rows += "Nuker:    ${if (MiningMacroModule.isActive) "Paused" else "Active"}"
+      if (powderChestCollector.value) {
+        rows += "Powder:   ${if (MiningNukerController.hasQueuedPowderChest()) "Queued" else "Idle"}"
+        rows += "Opened:   ${MiningNukerController.getPowderChestsCollected()}"
+      }
+    }
+    rows += MiningPrecisionTracker.buildOverlayRows()
+    return rows
+  }
 
   fun getDetectedBlockPos(): BlockPos? = detectedBlockPos
   fun getDetectedBlockId(): String? = detectedBlockId
+  fun isNukerActive(): Boolean = nukerEnabled.value && !MiningMacroModule.isActive
+  fun getPowderChestCount(): Int = MiningNukerController.getPowderChestsCollected()
 
   fun getBuffStatuses(): List<Pair<String, Boolean>> = listOf(
     "Lantern Buff" to AutoLanternModule.isLanternBuffActive(),

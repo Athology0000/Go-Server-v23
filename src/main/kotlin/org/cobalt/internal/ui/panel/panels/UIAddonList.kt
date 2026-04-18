@@ -9,14 +9,15 @@ import org.cobalt.api.util.ui.NVGRenderer
 import org.cobalt.internal.loader.AddonLoader
 import org.cobalt.internal.mining.AutoLanternModule
 import org.cobalt.internal.mining.CommissionHudModule
-import org.cobalt.internal.mining.CommissionMacroModule
-import org.cobalt.internal.mining.MiningHudModule
+import org.cobalt.api.hud.modules.CommissionMacroModule
+import org.cobalt.api.hud.modules.MiningHudModule
 import org.cobalt.internal.mining.FairyModule
 import org.cobalt.internal.mining.MiningMacroModule
 import org.cobalt.internal.mining.MiningModule
 import org.cobalt.internal.mining.RoutesModule
 import org.cobalt.internal.mining.VeinDirectionModule
 import org.cobalt.internal.combat.CombatMacroModule
+import org.cobalt.internal.garden.GardenAnalyzerModule
 import org.cobalt.internal.garden.GardenMacroModule
 import org.cobalt.internal.visual.BlockOutlineModule
 import org.cobalt.internal.visual.BlockOverlayModule
@@ -101,10 +102,10 @@ internal class UIAddonList : UIPanel(
     entries.addAll(AddonLoader.getAddons().map { UIAddonEntry(it.first, it.second) })
 
     val addonModules = AddonLoader.getAddons().flatMap { it.second.getModules() }.toSet()
-    val builtinModules = ModuleManager.getModules().filter { it !in addonModules && it != CommissionHudModule }
+    val builtinModules = ModuleManager.getModules().filter { it !in addonModules }
 
     val miningModules = builtinModules.filter {
-      it == MiningModule || it == MiningHudModule || it == MiningMacroModule || it == FairyModule ||
+      it == MiningModule || it == MiningHudModule || it == MiningMacroModule || it == CommissionHudModule || it == FairyModule ||
         it == RoutesModule || it == CommissionMacroModule ||
         it == VeinDirectionModule || it == AutoLanternModule
     }
@@ -122,7 +123,7 @@ internal class UIAddonList : UIPanel(
     }
 
     val gardenModules = builtinModules.filter {
-      it == GardenMacroModule
+      it == GardenMacroModule || it == GardenAnalyzerModule
     }
 
     val coreModules = builtinModules.filter {

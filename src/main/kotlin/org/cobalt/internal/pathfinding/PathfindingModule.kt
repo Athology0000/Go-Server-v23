@@ -14,9 +14,6 @@ import net.minecraft.world.InteractionHand
 import net.minecraft.world.phys.Vec3
 import org.cobalt.internal.pathfinding.OverlayRenderEngine
 import org.cobalt.internal.pathfinding.PathSplineRenderer
-import org.cobalt.internal.pathfinding.PatrolWaypointStore
-import org.cobalt.internal.pathfinding.RouteWaypoint
-import org.cobalt.internal.pathfinding.KillWaypoint
 import org.cobalt.api.pathfinder.jni.MovementProfile
 import org.cobalt.api.module.setting.impl.SliderSetting
 import org.cobalt.api.module.Module
@@ -37,12 +34,18 @@ import org.cobalt.api.util.ui.NVGRenderer
 import kotlin.math.sqrt
 import kotlin.math.max
 
+private data class RouteWaypoint(val x: Double, val y: Double, val z: Double)
+private data class KillWaypoint(val x: Double, val y: Double, val z: Double)
+
 object PathfindingModule : Module("Pathfinding") {
 
   private val mc: Minecraft = Minecraft.getInstance()
   private var moduleOwnsPath = false
   private var cachedSpline: PathSplineRenderer.SplineResult? = null
   private var lastNodesRef: List<Vec3>? = null
+
+  private val localRouteWaypoints = mutableListOf<RouteWaypoint>()
+  private val localKillWaypoints  = mutableListOf<KillWaypoint>()
 
   private enum class PatrolState { IDLE, NAVIGATING, AT_KILL }
 
@@ -59,6 +62,7 @@ object PathfindingModule : Module("Pathfinding") {
   private val COLOR_JUMP_FILL   = OverlayRenderEngine.Color(0, 200, 255, 70)
   private val COLOR_JUMP_OUTLINE = OverlayRenderEngine.Color(0, 200, 255, 255)
   private val COLOR_JUMP_AIR_OUTLINE = OverlayRenderEngine.Color(140, 210, 255, 220)
+  private val COLOR_NODE_DOT    = OverlayRenderEngine.Color(0, 200, 255, 180)   // cyan semi-transparent
 
   val enabled = CheckboxSetting(
     "Enabled",
@@ -152,9 +156,9 @@ object PathfindingModule : Module("Pathfinding") {
     "Record"
   ) {
     val player = mc.player ?: return@ActionSetting
-    PatrolWaypointStore.routeWaypoints.add(RouteWaypoint(player.x, player.y, player.z))
-    PatrolWaypointStore.save()
-    ChatUtils.sendMessage("Route point recorded (${PatrolWaypointStore.routeWaypoints.size} total).")
+    localRouteWaypoints.add(RouteWaypoint(player.x, player.y, player.z))
+
+    ChatUtils.sendMessage("Route point recorded (${localRouteWaypoints.size} total).")
   }
 
   private val clearRouteAction = ActionSetting(
@@ -162,8 +166,8 @@ object PathfindingModule : Module("Pathfinding") {
     "Removes all recorded route waypoints.",
     "Clear"
   ) {
-    PatrolWaypointStore.routeWaypoints.clear()
-    PatrolWaypointStore.save()
+    localRouteWaypoints.clear()
+
     ChatUtils.sendMessage("Route cleared.")
   }
 
@@ -178,8 +182,8 @@ object PathfindingModule : Module("Pathfinding") {
     "Removes all recorded kill waypoints.",
     "Clear"
   ) {
-    PatrolWaypointStore.killWaypoints.clear()
-    PatrolWaypointStore.save()
+    localKillWaypoints.clear()
+
     ChatUtils.sendMessage("Kill waypoints cleared.")
   }
 
@@ -326,9 +330,9 @@ object PathfindingModule : Module("Pathfinding") {
     if (hit !is net.minecraft.world.phys.BlockHitResult) return
     val pos = hit.blockPos
     val wp = KillWaypoint(pos.x + 0.5, pos.y + 1.0, pos.z + 0.5)
-    PatrolWaypointStore.killWaypoints.add(wp)
-    PatrolWaypointStore.save()
-    ChatUtils.sendMessage("Kill waypoint recorded (${PatrolWaypointStore.killWaypoints.size} total).")
+    localKillWaypoints.add(wp)
+
+    ChatUtils.sendMessage("Kill waypoint recorded (${localKillWaypoints.size} total).")
   }
 
   @SubscribeEvent
@@ -336,8 +340,8 @@ object PathfindingModule : Module("Pathfinding") {
     org.cobalt.internal.pathfinding.DebugLog.debugFileEnabled = debugFileLogging.value
 
     // Update live info settings
-    routeCountInfo.value = "${PatrolWaypointStore.routeWaypoints.size} points"
-    killCountInfo.value  = "${PatrolWaypointStore.killWaypoints.size} points"
+    routeCountInfo.value = "${localRouteWaypoints.size} points"
+    killCountInfo.value  = "${localKillWaypoints.size} points"
     statusInfo.value = if (!NativePathfinder.isInitialized) "Not initialized" else {
       val s = NativePathfinder.status
       if (!moduleOwnsPath) "${s.name} (idle)" else s.name
@@ -364,7 +368,7 @@ object PathfindingModule : Module("Pathfinding") {
         }
         PatrolState.AT_KILL -> {
           if (--dwellTicksRemaining <= 0) {
-            val kills = PatrolWaypointStore.killWaypoints
+            val kills = localKillWaypoints
             val next = kills.filter { it != currentKillWp }
             if (next.isEmpty()) {
               stopPatrol()
@@ -375,6 +379,28 @@ object PathfindingModule : Module("Pathfinding") {
           }
         }
         PatrolState.IDLE -> { /* nothing */ }
+      }
+    }
+
+    if (enabled.value) {
+      val player = mc.player
+      val level = mc.level
+      if (player != null && level != null) {
+        OverlayRenderEngine.clearTag("head-ray")
+        val pfStatus = NativePathfinder.status
+        if (pfStatus == PathStatus.EXECUTING || pfStatus == PathStatus.REPLANNING ||
+            pfStatus == PathStatus.RECOVERING) {
+          val eye  = player.getEyePosition()
+          val look = player.getLookAngle()
+          OverlayRenderEngine.addLine(
+            level,
+            eye.x, eye.y, eye.z,
+            eye.x + look.x * 5.0, eye.y + look.y * 5.0, eye.z + look.z * 5.0,
+            COLOR_HEAD_RAY, 1.5f, durationTicks = 2, tag = "head-ray"
+          )
+        }
+        OverlayRenderEngine.clearTag("jump-guide")
+        renderJumpGuides(level, player.position(), NativePathfinder.cachedPathNodes)
       }
     }
 
@@ -407,25 +433,7 @@ object PathfindingModule : Module("Pathfinding") {
   @SubscribeEvent
   fun onRender(event: WorldRenderEvent.Last) {
     if (!enabled.value) return
-    val player = mc.player ?: return
-    val level  = mc.level  ?: return
-
-    // Head-direction ray - only while pathfinder is actively navigating
-    OverlayRenderEngine.clearTag("head-ray")
-    val pfStatus = NativePathfinder.status
-    if (pfStatus == PathStatus.EXECUTING || pfStatus == PathStatus.REPLANNING ||
-        pfStatus == PathStatus.RECOVERING) {
-      val eye  = player.getEyePosition()
-      val look = player.getLookAngle()
-      OverlayRenderEngine.addLine(
-        level,
-        eye.x, eye.y, eye.z,
-        eye.x + look.x * 5.0, eye.y + look.y * 5.0, eye.z + look.z * 5.0,
-        COLOR_HEAD_RAY, 1.5f, durationTicks = 1, tag = "head-ray"
-      )
-    }
-
-    OverlayRenderEngine.clearTag("jump-guide")
+    val level = mc.level ?: return
 
     // Spline path rendering - rebuild only when path nodes change.
     // When nodes drops to < 2 (planning/arrived) keep the old spline visible so the
@@ -435,25 +443,39 @@ object PathfindingModule : Module("Pathfinding") {
       lastNodesRef = nodes
       if (nodes.size >= 2) {
         cachedSpline = PathSplineRenderer.buildSpline(nodes)
+        val spline = cachedSpline!!
+        val pts  = spline.points
+        val isAv = spline.isAotv
         OverlayRenderEngine.clearTag("path-spline")
+        for (i in 0 until pts.size - 1) {
+          val a = pts[i]; val b = pts[i + 1]
+          val color = if (isAv[i]) COLOR_PATH_AOTV else COLOR_PATH_NORMAL
+          OverlayRenderEngine.addLine(
+            level,
+            a.x, a.y + 0.05, a.z,
+            b.x, b.y + 0.05, b.z,
+            color, 2.0f, durationTicks = 60, tag = "path-spline", forceRender = true
+          )
+        }
+      } else {
+        OverlayRenderEngine.clearTag("path-spline")
+      }
+      OverlayRenderEngine.clearTag("path-nodes")
+      val r = NODE_DOT_RADIUS
+      for (node in nodes) {
+        val cx = node.x + 0.5
+        val cy = node.y + NODE_DOT_EYE_HEIGHT
+        val cz = node.z + 0.5
+        OverlayRenderEngine.addBox(
+          level,
+          cx - r, cy - r, cz - r,
+          cx + r, cy + r, cz + r,
+          COLOR_NODE_DOT, null,
+          lineWidth = 1.0f, durationTicks = 60, tag = "path-nodes", forceRender = true
+        )
       }
     }
 
-    renderJumpGuides(level, player.position(), nodes)
-
-    val spline = cachedSpline ?: return
-    val pts  = spline.points
-    val isAv = spline.isAotv
-    for (i in 0 until pts.size - 1) {
-      val a = pts[i]; val b = pts[i + 1]
-      val color = if (isAv[i]) COLOR_PATH_AOTV else COLOR_PATH_NORMAL
-      OverlayRenderEngine.addLine(
-        level,
-        a.x, a.y + 0.05, a.z,
-        b.x, b.y + 0.05, b.z,
-        color, 2.0f, durationTicks = 3, tag = "path-spline"
-      )
-    }
   }
 
   private fun renderJumpGuides(level: net.minecraft.world.level.Level, playerPos: Vec3, nodes: List<Vec3>) {
@@ -569,13 +591,14 @@ object PathfindingModule : Module("Pathfinding") {
     cachedSpline = null
     lastNodesRef = null
     OverlayRenderEngine.clearTag("path-spline")
+    OverlayRenderEngine.clearTag("path-nodes")
   }
 
   private fun buildSubRoute(
     fromX: Double, fromY: Double, fromZ: Double,
     killWp: KillWaypoint
   ): DoubleArray {
-    val route = PatrolWaypointStore.routeWaypoints
+    val route = localRouteWaypoints
     if (route.isEmpty()) {
       // No route - navigate directly (player position + kill target)
       return doubleArrayOf(fromX, fromY, fromZ, killWp.x, killWp.y, killWp.z)
@@ -615,12 +638,12 @@ object PathfindingModule : Module("Pathfinding") {
 
   fun startPatrol() {
     if (patrolState != PatrolState.IDLE) stopPatrol()
-    if (PatrolWaypointStore.killWaypoints.size < 2) {
+    if (localKillWaypoints.size < 2) {
       ChatUtils.sendMessage("Need at least 2 kill waypoints to patrol. Use 'Record Kill Points'.")
       return
     }
     if (!enabled.value) ensureEnabledForAutomation("patrol")
-    val first = PatrolWaypointStore.killWaypoints.random()
+    val first = localKillWaypoints.random()
     navigateToKill(first)
   }
 
@@ -651,7 +674,7 @@ object PathfindingModule : Module("Pathfinding") {
     NativePathfinder.setTarget(wx, wy, wz)
     moduleOwnsPath = true
     patrolState = PatrolState.NAVIGATING
-    ChatUtils.sendMessage("Patrolling to kill spot (${PatrolWaypointStore.killWaypoints.indexOf(target) + 1}/${PatrolWaypointStore.killWaypoints.size}).")
+    ChatUtils.sendMessage("Patrolling to kill spot (${localKillWaypoints.indexOf(target) + 1}/${localKillWaypoints.size}).")
   }
 
   fun stopPatrol() {
@@ -719,4 +742,7 @@ object PathfindingModule : Module("Pathfinding") {
   private const val JUMP_GUIDE_MAX_RISE = 1.25
   private const val JUMP_GUIDE_MAX_DISTANCE_SQ = 144.0
   private const val MAX_JUMP_GUIDES = 3
+  private const val NODE_DOT_RADIUS = 0.08
+  // Matches PathCommand.GUIDE_LOOK_HEIGHT so the dots show where the camera guide aims.
+  private const val NODE_DOT_EYE_HEIGHT = 1.62
 }

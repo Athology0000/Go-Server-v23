@@ -1,6 +1,8 @@
 package org.cobalt.api.pathfinder.jni
 
 import net.minecraft.client.Minecraft
+import org.cobalt.api.rotation.RotationExecutor
+import org.cobalt.api.util.player.MovementManager
 import org.cobalt.pathfinder.NativePathfinderBridge
 
 /**
@@ -23,6 +25,15 @@ object NativePathfinder {
     var cachedPathNodes: List<net.minecraft.world.phys.Vec3> = emptyList()
         private set
 
+    /**
+     * Forward-only cursor into [cachedPathNodes].
+     * PathCommand.nearestNodeIndex uses this as a lower bound so the "nearest node"
+     * search can never snap backward to already-passed nodes. Resets to 0 whenever
+     * the active path is refreshed (new EXECUTING transition).
+     */
+    var pathNodeCursor: Int = 0
+        internal set
+
     private var lastTickStatus: PathStatus = PathStatus.IDLE
     private var prevJump: Boolean = false
 
@@ -35,6 +46,7 @@ object NativePathfinder {
         if (handle == 0L) return
         NativePathfinderBridge.destroyEngine(handle)
         handle = 0L
+        releaseGuidedControl()
     }
 
     fun setTarget(x: Double, y: Double, z: Double) {
@@ -61,12 +73,14 @@ object NativePathfinder {
         if (handle == 0L) return
         NativePathfinderBridge.stop(handle)
         prevJump = false
+        releaseGuidedControl()
     }
 
     /** Call when the player changes dimension or disconnects so the buffer cache is flushed. */
     fun onLevelChange() {
         WorldBufferSerializer.invalidate()
         prevJump = false
+        releaseGuidedControl()
     }
 
     val status: PathStatus
@@ -81,11 +95,20 @@ object NativePathfinder {
      * Returns null if the engine is not initialized or the world is unavailable.
      */
     fun tick(): PathCommand? {
-        if (handle == 0L) return null
+        if (handle == 0L) {
+            releaseGuidedControl()
+            return null
+        }
         val mc = Minecraft.getInstance()
-        val player = mc.player ?: return null
+        val player = mc.player ?: run {
+            releaseGuidedControl()
+            return null
+        }
 
-        val world = WorldBufferSerializer.serialize(mc) ?: return null
+        val world = WorldBufferSerializer.serialize(mc) ?: run {
+            releaseGuidedControl()
+            return null
+        }
 
         val r = NativePathfinderBridge.update(
             handle,
@@ -111,6 +134,7 @@ object NativePathfinder {
             parsedStatus == PathStatus.EXECUTING && lastTickStatus != PathStatus.EXECUTING -> refreshPathNodes()
             parsedStatus == PathStatus.IDLE || parsedStatus == PathStatus.ARRIVED || parsedStatus == PathStatus.FAILED -> {
                 if (cachedPathNodes.isNotEmpty()) cachedPathNodes = emptyList()
+                pathNodeCursor = 0
             }
         }
         lastTickStatus = parsedStatus
@@ -121,6 +145,7 @@ object NativePathfinder {
             parsedStatus == PathStatus.ARRIVED ||
             parsedStatus == PathStatus.FAILED) {
             prevJump = false
+            releaseGuidedControl()
             return null
         }
 
@@ -156,5 +181,11 @@ object NativePathfinder {
             i += 3
         }
         cachedPathNodes = result
+        pathNodeCursor = 0
+    }
+
+    private fun releaseGuidedControl() {
+        MovementManager.setLookLock(false)
+        RotationExecutor.stopIfUsing(PathfinderRotationStrategy)
     }
 }
