@@ -1,16 +1,19 @@
 package org.cobalt.internal.seal
 
 import net.minecraft.client.Minecraft
+import net.minecraft.network.protocol.game.ClientboundRespawnPacket
 import net.minecraft.world.entity.monster.Slime
 import net.minecraft.world.phys.Vec3
 import org.cobalt.api.event.EventBus
 import org.cobalt.api.event.annotation.SubscribeEvent
+import org.cobalt.api.event.impl.client.PacketEvent
 import org.cobalt.api.event.impl.client.TickEvent
 import org.cobalt.api.module.Module
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.KeyBindSetting
 import org.cobalt.api.module.setting.impl.SliderSetting
 import org.cobalt.api.pathfinder.jni.NativePathfinder
+import org.cobalt.api.pathfinder.jni.PathStatus
 import org.cobalt.api.util.helper.KeyBind
 import org.cobalt.api.util.player.MovementManager
 
@@ -198,7 +201,7 @@ object YearOfTheSealModule : Module("Year of the Seal") {
             enabledSetting.value = !enabledSetting.value
         }
         if (!enabledSetting.value) {
-            if (predictors.isNotEmpty()) stopAll()
+            if (predictors.isNotEmpty() || lastIssuedTarget != null) stopAll()
             return
         }
         val level = mc.level ?: return
@@ -222,7 +225,46 @@ object YearOfTheSealModule : Module("Year of the Seal") {
             predictor.update(Vec3(entity.x, entity.y, entity.z))
         }
 
-        // Pathfinding — implemented in Task 5
+        // Find the first predictor with enough bounces and a valid prediction
+        val target = predictors.values
+            .firstOrNull { it.bounceCounter >= minBounces.value.toInt() && it.landingPos != null }
+            ?.landingPos
+
+        if (target == null) {
+            // No valid prediction yet — release pathfinder if we held it
+            if (lastIssuedTarget != null) {
+                NativePathfinder.stop()
+                MovementManager.clearForcedMovement()
+                lastIssuedTarget = null
+            }
+            return
+        }
+
+        // Only replan if target shifted by more than 0.5 blocks
+        val prev = lastIssuedTarget
+        if (prev == null || target.distanceTo(prev) > 0.5) {
+            NativePathfinder.setTarget(target.x, target.y, target.z)
+            lastIssuedTarget = target
+        }
+
+        // Tick the pathfinder and apply movement
+        val cmd = NativePathfinder.tick()
+        if (cmd != null) {
+            cmd.applyToPlayer()
+        } else {
+            when (NativePathfinder.status) {
+                PathStatus.IDLE, PathStatus.ARRIVED, PathStatus.FAILED ->
+                    MovementManager.clearForcedMovement()
+                else -> Unit
+            }
+        }
+    }
+
+    @SubscribeEvent
+    fun onRespawn(event: PacketEvent.Incoming) {
+        if (event.packet is ClientboundRespawnPacket) {
+            stopAll()
+        }
     }
 
     private fun stopAll() {
