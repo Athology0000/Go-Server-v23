@@ -84,10 +84,7 @@ object YearOfTheSealModule : Module("Year of the Seal") {
                 smallPoly(slice),
                 averagePoly(slice),
                 spreadPoly(slice)
-            ).filter { v ->
-                // Accept only predictions landing within 1 block of observed ground
-                kotlin.math.abs(v.y - minY) <= 1.0
-            }
+            )
             if (candidates.isEmpty()) return null
             // Average X and Z of all valid model outputs
             val avgX = candidates.sumOf { it.x } / candidates.size
@@ -108,9 +105,9 @@ object YearOfTheSealModule : Module("Year of the Seal") {
             val sq1 = t1.toDouble() * t1
             val sq2 = t2.toDouble() * t2
             val sq3 = t3.toDouble() * t3
-            val denom = (sq3 - sq1) * d1 + (sq2 - sq1) * (t1 - t3)
+            val denom = (sq2 - sq1) * d2 - (sq3 - sq1) * d1
             if (denom == 0.0) return null
-            val a = ((y3 - y1) * d1 + (y2 - y1) * (t1 - t3)) / denom
+            val a = ((y2 - y1) * d2 - (y3 - y1) * d1) / denom
             val b = ((y2 - y1) - a * (sq2 - sq1)) / d1
             val c = y1 - b * t1 - a * sq1
             return Triple(a, b, c)
