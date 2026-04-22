@@ -62,6 +62,8 @@ import org.cobalt.internal.visual.WitherImpactOverlayModule
 import org.cobalt.internal.garden.GardenAnalyzerModule
 import org.cobalt.internal.garden.GardenMacroModule
 import org.cobalt.internal.farming.FarmingMacroModule
+import org.cobalt.internal.fishing.FishingMacroModule
+import org.cobalt.internal.seal.YearOfTheSealModule
 import org.cobalt.internal.pig.PigMacroModule
 import org.cobalt.internal.spotify.SpotifyModule
 import org.cobalt.internal.chat.ChatFilterModule
@@ -124,6 +126,8 @@ object Cobalt : ClientModInitializer {
         GardenAnalyzerModule,
         GardenMacroModule,
         FarmingMacroModule,
+        FishingMacroModule,
+        YearOfTheSealModule,
         PigMacroModule,
         SpotifyModule,
         ChatFilterModule,
