@@ -49,8 +49,38 @@ object YearOfTheSealModule : Module("Year of the Seal") {
         var landingPos: Vec3? = null        // current best landing prediction
 
         fun update(pos: Vec3) {
-            // implemented in Task 3
             data.add(pos)
+            if (pos.y < minY) minY = pos.y
+
+            // Skip bounce logic on first tick — lastPos is uninitialized
+            if (data.size == 1) { lastPos = pos; return }
+
+            // Bounce detection — skip if movement too small or debounce active
+            val dist = pos.distanceTo(lastPos)
+            if (dist >= 0.3) {
+                val dy = pos.y - lastPos.y
+                val nowMs = System.currentTimeMillis()
+                if (dy > 0.0 && !positiveYDelta && (nowMs - lastBounceMs) > 800L) {
+                    // Ball just started going up — it bounced
+                    bounceCounter++
+                    lastBounceMs = nowMs
+                    startIndex = data.lastIndex   // reset prediction slice to this bounce
+                }
+                positiveYDelta = dy > 0.0
+                lastPos = pos
+            }
+
+            // Throttle prediction to every 3 ticks
+            predTick++
+            if (predTick >= 3) {
+                predTick = 0
+                landingPos = runPrediction()
+            }
+        }
+
+        private fun runPrediction(): Vec3? {
+            // implemented in Task 4
+            return null
         }
     }
 
