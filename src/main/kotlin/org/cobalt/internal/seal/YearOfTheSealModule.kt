@@ -79,8 +79,109 @@ object YearOfTheSealModule : Module("Year of the Seal") {
         }
 
         private fun runPrediction(): Vec3? {
-            // implemented in Task 4
+            val slice = data.subList(startIndex, data.size).toList()
+            val candidates = listOfNotNull(
+                smallPoly(slice),
+                averagePoly(slice),
+                spreadPoly(slice)
+            ).filter { v ->
+                // Accept only predictions landing within 1 block of observed ground
+                kotlin.math.abs(v.y - minY) <= 1.0
+            }
+            if (candidates.isEmpty()) return null
+            // Average X and Z of all valid model outputs
+            val avgX = candidates.sumOf { it.x } / candidates.size
+            val avgZ = candidates.sumOf { it.z } / candidates.size
+            return Vec3(avgX, minY, avgZ)
+        }
+
+        // Fit y = a*t^2 + b*t + c through three (t, y) points.
+        // Returns Triple(a, b, c) or null if inputs are degenerate.
+        private fun fitQuadratic(
+            t1: Int, y1: Double,
+            t2: Int, y2: Double,
+            t3: Int, y3: Double
+        ): Triple<Double, Double, Double>? {
+            val d1 = (t2 - t1).toDouble()
+            val d2 = (t3 - t1).toDouble()
+            if (d1 == 0.0 || d2 == 0.0 || d1 == d2) return null
+            val sq1 = t1.toDouble() * t1
+            val sq2 = t2.toDouble() * t2
+            val sq3 = t3.toDouble() * t3
+            val denom = (sq3 - sq1) * d1 + (sq2 - sq1) * (t1 - t3)
+            if (denom == 0.0) return null
+            val a = ((y3 - y1) * d1 + (y2 - y1) * (t1 - t3)) / denom
+            val b = ((y2 - y1) - a * (sq2 - sq1)) / d1
+            val c = y1 - b * t1 - a * sq1
+            return Triple(a, b, c)
+        }
+
+        // Extrapolate from t=fromT forward until poly(t) <= targetY, up to maxSteps ticks.
+        // Returns the landing Vec3 (XZ from linear drift + Y at targetY), or null if never reached.
+        private fun extrapolate(
+            fromT: Int,
+            startXZ: Vec3,
+            dx: Double, dz: Double,
+            a: Double, b: Double, c: Double,
+            targetY: Double,
+            maxSteps: Int = 300
+        ): Vec3? {
+            var x = startXZ.x
+            var z = startXZ.z
+            for (t in (fromT + 1)..(fromT + maxSteps)) {
+                x += dx
+                z += dz
+                val y = a * t * t + b * t + c
+                if (y <= targetY) return Vec3(x, targetY, z)
+            }
             return null
+        }
+
+        // Average XZ drift per tick across the current bounce segment.
+        private fun segmentDrift(slice: List<Vec3>): Pair<Double, Double> {
+            if (slice.size < 2) return 0.0 to 0.0
+            val n = (slice.size - 1).toDouble()
+            return (slice.last().x - slice.first().x) / n to
+                   (slice.last().z - slice.first().z) / n
+        }
+
+        // SmallPoly: 3 most recent points. Min 3 points in slice.
+        private fun smallPoly(slice: List<Vec3>): Vec3? {
+            if (slice.size < 3) return null
+            val n = slice.size - 1
+            val (dx, dz) = segmentDrift(slice)
+            val (a, b, c) = fitQuadratic(
+                n,     slice[n].y,
+                n - 1, slice[n - 1].y,
+                n - 2, slice[n - 2].y
+            ) ?: return null
+            return extrapolate(n, slice[n], dx, dz, a, b, c, minY)
+        }
+
+        // AveragePoly: 2-point averaged windows at t-1, t-3, t-5. Min 7 points in slice.
+        private fun averagePoly(slice: List<Vec3>): Vec3? {
+            if (slice.size < 7) return null
+            val n = slice.size - 1
+            val y1 = (slice[n - 1].y + slice[n - 2].y) / 2.0
+            val y2 = (slice[n - 3].y + slice[n - 4].y) / 2.0
+            val y3 = (slice[n - 5].y + slice[n - 6].y) / 2.0
+            val (dx, dz) = segmentDrift(slice)
+            val (a, b, c) = fitQuadratic(n - 1, y1, n - 3, y2, n - 5, y3) ?: return null
+            return extrapolate(n - 1, slice[n - 1], dx, dz, a, b, c, minY)
+        }
+
+        // SpreadPoly: spread across full bounce segment. Min 5 points in slice.
+        private fun spreadPoly(slice: List<Vec3>): Vec3? {
+            if (slice.size < 5) return null
+            val n = slice.size - 1
+            val mid = (n + 1) / 2
+            val (dx, dz) = segmentDrift(slice)
+            val (a, b, c) = fitQuadratic(
+                n - 1,  slice[n - 1].y,
+                mid,    slice[mid].y,
+                1,      slice[1].y
+            ) ?: return null
+            return extrapolate(n - 1, slice[n - 1], dx, dz, a, b, c, minY)
         }
     }
 
