@@ -43,7 +43,7 @@ object YearOfTheSealModule : Module("Year of the Seal") {
         var minY = Double.MAX_VALUE         // lowest Y seen (ground level)
         var bounceCounter = 0
         var lastBounceMs = 0L
-        var positiveYDelta = false          // whether last Y delta was upward
+        var positiveYDelta = true           // whether last Y delta was upward (true = start neutral so first rise doesn't count as bounce)
         var lastPos = Vec3(0.0, 0.0, 0.0)
         var predTick = 0                    // counter mod 3 for throttled prediction updates
         var landingPos: Vec3? = null        // current best landing prediction
@@ -68,13 +68,13 @@ object YearOfTheSealModule : Module("Year of the Seal") {
                 }
                 positiveYDelta = dy > 0.0
                 lastPos = pos
-            }
 
-            // Throttle prediction to every 3 ticks
-            predTick++
-            if (predTick >= 3) {
-                predTick = 0
-                landingPos = runPrediction()
+                // Throttle prediction to every 3 meaningful position updates
+                predTick++
+                if (predTick >= 3) {
+                    predTick = 0
+                    landingPos = runPrediction()
+                }
             }
         }
 
