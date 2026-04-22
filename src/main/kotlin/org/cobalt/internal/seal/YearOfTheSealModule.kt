@@ -1,21 +1,30 @@
 package org.cobalt.internal.seal
 
 import net.minecraft.client.Minecraft
-import net.minecraft.network.protocol.game.ClientboundRespawnPacket
 import net.minecraft.world.entity.monster.Slime
 import net.minecraft.world.phys.Vec3
 import org.cobalt.api.event.EventBus
 import org.cobalt.api.event.annotation.SubscribeEvent
-import org.cobalt.api.event.impl.client.PacketEvent
 import org.cobalt.api.event.impl.client.TickEvent
 import org.cobalt.api.module.Module
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.KeyBindSetting
 import org.cobalt.api.module.setting.impl.SliderSetting
+import org.cobalt.api.module.setting.impl.TextSetting
+import org.cobalt.api.pathfinder.jni.PathCommand
+import org.cobalt.api.pathfinder.jni.PathfinderRotationStrategy
 import org.cobalt.api.pathfinder.jni.NativePathfinder
 import org.cobalt.api.pathfinder.jni.PathStatus
+import org.cobalt.api.rotation.RotationExecutor
+import org.cobalt.api.util.ChatUtils
 import org.cobalt.api.util.helper.KeyBind
 import org.cobalt.api.util.player.MovementManager
+import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 object YearOfTheSealModule : Module("Year of the Seal") {
 
@@ -36,7 +45,13 @@ object YearOfTheSealModule : Module("Year of the Seal") {
     private val minBounces = SliderSetting(
         "Min Bounce Quality",
         "Minimum observed bounces before pathfinding starts. Higher = more data, more accurate prediction.",
-        2.0, 1.0, 10.0, 1.0
+        2.0, 1.0, 40.0, 1.0
+    )
+
+    private val statusSetting = TextSetting(
+        "Status",
+        "Current Year of the Seal macro state.",
+        "Idle"
     )
 
     /** Tracks position history and predicts the landing position for one beach ball entity. */
@@ -46,10 +61,15 @@ object YearOfTheSealModule : Module("Year of the Seal") {
         var minY = Double.MAX_VALUE         // lowest Y seen (ground level)
         var bounceCounter = 0
         var lastBounceMs = 0L
-        var positiveYDelta = true           // whether last Y delta was upward (true = start neutral so first rise doesn't count as bounce)
+        var positiveYDelta = false          // whether last Y delta was upward
         var lastPos = Vec3(0.0, 0.0, 0.0)
         var predTick = 0                    // counter mod 3 for throttled prediction updates
         var landingPos: Vec3? = null        // current best landing prediction
+        private val models = listOf(
+            PolynomialModel.SmallPoly,
+            PolynomialModel.AveragePoly,
+            PolynomialModel.SpreadPoly
+        )
 
         fun update(pos: Vec3) {
             data.add(pos)
@@ -71,23 +91,20 @@ object YearOfTheSealModule : Module("Year of the Seal") {
                 }
                 positiveYDelta = dy > 0.0
                 lastPos = pos
+            }
 
-                // Throttle prediction to every 3 meaningful position updates
-                predTick++
-                if (predTick >= 3) {
-                    predTick = 0
-                    landingPos = runPrediction()
-                }
+            // Throttle prediction to every 3 ticks
+            predTick++
+            if (predTick >= 3) {
+                predTick = 0
+                landingPos = runPrediction()
             }
         }
 
         private fun runPrediction(): Vec3? {
             val slice = data.subList(startIndex, data.size).toList()
-            val candidates = listOfNotNull(
-                smallPoly(slice),
-                averagePoly(slice),
-                spreadPoly(slice)
-            )
+            val candidates = models.mapNotNull { it.predict(this, slice) }
+                .filter { abs(it.y - minY) <= 1.0 }
             if (candidates.isEmpty()) return null
             // Average X and Z of all valid model outputs
             val avgX = candidates.sumOf { it.x } / candidates.size
@@ -145,6 +162,25 @@ object YearOfTheSealModule : Module("Year of the Seal") {
                    (slice.last().z - slice.first().z) / n
         }
 
+        private sealed class PolynomialModel {
+            abstract fun predict(predictor: BallPredictor, slice: List<Vec3>): Vec3?
+
+            object SmallPoly : PolynomialModel() {
+                override fun predict(predictor: BallPredictor, slice: List<Vec3>): Vec3? =
+                    predictor.smallPoly(slice)
+            }
+
+            object AveragePoly : PolynomialModel() {
+                override fun predict(predictor: BallPredictor, slice: List<Vec3>): Vec3? =
+                    predictor.averagePoly(slice)
+            }
+
+            object SpreadPoly : PolynomialModel() {
+                override fun predict(predictor: BallPredictor, slice: List<Vec3>): Vec3? =
+                    predictor.spreadPoly(slice)
+            }
+        }
+
         // SmallPoly: 3 most recent points. Min 3 points in slice.
         private fun smallPoly(slice: List<Vec3>): Vec3? {
             if (slice.size < 3) return null
@@ -187,11 +223,18 @@ object YearOfTheSealModule : Module("Year of the Seal") {
 
     // Ball trackers keyed by entity ID
     private val predictors = mutableMapOf<Int, BallPredictor>()
+    // Entity ID of the ball locked onto when the macro was enabled — only this ball is tracked
+    private var lockedEntityId: Int? = null
     // Last target issued to NativePathfinder (to avoid replanning on every tick)
     private var lastIssuedTarget: Vec3? = null
+    private var pathActive = false
+    private var wasEnabled = false
+    private var lastStatus = ""
+    private var lastTrackedCount = 0
+    private var announcedTarget = false
 
     init {
-        addSetting(enabledSetting, toggleKeybind, minBounces)
+        addSetting(enabledSetting, toggleKeybind, minBounces, statusSetting)
         EventBus.register(this)
     }
 
@@ -200,16 +243,29 @@ object YearOfTheSealModule : Module("Year of the Seal") {
         if (toggleKeybind.value.isPressed()) {
             enabledSetting.value = !enabledSetting.value
         }
+        handleEnabledTransition()
         if (!enabledSetting.value) {
             if (predictors.isNotEmpty() || lastIssuedTarget != null) stopAll()
             return
         }
         val level = mc.level ?: return
 
-        // Discover new beach ball slimes (invisible, 1024 max HP)
+        var slimeCount = 0
+        var candidateCount = 0
+
+        // Lock onto the first beach ball seen after enabling — never switch to a different ball.
         level.entitiesForRendering().forEach { entity ->
-            if (entity is Slime && entity.isInvisible && entity.maxHealth == 1024f && entity.size == 4) {
-                predictors.putIfAbsent(entity.id, BallPredictor())
+            if (entity !is Slime) return@forEach
+            slimeCount++
+            if (isBeachBallCandidate(entity)) {
+                candidateCount++
+                if (lockedEntityId == null) {
+                    lockedEntityId = entity.id
+                    ChatUtils.sendMessage("Year of the Seal: locked onto ball #${entity.id}.")
+                }
+                if (entity.id == lockedEntityId) {
+                    predictors.putIfAbsent(entity.id, BallPredictor())
+                }
             }
         }
 
@@ -226,9 +282,10 @@ object YearOfTheSealModule : Module("Year of the Seal") {
         }
 
         // Find the first predictor with enough bounces and a valid prediction
-        val target = predictors.values
-            .firstOrNull { it.bounceCounter >= minBounces.value.toInt() && it.landingPos != null }
-            ?.landingPos
+        val readyPredictor = predictors.values
+            .filter { it.bounceCounter >= minBounces.value.toInt() && it.landingPos != null }
+            .maxByOrNull { it.bounceCounter }
+        val target = readyPredictor?.landingPos
 
         if (target == null) {
             // No valid prediction yet — release pathfinder if we held it
@@ -236,41 +293,192 @@ object YearOfTheSealModule : Module("Year of the Seal") {
                 NativePathfinder.stop()
                 MovementManager.clearForcedMovement()
                 lastIssuedTarget = null
+                pathActive = false
+                announcedTarget = false
             }
+            updateTrackingStatus(slimeCount, candidateCount)
             return
         }
 
         // Only replan if target shifted by more than 0.5 blocks
         val prev = lastIssuedTarget
         if (prev == null || target.distanceTo(prev) > 0.5) {
+            NativePathfinder.availabilityFlagsOverride = 0
             NativePathfinder.setTarget(target.x, target.y, target.z)
             lastIssuedTarget = target
+            pathActive = true
+            if (!announcedTarget) {
+                ChatUtils.sendMessage(
+                    "Year of the Seal target acquired after ${readyPredictor.bounceCounter} bounces."
+                )
+                announcedTarget = true
+            }
         }
+        setStatus(
+            "Pathing: ${formatVec(target)} | bounces=${readyPredictor.bounceCounter} | ${NativePathfinder.status.name}"
+        )
 
         // Tick the pathfinder and apply movement
-        val cmd = NativePathfinder.tick()
-        if (cmd != null) {
-            cmd.applyToPlayer()
-        } else {
-            when (NativePathfinder.status) {
-                PathStatus.IDLE, PathStatus.ARRIVED, PathStatus.FAILED ->
-                    MovementManager.clearForcedMovement()
-                else -> Unit
+        if (pathActive) {
+            val cmd = NativePathfinder.tick()
+            if (cmd != null) {
+                applyWalkingCommand(cmd, target)
+            } else {
+                when (NativePathfinder.status) {
+                    PathStatus.IDLE, PathStatus.ARRIVED, PathStatus.FAILED -> {
+                        MovementManager.clearForcedMovement()
+                        pathActive = false
+                    }
+                    else -> Unit
+                }
             }
         }
     }
 
-    @SubscribeEvent
-    fun onRespawn(event: PacketEvent.Incoming) {
-        if (event.packet is ClientboundRespawnPacket) {
-            stopAll()
+    private fun applyWalkingCommand(cmd: PathCommand, target: Vec3) {
+        val player = mc.player ?: return
+        val guide = resolveWalkGuide(player, target)
+        val dx = guide.x - player.x
+        val dz = guide.z - player.z
+        val distance = sqrt(dx * dx + dz * dz)
+        if (distance < WALK_STOP_DISTANCE) {
+            MovementManager.clearForcedMovement()
+            return
         }
+
+        MovementManager.setLookLock(false)
+        RotationExecutor.stopIfUsing(PathfinderRotationStrategy)
+
+        val nx = dx / distance
+        val nz = dz / distance
+        val yawRad = Math.toRadians(player.yRot.toDouble())
+        val sinYaw = sin(yawRad)
+        val cosYaw = cos(yawRad)
+        val localForward = -nx * sinYaw + nz * cosYaw
+        val localStrafe = nx * cosYaw + nz * sinYaw
+
+        val forward = localForward > WALK_INPUT_THRESHOLD
+        val backward = localForward < -WALK_INPUT_THRESHOLD
+        val right = localStrafe > WALK_INPUT_THRESHOLD
+        val left = localStrafe < -WALK_INPUT_THRESHOLD
+        val sprint = cmd.sprint && forward && !backward && abs(localStrafe) < SPRINT_STRAFE_LIMIT
+
+        MovementManager.setMovementLock(true)
+        MovementManager.setForcedMovement(
+            forward = forward,
+            backward = backward,
+            left = left,
+            right = right,
+            jump = cmd.jump,
+            shift = cmd.sneak,
+            sprint = sprint
+        )
+        player.setSprinting(sprint)
+    }
+
+    private fun resolveWalkGuide(player: net.minecraft.client.player.LocalPlayer, target: Vec3): Vec3 {
+        val nodes = NativePathfinder.cachedPathNodes
+        if (nodes.isEmpty()) return target
+
+        val nearestIndex = nearestPathNodeIndex(player, nodes)
+        val guideIndex = min(nodes.lastIndex, nearestIndex + WALK_NODE_LOOKAHEAD)
+        val node = nodes[guideIndex]
+        return Vec3(node.x + 0.5, node.y, node.z + 0.5)
+    }
+
+    private fun nearestPathNodeIndex(
+        player: net.minecraft.client.player.LocalPlayer,
+        nodes: List<Vec3>
+    ): Int {
+        val cursor = NativePathfinder.pathNodeCursor.coerceIn(0, nodes.lastIndex)
+        val start = max(0, cursor - 1)
+        val end = min(nodes.lastIndex, cursor + WALK_NODE_SEARCH_WINDOW)
+        var nearestIndex = start
+        var nearestDistanceSq = Double.POSITIVE_INFINITY
+
+        for (index in start..end) {
+            val node = nodes[index]
+            val dx = node.x + 0.5 - player.x
+            val dz = node.z + 0.5 - player.z
+            val distanceSq = dx * dx + dz * dz
+            if (distanceSq < nearestDistanceSq) {
+                nearestDistanceSq = distanceSq
+                nearestIndex = index
+            }
+        }
+
+        if (nearestIndex > NativePathfinder.pathNodeCursor) {
+            NativePathfinder.pathNodeCursor = nearestIndex
+        }
+        return nearestIndex
+    }
+
+    private fun isBeachBallCandidate(entity: Slime): Boolean {
+        return entity.maxHealth >= BEACH_BALL_HEALTH_THRESHOLD ||
+            entity.health >= BEACH_BALL_HEALTH_THRESHOLD
+    }
+
+    private fun updateTrackingStatus(slimeCount: Int, candidateCount: Int) {
+        if (predictors.isEmpty()) {
+            setStatus("Scanning: no beach ball | slimes=$slimeCount candidates=$candidateCount")
+            lastTrackedCount = 0
+            return
+        }
+
+        val best = predictors.values.maxByOrNull { it.bounceCounter }
+        val bestBounces = best?.bounceCounter ?: 0
+        val hasPrediction = best?.landingPos != null
+        setStatus(
+            "Tracking ${predictors.size}: bounces=$bestBounces/${minBounces.value.toInt()} prediction=$hasPrediction"
+        )
+
+        if (lastTrackedCount == 0) {
+            ChatUtils.sendMessage("Year of the Seal is tracking ${predictors.size} beach ball candidate(s).")
+        }
+        lastTrackedCount = predictors.size
+    }
+
+    private fun handleEnabledTransition() {
+        val enabled = enabledSetting.value
+        if (enabled == wasEnabled) return
+        wasEnabled = enabled
+        if (enabled) {
+            setStatus("Scanning: enabled")
+            ChatUtils.sendMessage("Year of the Seal enabled. Scanning for the beach ball.")
+        } else {
+            setStatus("Idle")
+            ChatUtils.sendMessage("Year of the Seal disabled.")
+        }
+    }
+
+    private fun setStatus(status: String) {
+        if (status == lastStatus) return
+        lastStatus = status
+        statusSetting.value = status
+    }
+
+    private fun formatVec(vec: Vec3): String {
+        return "${vec.x.toInt()}, ${vec.y.toInt()}, ${vec.z.toInt()}"
     }
 
     private fun stopAll() {
         NativePathfinder.stop()
         MovementManager.clearForcedMovement()
         predictors.clear()
+        lockedEntityId = null
         lastIssuedTarget = null
+        pathActive = false
+        lastTrackedCount = 0
+        announcedTarget = false
+        setStatus(if (enabledSetting.value) "Scanning: reset" else "Idle")
     }
+
+    internal fun onLevelChange() = stopAll()
+
+    private const val BEACH_BALL_HEALTH_THRESHOLD = 1000f
+    private const val WALK_INPUT_THRESHOLD = 0.22
+    private const val WALK_STOP_DISTANCE = 0.18
+    private const val SPRINT_STRAFE_LIMIT = 0.35
+    private const val WALK_NODE_LOOKAHEAD = 2
+    private const val WALK_NODE_SEARCH_WINDOW = 16
 }

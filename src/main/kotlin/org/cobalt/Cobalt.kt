@@ -164,7 +164,10 @@ object Cobalt : ClientModInitializer {
 
   @SubscribeEvent
   fun onRespawn(event: PacketEvent.Incoming) {
-    if (event.packet is ClientboundRespawnPacket) NativePathfinder.onLevelChange()
+    if (event.packet is ClientboundRespawnPacket) {
+      NativePathfinder.onLevelChange()
+      YearOfTheSealModule.onLevelChange()
+    }
   }
 
 }
