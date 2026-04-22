@@ -33,8 +33,11 @@ object YearOfTheSealModule : Module("Year of the Seal") {
         2.0, 1.0, 10.0, 1.0
     )
 
+    // Placeholder — full implementation added in Task 2
+    private class BallPredictor
+
     // Ball trackers keyed by entity ID
-    private val predictors = mutableMapOf<Int, Any>()
+    private val predictors = mutableMapOf<Int, BallPredictor>()
     // Last target issued to NativePathfinder (to avoid replanning on every tick)
     private var lastIssuedTarget: Vec3? = null
 
