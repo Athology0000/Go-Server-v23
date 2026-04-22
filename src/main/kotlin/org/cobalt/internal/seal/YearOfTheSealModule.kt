@@ -36,6 +36,7 @@ object YearOfTheSealModule : Module("Year of the Seal") {
         2.0, 1.0, 10.0, 1.0
     )
 
+    /** Tracks position history and predicts the landing position for one beach ball entity. */
     private class BallPredictor {
         val data = mutableListOf<Vec3>()    // all positions recorded since spawn
         var startIndex = 0                  // slice start within data (reset each bounce)
@@ -76,7 +77,7 @@ object YearOfTheSealModule : Module("Year of the Seal") {
 
         // Discover new beach ball slimes (invisible, 1024 max HP)
         level.entitiesForRendering().forEach { entity ->
-            if (entity is Slime && entity.isInvisible && entity.maxHealth == 1024f) {
+            if (entity is Slime && entity.isInvisible && entity.maxHealth == 1024f && entity.size == 4) {
                 predictors.putIfAbsent(entity.id, BallPredictor())
             }
         }
