@@ -7,20 +7,21 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(JNI REQUIRED)
 
 set(SOURCES
-    src/pathfinder_jni.cpp
-    src/engine/PathfinderEngine.cpp
-    src/engine/AStarPlanner.cpp
-    src/engine/PathExecutor.cpp
-    src/engine/MovementExpander.cpp
-    src/engine/WorldAccessor.cpp
-    src/engine/RotationController.cpp
-    src/engine/StuckDetector.cpp
+    src/jni_bridge.cpp
+    src/world_state.cpp
+    src/pathfinder.cpp
+    src/path_annotations.cpp
+    src/path_directional_scan.cpp
+    src/path_signature.cpp
+    src/path_simplifier.cpp
+    src/etherwarp_raymarch.cpp
+    src/etherwarp_search.cpp
 )
 
 add_library(cobalt_pathfinder SHARED ${SOURCES})
 
 target_include_directories(cobalt_pathfinder PRIVATE
-    include
+    src
     ${JNI_INCLUDE_DIRS}
 )
 

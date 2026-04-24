@@ -18,6 +18,11 @@ enum class MovementProfile : int {
 struct Vec3d { double x, y, z; };
 struct Vec3i { int x, y, z; };
 
+inline bool isOnBlock(const Vec3d& point, const Vec3d& playerPos, double range) noexcept {
+    return playerPos.x >= point.x - range && playerPos.x < point.x + range &&
+           playerPos.z >= point.z - range && playerPos.z < point.z + range;
+}
+
 struct PathCommand {
     bool forward, back, jump, sneak, sprint;
     float targetYaw, targetPitch;   // raw angles — no GCD applied
@@ -41,3 +46,15 @@ static constexpr uint8_t BT_LADDER = 4;
 // Half-height blocks (slabs 0.5, thin snow, etc.) that Minecraft auto-steps onto.
 // Treated as solid ground but do not require an explicit jump to ascend.
 static constexpr uint8_t BT_STEP   = 5;
+// Bottom stairs with the direction the player must move to climb them.
+// Stairs retain direction so the planner does not walk into their blocked side faces.
+static constexpr uint8_t BT_STAIR_NORTH = 6;
+static constexpr uint8_t BT_STAIR_SOUTH = 7;
+static constexpr uint8_t BT_STAIR_WEST  = 8;
+static constexpr uint8_t BT_STAIR_EAST  = 9;
+// Top stairs or unsupported stair shapes: solid for collision/standing, not a step-up edge.
+static constexpr uint8_t BT_STAIR_BLOCKED = 10;
+
+// Availability flags for AOTV / Etherwarp — passed from Kotlin each tick.
+static constexpr int AVAIL_AOTV      = 1 << 0;
+static constexpr int AVAIL_ETHERWARP = 1 << 1;
