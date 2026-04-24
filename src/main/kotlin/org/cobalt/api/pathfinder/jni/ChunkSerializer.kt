@@ -54,11 +54,12 @@ object ChunkSerializer {
     }
 
     fun onChunkLoad(world: ClientLevel, chunk: LevelChunk) {
-        val minY = world.minBuildHeight
-        val maxY = world.maxBuildHeight
+        val dimType = world.dimensionType()
+        val minY = dimType.minY()
+        val maxY = minY + dimType.height()
         val chunkX = chunk.pos.x
         val chunkZ = chunk.pos.z
-        val worldKey = world.dimension().location().toString()
+        val worldKey = world.dimension().toString()
 
         if (worldKey != currentWorldKey) {
             NativePathfinderJNI.setWorld(worldKey, minY, maxY)

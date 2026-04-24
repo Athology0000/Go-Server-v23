@@ -90,10 +90,10 @@ object NativePathfinder {
         setRouteWithRadius(waypoints, loop, profile, 1.8)
     }
 
-    fun setRouteWithRadius(waypoints: DoubleArray, loop: Boolean, profile: MovementProfile, radius: Double) {
+    fun setRouteWithRadius(waypoints: DoubleArray, loop: Boolean, profile: MovementProfile, arrivalRadius: Double) {
         routeLoop = loop
         routeProfile = profile
-        routeArrivalRadius = radius
+        routeArrivalRadius = arrivalRadius
         routeWpIndex = 0
         routeWaypoints = buildList {
             var i = 0
@@ -105,7 +105,7 @@ object NativePathfinder {
         if (routeWaypoints.isNotEmpty()) {
             val wp = routeWaypoints[0]
             goalX = wp.first; goalY = wp.second; goalZ = wp.third
-            arrivalRadius = radius
+            this.arrivalRadius = arrivalRadius
             startSearch()
         }
     }
