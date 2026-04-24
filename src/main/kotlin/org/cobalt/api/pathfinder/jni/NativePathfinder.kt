@@ -1,187 +1,401 @@
 package org.cobalt.api.pathfinder.jni
 
 import net.minecraft.client.Minecraft
+import net.minecraft.world.phys.Vec3
 import org.cobalt.api.rotation.RotationExecutor
+import org.cobalt.api.util.AngleUtils
+import org.cobalt.api.util.InventoryUtils
+import org.cobalt.api.util.TickScheduler
 import org.cobalt.api.util.player.MovementManager
-import org.cobalt.pathfinder.NativePathfinderBridge
+import org.cobalt.internal.etherwarp.EtherwarpLogic
+import org.cobalt.internal.pathfinding.DebugLog
+import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.sqrt
 
-/**
- * Singleton wrapper around the native pathfinder engine.
- *
- * Usage:
- *   NativePathfinder.init()                      // once at mod startup
- *   NativePathfinder.setTarget(x, y, z)
- *   // each tick:
- *   NativePathfinder.tick()?.applyToPlayer()
- *   NativePathfinder.destroy()                   // on mod unload
- */
 object NativePathfinder {
 
-    private var handle: Long = 0L
+    val isInitialized: Boolean get() = true
 
-    val isInitialized: Boolean get() = handle != 0L
-
-    /** Cached path nodes as Vec3 list; updated on EXECUTING transition. Call only from game tick thread. */
-    var cachedPathNodes: List<net.minecraft.world.phys.Vec3> = emptyList()
+    /** Cached key path nodes (integer block positions as Vec3). Updated on EXECUTING transition. */
+    var cachedPathNodes: List<Vec3> = emptyList()
         private set
 
     /**
      * Forward-only cursor into [cachedPathNodes].
-     * PathCommand.nearestNodeIndex uses this as a lower bound so the "nearest node"
-     * search can never snap backward to already-passed nodes. Resets to 0 whenever
-     * the active path is refreshed (new EXECUTING transition).
+     * Written by PathCommand.nearestNodeIndex() during applyToPlayer(); never reset backward.
      */
     var pathNodeCursor: Int = 0
         internal set
 
+    var availabilityFlagsOverride: Int? = null
+
+    private var state: PathStatus = PathStatus.IDLE
     private var lastTickStatus: PathStatus = PathStatus.IDLE
+
+    // Current goal block position
+    private var goalX: Int = 0
+    private var goalY: Int = 0
+    private var goalZ: Int = 0
+    private var arrivalRadius: Double = 1.8
+
+    // Route state
+    private var routeWaypoints: List<Triple<Int, Int, Int>> = emptyList()
+    private var routeLoop: Boolean = false
+    private var routeProfile: MovementProfile = MovementProfile.DEFAULT
+    private var routeArrivalRadius: Double = 1.8
+    private var routeWpIndex: Int = 0
+
+    // Async search state (written from search thread, read on game thread)
+    @Volatile private var searchResult: NativePathResult? = null
+    @Volatile private var searchFailed: Boolean = false
+    private var searchThread: Thread? = null
+
     private var prevJump: Boolean = false
+    private var teleportFiredNodeKey: Long = -1L
+    private var teleportRestoreSlot: Int = -1
+
+    private var stuckTicks: Int = 0
+    private var lastStuckCheckPos: Vec3 = Vec3.ZERO
+
+    private const val STUCK_CHECK_INTERVAL = 60
+    private const val STUCK_THRESHOLD = 0.5
+    private const val TELEPORT_YAW_THRESHOLD = 8f
+    private const val TELEPORT_PITCH_THRESHOLD = 8f
+    private const val MAX_ITERATIONS = 500_000
+    private const val HEURISTIC_WEIGHT = 1.05
 
     fun init() {
-        if (handle != 0L) return
-        handle = NativePathfinderBridge.createEngine()
+        // NativePathfinderJNI object init loads the DLL on first access
+        NativePathfinderJNI.initNative()
     }
 
     fun destroy() {
-        if (handle == 0L) return
-        NativePathfinderBridge.destroyEngine(handle)
-        handle = 0L
+        cancelSearch()
         releaseGuidedControl()
     }
 
     fun setTarget(x: Double, y: Double, z: Double) {
-        if (handle == 0L) return
-        NativePathfinderBridge.setTarget(handle, x, y, z)
+        setTargetWithRadius(x, y, z, 1.8)
     }
 
     fun setTargetWithRadius(x: Double, y: Double, z: Double, radius: Double) {
-        if (handle == 0L) return
-        NativePathfinderBridge.setTargetWithRadius(handle, x, y, z, radius)
+        routeWaypoints = emptyList()
+        goalX = x.toInt(); goalY = y.toInt(); goalZ = z.toInt()
+        arrivalRadius = radius
+        startSearch()
     }
 
-    /**
-     * @param waypoints list of Vec3-like triples as flat [x0,y0,z0, x1,y1,z1, ...]
-     * @param loop whether to loop the route
-     * @param profile MovementProfile ordinal
-     */
     fun setRoute(waypoints: DoubleArray, loop: Boolean, profile: MovementProfile) {
-        if (handle == 0L) return
-        NativePathfinderBridge.setRoute(handle, waypoints, loop, profile.ordinal)
+        setRouteWithRadius(waypoints, loop, profile, 1.8)
+    }
+
+    fun setRouteWithRadius(waypoints: DoubleArray, loop: Boolean, profile: MovementProfile, radius: Double) {
+        routeLoop = loop
+        routeProfile = profile
+        routeArrivalRadius = radius
+        routeWpIndex = 0
+        routeWaypoints = buildList {
+            var i = 0
+            while (i + 2 < waypoints.size) {
+                add(Triple(waypoints[i].toInt(), waypoints[i + 1].toInt(), waypoints[i + 2].toInt()))
+                i += 3
+            }
+        }
+        if (routeWaypoints.isNotEmpty()) {
+            val wp = routeWaypoints[0]
+            goalX = wp.first; goalY = wp.second; goalZ = wp.third
+            arrivalRadius = radius
+            startSearch()
+        }
     }
 
     fun stop() {
-        if (handle == 0L) return
-        NativePathfinderBridge.stop(handle)
+        cancelSearch()
+        state = PathStatus.IDLE
+        cachedPathNodes = emptyList()
+        pathNodeCursor = 0
         prevJump = false
+        teleportFiredNodeKey = -1L
+        availabilityFlagsOverride = null
+        routeWpIndex = 0
+        stuckTicks = 0
         releaseGuidedControl()
     }
 
-    /** Call when the player changes dimension or disconnects so the buffer cache is flushed. */
     fun onLevelChange() {
-        WorldBufferSerializer.invalidate()
+        cancelSearch()
+        ChunkSerializer.invalidate()
+        state = PathStatus.IDLE
+        cachedPathNodes = emptyList()
+        pathNodeCursor = 0
         prevJump = false
+        teleportFiredNodeKey = -1L
+        availabilityFlagsOverride = null
+        routeWpIndex = 0
+        stuckTicks = 0
         releaseGuidedControl()
     }
 
-    val status: PathStatus
-        get() {
-            if (handle == 0L) return PathStatus.IDLE
-            val ordinal = NativePathfinderBridge.getStatus(handle)
-            return PathStatus.entries.getOrElse(ordinal) { PathStatus.FAILED }
-        }
+    val status: PathStatus get() = state
 
-    /**
-     * Must be called every tick (TickEvent.Start) on the main thread.
-     * Returns null if the engine is not initialized or the world is unavailable.
-     */
     fun tick(): PathCommand? {
-        if (handle == 0L) {
-            releaseGuidedControl()
-            return null
-        }
         val mc = Minecraft.getInstance()
-        val player = mc.player ?: run {
-            releaseGuidedControl()
-            return null
-        }
+        val player = mc.player ?: run { releaseGuidedControl(); return null }
 
-        val world = WorldBufferSerializer.serialize(mc) ?: run {
-            releaseGuidedControl()
-            return null
-        }
-
-        val r = NativePathfinderBridge.update(
-            handle,
-            world.buf,
-            world.bx, world.by, world.bz,
-            player.x, player.y, player.z,
-            player.yRot, player.xRot,
-            player.onGround()
-        )
-
-        // int[10]: [0]=forward [1]=back [2]=jump [3]=sneak [4]=sprint
-        //          [5]=targetYaw (float bits) [6]=targetPitch (float bits)
-        //          [7]=PathStatus ordinal [8]=ActionType ordinal
-        //          [9]=distanceToTarget (float bits)
-        val statusOrdinal = r[7]
-        val actionOrdinal = r[8]
-        val parsedStatus = PathStatus.entries.getOrElse(statusOrdinal) { PathStatus.FAILED }
-
-        // Refresh node cache on EXECUTING transition; clear when path ends.
-        // REPLANNING: keep old cached nodes (engine continues on old path until new plan arrives).
-        // PLANNING: neither refresh nor clear (no path exists yet).
-        when {
-            parsedStatus == PathStatus.EXECUTING && lastTickStatus != PathStatus.EXECUTING -> refreshPathNodes()
-            parsedStatus == PathStatus.IDLE || parsedStatus == PathStatus.ARRIVED || parsedStatus == PathStatus.FAILED -> {
-                if (cachedPathNodes.isNotEmpty()) cachedPathNodes = emptyList()
-                pathNodeCursor = 0
+        // Consume completed search result on game thread
+        if (searchFailed) {
+            searchFailed = false
+            searchThread = null
+            if (state == PathStatus.PLANNING) {
+                state = PathStatus.FAILED
+                logFailure("findPath returned no result")
+            } else {
+                // REPLANNING failed — keep executing old path
+                state = PathStatus.EXECUTING
+            }
+        } else {
+            val result = searchResult
+            if (result != null) {
+                searchResult = null
+                searchThread = null
+                applySearchResult(result)
             }
         }
-        lastTickStatus = parsedStatus
 
-        // Don't lock movement/rotation when the engine isn't actively navigating
-        if (parsedStatus == PathStatus.IDLE ||
-            parsedStatus == PathStatus.PLANNING ||
-            parsedStatus == PathStatus.ARRIVED ||
-            parsedStatus == PathStatus.FAILED) {
-            prevJump = false
+        when (state) {
+            PathStatus.IDLE, PathStatus.FAILED, PathStatus.ARRIVED -> {
+                if (state != lastTickStatus) {
+                    prevJump = false
+                    cachedPathNodes = emptyList()
+                    pathNodeCursor = 0
+                    releaseGuidedControl()
+                }
+                lastTickStatus = state
+                return null
+            }
+            PathStatus.PLANNING -> {
+                lastTickStatus = state
+                return null
+            }
+            else -> {}
+        }
+
+        // EXECUTING or REPLANNING
+        val nodes = cachedPathNodes
+        if (nodes.isEmpty()) {
+            state = PathStatus.FAILED
             releaseGuidedControl()
+            lastTickStatus = state
             return null
         }
 
-        // Edge-trigger jump: fire for exactly one tick on the rising edge.
-        // Prevents bunny-hopping when the DLL holds jump=true for multiple ticks.
-        // Re-arm on landing so a pulse wasted while airborne (e.g. mid-fall) retries.
-        val jumpRaw = r[2] != 0
+        val playerPos = Vec3(player.x, player.y, player.z)
+
+        // Check arrival at current goal
+        val dx = goalX - player.x
+        val dy = goalY - player.y
+        val dz = goalZ - player.z
+        val distToGoal = sqrt(dx * dx + dy * dy + dz * dz)
+
+        if (distToGoal <= arrivalRadius) {
+            if (routeWaypoints.isNotEmpty()) {
+                routeWpIndex++
+                val totalWp = routeWaypoints.size
+                val nextIndex = if (routeLoop) routeWpIndex % totalWp else routeWpIndex
+                if (nextIndex < totalWp) {
+                    routeWpIndex = nextIndex
+                    val wp = routeWaypoints[nextIndex]
+                    goalX = wp.first; goalY = wp.second; goalZ = wp.third
+                    arrivalRadius = routeArrivalRadius
+                    startSearch()
+                    lastTickStatus = state
+                    return null
+                }
+            }
+            state = PathStatus.ARRIVED
+            cachedPathNodes = emptyList()
+            pathNodeCursor = 0
+            releaseGuidedControl()
+            lastTickStatus = state
+            return null
+        }
+
+        // Stuck detection — only trigger new replan when EXECUTING (not already REPLANNING)
+        stuckTicks++
+        if (stuckTicks >= STUCK_CHECK_INTERVAL && state == PathStatus.EXECUTING) {
+            stuckTicks = 0
+            val moved = playerPos.distanceTo(lastStuckCheckPos)
+            if (moved < STUCK_THRESHOLD) startReplan(playerPos)
+            lastStuckCheckPos = playerPos
+        }
+
+        // Compute targetYaw toward next path node (PathCommand.resolveGuidedRotation overrides this)
+        val curNode = nodes.getOrNull(minOf(pathNodeCursor, nodes.lastIndex)) ?: nodes.last()
+        val ndx = curNode.x + 0.5 - player.x
+        val ndz = curNode.z + 0.5 - player.z
+        val targetYaw = Math.toDegrees(atan2(-ndx, ndz)).toFloat()
+
+        // Jump pulse logic
+        val ndyRaw = curNode.y - player.y
+        val jumpRaw = player.onGround() && ndyRaw > 0.5 && sqrt(ndx * ndx + ndz * ndz) < 2.5
         if (jumpRaw && player.onGround()) prevJump = false
         val jumpPulse = jumpRaw && !prevJump
         prevJump = jumpRaw
 
-        return PathCommand(
-            forward  = r[0] != 0,
-            back     = r[1] != 0,
-            jump     = jumpPulse,
-            sneak    = r[3] != 0,
-            sprint   = r[4] != 0,
-            targetYaw   = java.lang.Float.intBitsToFloat(r[5]),
-            targetPitch = java.lang.Float.intBitsToFloat(r[6]),
-            status      = parsedStatus,
-            activeAction = ActionType.entries.getOrElse(actionOrdinal) { ActionType.WALK },
-            distanceToTarget = java.lang.Float.intBitsToFloat(r[9])
+        val aotvSlot = EtherwarpLogic.findEtherwarpHotbarSlot()
+        val computedFlags = if (aotvSlot >= 0) 0x1 or 0x2 else 0
+        val availabilityFlags = availabilityFlagsOverride ?: computedFlags
+
+        val cmd = PathCommand(
+            forward = true,
+            back = false,
+            jump = jumpPulse,
+            sneak = false,
+            sprint = true,
+            targetYaw = targetYaw,
+            targetPitch = 0f,
+            status = state,
+            activeAction = ActionType.WALK,
+            distanceToTarget = distToGoal.toFloat()
         )
+
+        // AOTV / Etherwarp fire on rotation convergence
+        if (state == PathStatus.EXECUTING &&
+            (cmd.activeAction == ActionType.AOTV || cmd.activeAction == ActionType.ETHERWARP)) {
+            val yawErr = abs(AngleUtils.getRotationDelta(player.yRot, cmd.targetYaw))
+            val pitchErr = abs(player.xRot - cmd.targetPitch)
+            val aligned = yawErr < TELEPORT_YAW_THRESHOLD &&
+                (cmd.activeAction == ActionType.AOTV || pitchErr < TELEPORT_PITCH_THRESHOLD)
+            val nodeKey = cachedPathNodes.getOrNull(pathNodeCursor)
+                ?.let { n -> (n.x.toLong() and 0x1FFFFF) or ((n.z.toLong() and 0x1FFFFF) shl 21) }
+                ?: -1L
+            if (aligned && nodeKey != teleportFiredNodeKey && aotvSlot >= 0) {
+                teleportFiredNodeKey = nodeKey
+                fireTeleport(cmd.activeAction == ActionType.ETHERWARP, aotvSlot)
+            }
+        } else if (cmd.activeAction != ActionType.AOTV && cmd.activeAction != ActionType.ETHERWARP) {
+            teleportFiredNodeKey = -1L
+        }
+
+        if (state != lastTickStatus && state == PathStatus.EXECUTING) {
+            DebugLog.debug(mc, "NativePathfinder", "executing path, ${nodes.size} key nodes")
+        }
+        lastTickStatus = state
+        return cmd
     }
 
-    private fun refreshPathNodes() {
-        if (handle == 0L) { cachedPathNodes = emptyList(); return }
-        val raw = NativePathfinderBridge.getPathNodes(handle)
-        val result = ArrayList<net.minecraft.world.phys.Vec3>(raw.size / 3)
+    private fun startSearch() {
+        cancelSearch()
+        state = PathStatus.PLANNING
+        val mc = Minecraft.getInstance()
+        val player = mc.player ?: return
+        val sx = player.blockX; val sy = player.blockY; val sz = player.blockZ
+        val gx = goalX; val gy = goalY; val gz = goalZ
+        val isFly = routeProfile == MovementProfile.FLY
+
+        searchThread = Thread {
+            try {
+                val result = NativePathfinderJNI.findPath(
+                    startPoints = intArrayOf(sx, sy, sz),
+                    endPoints = intArrayOf(gx, gy, gz),
+                    isFly = isFly,
+                    maxIterations = MAX_ITERATIONS,
+                    heuristicWeight = HEURISTIC_WEIGHT,
+                    nonPrimaryStartPenalty = 0.0,
+                    moveOrderOffset = 0,
+                    avoidMeta = intArrayOf(),
+                    avoidPenalty = doubleArrayOf()
+                )
+                if (result != null && result.keyPath.size >= 3) {
+                    searchResult = result
+                } else {
+                    searchFailed = true
+                }
+            } catch (_: Exception) {
+                searchFailed = true
+            }
+        }.also { it.isDaemon = true; it.name = "cobalt-pathfinder"; it.start() }
+    }
+
+    private fun startReplan(playerPos: Vec3) {
+        if (state == PathStatus.REPLANNING) return
+        state = PathStatus.REPLANNING
+        NativePathfinderJNI.cancelSearch()
+        searchThread = null
+        val gx = goalX; val gy = goalY; val gz = goalZ
+        val sx = playerPos.x.toInt(); val sy = playerPos.y.toInt(); val sz = playerPos.z.toInt()
+        val isFly = routeProfile == MovementProfile.FLY
+
+        searchThread = Thread {
+            try {
+                val result = NativePathfinderJNI.findPath(
+                    startPoints = intArrayOf(sx, sy, sz),
+                    endPoints = intArrayOf(gx, gy, gz),
+                    isFly = isFly,
+                    maxIterations = MAX_ITERATIONS,
+                    heuristicWeight = HEURISTIC_WEIGHT,
+                    nonPrimaryStartPenalty = 0.0,
+                    moveOrderOffset = 0,
+                    avoidMeta = intArrayOf(),
+                    avoidPenalty = doubleArrayOf()
+                )
+                if (result != null && result.keyPath.size >= 3) {
+                    searchResult = result
+                } else {
+                    searchFailed = true
+                }
+            } catch (_: Exception) {
+                searchFailed = true
+            }
+        }.also { it.isDaemon = true; it.name = "cobalt-pathfinder-replan"; it.start() }
+    }
+
+    private fun applySearchResult(result: NativePathResult) {
+        val flat = result.keyPath
+        val nodes = ArrayList<Vec3>(flat.size / 3)
         var i = 0
-        while (i + 2 < raw.size) {
-            result.add(net.minecraft.world.phys.Vec3(raw[i].toDouble(), raw[i + 1].toDouble(), raw[i + 2].toDouble()))
+        while (i + 2 < flat.size) {
+            // Store as integer block coords; PathCommand adds +0.5 for centering
+            nodes.add(Vec3(flat[i].toDouble(), flat[i + 1].toDouble(), flat[i + 2].toDouble()))
             i += 3
         }
-        cachedPathNodes = result
+        cachedPathNodes = nodes
         pathNodeCursor = 0
+        stuckTicks = 0
+        lastStuckCheckPos = Vec3.ZERO
+        state = PathStatus.EXECUTING
+    }
+
+    private fun cancelSearch() {
+        NativePathfinderJNI.cancelSearch()
+        searchThread = null
+        searchResult = null
+        searchFailed = false
+        state = PathStatus.IDLE
+    }
+
+    private fun fireTeleport(isEtherwarp: Boolean, aotvSlot: Int) {
+        val mc = Minecraft.getInstance()
+        val player = mc.player ?: return
+        teleportRestoreSlot = player.inventory.selectedSlot
+        InventoryUtils.holdHotbarSlot(aotvSlot)
+        if (isEtherwarp) mc.options.keyShift?.setDown(true)
+        mc.options.keyUse?.setDown(true)
+        TickScheduler.schedule(1L) {
+            mc.options.keyUse?.setDown(false)
+            if (isEtherwarp) mc.options.keyShift?.setDown(false)
+        }
+        TickScheduler.schedule(4L) {
+            val restore = teleportRestoreSlot
+            if (restore in 0..8) InventoryUtils.holdHotbarSlot(restore)
+            teleportRestoreSlot = -1
+        }
+    }
+
+    private fun logFailure(reason: String) {
+        val mc = Minecraft.getInstance()
+        DebugLog.debug(mc, "NativePathfinder", "path failed: $reason")
     }
 
     private fun releaseGuidedControl() {

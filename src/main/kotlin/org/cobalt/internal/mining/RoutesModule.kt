@@ -8,6 +8,7 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import java.awt.Color
 import java.io.File
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.max
 import net.minecraft.client.Minecraft
@@ -48,6 +49,7 @@ import org.cobalt.api.pathfinder.jni.NativePathfinder
 import org.cobalt.api.pathfinder.jni.PathStatus
 import org.cobalt.api.util.player.MovementManager
 import org.cobalt.internal.etherwarp.EtherwarpLogic
+import org.cobalt.internal.pathfinding.DebugLog
 import org.cobalt.internal.pathfinding.PathfindingModule
 import org.cobalt.internal.rotation.RotationsModule
 import org.cobalt.internal.routes.RouteStore
@@ -86,6 +88,14 @@ object RoutesModule : Module("Routes") {
     val pointCount: Int,
   )
 
+  private data class WarpCheck(
+    val canWarp: Boolean,
+    val reason: String,
+    val aimPoint: Vec3,
+    val hitBlock: BlockPos?,
+    val raycastTarget: BlockPos? = null
+  )
+
   private enum class RouteAction {
     NONE,
     WALK,
@@ -111,6 +121,8 @@ object RoutesModule : Module("Routes") {
   private var awaitingArrival = false
   private var walkCompletePointOnArrival = true
   private var walkRetryCount = 0
+  private var walkArrivalDistanceSq = ARRIVAL_DISTANCE_SQ
+  private var walkEdgeArrivalDistanceSq = WALK_EDGE_ARRIVAL_DISTANCE_SQ
   private var lastTarget: BlockPos? = null
   private var lastResolvedTarget: BlockPos? = null
   private var action = RouteAction.NONE
@@ -146,6 +158,8 @@ object RoutesModule : Module("Routes") {
   private var pendingWarpUseRelease = false
   private var warpCompletePointOnArrival = true
   private var warpResumeAction = RouteAction.NONE
+  private var warpRestartCurrentPointOnArrival = false
+  private var warpPostArrivalWalkTarget: BlockPos? = null
   private var lastSuccessfulWarpTarget: BlockPos? = null
   private var lastSuccessfulWarpTick = -1L
   private var screenPauseNoticeTick = 0L
@@ -411,10 +425,17 @@ object RoutesModule : Module("Routes") {
     if (action == RouteAction.WALK) {
       if (nativeActive()) {
         val cmd = NativePathfinder.tick()
-        applyWalkCameraRotation(player)
+        val isTeleportAction = cmd != null &&
+          (cmd.activeAction == org.cobalt.api.pathfinder.jni.ActionType.AOTV ||
+           cmd.activeAction == org.cobalt.api.pathfinder.jni.ActionType.ETHERWARP)
+        if (!isTeleportAction) applyWalkCameraRotation(player)
         if (cmd != null) {
-          cmd.applyToPlayer(applyRotation = false, movementYawOverride = player.yRot)
-          applyWalkEdgeSafety(player, level)
+          if (isTeleportAction) {
+            cmd.applyToPlayer(applyRotation = true)
+          } else {
+            cmd.applyToPlayer(applyRotation = false, movementYawOverride = player.yRot)
+            applyWalkEdgeSafety(player, level)
+          }
         } else {
           holdWalkAutonomousMovement()
         }
@@ -446,6 +467,18 @@ object RoutesModule : Module("Routes") {
               walkCompletePointOnArrival = true
               return
             }
+            logRouteActionFailure(
+              currentWalkArrivalTarget(),
+              "failed trying to pathfind to route point: could not reach after $MAX_WALK_RETRIES retries",
+              "stop route",
+              mapOf(
+                "routePoint" to routeIndex + 1,
+                "nativeStatus" to NativePathfinder.status.name,
+                "lastTarget" to lastTarget,
+                "lastResolvedTarget" to lastResolvedTarget,
+                "walkSegmentEndIndex" to walkSegmentEndIndex
+              )
+            )
             stopRoute("Route failed: could not reach point ${routeIndex + 1}.")
           } else {
             action = RouteAction.NONE
@@ -751,6 +784,7 @@ object RoutesModule : Module("Routes") {
     }
 
     PathfindingModule.ensureEnabledForAutomation("routes")
+    NativePathfinder.availabilityFlagsOverride = 0
 
     NativePathfinder.setTarget(bestTarget.x + 0.5, bestTarget.y.toDouble(), bestTarget.z + 0.5)
     lastPathStartTick = level.gameTime
@@ -1318,6 +1352,12 @@ object RoutesModule : Module("Routes") {
     when (point.type) {
       RoutePointType.WARP -> {
         val warpPoint = resolveWarpPoint(level, point.pos) ?: run {
+          logRouteActionFailure(
+            point.pos,
+            "failed trying to resolve route warp point: target block is not viable for etherwarp",
+            "stop route",
+            mapOf("routePoint" to routeIndex + 1)
+          )
           stopRoute("Route failed: invalid warp point ${routeIndex + 1}.")
           return
         }
@@ -1326,6 +1366,44 @@ object RoutesModule : Module("Routes") {
           return
         }
         if (!hasEtherwarpAvailable()) {
+          logRouteActionFailure(
+            warpPoint,
+            "failed trying to etherwarp to route point: no etherwarp item is available; pathfinding to target instead",
+            "pathfind to warp point",
+            mapOf(
+              "routePoint" to routeIndex + 1,
+              "recordedPoint" to point.pos
+            )
+          )
+          startWalk(warpPoint)
+          return
+        }
+        val directWarp = checkDirectEtherwarp(level, player, warpPoint)
+        if (!directWarp.canWarp) {
+          val raycastTarget = directWarp.raycastTarget
+          if (
+            raycastTarget != null &&
+            startWarp(
+              raycastTarget,
+              completePointOnArrival = false,
+              resumeAction = RouteAction.NONE,
+              postArrivalWalkTarget = warpPoint
+            )
+          ) {
+            return
+          }
+          logRouteActionFailure(
+            warpPoint,
+            "failed trying to etherwarp to route point: ${directWarp.reason}; pathfinding to target instead",
+            "pathfind to warp point",
+            mapOf(
+              "routePoint" to routeIndex + 1,
+              "recordedPoint" to point.pos,
+              "aimPoint" to directWarp.aimPoint,
+              "hitBlock" to directWarp.hitBlock,
+              "raycastTarget" to directWarp.raycastTarget
+            )
+          )
           startWalk(warpPoint)
           return
         }
@@ -1344,6 +1422,16 @@ object RoutesModule : Module("Routes") {
           return
         }
         if (!attemptRouteVisibleEtherwarpRecovery(level, player)) {
+          logRouteActionFailure(
+            warpPoint,
+            "failed trying to recover route etherwarp: no visible route etherwarp target",
+            "stop route",
+            mapOf(
+              "routePoint" to routeIndex + 1,
+              "recordedPoint" to point.pos,
+              "currentAction" to action.name
+            )
+          )
           stopRoute("Route failed: no visible route etherwarp target.")
         }
         return
@@ -1365,17 +1453,25 @@ object RoutesModule : Module("Routes") {
   ) {
     val resolved = resolveApproxTarget(target)
     if (resolved == null) {
+      logRouteActionFailure(
+        target,
+        "failed trying to pathfind to route point: no walkable target near point",
+        "stop route",
+        mapOf("routePoint" to routeIndex + 1)
+      )
       stopRoute("Route failed: no walkable target near point ${routeIndex + 1}.")
       return
     }
     val level = mc.level ?: return
-    beginSingleWalkPath(level, target, resolved, completePointOnArrival)
+    val arrivalRadius = selectSingleWalkArrivalRadius(level, target, resolved)
+    beginSingleWalkPath(level, target, resolved, completePointOnArrival, arrivalRadius)
     walkRetryCount = 0
   }
 
   private fun startWalkSegment(level: net.minecraft.world.level.Level) {
     PathfindingModule.ensureEnabledForAutomation("routes")
     NativePathfinder.stop()
+    NativePathfinder.availabilityFlagsOverride = 0
     MovementManager.setMovementLock(false)
     stopRouteRotation()
 
@@ -1390,6 +1486,16 @@ object RoutesModule : Module("Routes") {
       val absoluteIndex = routeIndex + offset
       val resolvedPoint = resolveApproxTarget(pt.pos)
       if (resolvedPoint == null) {
+        logRouteActionFailure(
+          pt.pos,
+          "failed trying to pathfind walk segment: no walkable target near point",
+          "stop route",
+          mapOf(
+            "routePoint" to absoluteIndex + 1,
+            "segmentStart" to routeIndex + 1,
+            "segmentEnd" to segEnd + 1
+          )
+        )
         stopRoute("Route failed: no walkable target near point ${absoluteIndex + 1}.")
         return
       }
@@ -1404,7 +1510,9 @@ object RoutesModule : Module("Routes") {
       wps[i * 3 + 2] = resolvedPoint.z + 0.5
     }
 
-    NativePathfinder.setRoute(wps, loop = false, profile = MovementProfile.DEFAULT)
+    val arrivalRadius = selectSegmentWalkArrivalRadius(level, resolvedWaypoints)
+    updateWalkArrivalThresholds(arrivalRadius)
+    NativePathfinder.setRouteWithRadius(wps, loop = false, profile = MovementProfile.DEFAULT, arrivalRadius = arrivalRadius)
     lastPathStartTick = level.gameTime
     walkSegmentEndIndex = segEnd
     action = RouteAction.WALK
@@ -2145,6 +2253,15 @@ object RoutesModule : Module("Routes") {
   ) {
     val approach = findApproach(level, player, target) ?: return
     PathfindingModule.ensureEnabledForAutomation("routes")
+
+    // Already adjacent to the approach block — stop re-pathing to prevent oscillation.
+    val adx = (approach.x + 0.5) - player.x
+    val adz = (approach.z + 0.5) - player.z
+    if (adx * adx + adz * adz <= MINE_APPROACH_AT_DIST_SQ) {
+      NativePathfinder.tick()?.applyToPlayer()
+      return
+    }
+
     val distSq = minePathTarget?.distSqr(approach)?.toDouble() ?: Double.POSITIVE_INFINITY
     if (!nativeActive() || distSq > 1.0) {
       if (level.gameTime - lastPathStartTick < 8L) {
@@ -2467,14 +2584,14 @@ object RoutesModule : Module("Routes") {
     val dy = target.y - player.y
     val dz = (target.z + 0.5) - player.z
     val distSq = dx * dx + dy * dy + dz * dz
-    if (distSq <= ARRIVAL_DISTANCE_SQ) {
+    if (distSq <= walkArrivalDistanceSq) {
       return true
     }
     if (!cautious) {
       return false
     }
     val horizontalDistSq = dx * dx + dz * dz
-    return horizontalDistSq <= WALK_EDGE_ARRIVAL_DISTANCE_SQ && abs(dy) <= WALK_EDGE_ARRIVAL_VERTICAL
+    return horizontalDistSq <= walkEdgeArrivalDistanceSq && abs(dy) <= WALK_EDGE_ARRIVAL_VERTICAL
   }
 
   private fun handleWalkArrival(
@@ -2509,13 +2626,16 @@ object RoutesModule : Module("Routes") {
     level: net.minecraft.world.level.Level,
     target: BlockPos,
     resolved: BlockPos,
-    completePointOnArrival: Boolean
+    completePointOnArrival: Boolean,
+    arrivalRadius: Double
   ) {
     PathfindingModule.ensureEnabledForAutomation("routes")
     NativePathfinder.stop()
+    NativePathfinder.availabilityFlagsOverride = 0
     MovementManager.setMovementLock(false)
     stopRouteRotation()
-    NativePathfinder.setTarget(resolved.x + 0.5, resolved.y.toDouble(), resolved.z + 0.5)
+    updateWalkArrivalThresholds(arrivalRadius)
+    NativePathfinder.setTargetWithRadius(resolved.x + 0.5, resolved.y.toDouble(), resolved.z + 0.5, arrivalRadius)
     lastPathStartTick = level.gameTime
     action = RouteAction.WALK
     awaitingArrival = true
@@ -2534,8 +2654,38 @@ object RoutesModule : Module("Routes") {
 
     val target = lastTarget ?: return false
     val resolved = lastResolvedTarget ?: resolveApproxTarget(target) ?: return false
-    beginSingleWalkPath(level, target, resolved, walkCompletePointOnArrival)
+    val arrivalRadius = selectSingleWalkArrivalRadius(level, target, resolved)
+    beginSingleWalkPath(level, target, resolved, walkCompletePointOnArrival, arrivalRadius)
     return true
+  }
+
+  private fun updateWalkArrivalThresholds(arrivalRadius: Double) {
+    walkArrivalDistanceSq = arrivalRadius * arrivalRadius
+    val cautiousRadius = max(arrivalRadius + WALK_EDGE_ARRIVAL_EXTRA_RADIUS, MIN_WALK_EDGE_ARRIVAL_RADIUS)
+    walkEdgeArrivalDistanceSq = cautiousRadius * cautiousRadius
+  }
+
+  private fun selectSingleWalkArrivalRadius(
+    level: net.minecraft.world.level.Level,
+    target: BlockPos,
+    resolved: BlockPos
+  ): Double {
+    return if (isRiskyWalkTarget(level, target) || isRiskyWalkTarget(level, resolved)) {
+      RISKY_ROUTE_SINGLE_WALK_ARRIVAL_RADIUS
+    } else {
+      ROUTE_SINGLE_WALK_ARRIVAL_RADIUS
+    }
+  }
+
+  private fun selectSegmentWalkArrivalRadius(
+    level: net.minecraft.world.level.Level,
+    resolvedWaypoints: List<BlockPos>
+  ): Double {
+    return if (resolvedWaypoints.any { isRiskyWalkTarget(level, it) }) {
+      RISKY_ROUTE_SEGMENT_ARRIVAL_RADIUS
+    } else {
+      ROUTE_SEGMENT_ARRIVAL_RADIUS
+    }
   }
 
   private fun holdWalkAutonomousMovement() {
@@ -2547,8 +2697,8 @@ object RoutesModule : Module("Routes") {
     player: Player,
     level: net.minecraft.world.level.Level
   ) {
-    val arrivalTarget = currentWalkArrivalTarget() ?: return
-    if (!shouldUseCautiousWalkApproach(player, level, arrivalTarget)) return
+    val cautionTarget = currentWalkCautionTarget(player, level) ?: return
+    if (!shouldUseCautiousWalkApproach(player, level, cautionTarget)) return
     if (!MovementManager.hasForcedMovement) return
 
     MovementManager.setMovementLock(true)
@@ -2615,7 +2765,11 @@ object RoutesModule : Module("Routes") {
     if (nodes.isNotEmpty()) {
       val nearestIndex = nearestWalkNodeIndex(player, nodes)
       if (nearestIndex >= 0) {
-        val lookahead = RotationsModule.routeFollowLookaheadNodes.value.toInt().coerceAtLeast(1)
+        val level = mc.level
+        val requestedLookahead = RotationsModule.routeFollowLookaheadNodes.value.toInt().coerceAtLeast(1)
+        val lookahead =
+          if (level != null && shouldUsePreciseWalkCamera(level, player, nodes, nearestIndex)) 1
+          else requestedLookahead
         val startIndex = (nearestIndex + 1).coerceAtMost(nodes.lastIndex)
         val endIndex = (nearestIndex + lookahead).coerceAtMost(nodes.lastIndex)
         var sumX = 0.0
@@ -2629,7 +2783,7 @@ object RoutesModule : Module("Routes") {
         }
         val refNode = nodes[endIndex]
         if (count > 0) {
-          return Vec3(sumX / count + 0.5, max(refNode.y + lookHeight, player.eyePosition.y), sumZ / count + 0.5)
+          return Vec3(sumX / count, max(refNode.y + lookHeight, player.eyePosition.y), sumZ / count)
         }
       }
     }
@@ -2644,11 +2798,18 @@ object RoutesModule : Module("Routes") {
   }
 
   private fun nearestWalkNodeIndex(player: Player, nodes: List<Vec3>): Int {
-    var nearestIndex = -1
+    val cursor = NativePathfinder.pathNodeCursor
+    val searchStart = (cursor - 1).coerceAtLeast(0)
+    val searchEnd = (cursor + WALK_CAMERA_FORWARD_SEARCH_WINDOW).coerceAtMost(nodes.lastIndex)
+    if (searchStart > searchEnd) {
+      return cursor.coerceIn(0, nodes.lastIndex)
+    }
+
+    var nearestIndex = searchStart
     var nearestDistSq = Double.POSITIVE_INFINITY
     val px = player.x
     val pz = player.z
-    for (index in nodes.indices) {
+    for (index in searchStart..searchEnd) {
       val node = nodes[index]
       val dx = node.x - px
       val dz = node.z - pz
@@ -2658,7 +2819,72 @@ object RoutesModule : Module("Routes") {
         nearestIndex = index
       }
     }
+    if (nearestIndex > cursor) {
+      NativePathfinder.pathNodeCursor = nearestIndex
+    }
     return nearestIndex
+  }
+
+  private fun currentWalkCautionTarget(
+    player: Player,
+    level: net.minecraft.world.level.Level
+  ): BlockPos? {
+    val nodes = NativePathfinder.cachedPathNodes
+    if (nodes.isNotEmpty()) {
+      val nearestIndex = nearestWalkNodeIndex(player, nodes)
+      if (nearestIndex >= 0) {
+        val riskyNode = findUpcomingRiskyWalkNode(level, player, nodes, nearestIndex)
+        if (riskyNode != null) {
+          return riskyNode
+        }
+      }
+    }
+    return currentWalkArrivalTarget()
+  }
+
+  private fun findUpcomingRiskyWalkNode(
+    level: net.minecraft.world.level.Level,
+    player: Player,
+    nodes: List<Vec3>,
+    nearestIndex: Int
+  ): BlockPos? {
+    val endIndex = (nearestIndex + WALK_EDGE_NODE_LOOKAHEAD).coerceAtMost(nodes.lastIndex)
+    for (index in nearestIndex..endIndex) {
+      val nodePos = BlockPos.containing(nodes[index].x, nodes[index].y, nodes[index].z)
+      if (!isRiskyWalkTarget(level, nodePos)) continue
+      if (horizontalDistanceToBlockCenterSq(player, nodePos) <= WALK_EDGE_SLOW_DISTANCE_SQ) {
+        return nodePos
+      }
+    }
+    return null
+  }
+
+  private fun shouldUsePreciseWalkCamera(
+    level: net.minecraft.world.level.Level,
+    player: Player,
+    nodes: List<Vec3>,
+    nearestIndex: Int
+  ): Boolean {
+    if (findUpcomingRiskyWalkNode(level, player, nodes, nearestIndex) != null) {
+      return true
+    }
+    if (nearestIndex + 2 > nodes.lastIndex) {
+      return false
+    }
+    val first = nodes[nearestIndex]
+    val second = nodes[nearestIndex + 1]
+    val third = nodes[nearestIndex + 2]
+    val ax = second.x - first.x
+    val az = second.z - first.z
+    val bx = third.x - second.x
+    val bz = third.z - second.z
+    val aLen = kotlin.math.sqrt(ax * ax + az * az)
+    val bLen = kotlin.math.sqrt(bx * bx + bz * bz)
+    if (aLen < SHARP_TURN_MIN_VECTOR || bLen < SHARP_TURN_MIN_VECTOR) {
+      return false
+    }
+    val cosTheta = ((ax * bx) + (az * bz)) / (aLen * bLen)
+    return cosTheta <= SHARP_TURN_COS_THRESHOLD
   }
 
   private fun shouldUseCautiousWalkApproach(
@@ -2756,7 +2982,9 @@ object RoutesModule : Module("Routes") {
   private fun startWarp(
     target: BlockPos,
     completePointOnArrival: Boolean = true,
-    resumeAction: RouteAction = RouteAction.NONE
+    resumeAction: RouteAction = RouteAction.NONE,
+    restartCurrentPointOnArrival: Boolean = false,
+    postArrivalWalkTarget: BlockPos? = null
   ): Boolean {
     val player = mc.player ?: return false
     val level = mc.level ?: return false
@@ -2786,6 +3014,8 @@ object RoutesModule : Module("Routes") {
     pendingWarpUseRelease = false
     warpCompletePointOnArrival = completePointOnArrival
     warpResumeAction = resumeAction
+    warpRestartCurrentPointOnArrival = restartCurrentPointOnArrival
+    warpPostArrivalWalkTarget = postArrivalWalkTarget
     action = RouteAction.WARP
     return true
   }
@@ -2821,11 +3051,13 @@ object RoutesModule : Module("Routes") {
         mc.options.keyShift?.setDown(true)
         if (!canWarpToTarget(level, player, target, warpAimPoint)) {
           if (warpStageElapsedMs >= WARP_STAGE1_TIMEOUT_MS) {
-            mc.options.keyShift?.setDown(false)
-            warpCooldownUntil = level.gameTime + WARP_RETRY_COOLDOWN_TICKS
-            val resumeAction = warpResumeAction
-            resetWarp()
-            action = resumeAction
+            failWarpAttemptAndFallback(
+              level,
+              player,
+              target,
+              warpAimPoint,
+              "timed out trying to etherwarp to target block"
+            )
             return
           }
           return
@@ -2843,11 +3075,13 @@ object RoutesModule : Module("Routes") {
           return
         }
         if (warpStageElapsedMs >= WARP_STAGE1_TIMEOUT_MS) {
-          mc.options.keyShift?.setDown(false)
-          warpCooldownUntil = level.gameTime + WARP_RETRY_COOLDOWN_TICKS
-          val resumeAction = warpResumeAction
-          resetWarp()
-          action = resumeAction
+          failWarpAttemptAndFallback(
+            level,
+            player,
+            target,
+            warpAimPoint,
+            "timed out trying to hold sneak before etherwarp use"
+          )
         }
       }
       else -> {
@@ -2881,10 +3115,16 @@ object RoutesModule : Module("Routes") {
           }
           val completePointOnArrival = warpCompletePointOnArrival
           val resumeAction = warpResumeAction
+          val restartCurrentPoint = warpRestartCurrentPointOnArrival
+          val postArrivalWalkTarget = warpPostArrivalWalkTarget
           resetWarp(releaseSneak = !keepSneakChained)
           if (arrived) {
             if (completePointOnArrival) {
               completePoint()
+            } else if (postArrivalWalkTarget != null) {
+              startWalk(postArrivalWalkTarget)
+            } else if (restartCurrentPoint) {
+              startPointAtCurrentIndex(player, level)
             } else {
               action = resumeAction
             }
@@ -2894,6 +3134,41 @@ object RoutesModule : Module("Routes") {
           return
         }
       }
+    }
+  }
+
+  private fun failWarpAttemptAndFallback(
+    level: net.minecraft.world.level.Level,
+    player: Player,
+    target: BlockPos,
+    aimPoint: Vec3,
+    reason: String
+  ) {
+    val check = checkDirectEtherwarp(level, player, target, aimPoint)
+    val resumeAction = warpResumeAction
+    val completePointOnArrival = warpCompletePointOnArrival
+    logRouteActionFailure(
+      target,
+      "$reason: ${check.reason}",
+      if (resumeAction == RouteAction.NONE && completePointOnArrival) "pathfind to warp point" else "resume ${resumeAction.name.lowercase()}",
+      mapOf(
+        "routePoint" to routeIndex + 1,
+        "aimPoint" to aimPoint,
+        "hitBlock" to check.hitBlock,
+        "raycastTarget" to check.raycastTarget,
+        "warpStage" to warpStage,
+        "stageElapsedMs" to warpStageElapsedMs,
+        "timeoutMs" to WARP_STAGE1_TIMEOUT_MS,
+        "resumeAction" to resumeAction.name
+      )
+    )
+    mc.options.keyShift?.setDown(false)
+    warpCooldownUntil = level.gameTime + WARP_RETRY_COOLDOWN_TICKS
+    resetWarp()
+    if (resumeAction == RouteAction.NONE && completePointOnArrival) {
+      startWalk(target)
+    } else {
+      action = resumeAction
     }
   }
 
@@ -3091,6 +3366,165 @@ object RoutesModule : Module("Routes") {
     return true
   }
 
+  private fun checkDirectEtherwarp(
+    level: net.minecraft.world.level.Level,
+    player: Player,
+    target: BlockPos,
+    aimPoint: Vec3 = resolveWarpAimPoint(level, player, target)
+  ): WarpCheck {
+    if (!isWarpBlockViable(level, target)) {
+      return WarpCheck(false, describeWarpViabilityFailure(level, target), aimPoint, null)
+    }
+    if (!EtherwarpLogic.canEtherwarp()) {
+      return WarpCheck(false, "etherwarp cannot be used in the current screen/state", aimPoint, null)
+    }
+
+    val eye = Vec3(player.x, player.y + 1.54, player.z)
+    val range = EtherwarpLogic.getEtherwarpRange().toDouble() + 0.5
+    val distanceSq = eye.distanceToSqr(aimPoint)
+    if (distanceSq > range * range) {
+      val distance = kotlin.math.sqrt(distanceSq)
+      val raycastTarget = findRaycastFallbackWarpTarget(level, player, target, aimPoint, range)
+      return WarpCheck(
+        false,
+        if (raycastTarget != null) {
+          "target is outside etherwarp range (${formatDebugNumber(distance)} > ${formatDebugNumber(range)}); raycast fallback hit ${formatBlock(raycastTarget)}"
+        } else {
+          "target is outside etherwarp range (${formatDebugNumber(distance)} > ${formatDebugNumber(range)})"
+        },
+        aimPoint,
+        null,
+        raycastTarget
+      )
+    }
+
+    val result = EtherwarpLogic.getEtherwarpResultTo(target, aimPoint)
+    if (result.succeeded && result.pos == target) {
+      return WarpCheck(true, "direct etherwarp line of sight is clear", aimPoint, target)
+    }
+
+    val hitBlock = result.pos
+    val reason =
+      when {
+        hitBlock != null && hitBlock != target ->
+          "direct etherwarp line of sight hit ${formatBlock(hitBlock)} before target"
+        !result.reason.isNullOrBlank() -> result.reason
+        else -> "target is not directly etherwarpable"
+      }
+    return WarpCheck(false, reason, aimPoint, hitBlock)
+  }
+
+  private fun findRaycastFallbackWarpTarget(
+    level: net.minecraft.world.level.Level,
+    player: Player,
+    originalTarget: BlockPos,
+    aimPoint: Vec3,
+    range: Double
+  ): BlockPos? {
+    val etherResult = EtherwarpLogic.getEtherwarpResultTo(originalTarget, aimPoint)
+    val etherHit = etherResult.pos
+    if (
+      etherResult.succeeded &&
+      etherHit != null &&
+      etherHit != originalTarget &&
+      isValidRaycastFallbackWarpTarget(level, player, originalTarget, etherHit, range)
+    ) {
+      return etherHit
+    }
+
+    val eye = Vec3(player.x, player.y + 1.54, player.z)
+    val dx = aimPoint.x - eye.x
+    val dy = aimPoint.y - eye.y
+    val dz = aimPoint.z - eye.z
+    val len = kotlin.math.sqrt(dx * dx + dy * dy + dz * dz)
+    if (len <= 1.0e-6) return null
+
+    val rayEnd = Vec3(
+      eye.x + dx / len * range,
+      eye.y + dy / len * range,
+      eye.z + dz / len * range
+    )
+    val hit = level.clip(
+      net.minecraft.world.level.ClipContext(
+        eye,
+        rayEnd,
+        net.minecraft.world.level.ClipContext.Block.OUTLINE,
+        net.minecraft.world.level.ClipContext.Fluid.NONE,
+        player
+      )
+    )
+    if (hit.type != HitResult.Type.BLOCK) return null
+
+    val blockHit = hit
+    val candidate = candidateWarpBlock(level, blockHit.blockPos) ?: blockHit.blockPos
+    return if (isValidRaycastFallbackWarpTarget(level, player, originalTarget, candidate, range)) {
+      candidate
+    } else {
+      null
+    }
+  }
+
+  private fun isValidRaycastFallbackWarpTarget(
+    level: net.minecraft.world.level.Level,
+    player: Player,
+    originalTarget: BlockPos,
+    candidate: BlockPos,
+    range: Double
+  ): Boolean {
+    if (candidate == originalTarget) return false
+    if (!isWarpBlockViable(level, candidate)) return false
+    if (isStandingOnWarpTarget(player, candidate)) return false
+    if (wasJustWarpedToTarget(level, player, candidate)) return false
+
+    val currentProgressDistSq = player.blockPosition().below().distSqr(originalTarget).toDouble()
+    val candidateProgressDistSq = candidate.distSqr(originalTarget).toDouble()
+    if (candidateProgressDistSq >= currentProgressDistSq - 1.0) return false
+
+    val candidateAim = resolveWarpAimPoint(level, player, candidate)
+    val eye = Vec3(player.x, player.y + 1.54, player.z)
+    if (eye.distanceToSqr(candidateAim) > range * range) return false
+
+    val result = EtherwarpLogic.getEtherwarpResultTo(candidate, candidateAim)
+    return result.succeeded && result.pos == candidate
+  }
+
+  private fun describeWarpViabilityFailure(
+    level: net.minecraft.world.level.Level,
+    target: BlockPos
+  ): String {
+    if (level.getBlockState(target).isAir) {
+      return "target block is air"
+    }
+    val foot = target.above()
+    if (!MinecraftPathingRules.isPassable(level, foot)) {
+      return "blocked foot space at ${formatBlock(foot)}"
+    }
+    val head = target.above(2)
+    if (!MinecraftPathingRules.isPassable(level, head)) {
+      return "blocked head space at ${formatBlock(head)}"
+    }
+    return "target block is not viable for etherwarp"
+  }
+
+  private fun logRouteActionFailure(
+    target: BlockPos?,
+    reason: String,
+    attemptedAction: String,
+    relevant: Map<String, Any?> = emptyMap()
+  ) {
+    val details = LinkedHashMap<String, Any?>()
+    details["routeIndex"] = routeIndex + 1
+    details["routeAction"] = action.name
+    details.putAll(relevant)
+    DebugLog.actionFailure(mc, "Routes", target, reason, attemptedAction, details)
+  }
+
+  private fun formatBlock(pos: BlockPos): String = "${pos.x}, ${pos.y}, ${pos.z}"
+
+  private fun formatDebugNumber(value: Double): String {
+    return String.format(Locale.US, "%.2f", value)
+  }
+
   private fun canWarpToTarget(
     level: net.minecraft.world.level.Level,
     player: Player,
@@ -3139,6 +3573,8 @@ object RoutesModule : Module("Routes") {
     warpLookLastNs = 0L
     warpCompletePointOnArrival = true
     warpResumeAction = RouteAction.NONE
+    warpRestartCurrentPointOnArrival = false
+    warpPostArrivalWalkTarget = null
   }
 
   private fun ensureEtherwarpHotbarSelected(): Boolean {
@@ -3204,8 +3640,19 @@ object RoutesModule : Module("Routes") {
   private const val WALK_EDGE_SLOW_DISTANCE_SQ = 2.15 * 2.15
   private const val WALK_EDGE_ARRIVAL_DISTANCE_SQ = 1.9 * 1.9
   private const val WALK_EDGE_ARRIVAL_VERTICAL = 1.35
+  private const val WALK_CAMERA_FORWARD_SEARCH_WINDOW = 16
+  private const val WALK_EDGE_NODE_LOOKAHEAD = 2
+  private const val ROUTE_SEGMENT_ARRIVAL_RADIUS = 0.95
+  private const val RISKY_ROUTE_SEGMENT_ARRIVAL_RADIUS = 0.7
+  private const val ROUTE_SINGLE_WALK_ARRIVAL_RADIUS = 1.05
+  private const val RISKY_ROUTE_SINGLE_WALK_ARRIVAL_RADIUS = 0.8
+  private const val WALK_EDGE_ARRIVAL_EXTRA_RADIUS = 0.25
+  private const val MIN_WALK_EDGE_ARRIVAL_RADIUS = 0.95
+  private const val SHARP_TURN_COS_THRESHOLD = 0.78
+  private const val SHARP_TURN_MIN_VECTOR = 0.2
   private const val APPROX_SCAN_RADIUS = 6
   private const val APPROX_SCAN_VERTICAL = 4
+  private const val MINE_APPROACH_AT_DIST_SQ = 2.25  // 1.5 blocks — already adjacent, no re-path
   private const val MINE_RANGE = 4.5
   private const val MINE_ANCHOR_SCAN_RADIUS = 4
   private const val MINE_REQUIRE_LOS = true

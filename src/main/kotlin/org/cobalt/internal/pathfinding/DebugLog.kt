@@ -1,12 +1,15 @@
 package org.cobalt.internal.pathfinding
 
 import net.minecraft.client.Minecraft
+import net.minecraft.core.BlockPos
 import net.minecraft.network.chat.Component
+import net.minecraft.world.phys.Vec3
 import java.io.File
 import java.io.FileWriter
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 object DebugLog {
 	var statusChatEnabled = true
@@ -54,11 +57,46 @@ object DebugLog {
 		writeLine(client, module, message, gameTime)
 	}
 
+	fun actionFailure(
+		client: Minecraft,
+		module: String,
+		targetPosition: Any?,
+		reason: String,
+		action: String,
+		relevant: Map<String, Any?> = emptyMap(),
+		gameTime: Long? = client.level?.gameTime
+	) {
+		if (!debugFileEnabled && !debugChatEnabled) {
+			return
+		}
+
+		val player = client.player
+		val playerLocation = player?.let { formatVec(it.x, it.y, it.z) } ?: "unknown"
+		val playerRotation = player?.let {
+			"yaw=${formatDouble(it.yRot.toDouble())}, pitch=${formatDouble(it.xRot.toDouble())}"
+		} ?: "unknown"
+		val details = relevant
+			.filterValues { it != null }
+			.entries
+			.joinToString(", ") { "${it.key}=${formatValue(it.value)}" }
+			.ifBlank { "none" }
+		val message =
+			"target position: ${formatValue(targetPosition)} | " +
+				"reason: $reason | " +
+				"player location: $playerLocation | " +
+				"player rotation: $playerRotation | " +
+				"action: $action | " +
+				"relevant: $details"
+
+		writeLine(client, module, message, gameTime)
+		client.player?.displayClientMessage(Component.literal("$tag[$module] $message"), false)
+	}
+
 	fun startSession(client: Minecraft, module: String) {
 		if (!debugFileEnabled) {
 			return
 		}
-		val dir = client.gameDirectory ?: return
+		val dir = client.gameDirectory
 		val stamp = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneId.systemDefault()).format(Instant.now())
 		val file = File(dir, "dutt-debug-$module-$stamp.txt")
 		sessionFileByModule[module] = file
@@ -78,7 +116,7 @@ object DebugLog {
 	}
 
 	private fun writeLine(client: Minecraft, module: String, message: String, gameTime: Long?) {
-		val dir = client.gameDirectory ?: return
+		val dir = client.gameDirectory
 		val file = sessionFileByModule[module] ?: File(dir, debugFileName)
 		val time = timeFormatter.format(Instant.now())
 		val tickText = if (gameTime != null) " t=$gameTime" else ""
@@ -97,5 +135,24 @@ object DebugLog {
 		} catch (_: Exception) {
 			// ignore file errors
 		}
+	}
+
+	private fun formatValue(value: Any?): String {
+		return when (value) {
+			null -> "unknown"
+			is BlockPos -> "${value.x}, ${value.y}, ${value.z}"
+			is Vec3 -> formatVec(value.x, value.y, value.z)
+			is Float -> formatDouble(value.toDouble())
+			is Double -> formatDouble(value)
+			else -> value.toString()
+		}
+	}
+
+	private fun formatVec(x: Double, y: Double, z: Double): String {
+		return "${formatDouble(x)}, ${formatDouble(y)}, ${formatDouble(z)}"
+	}
+
+	private fun formatDouble(value: Double): String {
+		return String.format(Locale.US, "%.3f", value)
 	}
 }

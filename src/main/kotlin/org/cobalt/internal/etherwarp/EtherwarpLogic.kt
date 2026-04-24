@@ -85,7 +85,7 @@ object EtherwarpLogic {
 
   private val passableBlockIds: BitSet = initPassableBlocks()
 
-  data class EtherPos(val succeeded: Boolean, val pos: BlockPos?, val state: BlockState?) {
+  data class EtherPos(val succeeded: Boolean, val pos: BlockPos?, val state: BlockState?, val reason: String? = null) {
     companion object {
       val NONE = EtherPos(false, null, null)
     }
@@ -149,6 +149,30 @@ object EtherwarpLogic {
   fun holdingEtherwarpItem(): Boolean {
     val player = mc.player ?: return false
     return isEtherwarpStack(player.mainHandItem) || isEtherwarpStack(player.offhandItem)
+  }
+
+  /**
+   * Uses the v5 native RRT* search to find yaw/pitch that etherwarp-teleports to [target].
+   * Returns (yaw, pitch) pair, or null if no angle path found.
+   */
+  fun findEtherwarpAngles(target: BlockPos): Pair<Float, Float>? {
+    val player = mc.player ?: return null
+    val eyePos = player.eyePosition
+    val result = org.cobalt.api.pathfinder.jni.NativePathfinderJNI.findEtherwarpPath(
+      goalX = target.x, goalY = target.y, goalZ = target.z,
+      startEyeX = eyePos.x, startEyeY = eyePos.y, startEyeZ = eyePos.z,
+      maxIterations = 50_000,
+      threadCount = 1,
+      yawStep = 0.5,
+      pitchStep = 0.5,
+      newNodeCost = 1.0,
+      heuristicWeight = 1.0,
+      rayLength = 60.0,
+      rewireEpsilon = 0.01,
+      eyeHeight = 1.62
+    ) ?: return null
+    if (result.angles.size < 2) return null
+    return Pair(result.angles[0], result.angles[1])
   }
 
   fun findEtherwarpHotbarSlot(): Int {
@@ -218,6 +242,20 @@ object EtherwarpLogic {
       result
     } else {
       EtherPos(false, BlockPos.containing(endPos), null)
+    }
+  }
+
+  fun getEtherwarpResultTo(target: BlockPos, aimPoint: Vec3? = null): EtherPos {
+    val player = mc.player ?: return EtherPos(false, target, null, "player is missing")
+    if (mc.level == null) return EtherPos(false, target, null, "world is missing")
+    val range = getEtherwarpRange().toDouble()
+    val startPos = Vec3(player.x, player.y + 1.54, player.z)
+    val endPos = aimPoint ?: Vec3(target.x + 0.5, target.y + 0.5, target.z + 0.5)
+    val result = traverseVoxels(startPos, endPos, true, range)
+    return if (result == EtherPos.NONE) {
+      EtherPos(false, null, null, "no solid block in direct etherwarp line of sight")
+    } else {
+      result
     }
   }
 
@@ -331,20 +369,25 @@ object EtherwarpLogic {
         val footBlock = level.getBlockState(footPos)
         val footBlockId = Block.getId(footBlock)
         if (!passableBlockIds.get(footBlockId)) {
-          return EtherPos(false, blockPos, currentBlock)
+          return EtherPos(false, blockPos, currentBlock, "blocked foot space at ${footPos.x}, ${footPos.y}, ${footPos.z}")
         }
 
         val headPos = blockPos.above(2)
         val headBlock = level.getBlockState(headPos)
         val headBlockId = Block.getId(headBlock)
         if (!passableBlockIds.get(headBlockId)) {
-          return EtherPos(false, blockPos, currentBlock)
+          return EtherPos(false, blockPos, currentBlock, "blocked head space at ${headPos.x}, ${headPos.y}, ${headPos.z}")
         }
 
         val blockCenter = Vec3(blockPos.x + 0.5, blockPos.y + 0.5, blockPos.z + 0.5)
         val distanceToBlock = start.distanceTo(blockCenter)
         val withinRange = distanceToBlock <= etherwarpRange
-        return EtherPos(withinRange, blockPos, currentBlock)
+        return EtherPos(
+          withinRange,
+          blockPos,
+          currentBlock,
+          if (withinRange) null else "target is outside etherwarp range (${String.format(Locale.US, "%.2f", distanceToBlock)} > ${String.format(Locale.US, "%.2f", etherwarpRange)})"
+        )
       }
 
       if (x == endX && y == endY && z == endZ) {

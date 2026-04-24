@@ -11,6 +11,7 @@ import org.cobalt.api.hud.modules.WatermarkModule
 import org.cobalt.api.hud.modules.InventoryHudModule
 import org.cobalt.api.module.ModuleManager
 import org.cobalt.api.notification.NotificationManager
+import org.cobalt.api.pathfinder.jni.ChunkSerializer
 import org.cobalt.api.pathfinder.jni.NativePathfinder
 import org.cobalt.api.rotation.RotationExecutor
 import org.cobalt.api.util.TickScheduler
@@ -153,6 +154,7 @@ object Cobalt : ClientModInitializer {
       RouteEditMode,
     ).forEach { EventBus.register(it) }
     NativePathfinder.init()
+    ChunkSerializer.register()
     Config.loadModulesConfig()
     RouteStore.migrate()
     RouteStore.loadAssignments()
@@ -166,6 +168,7 @@ object Cobalt : ClientModInitializer {
   fun onRespawn(event: PacketEvent.Incoming) {
     if (event.packet is ClientboundRespawnPacket) {
       NativePathfinder.onLevelChange()
+      ChunkSerializer.invalidate()
       YearOfTheSealModule.onLevelChange()
     }
   }
