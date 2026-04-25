@@ -25,7 +25,7 @@
 - Create: `src/main/kotlin/org/cobalt/internal/seal/YearOfTheSealModule.kt`
 - Modify: `src/main/kotlin/org/cobalt/Cobalt.kt`
 
-- [ ] **Step 1: Create the module file**
+- [x] **Step 1: Create the module file**
 
 Create `src/main/kotlin/org/cobalt/internal/seal/YearOfTheSealModule.kt` with this content:
 
@@ -88,7 +88,7 @@ object YearOfTheSealModule : Module("Year of the Seal") {
 }
 ```
 
-- [ ] **Step 2: Register the module in `Cobalt.kt`**
+- [x] **Step 2: Register the module in `Cobalt.kt`**
 
 Open `src/main/kotlin/org/cobalt/Cobalt.kt`. Add the import:
 ```kotlin
@@ -101,7 +101,7 @@ FishingMacroModule,
 YearOfTheSealModule,
 ```
 
-- [ ] **Step 3: Verify it compiles**
+- [x] **Step 3: Verify it compiles**
 
 Run:
 ```
@@ -109,7 +109,7 @@ Run:
 ```
 Expected: `BUILD SUCCESSFUL`. Fix any compile errors before continuing.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/main/kotlin/org/cobalt/internal/seal/YearOfTheSealModule.kt \
@@ -124,7 +124,7 @@ git commit -m "feat(seal): module skeleton with settings and registration"
 **Files:**
 - Modify: `src/main/kotlin/org/cobalt/internal/seal/YearOfTheSealModule.kt`
 
-- [ ] **Step 1: Add the `BallPredictor` stub class**
+- [x] **Step 1: Add the `BallPredictor` stub class**
 
 Inside `YearOfTheSealModule.kt`, before the `object` declaration, add:
 
@@ -148,7 +148,7 @@ class BallPredictor {
 }
 ```
 
-- [ ] **Step 2: Add entity scanning in `onTick`**
+- [x] **Step 2: Add entity scanning in `onTick`**
 
 Replace the `onTick` body with:
 
@@ -194,7 +194,7 @@ private fun stopAll() {
 }
 ```
 
-- [ ] **Step 3: Verify it compiles**
+- [x] **Step 3: Verify it compiles**
 
 ```
 ./gradlew build
@@ -215,7 +215,7 @@ git commit -m "feat(seal): ball entity detection and predictor lifecycle"
 **Files:**
 - Modify: `src/main/kotlin/org/cobalt/internal/seal/YearOfTheSealModule.kt`
 
-- [ ] **Step 1: Replace the `BallPredictor.update` stub with full implementation**
+- [x] **Step 1: Replace the `BallPredictor.update` stub with full implementation**
 
 Replace the `fun update(pos: Vec3)` body in `BallPredictor`:
 
@@ -256,7 +256,7 @@ private fun runPrediction(): Vec3? {
 }
 ```
 
-- [ ] **Step 2: Verify it compiles**
+- [x] **Step 2: Verify it compiles**
 
 ```
 ./gradlew build
@@ -277,7 +277,7 @@ git commit -m "feat(seal): position tracking and bounce detection"
 **Files:**
 - Modify: `src/main/kotlin/org/cobalt/internal/seal/YearOfTheSealModule.kt`
 
-- [ ] **Step 1: Add the shared quadratic solver and model base**
+- [x] **Step 1: Add the shared quadratic solver and model base**
 
 Inside `BallPredictor` (after the `update` / `runPrediction` functions), add:
 
@@ -325,7 +325,7 @@ private fun extrapolate(
 }
 ```
 
-- [ ] **Step 2: Add the three model functions**
+- [x] **Step 2: Add the three model functions**
 
 Still inside `BallPredictor`, add:
 
@@ -378,7 +378,7 @@ private fun spreadPoly(slice: List<Vec3>): Vec3? {
 }
 ```
 
-- [ ] **Step 3: Implement `runPrediction`**
+- [x] **Step 3: Implement `runPrediction`**
 
 Replace the `runPrediction` stub:
 
@@ -401,7 +401,7 @@ private fun runPrediction(): Vec3? {
 }
 ```
 
-- [ ] **Step 4: Verify it compiles**
+- [x] **Step 4: Verify it compiles**
 
 ```
 ./gradlew build
@@ -422,7 +422,7 @@ git commit -m "feat(seal): 3-model polynomial regression landing prediction"
 **Files:**
 - Modify: `src/main/kotlin/org/cobalt/internal/seal/YearOfTheSealModule.kt`
 
-- [ ] **Step 1: Wire pathfinding into `onTick`**
+- [x] **Step 1: Wire pathfinding into `onTick`**
 
 At the end of the `onTick` body (after the predictor update loop), add:
 
@@ -462,7 +462,7 @@ if (cmd != null) {
 }
 ```
 
-- [ ] **Step 2: Clear state when module is disabled**
+- [x] **Step 2: Clear state when module is disabled**
 
 The `stopAll()` function is already called when `!enabledSetting.value`. Verify the full `onTick` reads correctly and that `stopAll()` is called before the early return:
 
@@ -473,7 +473,7 @@ if (!enabledSetting.value) {
 }
 ```
 
-- [ ] **Step 3: Stop pathfinder on level change**
+- [x] **Step 3: Stop pathfinder on level change**
 
 Add this event handler inside `YearOfTheSealModule`:
 
@@ -486,7 +486,7 @@ fun onRespawn(event: org.cobalt.api.event.impl.client.PacketEvent.Incoming) {
 }
 ```
 
-- [ ] **Step 4: Verify it compiles**
+- [x] **Step 4: Verify it compiles**
 
 ```
 ./gradlew build

@@ -27,15 +27,12 @@ enum VoxelFlags : uint16_t {
   VF_ETHER_TELEPORT_CLEAR = 1u << 11,
   VF_ETHER_FEET_BLOCKER = 1u << 12,
 };
-
 constexpr uint16_t VF_AIR_DEFAULT = VF_PASSABLE | VF_PASSABLE_FLY | VF_ETHER_PASSABLE | VF_ETHER_TELEPORT_CLEAR;
-
 struct Int3 {
   int x;
   int y;
   int z;
 };
-
 inline uint64_t coordKey(const int x, const int y, const int z) {
   const uint64_t px = ((static_cast<uint64_t>(x) + 33554432ULL) & 0x3FFFFFFULL);
   const uint64_t py = ((static_cast<uint64_t>(y) + 2048ULL) & 0xFFFULL);
@@ -78,12 +75,10 @@ struct ActionCosts {
       fallTimes[static_cast<size_t>(targetDistance)] = static_cast<double>(tick);
     }
   }
-
   [[nodiscard]] double getFallTime(const int blocks) const {
     if (blocks <= 0) return 0.0;
     if (blocks >= static_cast<int>(fallTimes.size())) return INF_COST;
     return fallTimes[static_cast<size_t>(blocks)] + LAND_RECOVERY_TIME;
   }
 };
-
-} // namespace v5pf
+}
