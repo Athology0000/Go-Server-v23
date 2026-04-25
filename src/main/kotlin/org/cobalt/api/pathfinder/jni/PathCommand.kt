@@ -13,6 +13,7 @@ import org.cobalt.api.util.player.MovementManager
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sqrt
 
 data class PathCommand(
     val forward: Boolean,
@@ -25,6 +26,7 @@ data class PathCommand(
     val status: PathStatus,
     val activeAction: ActionType,
     val distanceToTarget: Float,
+    val forwardOnly: Boolean = false,
 ) {
     fun applyToPlayer(applyRotation: Boolean = true, movementYawOverride: Float? = null) {
         val player = Minecraft.getInstance().player
@@ -98,12 +100,12 @@ data class PathCommand(
         val shouldMoveLeft =
             !turnInPlace &&
                 usesStrafeAdjustment() &&
-                localStrafe < -strafeThreshold &&
+                localStrafe > strafeThreshold &&
                 localForward > MIN_STRAFE_FORWARD
         val shouldMoveRight =
             !turnInPlace &&
                 usesStrafeAdjustment() &&
-                localStrafe > strafeThreshold &&
+                localStrafe < -strafeThreshold &&
                 localForward > MIN_STRAFE_FORWARD
         val shouldSprint =
             !cautiousTurn &&
@@ -197,11 +199,30 @@ data class PathCommand(
         val nearestIndex = nearestNodeIndex(player, nodes)
         if (nearestIndex < 0) return null
 
-        val guideIndex = min(nodes.lastIndex, nearestIndex + LOOKAHEAD_NODE_COUNT)
+        // Cap lookahead at sharp corners so the guide doesn't jump around them,
+        // which would stall movement while the camera turns in place.
+        var guideIndex = min(nodes.lastIndex, nearestIndex + LOOKAHEAD_NODE_COUNT)
+        if (guideIndex > nearestIndex + 1) {
+            val pivot = nodes[nearestIndex + 1]
+            val prev  = nodes[nearestIndex]
+            val far   = nodes[guideIndex]
+            val d1x = pivot.x - prev.x;  val d1z = pivot.z - prev.z
+            val d2x = far.x  - pivot.x;  val d2z = far.z  - pivot.z
+            val len1 = sqrt(d1x * d1x + d1z * d1z)
+            val len2 = sqrt(d2x * d2x + d2z * d2z)
+            if (len1 > 0.1 && len2 > 0.1) {
+                val dot = (d1x * d2x + d1z * d2z) / (len1 * len2)
+                if (dot < CORNER_DOT_THRESHOLD) guideIndex = nearestIndex + 1
+            }
+        }
+
         val baseNode = nodes[guideIndex]
+        val guideY = max(baseNode.y + GUIDE_LOOK_HEIGHT, player.eyePosition.y)
+        if (NativePathfinder.noTunnelCenter) {
+            return Vec3(baseNode.x + 0.5, guideY, baseNode.z + 0.5)
+        }
         val direction = nodeDirection(nodes, guideIndex)
         val centered = centerTunnelNode(baseNode, direction)
-        val guideY = max(baseNode.y + GUIDE_LOOK_HEIGHT, player.eyePosition.y)
         return Vec3(centered.x, guideY, centered.z)
     }
 
@@ -322,7 +343,7 @@ data class PathCommand(
             activeAction == ActionType.JUMP ||
             activeAction == ActionType.SPRINT_JUMP
 
-    private fun usesStrafeAdjustment(): Boolean = usesGroundMovement() && !back
+    private fun usesStrafeAdjustment(): Boolean = usesGroundMovement() && !back && !forwardOnly
 
     companion object {
         private const val AUTO_JUMP_MIN_RISE = 0.45
@@ -337,7 +358,10 @@ data class PathCommand(
         private const val CAUTIOUS_TURN_YAW = 28f
         private const val TURN_IN_PLACE_YAW = 55f
         private const val CAUTIOUS_TURN_FORWARD_THRESHOLD = 0.20f
-        private const val TURN_IN_PLACE_FORWARD_THRESHOLD = 0.52f
+        // Lowered from 0.52 — player keeps moving during camera turns at corners
+        private const val TURN_IN_PLACE_FORWARD_THRESHOLD = 0.15f
+        // dot product < this means the path turns > ~45° — cap lookahead at the corner node
+        private const val CORNER_DOT_THRESHOLD = 0.7
         private const val MIN_STRAFE_FORWARD = 0.12f
         private const val LOOKAHEAD_NODE_COUNT = 2
         private const val ROTATION_LOOKAHEAD = 4

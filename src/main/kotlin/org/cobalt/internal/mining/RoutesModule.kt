@@ -1472,6 +1472,7 @@ object RoutesModule : Module("Routes") {
     PathfindingModule.ensureEnabledForAutomation("routes")
     NativePathfinder.stop()
     NativePathfinder.availabilityFlagsOverride = 0
+    NativePathfinder.noTunnelCenter = true
     MovementManager.setMovementLock(false)
     stopRouteRotation()
 
@@ -2632,6 +2633,7 @@ object RoutesModule : Module("Routes") {
     PathfindingModule.ensureEnabledForAutomation("routes")
     NativePathfinder.stop()
     NativePathfinder.availabilityFlagsOverride = 0
+    NativePathfinder.noTunnelCenter = true
     MovementManager.setMovementLock(false)
     stopRouteRotation()
     updateWalkArrivalThresholds(arrivalRadius)

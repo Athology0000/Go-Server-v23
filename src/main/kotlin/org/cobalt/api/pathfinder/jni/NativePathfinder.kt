@@ -2,6 +2,7 @@ package org.cobalt.api.pathfinder.jni
 
 import net.minecraft.client.Minecraft
 import net.minecraft.world.phys.Vec3
+import org.cobalt.api.module.ModuleDebug
 import org.cobalt.api.rotation.RotationExecutor
 import org.cobalt.api.util.AngleUtils
 import org.cobalt.api.util.InventoryUtils
@@ -9,6 +10,9 @@ import org.cobalt.api.util.TickScheduler
 import org.cobalt.api.util.player.MovementManager
 import org.cobalt.internal.etherwarp.EtherwarpLogic
 import org.cobalt.internal.pathfinding.DebugLog
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.sqrt
@@ -21,6 +25,10 @@ object NativePathfinder {
     var cachedPathNodes: List<Vec3> = emptyList()
         private set
 
+    /** Cached per-node flags from the last search result (parallel to cachedPathNodes). */
+    var cachedKeyNodeFlags: IntArray = IntArray(0)
+        private set
+
     /**
      * Forward-only cursor into [cachedPathNodes].
      * Written by PathCommand.nearestNodeIndex() during applyToPlayer(); never reset backward.
@@ -29,6 +37,16 @@ object NativePathfinder {
         internal set
 
     var availabilityFlagsOverride: Int? = null
+
+    /** When true, suppresses strafe inputs — only W key and camera are used for movement. */
+    var noStrafe: Boolean = false
+
+    /**
+     * When true, skips the tunnel-centering logic in PathCommand that pulls the movement guide
+     * point to the spatial center of adjacent walkable blocks. Set by route-following callers so
+     * the player tracks the recorded waypoints rather than drifting to the room's open center.
+     */
+    var noTunnelCenter: Boolean = false
 
     private var state: PathStatus = PathStatus.IDLE
     private var lastTickStatus: PathStatus = PathStatus.IDLE
@@ -46,10 +64,16 @@ object NativePathfinder {
     private var routeArrivalRadius: Double = 1.8
     private var routeWpIndex: Int = 0
 
+    // Pre-warmed single-thread pool — keeps a daemon thread alive between searches so
+    // there is zero thread-creation overhead when a new path request arrives.
+    private val searchExecutor: ExecutorService = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "cobalt-pathfinder").apply { isDaemon = true }
+    }
+
     // Async search state (written from search thread, read on game thread)
     @Volatile private var searchResult: NativePathResult? = null
     @Volatile private var searchFailed: Boolean = false
-    private var searchThread: Thread? = null
+    private var searchFuture: Future<*>? = null
 
     private var prevJump: Boolean = false
     private var teleportFiredNodeKey: Long = -1L
@@ -62,16 +86,24 @@ object NativePathfinder {
     private const val STUCK_THRESHOLD = 0.5
     private const val TELEPORT_YAW_THRESHOLD = 8f
     private const val TELEPORT_PITCH_THRESHOLD = 8f
-    private const val MAX_ITERATIONS = 500_000
-    private const val HEURISTIC_WEIGHT = 1.05
+    private const val MAX_ITERATIONS = 100_000
+    private const val HEURISTIC_WEIGHT = 1.5
+    /** Minimum horizontal node-to-node distance to trigger AOTV (avoids firing on short hops). */
+    private const val AOTV_NODE_DISTANCE_MIN = 6.0
+    /** Maximum horizontal distance for AOTV — beyond this the shot is out of range. */
+    private const val AOTV_NODE_DISTANCE_MAX = 54.0
 
     fun init() {
         // NativePathfinderJNI object init loads the DLL on first access
         NativePathfinderJNI.initNative()
+        // Warm the pool thread — submitting a no-op brings the thread to RUNNABLE
+        // state so the first real search dispatches with no cold-start overhead.
+        searchExecutor.submit {}
     }
 
     fun destroy() {
         cancelSearch()
+        searchExecutor.shutdownNow()
         releaseGuidedControl()
     }
 
@@ -114,10 +146,13 @@ object NativePathfinder {
         cancelSearch()
         state = PathStatus.IDLE
         cachedPathNodes = emptyList()
+        cachedKeyNodeFlags = IntArray(0)
         pathNodeCursor = 0
         prevJump = false
         teleportFiredNodeKey = -1L
         availabilityFlagsOverride = null
+        noStrafe = false
+        noTunnelCenter = false
         routeWpIndex = 0
         stuckTicks = 0
         releaseGuidedControl()
@@ -128,10 +163,13 @@ object NativePathfinder {
         ChunkSerializer.invalidate()
         state = PathStatus.IDLE
         cachedPathNodes = emptyList()
+        cachedKeyNodeFlags = IntArray(0)
         pathNodeCursor = 0
         prevJump = false
         teleportFiredNodeKey = -1L
         availabilityFlagsOverride = null
+        noStrafe = false
+        noTunnelCenter = false
         routeWpIndex = 0
         stuckTicks = 0
         releaseGuidedControl()
@@ -146,7 +184,7 @@ object NativePathfinder {
         // Consume completed search result on game thread
         if (searchFailed) {
             searchFailed = false
-            searchThread = null
+            searchFuture = null
             if (state == PathStatus.PLANNING) {
                 state = PathStatus.FAILED
                 logFailure("findPath returned no result")
@@ -158,7 +196,7 @@ object NativePathfinder {
             val result = searchResult
             if (result != null) {
                 searchResult = null
-                searchThread = null
+                searchFuture = null
                 applySearchResult(result)
             }
         }
@@ -247,6 +285,8 @@ object NativePathfinder {
         val computedFlags = if (aotvSlot >= 0) 0x1 or 0x2 else 0
         val availabilityFlags = availabilityFlagsOverride ?: computedFlags
 
+        val activeAction = computeActiveAction(nodes, pathNodeCursor, aotvSlot >= 0)
+
         val cmd = PathCommand(
             forward = true,
             back = false,
@@ -256,8 +296,9 @@ object NativePathfinder {
             targetYaw = targetYaw,
             targetPitch = 0f,
             status = state,
-            activeAction = ActionType.WALK,
-            distanceToTarget = distToGoal.toFloat()
+            activeAction = activeAction,
+            distanceToTarget = distToGoal.toFloat(),
+            forwardOnly = noStrafe
         )
 
         // AOTV / Etherwarp fire on rotation convergence
@@ -279,22 +320,14 @@ object NativePathfinder {
         }
 
         if (state != lastTickStatus && state == PathStatus.EXECUTING) {
-            DebugLog.debug(mc, "NativePathfinder", "executing path, ${nodes.size} key nodes")
+            DebugLog.debug(mc, "Pathfinding", "NativePathfinder: executing path, ${nodes.size} key nodes")
         }
         lastTickStatus = state
         return cmd
     }
 
-    private fun startSearch() {
-        cancelSearch()
-        state = PathStatus.PLANNING
-        val mc = Minecraft.getInstance()
-        val player = mc.player ?: return
-        val sx = player.blockX; val sy = player.blockY; val sz = player.blockZ
-        val gx = goalX; val gy = goalY; val gz = goalZ
-        val isFly = routeProfile == MovementProfile.FLY
-
-        searchThread = Thread {
+    private fun submitSearch(sx: Int, sy: Int, sz: Int, gx: Int, gy: Int, gz: Int, isFly: Boolean) {
+        searchFuture = searchExecutor.submit {
             try {
                 val result = NativePathfinderJNI.findPath(
                     startPoints = intArrayOf(sx, sy, sz),
@@ -315,40 +348,31 @@ object NativePathfinder {
             } catch (_: Exception) {
                 searchFailed = true
             }
-        }.also { it.isDaemon = true; it.name = "cobalt-pathfinder"; it.start() }
+        }
+    }
+
+    private fun startSearch() {
+        cancelSearch()
+        state = PathStatus.PLANNING
+        val player = Minecraft.getInstance().player ?: return
+        submitSearch(
+            player.blockX, player.blockY, player.blockZ,
+            goalX, goalY, goalZ,
+            routeProfile == MovementProfile.FLY
+        )
     }
 
     private fun startReplan(playerPos: Vec3) {
         if (state == PathStatus.REPLANNING) return
         state = PathStatus.REPLANNING
         NativePathfinderJNI.cancelSearch()
-        searchThread = null
-        val gx = goalX; val gy = goalY; val gz = goalZ
-        val sx = playerPos.x.toInt(); val sy = playerPos.y.toInt(); val sz = playerPos.z.toInt()
-        val isFly = routeProfile == MovementProfile.FLY
-
-        searchThread = Thread {
-            try {
-                val result = NativePathfinderJNI.findPath(
-                    startPoints = intArrayOf(sx, sy, sz),
-                    endPoints = intArrayOf(gx, gy, gz),
-                    isFly = isFly,
-                    maxIterations = MAX_ITERATIONS,
-                    heuristicWeight = HEURISTIC_WEIGHT,
-                    nonPrimaryStartPenalty = 0.0,
-                    moveOrderOffset = 0,
-                    avoidMeta = intArrayOf(),
-                    avoidPenalty = doubleArrayOf()
-                )
-                if (result != null && result.keyPath.size >= 3) {
-                    searchResult = result
-                } else {
-                    searchFailed = true
-                }
-            } catch (_: Exception) {
-                searchFailed = true
-            }
-        }.also { it.isDaemon = true; it.name = "cobalt-pathfinder-replan"; it.start() }
+        searchFuture?.cancel(true)
+        searchFuture = null
+        submitSearch(
+            playerPos.x.toInt(), playerPos.y.toInt(), playerPos.z.toInt(),
+            goalX, goalY, goalZ,
+            routeProfile == MovementProfile.FLY
+        )
     }
 
     private fun applySearchResult(result: NativePathResult) {
@@ -361,15 +385,20 @@ object NativePathfinder {
             i += 3
         }
         cachedPathNodes = nodes
+        cachedKeyNodeFlags = result.keyNodeFlags
         pathNodeCursor = 0
         stuckTicks = 0
         lastStuckCheckPos = Vec3.ZERO
         state = PathStatus.EXECUTING
+        val mc = Minecraft.getInstance()
+        ModuleDebug.log("Pathfinding", "Path built in ${result.timeMs}ms")
+        DebugLog.status(mc, "Pathfinding", "Pathfinder: path found: ${nodes.size} nodes, goal ($goalX,$goalY,$goalZ), ${result.timeMs}ms, ${result.nodesExplored} explored")
     }
 
     private fun cancelSearch() {
         NativePathfinderJNI.cancelSearch()
-        searchThread = null
+        searchFuture?.cancel(true)
+        searchFuture = null
         searchResult = null
         searchFailed = false
         state = PathStatus.IDLE
@@ -393,9 +422,25 @@ object NativePathfinder {
         }
     }
 
+    /**
+     * Decides whether the current path segment warrants an AOTV shot.
+     * When consecutive key nodes are far apart the path simplifier has left a long straight
+     * leg — AOTV can bridge it faster than walking.
+     */
+    private fun computeActiveAction(nodes: List<Vec3>, cursor: Int, aotvAvailable: Boolean): ActionType {
+        if (!aotvAvailable || nodes.size < 2) return ActionType.WALK
+        val next = nodes.getOrNull(cursor + 1) ?: return ActionType.WALK
+        val current = nodes.getOrNull(cursor) ?: return ActionType.WALK
+        val dx = next.x - current.x
+        val dz = next.z - current.z
+        val horizDist = sqrt(dx * dx + dz * dz)
+        if (horizDist < AOTV_NODE_DISTANCE_MIN || horizDist > AOTV_NODE_DISTANCE_MAX) return ActionType.WALK
+        return ActionType.AOTV
+    }
+
     private fun logFailure(reason: String) {
         val mc = Minecraft.getInstance()
-        DebugLog.debug(mc, "NativePathfinder", "path failed: $reason")
+        DebugLog.status(mc, "Pathfinding", "Pathfinder: path failed: $reason")
     }
 
     private fun releaseGuidedControl() {
