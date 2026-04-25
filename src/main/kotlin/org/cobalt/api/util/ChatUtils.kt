@@ -14,19 +14,36 @@ object ChatUtils {
     Minecraft.getInstance()
 
   // used for sendDebug to prevent resending same message multiple times in a row
-  private var lastMessage: String = ""
+  private var lastDebugMessageKey: String = ""
 
   @JvmStatic
   fun sendDebug(message: String) {
+    sendDebug(source = null, message = message)
+  }
+
+  @JvmStatic
+  fun sendDebug(source: String?, message: String) {
     if (mc.player == null || mc.level == null) return
-    if (message == lastMessage) return
+
+    val trimmedSource = source?.trim().orEmpty()
+    val debugKey = if (trimmedSource.isEmpty()) message else "$trimmedSource|$message"
+    if (debugKey == lastDebugMessageKey) return
+
+    val body = Component.empty()
+    if (trimmedSource.isNotEmpty()) {
+      body.append(
+        Component.literal("[$trimmedSource] ")
+          .setStyle(Style.EMPTY.withColor(TextColor.fromRgb(0x71FF9E)))
+      )
+    }
+    body.append(Component.literal(message).setStyle(Style.EMPTY.withColor(TextColor.fromRgb(0xFFFFFF))))
 
     mc.gui.chat.addMessage(
       Component.empty().append(debugPrefix)
-        .append(Component.literal("${ChatFormatting.RESET}$message"))
+        .append(body)
     )
 
-    lastMessage = message
+    lastDebugMessageKey = debugKey
   }
 
   @JvmStatic

@@ -31,7 +31,6 @@ import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.ColorSetting
 import org.cobalt.api.module.setting.impl.SliderSetting
 import org.cobalt.api.module.setting.impl.TextSetting
-import org.cobalt.api.util.ChatUtils
 import org.cobalt.api.util.InventoryUtils
 import org.cobalt.api.util.render.Render3D
 import org.cobalt.bridge.module.IBonzoStaffHelper
@@ -147,12 +146,6 @@ object DungeonsModule : Module("Dungeons"), IBonzoStaffHelper {
     true
   )
 
-  private val superboomDebug = CheckboxSetting(
-    "Superboom Debug",
-    "Show debug messages in chat.",
-    false
-  )
-
   private val witherKeyEspEnabled = CheckboxSetting(
     "Wither Key ESP",
     "Highlight dropped Wither Keys in dungeons.",
@@ -237,7 +230,6 @@ object DungeonsModule : Module("Dungeons"), IBonzoStaffHelper {
       detectSlabs,
       detectStairs,
       allowNormalTnt,
-      superboomDebug,
       witherKeyEspEnabled,
       witherKeyTracer,
       witherKeyColor,
@@ -504,8 +496,7 @@ object DungeonsModule : Module("Dungeons"), IBonzoStaffHelper {
   }
 
   private fun debugSuperboom(message: String) {
-    if (!superboomDebug.value) return
-    ChatUtils.sendDebug(message)
+    debug(message)
   }
 
   private fun onChatMessage(message: String) {

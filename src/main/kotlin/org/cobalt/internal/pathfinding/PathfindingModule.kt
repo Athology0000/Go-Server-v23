@@ -117,7 +117,7 @@ object PathfindingModule : Module("Pathfinding") {
 
   private val debugFileLogging = CheckboxSetting(
     "Debug File Logs",
-    "Write path/rotation debug logs to chat and file.",
+    "Write path/rotation debug logs to file, and mirror them to chat while enabled.",
     false
   )
 
@@ -338,7 +338,7 @@ object PathfindingModule : Module("Pathfinding") {
   @SubscribeEvent
   fun onTick(@Suppress("UNUSED_PARAMETER") event: TickEvent.Start) {
     org.cobalt.internal.pathfinding.DebugLog.debugFileEnabled = debugFileLogging.value
-    org.cobalt.internal.pathfinding.DebugLog.debugChatEnabled = debugFileLogging.value
+    org.cobalt.internal.pathfinding.DebugLog.debugChatEnabled = debugFileLogging.value || isDebugEnabled()
 
     // Update live info settings
     routeCountInfo.value = "${localRouteWaypoints.size} points"

@@ -10,6 +10,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import org.cobalt.api.module.ModuleDebug
 
 object DebugLog {
 	var statusChatEnabled = true
@@ -25,6 +26,10 @@ object DebugLog {
 	private val timeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
 		.withZone(ZoneId.systemDefault())
 
+	private fun isModuleDebugEnabled(module: String): Boolean {
+		return ModuleDebug.isEnabled(module)
+	}
+
 	fun status(client: Minecraft, module: String, message: String) {
 		if (statusFileEnabled && debugFileEnabled) {
 			writeLine(client, module, message, null)
@@ -35,8 +40,12 @@ object DebugLog {
 	}
 
 	fun debug(client: Minecraft, module: String, message: String, overlay: Boolean = true) {
-		if (!debugChatEnabled) {
+		val moduleDebugEnabled = isModuleDebugEnabled(module)
+		if (!debugChatEnabled && !moduleDebugEnabled) {
 			return
+		}
+		if (moduleDebugEnabled) {
+			ModuleDebug.logger(module).info(message)
 		}
 		client.player?.displayClientMessage(Component.literal("$tag[$module] $message"), overlay)
 	}
@@ -44,7 +53,10 @@ object DebugLog {
 	fun debugTick(client: Minecraft, module: String, message: String, gameTime: Long) {
 		writeLine(client, module, message, gameTime)
 		val lastTick = lastChatTickByModule[module] ?: Long.MIN_VALUE
-		if (tickChatInterval > 0 && gameTime - lastTick >= tickChatInterval) {
+		if (isModuleDebugEnabled(module)) {
+			ModuleDebug.logger(module).info(message)
+		}
+		if ((debugChatEnabled || isModuleDebugEnabled(module)) && tickChatInterval > 0 && gameTime - lastTick >= tickChatInterval) {
 			lastChatTickByModule[module] = gameTime
 			client.player?.displayClientMessage(Component.literal("$tag[$module] $message"), false)
 		}
@@ -66,7 +78,8 @@ object DebugLog {
 		relevant: Map<String, Any?> = emptyMap(),
 		gameTime: Long? = client.level?.gameTime
 	) {
-		if (!debugFileEnabled && !debugChatEnabled) {
+		val moduleDebugEnabled = isModuleDebugEnabled(module)
+		if (!debugFileEnabled && !debugChatEnabled && !moduleDebugEnabled) {
 			return
 		}
 
@@ -89,6 +102,9 @@ object DebugLog {
 				"relevant: $details"
 
 		writeLine(client, module, message, gameTime)
+		if (moduleDebugEnabled) {
+			ModuleDebug.logger(module).info(message)
+		}
 		client.player?.displayClientMessage(Component.literal("$tag[$module] $message"), false)
 	}
 
