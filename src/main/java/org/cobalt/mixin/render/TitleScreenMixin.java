@@ -7,11 +7,13 @@ import net.minecraft.client.gui.components.SpriteIconButton;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
+import org.cobalt.internal.auth.Auth;
 import org.cobalt.internal.visual.TitleScreenRenderer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.Locale;
 
@@ -84,5 +86,28 @@ public class TitleScreenMixin {
     private void customRender(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
         TitleScreenRenderer.INSTANCE.render(guiGraphics, mouseX, mouseY, partialTick);
         ci.cancel();
+    }
+
+    @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
+    private void cobalt$gateMouseClicked(double mouseX, double mouseY, int button, CallbackInfoReturnable<Boolean> cir) {
+        if (!Auth.INSTANCE.isGateLocked()) return;
+
+        Screen screen = (Screen) (Object) this;
+        int centerX = screen.width / 2;
+        int singleplayerY = screen.height / 4 + 48;
+        int multiplayerY = screen.height / 4 + 72;
+        int buttonHeight = 20;
+        int buttonWidth = 200;
+        int left = centerX - 100;
+
+        boolean overSingleplayer = mouseX >= left && mouseX <= left + buttonWidth
+            && mouseY >= singleplayerY && mouseY <= singleplayerY + buttonHeight;
+        boolean overMultiplayer = mouseX >= left && mouseX <= left + buttonWidth
+            && mouseY >= multiplayerY && mouseY <= multiplayerY + buttonHeight;
+
+        if (overSingleplayer || overMultiplayer) {
+            cir.setReturnValue(false);
+            cir.cancel();
+        }
     }
 }
