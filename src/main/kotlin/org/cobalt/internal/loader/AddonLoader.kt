@@ -106,6 +106,15 @@ object AddonLoader {
     }
   }
 
+  fun loadFromPath(jarPath: java.nio.file.Path) {
+    try {
+      FabricLauncherBase.getLauncher().addToClassPath(jarPath)
+      loadAddon(jarPath)
+    } catch (e: Exception) {
+      e.printStackTrace()
+    }
+  }
+
   fun getAddons(): List<Pair<AddonMetadata, Addon>> {
     return addons.toList()
   }
