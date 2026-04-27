@@ -109,7 +109,7 @@ func (s *Service) Start(ctx context.Context, username, rawHWID, minecraftUsernam
 	}
 
 	// Minecraft username check (only after fully bound)
-	if device.BindingStatus == "fully_bound" {
+	if device.BindingStatus == "fully_bound" && minecraftUsername != "" {
 		if device.MinecraftUsername == nil || !strings.EqualFold(*device.MinecraftUsername, minecraftUsername) {
 			s.auditSvc.Log("auth.start.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{"reason": "username_mismatch"})
 			return nil, ErrUsernameMismatch
