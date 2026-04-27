@@ -26,6 +26,7 @@ var (
 	ErrBadProof         = errors.New("bad proof")
 	ErrDeviceBlocked    = errors.New("device blocked")
 	ErrNoChallenge      = errors.New("no challenge")
+	ErrSessionInvalid   = errors.New("session invalid")
 )
 
 type StartResult struct {
@@ -234,3 +235,85 @@ func (s *Service) Finish(ctx context.Context, username, proofHex, sourceIP, mine
 
 func normalize(s string) string     { return strings.ToLower(strings.TrimSpace(s)) }
 func normalizeHWID(s string) string { return strings.ToUpper(strings.TrimSpace(s)) }
+
+type VerifyMinecraftResult struct {
+	Authorized           bool
+	Reason               string
+	PlanTier             string
+	Modules              []string
+	Features             []string
+	ManifestURL          string
+	ManifestSignature    string
+	EntitlementExpiresAt *time.Time
+}
+
+func (s *Service) VerifyMinecraft(ctx context.Context, rawToken, minecraftUsername, sourceIP string) (*VerifyMinecraftResult, error) {
+	tokenHash, err := crypto.HashToken(rawToken)
+	if err != nil {
+		return nil, ErrSessionInvalid
+	}
+
+	sess, err := db.GetSessionByTokenHash(ctx, s.pool, tokenHash)
+	if err != nil || sess.Revoked || time.Now().After(sess.ExpiresAt) {
+		return nil, ErrSessionInvalid
+	}
+
+	device, err := db.GetDeviceByID(ctx, s.pool, sess.DeviceID)
+	if err != nil {
+		return nil, err
+	}
+
+	account, err := db.GetAccountByID(ctx, s.pool, sess.AccountID)
+	if err != nil {
+		return nil, err
+	}
+
+	if account.Status != "active" {
+		s.auditSvc.Log("auth.verify_mc.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{"reason": "account_blocked"})
+		return &VerifyMinecraftResult{Authorized: false, Reason: "account_blocked"}, nil
+	}
+
+	switch device.BindingStatus {
+	case "hwid_pending":
+		if err := db.FullyBind(ctx, s.pool, device.ID, minecraftUsername, sourceIP); err != nil {
+			return nil, err
+		}
+	case "fully_bound":
+		if device.MinecraftUsername == nil || !strings.EqualFold(*device.MinecraftUsername, minecraftUsername) {
+			s.auditSvc.Log("auth.verify_mc.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{"reason": "minecraft_username_mismatch"})
+			return &VerifyMinecraftResult{Authorized: false, Reason: "minecraft_username_mismatch"}, nil
+		}
+	default:
+		s.auditSvc.Log("auth.verify_mc.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{"reason": "device_not_eligible", "status": device.BindingStatus})
+		return &VerifyMinecraftResult{Authorized: false, Reason: "device_not_eligible"}, nil
+	}
+
+	ent, err := s.entSvc.Resolve(ctx, account.ID)
+	if err != nil {
+		return nil, err
+	}
+	if !ent.Authorized {
+		s.auditSvc.Log("auth.verify_mc.entitlement_denied", &account.ID, &device.ID, nil, &sourceIP, map[string]any{"reason": ent.Reason})
+		return &VerifyMinecraftResult{Authorized: false, Reason: ent.Reason}, nil
+	}
+
+	manifestURL := ""
+	manifestSig := ""
+	manifest, err := db.GetLatestManifest(ctx, s.pool, ent.ContentChannel)
+	if err == nil {
+		manifestURL = s.baseURL + "/content/manifest/" + manifest.ID
+		manifestSig = manifest.Signature
+	}
+
+	s.auditSvc.Log("auth.verify_mc.success", &account.ID, &device.ID, nil, &sourceIP, map[string]any{"plan_tier": ent.PlanTier})
+
+	return &VerifyMinecraftResult{
+		Authorized:           true,
+		PlanTier:             ent.PlanTier,
+		Modules:              ent.EnabledModules,
+		Features:             ent.EnabledFeatures,
+		ManifestURL:          manifestURL,
+		ManifestSignature:    manifestSig,
+		EntitlementExpiresAt: ent.EntitlementExpiresAt,
+	}, nil
+}
