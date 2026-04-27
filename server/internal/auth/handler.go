@@ -29,6 +29,7 @@ func RegisterRoutes(app *fiber.App, svc *Service, rdb *redis.Client) {
 
 	app.Post("/auth/start", authLimit, handleStart(svc))
 	app.Post("/auth/finish", authLimit, handleFinish(svc))
+	app.Post("/auth/verify-minecraft", authLimit, handleVerifyMinecraft(svc))
 }
 
 func handleStart(svc *Service) fiber.Handler {
@@ -47,6 +48,40 @@ func handleStart(svc *Service) fiber.Handler {
 			return c.Status(500).JSON(fiber.Map{"error": "authentication_failed"})
 		}
 		return c.JSON(fiber.Map{"challenge": result.Challenge, "expires_in": result.ExpiresIn})
+	}
+}
+
+type verifyMinecraftRequest struct {
+	SessionToken      string `json:"session_token"`
+	MinecraftUsername string `json:"minecraft_username"`
+}
+
+func handleVerifyMinecraft(svc *Service) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var req verifyMinecraftRequest
+		if err := c.BodyParser(&req); err != nil || req.SessionToken == "" || req.MinecraftUsername == "" {
+			return c.Status(400).JSON(fiber.Map{"error": "invalid_request"})
+		}
+		ip := middleware.GetRealIP(c)
+		result, err := svc.VerifyMinecraft(c.Context(), req.SessionToken, req.MinecraftUsername, ip)
+		if errors.Is(err, ErrSessionInvalid) {
+			return c.Status(401).JSON(fiber.Map{"error": "session_invalid"})
+		}
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
+		}
+		if !result.Authorized {
+			return c.JSON(fiber.Map{"authorized": false, "reason": result.Reason})
+		}
+		return c.JSON(fiber.Map{
+			"authorized":             true,
+			"plan_tier":              result.PlanTier,
+			"enabled_modules":        result.Modules,
+			"enabled_features":       result.Features,
+			"manifest_url":           result.ManifestURL,
+			"manifest_signature":     result.ManifestSignature,
+			"entitlement_expires_at": result.EntitlementExpiresAt,
+		})
 	}
 }
 
