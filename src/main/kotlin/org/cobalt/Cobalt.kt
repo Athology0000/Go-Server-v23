@@ -6,6 +6,7 @@ import org.cobalt.api.command.CommandManager
 import org.cobalt.api.event.EventBus
 import org.cobalt.api.event.annotation.SubscribeEvent
 import org.cobalt.api.event.impl.client.PacketEvent
+import org.cobalt.api.event.impl.render.GuiRenderEvent
 import org.cobalt.api.hud.HudModuleManager
 import org.cobalt.api.hud.modules.WatermarkModule
 import org.cobalt.api.hud.modules.InventoryHudModule
@@ -42,6 +43,7 @@ import org.cobalt.internal.mining.NoFrillsMiningModule
 import org.cobalt.internal.mining.CommissionHudModule
 import org.cobalt.internal.pathfinding.PathfindingModule
 import org.cobalt.internal.qol.AutoStashModule
+import org.cobalt.internal.qol.CraftHelperModule
 import org.cobalt.internal.qol.ItemLockingModule
 import org.cobalt.internal.qol.PriceTooltipModule
 import org.cobalt.internal.qol.QolModule
@@ -62,15 +64,21 @@ import org.cobalt.internal.visual.TitleScreenRenderer
 import org.cobalt.internal.visual.WitherImpactOverlayModule
 import org.cobalt.internal.garden.GardenAnalyzerModule
 import org.cobalt.internal.garden.GardenMacroModule
+import org.cobalt.internal.garden.PestWarningModule
 import org.cobalt.internal.farming.FarmingMacroModule
 import org.cobalt.internal.fishing.FishingMacroModule
+import org.cobalt.internal.fishing.FishingHotspotModule
+import org.cobalt.internal.fishing.FishingQolModule
 import org.cobalt.internal.seal.YearOfTheSealModule
 import org.cobalt.internal.pig.PigMacroModule
 import org.cobalt.internal.spotify.SpotifyModule
 import org.cobalt.internal.chat.ChatFilterModule
+import org.cobalt.internal.chat.RngDropDisplayModule
 import org.cobalt.internal.diana.DianaMacroModule
 import org.cobalt.internal.diana.DianaHelperModule
 import org.cobalt.internal.wardrobe.WardrobeModule
+import org.cobalt.internal.auth.CobaltAuthService
+import org.cobalt.internal.auth.CobaltSession
 import org.cobalt.internal.garden.GardenHudModule
 import org.cobalt.internal.routes.RouteEditMode
 import org.cobalt.internal.routes.RouteStore
@@ -78,8 +86,11 @@ import org.cobalt.internal.routes.RouteStore
 @Suppress("UNUSED")
 object Cobalt : ClientModInitializer {
 
+  private var cobaltSession: CobaltSession = CobaltSession.INVALID
+  private var authStarted = false
 
   override fun onInitializeClient() {
+    cobaltSession = CobaltSession.readAndDelete()
     ModuleManager.addModules(
       listOf(
         WatermarkModule(),
@@ -120,18 +131,23 @@ object Cobalt : ClientModInitializer {
         QolModule,
         ItemLockingModule,
         PriceTooltipModule,
+        CraftHelperModule,
         AutoStashModule,
         RotationsModule,
         HotbarOverlayModule,
         PetDisplayModule,
         GardenAnalyzerModule,
         GardenMacroModule,
+        PestWarningModule,
         FarmingMacroModule,
         FishingMacroModule,
+        FishingHotspotModule,
+        FishingQolModule,
         YearOfTheSealModule,
         PigMacroModule,
         SpotifyModule,
         ChatFilterModule,
+        RngDropDisplayModule,
         DianaMacroModule,
         DianaHelperModule,
         WardrobeModule,
@@ -162,6 +178,16 @@ object Cobalt : ClientModInitializer {
     WardrobeModule.loadFavorites()
     EventBus.register(this)
     println("Dutt Client Initialized")
+  }
+
+  @SubscribeEvent
+  fun onGuiRender(event: GuiRenderEvent) {
+    if (authStarted) return
+    val screen = net.minecraft.client.Minecraft.getInstance().screen
+    if (screen is net.minecraft.client.gui.screens.TitleScreen) {
+      authStarted = true
+      CobaltAuthService.start(cobaltSession)
+    }
   }
 
   @SubscribeEvent
