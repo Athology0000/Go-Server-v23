@@ -86,6 +86,8 @@ object NativePathfinder {
     private var lastCollisionCheckPos: Vec3 = Vec3.ZERO
     private var verticalStallTicks: Int = 0
     private var lastVerticalCheckPos: Vec3 = Vec3.ZERO
+    private val stuckPositions: ArrayDeque<BlockPos> = ArrayDeque(4)
+    private var cleanExecTicks: Int = 0
 
     private const val STUCK_CHECK_INTERVAL = 20
     private const val STUCK_THRESHOLD = 0.5
@@ -107,6 +109,11 @@ object NativePathfinder {
 
     private const val VERTICAL_STALL_CHECK_INTERVAL = 15
     private const val VERTICAL_STALL_MIN_RISE = 0.2
+    private const val STUCK_POSITIONS_MAX  = 4
+    private const val AVOID_PENALTY        = 25.0
+    private const val AVOID_RADIUS_SQ      = 4
+    private const val AVOID_MAX_Y_DIFF     = 2
+    private const val CLEAN_EXEC_TICKS     = 30
 
     fun init() {
         // NativePathfinderJNI object init loads the DLL on first access
@@ -175,6 +182,8 @@ object NativePathfinder {
         lastCollisionCheckPos = Vec3.ZERO
         verticalStallTicks = 0
         lastVerticalCheckPos = Vec3.ZERO
+        stuckPositions.clear()
+        cleanExecTicks = 0
         releaseGuidedControl()
     }
 
@@ -197,6 +206,8 @@ object NativePathfinder {
         lastCollisionCheckPos = Vec3.ZERO
         verticalStallTicks = 0
         lastVerticalCheckPos = Vec3.ZERO
+        stuckPositions.clear()
+        cleanExecTicks = 0
         releaseGuidedControl()
     }
 
@@ -333,6 +344,14 @@ object NativePathfinder {
             lastStuckCheckPos = playerPos
         }
 
+        if (state == PathStatus.EXECUTING && stuckPositions.isNotEmpty()) {
+            cleanExecTicks++
+            if (cleanExecTicks >= CLEAN_EXEC_TICKS) {
+                stuckPositions.clear()
+                cleanExecTicks = 0
+            }
+        }
+
         // Compute targetYaw toward next path node (PathCommand.resolveGuidedRotation overrides this)
         val curNode = nodes.getOrNull(minOf(pathNodeCursor, nodes.lastIndex)) ?: nodes.last()
         val ndx = curNode.x + 0.5 - player.x
@@ -395,7 +414,23 @@ object NativePathfinder {
         return cmd
     }
 
+    private fun buildAvoidMeta(): IntArray {
+        if (stuckPositions.isEmpty()) return intArrayOf()
+        val meta = IntArray(stuckPositions.size * 5)
+        var i = 0
+        for (pos in stuckPositions) {
+            meta[i++] = pos.x
+            meta[i++] = pos.y
+            meta[i++] = pos.z
+            meta[i++] = AVOID_RADIUS_SQ
+            meta[i++] = AVOID_MAX_Y_DIFF
+        }
+        return meta
+    }
+
     private fun submitSearch(sx: Int, sy: Int, sz: Int, gx: Int, gy: Int, gz: Int, isFly: Boolean) {
+        val avoidMeta = buildAvoidMeta()
+        val avoidPenalty = DoubleArray(stuckPositions.size) { AVOID_PENALTY }
         searchFuture = searchExecutor.submit {
             try {
                 val result = NativePathfinderJNI.findPath(
@@ -406,8 +441,8 @@ object NativePathfinder {
                     heuristicWeight = HEURISTIC_WEIGHT,
                     nonPrimaryStartPenalty = 0.0,
                     moveOrderOffset = 0,
-                    avoidMeta = intArrayOf(),
-                    avoidPenalty = doubleArrayOf()
+                    avoidMeta = avoidMeta,
+                    avoidPenalty = avoidPenalty
                 )
                 if (result != null && result.keyPath.size >= 3) {
                     searchResult = result
@@ -422,6 +457,8 @@ object NativePathfinder {
 
     private fun startSearch() {
         cancelSearch()
+        stuckPositions.clear()
+        cleanExecTicks = 0
         state = PathStatus.PLANNING
         val player = Minecraft.getInstance().player ?: return
         submitSearch(
@@ -437,6 +474,9 @@ object NativePathfinder {
         NativePathfinderJNI.cancelSearch()
         searchFuture?.cancel(true)
         searchFuture = null
+        cleanExecTicks = 0
+        if (stuckPositions.size >= STUCK_POSITIONS_MAX) stuckPositions.removeFirst()
+        stuckPositions.addLast(BlockPos.containing(playerPos))
         val startPos = BlockPos.containing(playerPos)
         submitSearch(
             startPos.x, startPos.y, startPos.z,
