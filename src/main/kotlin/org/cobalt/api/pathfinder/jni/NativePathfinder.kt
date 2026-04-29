@@ -1,6 +1,7 @@
 package org.cobalt.api.pathfinder.jni
 
 import net.minecraft.client.Minecraft
+import net.minecraft.core.BlockPos
 import net.minecraft.world.phys.Vec3
 import org.cobalt.api.module.ModuleDebug
 import org.cobalt.api.rotation.RotationExecutor
@@ -81,9 +82,15 @@ object NativePathfinder {
 
     private var stuckTicks: Int = 0
     private var lastStuckCheckPos: Vec3 = Vec3.ZERO
+    private var collisionTicks: Int = 0
+    private var lastCollisionCheckPos: Vec3 = Vec3.ZERO
+    private var verticalStallTicks: Int = 0
+    private var lastVerticalCheckPos: Vec3 = Vec3.ZERO
 
     private const val STUCK_CHECK_INTERVAL = 60
     private const val STUCK_THRESHOLD = 0.5
+    private const val COLLISION_REPLAN_TICKS = 12
+    private const val COLLISION_STUCK_THRESHOLD = 0.22
     private const val TELEPORT_YAW_THRESHOLD = 8f
     private const val TELEPORT_PITCH_THRESHOLD = 8f
     private const val MAX_ITERATIONS = 100_000
@@ -92,6 +99,11 @@ object NativePathfinder {
     private const val AOTV_NODE_DISTANCE_MIN = 6.0
     /** Maximum horizontal distance for AOTV — beyond this the shot is out of range. */
     private const val AOTV_NODE_DISTANCE_MAX = 54.0
+
+    // Per-node flag bits — mirrored from natives/src/path_annotations.cpp
+    private const val FLAG_LOW_HEADROOM   = 1 shl 2
+    private const val FLAG_STEP_UP_NEXT   = 1 shl 5
+    private const val FLAG_TIGHT_CORRIDOR = 1 shl 7
 
     fun init() {
         // NativePathfinderJNI object init loads the DLL on first access
@@ -155,6 +167,9 @@ object NativePathfinder {
         noTunnelCenter = false
         routeWpIndex = 0
         stuckTicks = 0
+        collisionTicks = 0
+        lastStuckCheckPos = Vec3.ZERO
+        lastCollisionCheckPos = Vec3.ZERO
         releaseGuidedControl()
     }
 
@@ -172,6 +187,9 @@ object NativePathfinder {
         noTunnelCenter = false
         routeWpIndex = 0
         stuckTicks = 0
+        collisionTicks = 0
+        lastStuckCheckPos = Vec3.ZERO
+        lastCollisionCheckPos = Vec3.ZERO
         releaseGuidedControl()
     }
 
@@ -229,6 +247,28 @@ object NativePathfinder {
         }
 
         val playerPos = Vec3(player.x, player.y, player.z)
+        if (lastStuckCheckPos == Vec3.ZERO) {
+            lastStuckCheckPos = playerPos
+        }
+
+        // Short collision loops are a better signal for corner snags than the coarse 60-tick stall check.
+        if (player.horizontalCollision && player.onGround() && state == PathStatus.EXECUTING) {
+            if (collisionTicks == 0 || lastCollisionCheckPos == Vec3.ZERO) {
+                lastCollisionCheckPos = playerPos
+            }
+            collisionTicks++
+            if (collisionTicks >= COLLISION_REPLAN_TICKS) {
+                collisionTicks = 0
+                val moved = playerPos.distanceTo(lastCollisionCheckPos)
+                if (moved < COLLISION_STUCK_THRESHOLD) {
+                    startReplan(playerPos)
+                }
+                lastCollisionCheckPos = playerPos
+            }
+        } else {
+            collisionTicks = 0
+            lastCollisionCheckPos = playerPos
+        }
 
         // Check arrival at current goal
         val dx = goalX - player.x
@@ -285,20 +325,24 @@ object NativePathfinder {
         val computedFlags = if (aotvSlot >= 0) 0x1 or 0x2 else 0
         val availabilityFlags = availabilityFlagsOverride ?: computedFlags
 
-        val activeAction = computeActiveAction(nodes, pathNodeCursor, aotvSlot >= 0)
+        val flagsAtCursor = cachedKeyNodeFlags.getOrElse(pathNodeCursor) { 0 }
+        val lowHeadroom   = flagsAtCursor and FLAG_LOW_HEADROOM   != 0
+        val tightCorridor = flagsAtCursor and FLAG_TIGHT_CORRIDOR != 0
+
+        val activeAction = computeActiveAction(nodes, pathNodeCursor, aotvSlot >= 0, flagsAtCursor)
 
         val cmd = PathCommand(
             forward = true,
             back = false,
             jump = jumpPulse,
             sneak = false,
-            sprint = true,
+            sprint = !lowHeadroom && !tightCorridor,
             targetYaw = targetYaw,
             targetPitch = 0f,
             status = state,
             activeAction = activeAction,
             distanceToTarget = distToGoal.toFloat(),
-            forwardOnly = noStrafe
+            forwardOnly = noStrafe || tightCorridor
         )
 
         // AOTV / Etherwarp fire on rotation convergence
@@ -368,8 +412,9 @@ object NativePathfinder {
         NativePathfinderJNI.cancelSearch()
         searchFuture?.cancel(true)
         searchFuture = null
+        val startPos = BlockPos.containing(playerPos)
         submitSearch(
-            playerPos.x.toInt(), playerPos.y.toInt(), playerPos.z.toInt(),
+            startPos.x, startPos.y, startPos.z,
             goalX, goalY, goalZ,
             routeProfile == MovementProfile.FLY
         )
@@ -388,9 +433,12 @@ object NativePathfinder {
         cachedKeyNodeFlags = result.keyNodeFlags
         pathNodeCursor = 0
         stuckTicks = 0
-        lastStuckCheckPos = Vec3.ZERO
+        collisionTicks = 0
         state = PathStatus.EXECUTING
         val mc = Minecraft.getInstance()
+        val playerPos = mc.player?.position() ?: Vec3.ZERO
+        lastStuckCheckPos = playerPos
+        lastCollisionCheckPos = playerPos
         ModuleDebug.log("Pathfinding", "Path built in ${result.timeMs}ms")
         DebugLog.status(mc, "Pathfinding", "Pathfinder: path found: ${nodes.size} nodes, goal ($goalX,$goalY,$goalZ), ${result.timeMs}ms, ${result.nodesExplored} explored")
     }
@@ -427,15 +475,19 @@ object NativePathfinder {
      * When consecutive key nodes are far apart the path simplifier has left a long straight
      * leg — AOTV can bridge it faster than walking.
      */
-    private fun computeActiveAction(nodes: List<Vec3>, cursor: Int, aotvAvailable: Boolean): ActionType {
-        if (!aotvAvailable || nodes.size < 2) return ActionType.WALK
-        val next = nodes.getOrNull(cursor + 1) ?: return ActionType.WALK
-        val current = nodes.getOrNull(cursor) ?: return ActionType.WALK
-        val dx = next.x - current.x
-        val dz = next.z - current.z
-        val horizDist = sqrt(dx * dx + dz * dz)
-        if (horizDist < AOTV_NODE_DISTANCE_MIN || horizDist > AOTV_NODE_DISTANCE_MAX) return ActionType.WALK
-        return ActionType.AOTV
+    private fun computeActiveAction(nodes: List<Vec3>, cursor: Int, aotvAvailable: Boolean, nodeFlags: Int): ActionType {
+        if (aotvAvailable && nodes.size >= 2) {
+            val current = nodes.getOrNull(cursor)
+            val next = nodes.getOrNull(cursor + 1)
+            if (current != null && next != null) {
+                val dx = next.x - current.x
+                val dz = next.z - current.z
+                val horizDist = sqrt(dx * dx + dz * dz)
+                if (horizDist in AOTV_NODE_DISTANCE_MIN..AOTV_NODE_DISTANCE_MAX) return ActionType.AOTV
+            }
+        }
+        if (nodeFlags and FLAG_STEP_UP_NEXT != 0) return ActionType.SPRINT_JUMP
+        return ActionType.WALK
     }
 
     private fun logFailure(reason: String) {
