@@ -87,7 +87,7 @@ object NativePathfinder {
     private var verticalStallTicks: Int = 0
     private var lastVerticalCheckPos: Vec3 = Vec3.ZERO
 
-    private const val STUCK_CHECK_INTERVAL = 60
+    private const val STUCK_CHECK_INTERVAL = 20
     private const val STUCK_THRESHOLD = 0.5
     private const val COLLISION_REPLAN_TICKS = 12
     private const val COLLISION_STUCK_THRESHOLD = 0.22
@@ -104,6 +104,9 @@ object NativePathfinder {
     private const val FLAG_LOW_HEADROOM   = 1 shl 2
     private const val FLAG_STEP_UP_NEXT   = 1 shl 5
     private const val FLAG_TIGHT_CORRIDOR = 1 shl 7
+
+    private const val VERTICAL_STALL_CHECK_INTERVAL = 15
+    private const val VERTICAL_STALL_MIN_RISE = 0.2
 
     fun init() {
         // NativePathfinderJNI object init loads the DLL on first access
@@ -170,6 +173,8 @@ object NativePathfinder {
         collisionTicks = 0
         lastStuckCheckPos = Vec3.ZERO
         lastCollisionCheckPos = Vec3.ZERO
+        verticalStallTicks = 0
+        lastVerticalCheckPos = Vec3.ZERO
         releaseGuidedControl()
     }
 
@@ -190,6 +195,8 @@ object NativePathfinder {
         collisionTicks = 0
         lastStuckCheckPos = Vec3.ZERO
         lastCollisionCheckPos = Vec3.ZERO
+        verticalStallTicks = 0
+        lastVerticalCheckPos = Vec3.ZERO
         releaseGuidedControl()
     }
 
@@ -297,6 +304,24 @@ object NativePathfinder {
             releaseGuidedControl()
             lastTickStatus = state
             return null
+        }
+
+        // Vertical stall — if the upcoming node is a step-up but Y hasn't risen, replan
+        if (state == PathStatus.EXECUTING) {
+            val upcomingFlags = cachedKeyNodeFlags.getOrElse(pathNodeCursor) { 0 }
+            if (upcomingFlags and FLAG_STEP_UP_NEXT != 0) {
+                if (lastVerticalCheckPos == Vec3.ZERO) lastVerticalCheckPos = playerPos
+                verticalStallTicks++
+                if (verticalStallTicks >= VERTICAL_STALL_CHECK_INTERVAL) {
+                    verticalStallTicks = 0
+                    val rise = playerPos.y - lastVerticalCheckPos.y
+                    if (rise < VERTICAL_STALL_MIN_RISE) startReplan(playerPos)
+                    lastVerticalCheckPos = playerPos
+                }
+            } else {
+                verticalStallTicks = 0
+                lastVerticalCheckPos = Vec3.ZERO
+            }
         }
 
         // Stuck detection — only trigger new replan when EXECUTING (not already REPLANNING)
