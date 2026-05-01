@@ -64,6 +64,7 @@ import org.cobalt.internal.combat.slayer.SpiderSlayerSettings
 import org.cobalt.internal.combat.slayer.VampireSlayerSettings
 import org.cobalt.internal.combat.slayer.WolfSlayerSettings
 import org.cobalt.internal.combat.slayer.ZombieSlayerSettings
+import org.cobalt.internal.etherwarp.EtherwarpLogic
 
 object CombatMacroModule : Module("Combat Macro") {
 
@@ -79,6 +80,9 @@ object CombatMacroModule : Module("Combat Macro") {
   private val spiderAutoDetectBow get() = SpiderSlayerSettings.autoDetectBow
   private val spiderPhaseBowCombat get() = SpiderSlayerSettings.hatchlingsPhase
   private val spiderHyperionBeforeShooting get() = SpiderSlayerSettings.hyperionBeforeShooting
+  private val spiderEtherwarpEnabled get() = SpiderSlayerSettings.etherwarpEnabled
+  private val spiderEtherwarpMinDist get() = SpiderSlayerSettings.etherwarpMinDist
+  private val spiderITEnabled get() = SpiderSlayerSettings.instantTransmission
   private val slayerLocation get() = ZombieSlayerSettings.location
   private val zombieDynamicCombat get() = ZombieSlayerSettings.dynamicCombat
   private val zombieSpawnWeapon get() = ZombieSlayerSettings.spawnWeapon
@@ -811,6 +815,12 @@ object CombatMacroModule : Module("Combat Macro") {
   private var slayerRagnarokUsedForLaserPhase = false
   private val overfluxLookDownStrategy = TimedEaseStrategy(EasingType.LINEAR, EasingType.LINEAR, 220L)
   private val spiderHyperionLookDownStrategy = TimedEaseStrategy(EasingType.LINEAR, EasingType.LINEAR, 180L)
+  // Spider combat etherwarp state
+  private var spiderWarpStage = -1            // -1 = idle, 0 = rotating, 1 = sneak+verify, 2 = release
+  private var spiderWarpAimPoint: net.minecraft.world.phys.Vec3? = null
+  private var spiderWarpRestoreSlot = -1
+  private var spiderWarpCooldownUntilTick = -1L
+  private var spiderWarpStageTick = -1L
 
   init {
     CombatMacroUi.register(
