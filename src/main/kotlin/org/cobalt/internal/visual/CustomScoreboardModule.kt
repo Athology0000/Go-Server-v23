@@ -15,14 +15,17 @@ import net.minecraft.network.chat.MutableComponent
 import net.minecraft.network.chat.Style
 import net.minecraft.network.chat.TextColor
 import net.minecraft.world.scores.Objective
+import net.minecraft.world.scores.PlayerScoreEntry
 import org.cobalt.api.module.Module
 import org.cobalt.api.module.ModuleCategory
+import org.cobalt.api.module.setting.impl.ActionSetting
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.ColorSetting
 import org.cobalt.api.module.setting.impl.ModeSetting
 import org.cobalt.api.module.setting.impl.SliderSetting
 import org.cobalt.api.module.setting.impl.TextSetting
 import org.cobalt.api.util.ChatUtils
+import org.cobalt.mixin.client.TabOverlayAccessor
 
 object CustomScoreboardModule : Module("Custom Scoreboard") {
 
@@ -30,6 +33,15 @@ object CustomScoreboardModule : Module("Custom Scoreboard") {
 
   private val mc = Minecraft.getInstance()
   private val changeCache = mutableMapOf<String, NumberChange>()
+  private const val DEFAULT_APPEARANCE =
+    "TITLE,LOBBY_CODE,EMPTY_LINE,DATE,TIME,ISLAND,PLAYER_AMOUNT,LOCATION,VISITING,PROFILE,EMPTY_LINE2," +
+      "PURSE,MOTES,BANK,BITS,COPPER,SOWDUST,GEMS,HEAT,COLD,NORTH_STARS,SOULFLOW,EMPTY_LINE3,EVENTS," +
+      "COOKIE,QUIVER,POWER,TUNING,EMPTY_LINE4,OBJECTIVE,SLAYER,POWDER,MAYOR,PARTY,FOOTER,EXTRA"
+  private const val DEFAULT_EVENTS_PRIORITY =
+    "ANNIVERSARY,BROODMOTHER,CARNIVAL,DAMAGE,DARK_AUCTION,DOJO,DUNGEONS,ESSENCE,FLIGHT_DURATION," +
+      "GALATEA,GARDEN,JACOB_MEDALS,JACOBS_CONTEST,KUUDRA,MAGMA_BOSS,MINING,NEW_YEAR,QUEUE,REDSTONE," +
+      "RIFT,SERVER_RESTART,SPOOKY,TRAPPER,VOTING,WINTER"
+  private const val DEFAULT_CHUNKED_STATS = "PURSE,BANK,BITS,GEMS,COPPER,MOTES,NORTH_STARS,SOULFLOW,SOWDUST"
 
   private val enabled = CheckboxSetting("Main Toggle", "Enable or disable the custom scoreboard.", true)
   private val hideWhenTab = CheckboxSetting("Hide While Tablist Open", "Hide while the tablist is open.", true)
@@ -39,40 +51,62 @@ object CustomScoreboardModule : Module("Custom Scoreboard") {
   private val customLines = CheckboxSetting("Custom Lines", "Use selected custom lines instead of raw Hypixel lines.", true)
   private val actions = CheckboxSetting("Click and Hover Actions", "Keep action rows grouped like CustomScoreboard.", true)
   private val outsideSkyBlock = CheckboxSetting("Outside SkyBlock", "Show custom scoreboard outside SkyBlock using server lines.", true)
+  private val appearance = TextSetting(
+    "Appearance",
+    "SkyHanni-style comma-separated scoreboard element order.",
+    DEFAULT_APPEARANCE,
+  )
+  private val resetAppearance = ActionSetting("Reset Appearance", "Reset the SkyHanni-style appearance order.", "Reset") {
+    appearance.value = DEFAULT_APPEARANCE
+  }
 
   private val showEvents = CheckboxSetting("Events", "Show event lines using CustomScoreboard event priority.", true)
+  private val eventsPriority = TextSetting(
+    "Events Priority",
+    "SkyHanni-style comma-separated event priority order.",
+    DEFAULT_EVENTS_PRIORITY,
+  )
+  private val resetEventsPriority = ActionSetting("Reset Events Priority", "Reset the event priority order.", "Reset") {
+    eventsPriority.value = DEFAULT_EVENTS_PRIORITY
+  }
   private val showAllActiveEvents = CheckboxSetting("All Events", "Show all active event groups instead of the first one.", true)
   private val showTablistLines = CheckboxSetting("Tablist Lines", "Use tab-list widgets for extra elements.", true)
   private val chunkedStats = CheckboxSetting("Chunked Stats", "Combine compact stats onto fewer lines.", false)
-  private val statsPerLine = SliderSetting("Chunked Stats Per Line", "Stats shown in each chunk.", 3.0, 1.0, 5.0, 1.0)
+  private val chunkedStatsOrder = TextSetting("Chunked Stats", "SkyHanni-style comma-separated chunked stat order.", DEFAULT_CHUNKED_STATS)
+  private val statsPerLine = SliderSetting("Max Stats per Line", "Stats shown in each chunk.", 3.0, 1.0, 10.0, 1.0)
 
   private val useHypixelTitle = CheckboxSetting("Use Hypixel Title", "Use the server scoreboard title.", true)
-  private val titleUseCustomText = CheckboxSetting("Title Use Custom Text", "Override title with custom text.", false)
-  private val titleText = TextSetting("Title Custom Text", "Supports & color codes and \\n.", "SkyBlock")
+  private val titleUseCustomText = CheckboxSetting("Use Custom Title", "Use a custom title instead of the default Hypixel title.", false)
+  private val titleUseCustomOutsideSkyBlock = CheckboxSetting("Use Custom Title Outside SkyBlock", "Use a custom title outside of SkyBlock.", false)
+  private val titleText = TextSetting("Custom Title", "Supports & color codes and \\n.", "SkyBlock")
   private val footerUseCustomText = CheckboxSetting("Footer Use Custom Text", "Override footer text.", true)
-  private val footerText = TextSetting("Footer Custom Text", "Supports & color codes and \\n.", "dutt client")
+  private val footerText = TextSetting("Custom Footer", "Supports & color codes and \\n.", "dutt client")
+  private val alphaFooterText = TextSetting("Custom Alpha Footer", "Supports & color codes and \\n.", "alpha.hypixel.net")
   private val titleAlignment = ModeSetting("Title Alignment", "Title text alignment.", 1, arrayOf("Left", "Center", "Right"))
   private val footerAlignment = ModeSetting("Footer Alignment", "Footer text alignment.", 1, arrayOf("Left", "Center", "Right"))
-  private val defaultTextAlignment = ModeSetting("Default Text Alignment", "Default line alignment.", 0, arrayOf("Left", "Center", "Right"))
+  private val defaultTextAlignment = ModeSetting("Text Alignment", "Default line alignment.", 0, arrayOf("Left", "Center", "Right"))
   private val verticalAlignment = ModeSetting("Vertical Alignment", "Scoreboard vertical position.", 1, arrayOf("Top", "Center", "Bottom"))
   private val horizontalAlignment = ModeSetting("Horizontal Alignment", "Scoreboard horizontal position.", 2, arrayOf("Left", "Center", "Right"))
   private val scale = SliderSetting("Scale", "Scoreboard scale.", 1.0, 0.1, 2.0, 0.05)
-  private val lineSpacing = SliderSetting("Line Spacing", "Spacing between lines.", 0.0, 0.0, 10.0, 1.0)
+  private val lineSpacing = SliderSetting("Line Spacing", "Spacing between lines.", 10.0, 0.0, 20.0, 1.0)
 
-  private val background = CheckboxSetting("Toggle Background", "Enable background.", true)
+  private val background = CheckboxSetting("Enabled", "Show a background behind the scoreboard.", true)
   private val backgroundColor = ColorSetting("Background Color", "Background color.", 0xA0000000.toInt())
-  private val padding = SliderSetting("Padding", "Background padding.", 5.0, 0.0, 20.0, 1.0)
+  private val padding = SliderSetting("Background Border Size", "The size of the border around the background.", 5.0, 0.0, 20.0, 1.0)
   private val margin = SliderSetting("Margin", "Distance from screen border.", 5.0, 0.0, 20.0, 1.0)
-  private val radius = SliderSetting("Rounded Corners", "Rounded-corner radius.", 6.0, 0.0, 20.0, 1.0)
-  private val blurEnabled = CheckboxSetting("Blur", "Use an extra translucent pass to imitate blur.", false)
+  private val radius = SliderSetting("Rounded Corner Smoothness", "Rounded-corner radius.", 6.0, 0.0, 30.0, 1.0)
+  private val blurEnabled = CheckboxSetting("Blur", "Use an extra translucent pass to imitate outline/background blur.", false)
+  private val outlineBlur = SliderSetting("Outline Blur", "Amount that the outline is blurred.", 0.7, 0.0, 1.0, 0.1)
   private val borderEnabled = CheckboxSetting("Outline", "Enable the scoreboard outline.", true)
-  private val borderSize = SliderSetting("Outline Size", "Outline thickness.", 3.0, 0.0, 10.0, 1.0)
+  private val borderSize = SliderSetting("Thickness", "Outline thickness.", 3.0, 0.0, 15.0, 1.0)
+  private val borderTop = ColorSetting("Color Top", "Color of the top of the outline.", 0xFF32A0DB.toInt())
+  private val borderBottom = ColorSetting("Color Bottom", "Color of the bottom of the outline.", 0xFF2BC95A.toInt())
   private val borderTopLeft = ColorSetting("Top Left Color", "Top-left border color.", 0xFF32A0DB.toInt())
   private val borderTopRight = ColorSetting("Top Right Color", "Top-right border color.", 0xFF32DB62.toInt())
   private val borderBottomLeft = ColorSetting("Bottom Left Color", "Bottom-left border color.", 0xFF29C8AE.toInt())
   private val borderBottomRight = ColorSetting("Bottom Right Color", "Bottom-right border color.", 0xFF2BC95A.toInt())
   private val imageBackground = CheckboxSetting("Custom Image Background", "Reserve image-background opacity behavior.", false)
-  private val imageBackgroundTransparency = SliderSetting("Transparency of the Background", "Image/background opacity percent.", 90.0, 5.0, 100.0, 1.0)
+  private val imageBackgroundTransparency = SliderSetting("Background Image Opacity", "Image/background opacity percent.", 90.0, 0.0, 100.0, 1.0)
   private val customImageFile = TextSetting("Custom Background Image", "Matches CustomScoreboard's scoreboard.png file option.", "")
 
   private val dateFormat = ModeSetting(
@@ -93,7 +127,9 @@ object CustomScoreboardModule : Module("Custom Scoreboard") {
     ),
   )
   private val time24hFormat = CheckboxSetting("24h SkyBlock Time", "Convert SkyBlock time lines to 24h where possible.", false)
-  private val smoothTime = CheckboxSetting("Show SkyBlock Time Smoothly", "Keep time lines visible between server updates.", true)
+  private val exactSkyBlockMinutes = CheckboxSetting("SkyBlock Time Exact Minutes", "Display exact SkyBlock minutes when they are available.", false)
+  private val dateInLobbyCode = CheckboxSetting("Date in Lobby Code", "Show the current date in front of the server name.", true)
+  private val smoothTime = CheckboxSetting("Cache Scoreboard on Island Switch", "Keep time/scoreboard lines visible between server updates.", false)
   private val coloredMonth = CheckboxSetting("Colored Month", "Color season/month date lines.", true)
   private val numberFormat = ModeSetting("Number Format", "Number formatting.", 1, arrayOf("Long", "Short"))
   private val numberDisplayFormat = ModeSetting(
@@ -103,13 +139,18 @@ object CustomScoreboardModule : Module("Custom Scoreboard") {
     arrayOf("Text: Number", "Colored Text Number", "Number Text", "Number Reset Text"),
   )
   private val showCurrencyGain = CheckboxSetting("Show Currency Gain", "Show temporary currency gain/loss.", true)
+  private val showCookieBuff = CheckboxSetting("Cookie Buff", "Show cookie-buff status from tab/list data.", true)
+  private val showGodPotion = CheckboxSetting("God Potion", "Show god-potion status from tab/list data.", true)
   private val showBitsAvailable = CheckboxSetting("Bits Available", "Show available bits when found.", true)
+  private val showMaxIslandPlayers = CheckboxSetting("Show Max Island Players", "Show the maximum amount of players that can join your current island.", true)
   private val bankAlwaysCompact = CheckboxSetting("Bank Always Compact", "Always compact bank value.", false)
   private val coopBankLayout = ModeSetting("Co-op Bank Layout", "Bank line layout.", 0, arrayOf("Personal/Coop", "Coop/Personal", "Combined Value"))
   private val showPiggy = CheckboxSetting("Piggy Bank", "Use Piggy prefix when a piggy-bank line is found.", false)
   private val hidePurseInDungeons = CheckboxSetting("Hide Purse and Bank in Dungeons", "Hide purse/bank while in dungeons.", false)
   private val slayerLevel = CheckboxSetting("Slayer Level", "Show slayer level/stat lines.", true)
   private val magicalPower = CheckboxSetting("Magical Power", "Show Magical Power with Maxwell power.", true)
+  private val compactTuning = CheckboxSetting("Compact Tuning", "Show tuning stats compact.", false)
+  private val tuningAmount = SliderSetting("Tuning Amount", "Only show the first number of tunings.", 2.0, 1.0, 8.0, 1.0)
   private val colorArrowAmount = CheckboxSetting("Colored Arrow", "Color quiver amount by remaining arrows.", true)
   private val arrowDisplay = ModeSetting("Arrow Display", "Arrow display type.", 0, arrayOf("Number", "Percentage"))
   private val powderDisplay = ModeSetting("Powder/Whisper Display", "Powder display type.", 0, arrayOf("Current", "Total", "Current/Total"))
@@ -124,9 +165,12 @@ object CustomScoreboardModule : Module("Custom Scoreboard") {
   private val mayorPerksDisplay = ModeSetting("Mayor Perks", "Mayor perks display.", 1, arrayOf("Off", "Perk Amount", "All Perks"))
   private val ministerDisplay = ModeSetting("Show Minister", "Minister display.", 1, arrayOf("Off", "Compact", "Show"))
   private val showJerryInMinister = CheckboxSetting("Show Extra Jerry Mayor as Minister", "Treat Jerry as minister when found.", true)
+  private val showExtraMayor = CheckboxSetting("Show Extra Mayor", "Show the extra mayor/minister style lines when found.", true)
   private val showActiveOnly = CheckboxSetting("Show Active Elements Only", "Hide empty inactive element lines.", false)
+  private val hideIrrelevantLines = CheckboxSetting("Hide non relevant info", "Hide lines that are not relevant to the current location.", true)
   private val condenseConsecutiveSeparators = CheckboxSetting("Condense Consecutive Separator", "Condense separator runs.", true)
   private val hideSeparatorsAtStartEnd = CheckboxSetting("Hide Separators at Start and End", "Trim leading/trailing separators.", true)
+  private val unknownLinesWarning = CheckboxSetting("Unknown Lines warning", "Reserved SkyHanni compatibility setting.", true)
 
   init {
     addSetting(
@@ -138,18 +182,25 @@ object CustomScoreboardModule : Module("Custom Scoreboard") {
       customLines,
       actions,
       outsideSkyBlock,
+      appearance,
+      resetAppearance,
       showEvents,
+      eventsPriority,
+      resetEventsPriority,
       showAllActiveEvents,
       showTablistLines,
       chunkedStats,
+      chunkedStatsOrder,
       statsPerLine,
       useHypixelTitle,
       titleAlignment,
       titleUseCustomText,
+      titleUseCustomOutsideSkyBlock,
       titleText,
       footerAlignment,
       footerUseCustomText,
       footerText,
+      alphaFooterText,
       scale,
       lineSpacing,
       verticalAlignment,
@@ -161,8 +212,11 @@ object CustomScoreboardModule : Module("Custom Scoreboard") {
       margin,
       radius,
       blurEnabled,
+      outlineBlur,
       borderEnabled,
       borderSize,
+      borderTop,
+      borderBottom,
       borderTopLeft,
       borderTopRight,
       borderBottomLeft,
@@ -172,18 +226,25 @@ object CustomScoreboardModule : Module("Custom Scoreboard") {
       customImageFile,
       dateFormat,
       time24hFormat,
+      exactSkyBlockMinutes,
+      dateInLobbyCode,
       smoothTime,
       coloredMonth,
       numberFormat,
       numberDisplayFormat,
       showCurrencyGain,
+      showCookieBuff,
+      showGodPotion,
       showBitsAvailable,
+      showMaxIslandPlayers,
       bankAlwaysCompact,
       coopBankLayout,
       showPiggy,
       hidePurseInDungeons,
       slayerLevel,
       magicalPower,
+      compactTuning,
+      tuningAmount,
       colorArrowAmount,
       arrowDisplay,
       powderDisplay,
@@ -198,9 +259,12 @@ object CustomScoreboardModule : Module("Custom Scoreboard") {
       mayorPerksDisplay,
       ministerDisplay,
       showJerryInMinister,
+      showExtraMayor,
       showActiveOnly,
+      hideIrrelevantLines,
       condenseConsecutiveSeparators,
       hideSeparatorsAtStartEnd,
+      unknownLinesWarning,
     )
   }
 
@@ -217,7 +281,7 @@ object CustomScoreboardModule : Module("Custom Scoreboard") {
       .asSequence()
       .filterNot { it.isHidden() }
       .sortedByDescending { it.value() }
-      .map { (it.display() ?: it.ownerName()).copy() }
+      .map { score -> scoreboardLine(score) }
       .mapNotNull(::cleanScoreboardComponent)
       .filterNot { strip(it).contains("hypixel.net", ignoreCase = true) }
       .toList()
@@ -336,6 +400,8 @@ object CustomScoreboardModule : Module("Custom Scoreboard") {
     addStat("Motes", "Motes", false, "motes:")
     appendStats(rows, chunkCandidates)
 
+    if (showCookieBuff.value) addLineFromAny("Cookie", "Cookie", "cookie buff:", "cookie:")
+    if (showGodPotion.value) addLineFromAny("God Pot", "God Pot", "god potion:", "god pot:")
     addLineFromAny("Mithril Powder", "Powder", "mithril powder") {
       if (showHypixelPowder.value) formatPowderLine(it) else Component.empty()
     }
@@ -356,34 +422,53 @@ object CustomScoreboardModule : Module("Custom Scoreboard") {
     addLineFromAny("Quiver", "Quiver", "quiver:", "arrows:") { formatQuiverLine(it) }
     addLineFromAny("Power", "Power", "power:", "selected power")
     if (magicalPower.value) addLineFromAny("Magical Power", "Power", "magical power:")
-    addLineFromAny("Tunings", "Tunings", "tuning", "tunings")
+    addLineFromAny("Tunings", "Tunings", "tuning", "tunings") { formatTuningLine(it) }
     addLineFromAny("SkyBlock Level", "SkyBlock Level", "skyblock level", "level:")
+    addLineFromAny("Chocolate", "Chocolate", "chocolate:")
+    addLineFromAny("Fame", "Fame", "fame:")
+    addLineFromAny("Pelts", "Pelts", "pelts:")
 
     if (showTablistLines.value) addTabWidgetRows(state, rows)
 
     if (showMayorTime.value) addElement("mayor", "mayor:", "election", "minister")
     if (mayorPerksDisplay.value > 0) addElement("mayor perks", "perk", "perks")
     if (ministerDisplay.value > 0) addElement("minister", "minister:")
-    if (showJerryInMinister.value) addElement("jerry", "jerry")
+    if (showExtraMayor.value && showJerryInMinister.value) addElement("jerry", "jerry")
     addElement("slayer", "slayer", "boss slain", "combat xp")
-    if (slayerLevel.value) addElement("slayer stats", "zombie:", "spider:", "wolf:", "enderman:", "blaze:", "vampire:")
+    if (slayerLevel.value) {
+      addElement(
+        "slayer stats",
+        "zombie:",
+        "spider:",
+        "wolf:",
+        "enderman:",
+        "blaze:",
+        "vampire:",
+        "slayer xp:",
+        "meter:",
+        "rng meter",
+      )
+    }
 
+    if (actions.value) addActionRows(state, used, rows)
     addFallbackRows(state, used, rows)
     rows.addAll(footerRows())
     return rows
   }
 
   private fun titleRows(state: ScoreboardState): List<ScoreboardRow> {
+    val skyBlockLike = state.isSkyBlockLike()
     val titleLines = when {
-      useHypixelTitle.value && !titleUseCustomText.value -> listOf(state.objective.displayName.copy())
-      titleUseCustomText.value -> parseLegacyLines(titleText.value.ifBlank { "SkyBlock" })
+      titleUseCustomText.value && (skyBlockLike || titleUseCustomOutsideSkyBlock.value) ->
+        parseLegacyLines(titleText.value.ifBlank { "SkyBlock" })
+      useHypixelTitle.value -> listOf(state.objective.displayName.copy())
       else -> listOf(Component.literal(titleText.value.ifBlank { "SkyBlock" }).withDefaultColor(textRgb()))
     }
     return titleLines.map { ScoreboardRow(it, RowKind.TITLE, alignment(titleAlignment.value)) }
   }
 
   private fun footerRows(): List<ScoreboardRow> {
-    val footer = if (footerUseCustomText.value) footerText.value.ifBlank { "dutt client" } else "dutt client"
+    val footer = if (footerUseCustomText.value) customFooterText() else "dutt client"
     val lines = footer.replace("\\n", "\n").split('\n')
     return lines.map { line ->
       val component = if (line.equals("dutt client", ignoreCase = true)) {
@@ -392,6 +477,20 @@ object CustomScoreboardModule : Module("Custom Scoreboard") {
         parseLegacyLine(line)
       }
       ScoreboardRow(component, RowKind.FOOTER, alignment(footerAlignment.value))
+    }
+  }
+
+  private fun customFooterText(): String {
+    val lines = (mc.level?.scoreboard?.let { scoreboard ->
+      scoreboard.getDisplayObjective(net.minecraft.world.scores.DisplaySlot.SIDEBAR)?.let { objective ->
+        scoreboard.listPlayerScores(objective).map { scoreboardLine(it).string }
+      }
+    } ?: emptyList()).joinToString(" ")
+    val alpha = lines.contains("alpha", ignoreCase = true) || mc.connection?.serverData?.ip?.contains("alpha", ignoreCase = true) == true
+    return if (alpha) {
+      alphaFooterText.value.ifBlank { footerText.value.ifBlank { "alpha.hypixel.net" } }
+    } else {
+      footerText.value.ifBlank { "dutt client" }
     }
   }
 
@@ -411,7 +510,7 @@ object CustomScoreboardModule : Module("Custom Scoreboard") {
   private fun addEventRows(state: ScoreboardState, used: MutableSet<Int>, rows: MutableList<ScoreboardRow>) {
     var groupsAdded = 0
     val addedTabLines = mutableSetOf<String>()
-    for (event in eventDefinitions) {
+    for (event in orderedEventDefinitions()) {
       val matches = state.cleanLines
         .mapIndexedNotNull { index, line ->
           if (index !in used && event.keywords.any { line.contains(it, ignoreCase = true) }) index else null
@@ -459,6 +558,9 @@ object CustomScoreboardModule : Module("Custom Scoreboard") {
     addTabRow("Soulflow", "Soulflow", "soulflow:")
     addTabRow("North Stars", "North Stars", "north stars:")
     addTabRow("Sowdust", "Sowdust", "sowdust:")
+    addTabRow("Chocolate", "Chocolate", "chocolate:")
+    addTabRow("Fame", "Fame", "fame:")
+    addTabRow("Pelts", "Pelts", "pelts:")
     addTabRow("Mithril Powder", "Powder", "mithril powder")
     addTabRow("Gemstone Powder", "Powder", "gemstone powder")
     addTabRow("Glacite Powder", "Powder", "glacite powder")
@@ -472,13 +574,26 @@ object CustomScoreboardModule : Module("Custom Scoreboard") {
     }
     addTabRow("Power", "Power", "power:", "selected power")
     if (magicalPower.value) addTabRow("Magical Power", "Power", "magical power:")
-    addTabRow("Tunings", "Tunings", "tuning", "tunings")
+    addTabRow("Tunings", "Tunings", "tuning", "tunings", transform = ::formatTuningText)
     addTabRow("Quiver", "Quiver", "quiver:", "arrows:")
     addTabRow("SkyBlock Level", "SkyBlock Level", "skyblock level")
-    addTabRow("Players", "Players", "players:", "player count")
+    addTabRow("Players", "Players", "players:", "player count", transform = ::formatPlayersText)
     if (showMayorTime.value) addTabRow("Mayor", "Mayor", "mayor:", "election", "minister:")
     if (slayerLevel.value) addTabRow("Slayer", "Slayer", "slayer", "zombie:", "spider:", "wolf:", "enderman:", "blaze:", "vampire:")
     addPartyRows(state, rows)
+  }
+
+  private fun addActionRows(state: ScoreboardState, used: MutableSet<Int>, rows: MutableList<ScoreboardRow>) {
+    val actionIndexes = state.cleanLines.mapIndexedNotNull { index, line ->
+      if (index in used) return@mapIndexedNotNull null
+      if (actionKeywords.any { line.contains(it, ignoreCase = true) }) index else null
+    }
+    if (actionIndexes.isEmpty()) return
+    rows.add(ScoreboardRow(separator(), RowKind.SEPARATOR, Align.CENTER))
+    actionIndexes.take(4).forEach { index ->
+      used.add(index)
+      rows.add(ScoreboardRow(state.rawLines[index].copy(), RowKind.NORMAL, defaultAlign()))
+    }
   }
 
   private fun addPartyRows(state: ScoreboardState, rows: MutableList<ScoreboardRow>) {
@@ -521,8 +636,11 @@ object CustomScoreboardModule : Module("Custom Scoreboard") {
   }
 
   private fun normalizeRows(rows: List<ScoreboardRow>): List<ScoreboardRow> {
+    val seenNormal = mutableSetOf<String>()
     val filtered = rows.filterNot { row ->
-      row.kind == RowKind.NORMAL && strip(row.component).isBlank()
+      val clean = strip(row.component)
+      if (row.kind == RowKind.NORMAL && clean.isBlank()) return@filterNot true
+      row.kind == RowKind.NORMAL && !seenNormal.add(clean.lowercase(Locale.US))
     }.toMutableList()
 
     if (condenseConsecutiveSeparators.value) {
@@ -658,8 +776,8 @@ object CustomScoreboardModule : Module("Custom Scoreboard") {
         val y = offset + row
         val left = offset + inset
         val right = width - offset - inset
-        val colorLeft = lerpArgb(borderTopLeft.value, borderBottomLeft.value, row.toFloat() / (innerHeight - 1).coerceAtLeast(1))
-        val colorRight = lerpArgb(borderTopRight.value, borderBottomRight.value, row.toFloat() / (innerHeight - 1).coerceAtLeast(1))
+        val colorLeft = lerpArgb(borderTop.value, borderBottom.value, row.toFloat() / (innerHeight - 1).coerceAtLeast(1))
+        val colorRight = lerpArgb(borderTop.value, borderBottom.value, row.toFloat() / (innerHeight - 1).coerceAtLeast(1))
         if (row < size || row >= innerHeight - size) {
           graphics.fillGradient(left, y, right, y + 1, colorLeft, colorRight)
         } else {
@@ -675,8 +793,8 @@ object CustomScoreboardModule : Module("Custom Scoreboard") {
     for (row in 0 until height) {
       val inset = roundedInset(row, height, r)
       val t = row.toFloat() / (height - 1).coerceAtLeast(1)
-      val left = lerpArgb(borderTopLeft.value, borderBottomLeft.value, t)
-      val right = lerpArgb(borderTopRight.value, borderBottomRight.value, t)
+      val left = lerpArgb(borderTop.value, borderBottom.value, t)
+      val right = lerpArgb(borderTop.value, borderBottom.value, t)
       graphics.fillGradient(x + inset, y + row, x + width - inset, y + row + 1, left, right)
     }
   }
@@ -708,11 +826,37 @@ object CustomScoreboardModule : Module("Custom Scoreboard") {
     return component
   }
 
+  private fun scoreboardLine(score: PlayerScoreEntry): Component {
+    score.display()?.let { return it.copy() }
+    val owner = score.owner()
+    val team = mc.level?.scoreboard?.getPlayersTeam(owner)
+    return if (team == null) {
+      score.ownerName().copy()
+    } else {
+      Component.empty()
+        .append(team.playerPrefix.copy())
+        .append(Component.literal(owner))
+        .append(team.playerSuffix.copy())
+    }
+  }
+
   private fun collectTabLines(): List<String> {
     val connection = mc.connection ?: return emptyList()
-    return connection.onlinePlayers
+    val lines = mutableListOf<String>()
+    val overlay = mc.gui.tabList as? TabOverlayAccessor
+    overlay?.header?.string?.let { lines.addAll(splitTabText(it)) }
+    overlay?.footer?.string?.let { lines.addAll(splitTabText(it)) }
+    lines += connection.onlinePlayers
       .mapNotNull { info -> info.tabListDisplayName?.string ?: info.profile.name }
-      .map { ChatFormatting.stripFormatting(it).orEmpty().trim() }
+      .flatMap(::splitTabText)
+    return lines.distinctBy { it.lowercase(Locale.US) }
+  }
+
+  private fun splitTabText(text: String): List<String> {
+    return ChatFormatting.stripFormatting(text).orEmpty()
+      .replace("\r", "\n")
+      .split('\n')
+      .map { it.replace(Regex("""\s+"""), " ").trim() }
       .filter { it.isNotEmpty() }
   }
 
@@ -761,12 +905,46 @@ object CustomScoreboardModule : Module("Custom Scoreboard") {
     return Component.literal(value).withDefaultColor(color)
   }
 
+  private fun formatTuningLine(text: String): Component {
+    return Component.literal(formatTuningText(text)).withDefaultColor(textRgb())
+  }
+
+  private fun formatTuningText(text: String): String {
+    if (compactTuning.value) {
+      return text.replace(Regex("""\s*[|/]\s*"""), " ").replace(Regex("""\s+"""), " ").trim()
+    }
+    val amount = tuningAmount.value.toInt().coerceIn(1, 8)
+    val parts = text.split(Regex("""\s*[|/]\s*""")).map { it.trim() }.filter { it.isNotEmpty() }
+    return if (parts.size > amount) parts.take(amount).joinToString(" / ") else text
+  }
+
+  private fun formatPlayersText(text: String): String {
+    if (showMaxIslandPlayers.value) return text
+    return text.replace(Regex("""\s*/\s*\d+\b"""), "")
+  }
+
   private fun formatNumberText(value: String, forceCompact: Boolean = false): String {
     if (!forceCompact && numberFormat.value == 0) return value
     return numberRegex.replace(value) { match ->
       val number = parseNumber(match.value) ?: return@replace match.value
       compactNumber(number)
     }
+  }
+
+  private fun orderedEventDefinitions(): List<EventDefinition> {
+    val byKey = eventDefinitions.associateBy { normalizeToken(it.name) }
+    val ordered = parseTokenList(eventsPriority.value).mapNotNull { byKey[normalizeToken(it)] }
+    return ordered + eventDefinitions.filterNot { event -> ordered.any { it.name == event.name } }
+  }
+
+  private fun parseTokenList(value: String): List<String> {
+    return value.split(',', ';', '\n')
+      .map { it.trim() }
+      .filter { it.isNotEmpty() }
+  }
+
+  private fun normalizeToken(value: String): String {
+    return value.lowercase(Locale.US).filter { it.isLetterOrDigit() }
   }
 
   private fun formatLabelValue(label: String, value: String, cacheKey: String): MutableComponent {
@@ -795,9 +973,10 @@ object CustomScoreboardModule : Module("Custom Scoreboard") {
     val now = System.currentTimeMillis()
     val previous = changeCache[key]
     val diff = previous?.let { number - it.value } ?: 0.0
-    changeCache[key] = NumberChange(number, if (abs(diff) > 0.0001) diff else previous?.difference ?: 0.0, now)
+    val changedAt = if (abs(diff) > 0.0001) now else previous?.changedAt ?: now
+    changeCache[key] = NumberChange(number, if (abs(diff) > 0.0001) diff else previous?.difference ?: 0.0, changedAt)
     val activeDiff = changeCache[key]?.difference ?: 0.0
-    val age = now - (previous?.changedAt ?: now)
+    val age = now - changedAt
     if (abs(activeDiff) <= 0.0001 || age > 3000L) return value
     val sign = if (activeDiff > 0) "+" else "-"
     return "$value ($sign${compactNumber(abs(activeDiff))})"
@@ -955,6 +1134,9 @@ object CustomScoreboardModule : Module("Custom Scoreboard") {
       "objective",
       "cookie buff",
       "god potion",
+      "chocolate:",
+      "fame:",
+      "pelts:",
       "profile:",
       "\u23E3",
     )
@@ -1081,6 +1263,9 @@ object CustomScoreboardModule : Module("Custom Scoreboard") {
     "Motes",
     "Soulflow",
     "Sowdust",
+    "Chocolate",
+    "Fame",
+    "Pelts",
     "Whispers",
     "Cold",
     "Heat",
@@ -1100,6 +1285,21 @@ object CustomScoreboardModule : Module("Custom Scoreboard") {
     "Enderman",
     "Blaze",
     "Vampire",
+  )
+
+  private val actionKeywords = listOf(
+    "click",
+    "right-click",
+    "left-click",
+    "warp",
+    "join",
+    "queue",
+    "rejoin",
+    "play again",
+    "claim",
+    "vote",
+    "visit",
+    "open",
   )
 
   private data class ScoreboardState(

@@ -43,6 +43,7 @@ object PathfindingModule : Module("Pathfinding") {
   private var moduleOwnsPath = false
   private var cachedSpline: PathSplineRenderer.SplineResult? = null
   private var lastNodesRef: List<Vec3>? = null
+  private var lastRenderCursor: Int = -1
 
   private val localRouteWaypoints = mutableListOf<RouteWaypoint>()
   private val localKillWaypoints  = mutableListOf<KillWaypoint>()
