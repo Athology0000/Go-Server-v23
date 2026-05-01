@@ -1,5 +1,6 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.gradle.api.GradleException
+import org.gradle.api.tasks.JavaExec
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
@@ -13,10 +14,25 @@ val baseGroup: String by project
 val modVersion: String by project
 val modName: String by project
 val gradlePropertiesFile = rootProject.file("gradle.properties")
+val requestedTaskNames = gradle.startParameter.taskNames.map { it.substringAfterLast(':') }.toSet()
+val buildChannel =
+  providers.gradleProperty("cobaltBuildChannel").orNull?.trim()?.lowercase()
+    ?: when {
+      requestedTaskNames.any { it in setOf("buildDev", "deployDev") } -> "dev"
+      else -> "release"
+    }
+
+if (buildChannel !in setOf("dev", "release")) {
+  throw GradleException("cobaltBuildChannel must be 'dev' or 'release', found '$buildChannel'.")
+}
+
+val isDevBuild = buildChannel == "dev"
+val artifactDisplayName = if (isDevBuild) "Dutt Client Dev" else "Dutt Client"
+val artifactBaseName = if (isDevBuild) "${modName}-dev" else modName
 
 fun shouldAutoBumpBuildVersion(): Boolean =
-  gradle.startParameter.taskNames.any { taskName ->
-    taskName.substringAfterLast(':') == "build"
+  !isDevBuild && requestedTaskNames.any { taskName ->
+    taskName == "build" || taskName == "buildRelease"
   }
 
 fun incrementMinorVersion(version: String): String {
@@ -46,11 +62,11 @@ val resolvedModVersion =
     modVersion
   }
 
-version = resolvedModVersion
+version = if (isDevBuild) "$resolvedModVersion-dev" else resolvedModVersion
 group = baseGroup
 
 base {
-  archivesName.set(modName)
+  archivesName.set(artifactBaseName)
 }
 
 repositories {
@@ -78,12 +94,21 @@ dependencies {
 }
 
 tasks {
+  named<JavaExec>("runClient") {
+    val devMockAuth =
+      System.getProperty("cobalt.devMockAuth")
+        ?: System.getenv("COBALT_DEV_MOCK_AUTH")
+        ?: "true"
+    systemProperty("cobalt.devMockAuth", devMockAuth)
+  }
+
   processResources {
     val fabricKotlinVersion = libs.versions.fabric.kotlin.get()
     val fabricLoaderVersion = libs.versions.fabric.loader.get()
     val minecraftVersion = libs.versions.minecraft.version.get()
 
     inputs.property("version", project.version)
+    inputs.property("displayName", artifactDisplayName)
     inputs.property("fabricKotlinVersion", fabricKotlinVersion)
     inputs.property("fabricLoaderVersion", fabricLoaderVersion)
     inputs.property("minecraftVersion", minecraftVersion)
@@ -91,6 +116,7 @@ tasks {
     filesMatching("fabric.mod.json") {
       expand(
         "version" to project.version,
+        "displayName" to artifactDisplayName,
         "fabricKotlinVersion" to fabricKotlinVersion,
         "fabricLoaderVersion" to fabricLoaderVersion,
         "minecraftVersion" to minecraftVersion,
@@ -142,15 +168,46 @@ tasks.named("processResources") {
 
 // ── Deploy JAR to Prism mods folder ──────────────────────────────────────────
 val modsDir = file("C:/Users/aeare/AppData/Roaming/PrismLauncher/instances/1.21.11(1)/minecraft/mods")
+val releaseBranchName = "release"
 
-tasks.register("deployMod") {
+tasks.register("buildDev") {
+  group = "build"
+  description = "Builds the dev artifact."
+  dependsOn("build")
+}
+
+tasks.register("buildRelease") {
+  group = "build"
+  description = "Builds the release artifact."
+  dependsOn("build")
+}
+
+tasks.register("verifyReleaseBranch") {
+  group = "build"
+  description = "Fails unless the current git branch is the release branch."
+  doLast {
+    val process = ProcessBuilder("git", "branch", "--show-current")
+      .directory(rootDir)
+      .redirectErrorStream(true)
+      .start()
+    val currentBranch = process.inputStream.bufferedReader().readText().trim()
+    process.waitFor()
+    if (currentBranch != releaseBranchName) {
+      val branchLabel = if (currentBranch.isBlank()) "unknown" else currentBranch
+      throw GradleException("deploy must be run from '$releaseBranchName' branch. Current branch: '$branchLabel'.")
+    }
+  }
+}
+
+tasks.register("copyBuiltMod") {
   group = "build"
   description = "Copies the built JAR to the Prism Launcher mods folder."
   dependsOn("build")
   doLast {
-    val sourceJar = layout.buildDirectory.file("libs/${modName}-${version}.jar").get().asFile.toPath()
-    val targetJar = modsDir.toPath().resolve("${modName}-${version}.jar")
-    val tempJar = modsDir.toPath().resolve("${modName}-${version}.jar.tmp")
+    val jarName = "${base.archivesName.get()}-${project.version}.jar"
+    val sourceJar = layout.buildDirectory.file("libs/$jarName").get().asFile.toPath()
+    val targetJar = modsDir.toPath().resolve(jarName)
+    val tempJar = modsDir.toPath().resolve("$jarName.tmp")
 
     Files.createDirectories(modsDir.toPath())
     Files.copy(sourceJar, tempJar, StandardCopyOption.REPLACE_EXISTING)
@@ -165,6 +222,18 @@ tasks.register("deployMod") {
       Files.move(tempJar, targetJar, StandardCopyOption.REPLACE_EXISTING)
     }
   }
+}
+
+tasks.register("deployDev") {
+  group = "build"
+  description = "Builds and copies the dev artifact to the Prism Launcher mods folder."
+  dependsOn("copyBuiltMod")
+}
+
+tasks.register("deploy") {
+  group = "build"
+  description = "Builds and copies the release artifact to the Prism Launcher mods folder. Only allowed on the release branch."
+  dependsOn("verifyReleaseBranch", "copyBuiltMod")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

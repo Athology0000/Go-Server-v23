@@ -7,6 +7,7 @@ import org.cobalt.api.event.impl.client.TickEvent
 import org.cobalt.api.hud.HudAnchor
 import org.cobalt.api.hud.hudElement
 import org.cobalt.api.module.Module
+import org.cobalt.api.module.ModuleCategory
 import org.cobalt.api.ui.theme.ThemeManager
 import org.cobalt.api.util.ui.NVGRenderer
 import org.cobalt.internal.garden.managers.PestManager
@@ -14,6 +15,8 @@ import org.cobalt.internal.garden.managers.PestTabListParser
 import org.cobalt.mixin.client.TabOverlayAccessor
 
 object GardenHudModule : Module("Garden HUD") {
+
+    override val category = ModuleCategory.FARMING
 
     private val mc = Minecraft.getInstance()
 

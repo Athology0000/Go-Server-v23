@@ -19,6 +19,7 @@ import org.cobalt.api.event.impl.client.TickEvent
 import org.cobalt.api.event.impl.render.WorldRenderContext
 import org.cobalt.api.event.impl.render.WorldRenderEvent
 import org.cobalt.api.module.Module
+import org.cobalt.api.module.ModuleCategory
 import org.cobalt.api.module.setting.impl.ActionSetting
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.InfoSetting
@@ -28,6 +29,8 @@ import org.cobalt.api.util.ChatUtils
 import org.cobalt.api.util.render.Render3D
 
 object VeinDirectionModule : Module("Vein Direction Setter") {
+
+  override val category = ModuleCategory.MINING
 
   data class VeinFlow(
     val start: BlockPos,

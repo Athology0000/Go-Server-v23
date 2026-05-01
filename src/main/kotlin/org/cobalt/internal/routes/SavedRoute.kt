@@ -95,7 +95,7 @@ data class SavedRoute(
                 runCatching {
                     val o = el.asJsonObject
                     RoutePoint(
-                        type    = RoutePointType.fromId(o["type"]?.asString),
+                        type    = parsePointType(o),
                         x       = o["x"].asInt,
                         y       = o["y"].asInt,
                         z       = o["z"].asInt,
@@ -113,6 +113,7 @@ data class SavedRoute(
             pts.forEach { p ->
                 val o = JsonObject()
                 o.addProperty("type", p.type.id)
+                o.addProperty("movements", p.type.toRdbtMovement())
                 o.addProperty("x", p.x); o.addProperty("y", p.y); o.addProperty("z", p.z)
                 p.mx?.let { o.addProperty("mx", it) }
                 p.my?.let { o.addProperty("my", it) }
@@ -121,6 +122,27 @@ data class SavedRoute(
                 arr.add(o)
             }
             return arr
+        }
+
+        private fun parsePointType(o: JsonObject): RoutePointType {
+            o["type"]?.asString?.let { return RoutePointType.fromId(it) }
+            val movements = o["movements"]?.asString?.uppercase().orEmpty()
+            return when {
+                "ETHERWARP" in movements || "WARP" in movements -> RoutePointType.WARP
+                "MINE" in movements -> RoutePointType.MINE
+                else -> RoutePointType.WALK
+            }
+        }
+
+        private fun RoutePointType.toRdbtMovement(): String {
+            return when (this) {
+                RoutePointType.WALK -> "WALK"
+                RoutePointType.WARP -> "ETHERWARP"
+                RoutePointType.MINE,
+                RoutePointType.VEIN -> "MINE"
+                RoutePointType.LANTERN -> "LANTERN"
+                RoutePointType.KILL -> "KILL"
+            }
         }
     }
 }

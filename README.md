@@ -7,7 +7,7 @@
     style="border-radius: 10%;"
   />
   <br />
-  <h3 align="center">Cobalt</h3>
+  <h3 align="center">Dutt</h3>
 
   ![mod-loader](https://img.shields.io/badge/modloader-Fabric-4682b4?style=for-the-badge&logoColor=white)
   ![minecraft-version](https://img.shields.io/badge/Minecraft-1.21.11-6BAA57?style=for-the-badge&logoColor=white)
@@ -17,7 +17,7 @@
 
 ## About The Project
 
-Cobalt is an open-source Minecraft Fabric project focused on providing a modular scripting and automation framework with an emphasis on extensibility. It is designed to be easy to experiment with, extend through addons, and adapt to different use cases without locking users into a rigid structure.
+Dutt is an open-source Minecraft Fabric project focused on providing a modular scripting and automation framework with an emphasis on extensibility. It is designed to be easy to experiment with, extend through addons, and adapt to different use cases without locking users into a rigid structure.
 
 Cobalt was open sourced to encourage learning, collaboration, and iteration. Whether you’re interested in exploring the codebase, building addons, or improving unfinished systems, contributions and experimentation are welcome.
 

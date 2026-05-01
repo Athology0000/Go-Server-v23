@@ -19,6 +19,7 @@ import org.cobalt.api.event.impl.client.MouseEvent
 import org.cobalt.api.event.impl.client.TickEvent
 import org.cobalt.api.event.impl.render.WorldRenderEvent
 import org.cobalt.api.module.Module
+import org.cobalt.api.module.ModuleCategory
 import org.cobalt.api.module.setting.impl.ActionSetting
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.InfoSetting
@@ -51,6 +52,8 @@ enum class CombatPatrolPointType(val id: String) {
 data class CombatPatrolPoint(val x: Int, val y: Int, val z: Int, val type: CombatPatrolPointType)
 
 object CombatPatrolModule : Module("Combat Patrol") {
+
+    override val category = ModuleCategory.COMBAT
 
     private val mc: Minecraft = Minecraft.getInstance()
     private val gson = GsonBuilder().setPrettyPrinting().create()

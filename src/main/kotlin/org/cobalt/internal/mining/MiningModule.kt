@@ -27,6 +27,7 @@ import org.cobalt.api.event.impl.client.ChatEvent
 import org.cobalt.api.event.impl.client.PacketEvent
 import org.cobalt.api.event.impl.client.TickEvent
 import org.cobalt.api.module.Module
+import org.cobalt.api.module.ModuleCategory
 import org.cobalt.api.module.setting.impl.ActionSetting
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.ModeSetting
@@ -40,6 +41,8 @@ import org.cobalt.internal.rotation.RotationsModule
 import org.cobalt.internal.ui.panel.panels.UIModuleList
 
 object MiningModule : Module("Mining") {
+
+  override val category = ModuleCategory.MINING
 
   private val mc: Minecraft = Minecraft.getInstance()
 

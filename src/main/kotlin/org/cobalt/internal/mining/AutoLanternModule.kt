@@ -14,6 +14,7 @@ import org.cobalt.api.event.annotation.SubscribeEvent
 import org.cobalt.api.event.impl.client.TickEvent
 import org.cobalt.api.event.impl.render.WorldRenderEvent
 import org.cobalt.api.module.Module
+import org.cobalt.api.module.ModuleCategory
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.InfoSetting
 import org.cobalt.api.module.setting.impl.InfoType
@@ -28,6 +29,8 @@ import org.cobalt.internal.pathfinding.OverlayRenderEngine
 import org.cobalt.internal.visual.DeployableHudModule
 
 object AutoLanternModule : Module("Auto Lantern") {
+
+  override val category = ModuleCategory.MINING
 
   private enum class LanternPlacementPhase {
     TURN_TO_PLACE,

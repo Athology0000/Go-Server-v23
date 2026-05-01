@@ -7,6 +7,7 @@ import net.minecraft.client.gui.components.SpriteIconButton;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.client.input.MouseButtonEvent;
 import org.cobalt.internal.auth.Auth;
 import org.cobalt.internal.visual.TitleScreenRenderer;
 import org.spongepowered.asm.mixin.Mixin;
@@ -89,7 +90,7 @@ public class TitleScreenMixin {
     }
 
     @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
-    private void cobalt$gateMouseClicked(double mouseX, double mouseY, int button, CallbackInfoReturnable<Boolean> cir) {
+    private void cobalt$gateMouseClicked(MouseButtonEvent mouseEvent, boolean bl, CallbackInfoReturnable<Boolean> cir) {
         if (!Auth.INSTANCE.isGateLocked()) return;
 
         Screen screen = (Screen) (Object) this;
@@ -99,6 +100,8 @@ public class TitleScreenMixin {
         int buttonHeight = 20;
         int buttonWidth = 200;
         int left = centerX - 100;
+        double mouseX = mouseEvent.x();
+        double mouseY = mouseEvent.y();
 
         boolean overSingleplayer = mouseX >= left && mouseX <= left + buttonWidth
             && mouseY >= singleplayerY && mouseY <= singleplayerY + buttonHeight;

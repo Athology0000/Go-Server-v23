@@ -20,6 +20,7 @@ import org.cobalt.api.event.annotation.SubscribeEvent
 import org.cobalt.api.event.impl.client.TickEvent
 import org.cobalt.api.event.impl.render.WorldRenderEvent
 import org.cobalt.api.module.Module
+import org.cobalt.api.module.ModuleCategory
 import org.cobalt.api.module.setting.inGroup
 import org.cobalt.api.module.setting.impl.ActionSetting
 import org.cobalt.api.module.setting.impl.CheckboxSetting
@@ -34,6 +35,8 @@ import org.cobalt.api.util.render.Render3D
 import org.cobalt.api.util.player.MovementManager
 
 object FarmingMacroModule : Module("Farming Macro") {
+
+  override val category = ModuleCategory.FARMING
 
   private const val REWARP_FILE_NAME = "farming_rewarps.json"
   private const val REWARP_ARM_TICKS = 20

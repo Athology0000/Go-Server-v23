@@ -18,6 +18,7 @@ import java.security.spec.X509EncodedKeySpec
 import java.time.Duration
 import java.util.Base64
 import kotlin.concurrent.thread
+import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.client.Minecraft
 import org.cobalt.internal.loader.AddonLoader
 import org.slf4j.LoggerFactory
@@ -27,6 +28,9 @@ object CobaltAuthService {
     // Replace with: echo "$MANIFEST_SIGNING_KEY" | base64 -d | tail -c 32 | base64
     private const val MANIFEST_PUBLIC_KEY_B64 = "REPLACE_ME_WITH_32_BYTE_BASE64_ED25519_PUBLIC_KEY"
     private const val SERVER_BASE_URL = "https://your-server-url.com" // replace with actual URL
+    private const val TEMP_BYPASS_ALIAS = "hwnm"
+    private const val DEV_MOCK_AUTH_PROPERTY = "cobalt.devMockAuth"
+    private const val DEV_MOCK_AUTH_ENV = "COBALT_DEV_MOCK_AUTH"
 
     private val logger = LoggerFactory.getLogger("Cobalt/AuthService")
     private val gson = Gson()
@@ -41,19 +45,60 @@ object CobaltAuthService {
     )
 
     fun start(session: CobaltSession) {
+        if (isDevMockAuthEnabled()) {
+            logger.warn("Dev mock auth enabled - skipping remote auth, entitlement, and module download flow")
+            markReady("Ready (dev mock auth)")
+            return
+        }
+
+        val mcUsername = Minecraft.getInstance().user.name
+        if (session.isTempAliasBypass() || mcUsername.equals(TEMP_BYPASS_ALIAS, ignoreCase = true)) {
+            logger.warn(
+                "Temporarily bypassing startup auth for alias '{}' / minecraft user '{}'",
+                session.alias,
+                mcUsername
+            )
+            markReady("Ready (alias bypass)")
+            return
+        }
+
         if (!session.isValid) {
             Auth.state = AuthState.FAILED
-            Auth.statusMessage = "No session — run the bootstrapper first"
+            Auth.statusMessage = "No session - run the bootstrapper first"
             Auth.failureReason = "no_session"
             return
         }
         thread(name = "Cobalt-Auth", isDaemon = true) { runAuth(session) }
     }
 
+    private fun isDevMockAuthEnabled(): Boolean {
+        if (!FabricLoader.getInstance().isDevelopmentEnvironment) return false
+        val propertyFlag = parseBooleanFlag(System.getProperty(DEV_MOCK_AUTH_PROPERTY))
+        if (propertyFlag != null) return propertyFlag
+        return parseBooleanFlag(System.getenv(DEV_MOCK_AUTH_ENV)) == true
+    }
+
+    private fun parseBooleanFlag(raw: String?): Boolean? {
+        return when (raw?.trim()?.lowercase()) {
+            null, "" -> null
+            "1", "true", "yes", "on" -> true
+            "0", "false", "no", "off" -> false
+            else -> null
+        }
+    }
+
+    private fun markReady(statusMessage: String) {
+        Auth.failureReason = ""
+        Auth.modulesLoaded = 0
+        Auth.modulesTotal = 0
+        Auth.state = AuthState.READY
+        Auth.statusMessage = statusMessage
+    }
+
     private fun runAuth(session: CobaltSession) {
         try {
             Auth.state = AuthState.VERIFYING
-            Auth.statusMessage = "Verifying account…"
+            Auth.statusMessage = "Verifying account..."
 
             val mc = Minecraft.getInstance()
             val mcUsername = mc.user.name
@@ -72,7 +117,7 @@ object CobaltAuthService {
             }
 
             Auth.state = AuthState.LOADING
-            Auth.statusMessage = "Fetching module list…"
+            Auth.statusMessage = "Fetching module list..."
 
             val manifest = fetchManifest(session.sessionToken, entitlement.manifestUrl)
                 ?: return fail("Failed to fetch manifest")
@@ -89,7 +134,7 @@ object CobaltAuthService {
             Files.createDirectories(cacheDir)
 
             for (module in toLoad) {
-                Auth.statusMessage = "Loading ${module.name}… (${Auth.modulesLoaded + 1}/${Auth.modulesTotal})"
+                Auth.statusMessage = "Loading ${module.name}... (${Auth.modulesLoaded + 1}/${Auth.modulesTotal})"
                 val jarPath = ensureModule(session.sessionToken, module) ?: return fail("Failed to load ${module.name}")
                 AddonLoader.loadFromPath(jarPath)
                 Auth.modulesLoaded++

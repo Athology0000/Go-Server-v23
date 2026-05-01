@@ -17,6 +17,7 @@ import org.cobalt.api.event.annotation.SubscribeEvent
 import org.cobalt.api.event.impl.client.TickEvent
 import org.cobalt.api.event.impl.render.WorldRenderEvent
 import org.cobalt.api.module.Module
+import org.cobalt.api.module.ModuleCategory
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.ColorSetting
 import org.cobalt.api.module.setting.impl.SliderSetting
@@ -29,6 +30,8 @@ import org.cobalt.internal.dungeons.map.DungeonScanState
 import org.cobalt.internal.dungeons.map.RoomKind
 
 object BloodCampHelperModule : Module("Blood Camp Helper") {
+
+  override val category = ModuleCategory.COMBAT
 
   private const val WATCHER_SCAN_RADIUS = 2.0
   private const val FIRST_WAVE_DISTANCE = 15.6 + 0.5

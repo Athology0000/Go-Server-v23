@@ -22,12 +22,41 @@ object NativePathfinder {
 
     val isInitialized: Boolean get() = true
 
+    /** Cached dense path nodes from the native V5 search result. */
+    var cachedFullPathNodes: List<Vec3> = emptyList()
+        private set
+
     /** Cached key path nodes (integer block positions as Vec3). Updated on EXECUTING transition. */
     var cachedPathNodes: List<Vec3> = emptyList()
         private set
 
+    /** Cached per-node flags from the dense native path. */
+    var cachedPathFlags: IntArray = IntArray(0)
+        private set
+
     /** Cached per-node flags from the last search result (parallel to cachedPathNodes). */
     var cachedKeyNodeFlags: IntArray = IntArray(0)
+        private set
+
+    var cachedKeyNodeMetrics: IntArray = IntArray(0)
+        private set
+
+    var selectedStartIndex: Int = -1
+        private set
+
+    var lastPathSignature: String = ""
+        private set
+
+    var lastTimeMs: Long = 0L
+        private set
+
+    var lastNodesExplored: Int = 0
+        private set
+
+    var lastNanosecondsPerNode: Double = 0.0
+        private set
+
+    var lastError: String = ""
         private set
 
     /**
@@ -38,9 +67,6 @@ object NativePathfinder {
         internal set
 
     var availabilityFlagsOverride: Int? = null
-
-    /** When true, suppresses strafe inputs — only W key and camera are used for movement. */
-    var noStrafe: Boolean = false
 
     /**
      * When true, skips the tunnel-centering logic in PathCommand that pulls the movement guide
@@ -64,6 +90,22 @@ object NativePathfinder {
     private var routeProfile: MovementProfile = MovementProfile.DEFAULT
     private var routeArrivalRadius: Double = 1.8
     private var routeWpIndex: Int = 0
+
+    private var searchVariantSeed: Int = 0
+
+    private data class SearchPoint(val x: Int, val y: Int, val z: Int)
+
+    private data class AvoidPoint(
+        val x: Int,
+        val y: Int,
+        val z: Int,
+        val radiusSq: Int,
+        val maxYDiff: Int,
+        val penalty: Double,
+        var ttlSearches: Int
+    )
+
+    private val transientAvoidPoints = mutableListOf<AvoidPoint>()
 
     // Pre-warmed single-thread pool — keeps a daemon thread alive between searches so
     // there is zero thread-creation overhead when a new path request arrives.
@@ -97,10 +139,12 @@ object NativePathfinder {
     private const val TELEPORT_PITCH_THRESHOLD = 8f
     private const val MAX_ITERATIONS = 100_000
     private const val HEURISTIC_WEIGHT = 1.5
+    private const val NON_PRIMARY_START_PENALTY = 18.0
     /** Minimum horizontal node-to-node distance to trigger AOTV (avoids firing on short hops). */
     private const val AOTV_NODE_DISTANCE_MIN = 6.0
     /** Maximum horizontal distance for AOTV — beyond this the shot is out of range. */
     private const val AOTV_NODE_DISTANCE_MAX = 54.0
+    private const val NODE_REACHED_RANGE = 0.75
 
     // Per-node flag bits — mirrored from natives/src/path_annotations.cpp
     private const val FLAG_LOW_HEADROOM   = 1 shl 2
@@ -113,7 +157,8 @@ object NativePathfinder {
     private const val AVOID_PENALTY        = 25.0
     private const val AVOID_RADIUS_SQ      = 4
     private const val AVOID_MAX_Y_DIFF     = 2
-    private const val CLEAN_EXEC_TICKS     = 30
+    private const val CLEAN_EXEC_TICKS          = 30
+    private const val SPRINT_SUPPRESS_NEAR_GOAL = 4.0
 
     fun init() {
         // NativePathfinderJNI object init loads the DLL on first access
@@ -138,6 +183,33 @@ object NativePathfinder {
         goalX = x.toInt(); goalY = y.toInt(); goalZ = z.toInt()
         arrivalRadius = radius
         startSearch()
+    }
+
+    fun setTargetWithStarts(
+        starts: List<BlockPos>,
+        goals: List<BlockPos>,
+        isFly: Boolean = false,
+        radius: Double = 1.8
+    ): Boolean {
+        if (starts.isEmpty() || goals.isEmpty()) {
+            lastError = "No start or goal points were provided"
+            state = PathStatus.FAILED
+            return false
+        }
+        routeWaypoints = emptyList()
+        routeProfile = if (isFly) MovementProfile.FLY else MovementProfile.DEFAULT
+        val finalGoal = goals.first()
+        goalX = finalGoal.x; goalY = finalGoal.y; goalZ = finalGoal.z
+        arrivalRadius = radius
+        return startSearch(starts.map { SearchPoint(it.x, if (isFly) it.y else it.y + 1, it.z) }, goals.map { SearchPoint(it.x, if (isFly) it.y else it.y + 1, it.z) }, isFly)
+    }
+
+    fun setFlyTarget(x: Double, y: Double, z: Double, radius: Double = 2.5) {
+        routeWaypoints = emptyList()
+        routeProfile = MovementProfile.FLY
+        goalX = x.toInt(); goalY = y.toInt(); goalZ = z.toInt()
+        arrivalRadius = radius
+        startSearch(isFly = true)
     }
 
     fun setRoute(waypoints: DoubleArray, loop: Boolean, profile: MovementProfile) {
@@ -167,13 +239,17 @@ object NativePathfinder {
     fun stop() {
         cancelSearch()
         state = PathStatus.IDLE
+        cachedFullPathNodes = emptyList()
         cachedPathNodes = emptyList()
+        cachedPathFlags = IntArray(0)
         cachedKeyNodeFlags = IntArray(0)
+        cachedKeyNodeMetrics = IntArray(0)
+        selectedStartIndex = -1
+        lastPathSignature = ""
         pathNodeCursor = 0
         prevJump = false
         teleportFiredNodeKey = -1L
         availabilityFlagsOverride = null
-        noStrafe = false
         noTunnelCenter = false
         routeWpIndex = 0
         stuckTicks = 0
@@ -183,7 +259,9 @@ object NativePathfinder {
         verticalStallTicks = 0
         lastVerticalCheckPos = Vec3.ZERO
         stuckPositions.clear()
+        transientAvoidPoints.clear()
         cleanExecTicks = 0
+        PathExecutorState.reset()
         releaseGuidedControl()
     }
 
@@ -191,13 +269,17 @@ object NativePathfinder {
         cancelSearch()
         ChunkSerializer.invalidate()
         state = PathStatus.IDLE
+        cachedFullPathNodes = emptyList()
         cachedPathNodes = emptyList()
+        cachedPathFlags = IntArray(0)
         cachedKeyNodeFlags = IntArray(0)
+        cachedKeyNodeMetrics = IntArray(0)
+        selectedStartIndex = -1
+        lastPathSignature = ""
         pathNodeCursor = 0
         prevJump = false
         teleportFiredNodeKey = -1L
         availabilityFlagsOverride = null
-        noStrafe = false
         noTunnelCenter = false
         routeWpIndex = 0
         stuckTicks = 0
@@ -207,7 +289,9 @@ object NativePathfinder {
         verticalStallTicks = 0
         lastVerticalCheckPos = Vec3.ZERO
         stuckPositions.clear()
+        transientAvoidPoints.clear()
         cleanExecTicks = 0
+        PathExecutorState.reset()
         releaseGuidedControl()
     }
 
@@ -241,6 +325,7 @@ object NativePathfinder {
             PathStatus.IDLE, PathStatus.FAILED, PathStatus.ARRIVED -> {
                 if (state != lastTickStatus) {
                     prevJump = false
+                    cachedFullPathNodes = emptyList()
                     cachedPathNodes = emptyList()
                     pathNodeCursor = 0
                     releaseGuidedControl()
@@ -294,27 +379,29 @@ object NativePathfinder {
         val dz = goalZ - player.z
         val distToGoal = sqrt(dx * dx + dy * dy + dz * dz)
 
-        if (distToGoal <= arrivalRadius) {
-            if (routeWaypoints.isNotEmpty()) {
-                routeWpIndex++
-                val totalWp = routeWaypoints.size
-                val nextIndex = if (routeLoop) routeWpIndex % totalWp else routeWpIndex
-                if (nextIndex < totalWp) {
-                    routeWpIndex = nextIndex
-                    val wp = routeWaypoints[nextIndex]
-                    goalX = wp.first; goalY = wp.second; goalZ = wp.third
-                    arrivalRadius = routeArrivalRadius
-                    startSearch()
-                    lastTickStatus = state
-                    return null
-                }
+        if (routeProfile == MovementProfile.FLY) {
+            val flyUpdate =
+                PathFlyMovementController.update(
+                    player,
+                    cachedFullPathNodes.ifEmpty { nodes },
+                    Vec3(goalX + 0.5, goalY.toDouble(), goalZ + 0.5),
+                    state,
+                    distToGoal.toFloat()
+                )
+            if (flyUpdate.arrived) {
+                advanceRouteOrArrive()
+                lastTickStatus = state
+                return null
             }
-            state = PathStatus.ARRIVED
-            cachedPathNodes = emptyList()
-            pathNodeCursor = 0
-            releaseGuidedControl()
             lastTickStatus = state
-            return null
+            return flyUpdate.command
+        }
+
+        if (distToGoal <= arrivalRadius) {
+            if (advanceRouteOrArrive()) {
+                lastTickStatus = state
+                return null
+            }
         }
 
         // Vertical stall — if the upcoming node is a step-up but Y hasn't risen, replan
@@ -352,18 +439,11 @@ object NativePathfinder {
             }
         }
 
-        // Compute targetYaw toward next path node (PathCommand.resolveGuidedRotation overrides this)
-        val curNode = nodes.getOrNull(minOf(pathNodeCursor, nodes.lastIndex)) ?: nodes.last()
-        val ndx = curNode.x + 0.5 - player.x
-        val ndz = curNode.z + 0.5 - player.z
-        val targetYaw = Math.toDegrees(atan2(-ndx, ndz)).toFloat()
-
-        // Jump pulse logic
-        val ndyRaw = curNode.y - player.y
-        val jumpRaw = player.onGround() && ndyRaw > 0.5 && sqrt(ndx * ndx + ndz * ndz) < 2.5
-        if (jumpRaw && player.onGround()) prevJump = false
-        val jumpPulse = jumpRaw && !prevJump
-        prevJump = jumpRaw
+        // Update V5-style dense path progress for rotations, while keeping the key-node
+        // cursor forward-only for flags, AOTV decisions, and jump annotations.
+        val rotationNodes = cachedFullPathNodes.ifEmpty { nodes }
+        PathExecutorState.update(player, rotationNodes)
+        advanceKeyCursor(player, nodes)
 
         val aotvSlot = EtherwarpLogic.findEtherwarpHotbarSlot()
         val computedFlags = if (aotvSlot >= 0) 0x1 or 0x2 else 0
@@ -374,19 +454,33 @@ object NativePathfinder {
         val tightCorridor = flagsAtCursor and FLAG_TIGHT_CORRIDOR != 0
 
         val activeAction = computeActiveAction(nodes, pathNodeCursor, aotvSlot >= 0, flagsAtCursor)
+        val directTargetIndex = directRotationTargetIndex(activeAction, pathNodeCursor, nodes.lastIndex)
+        val directTargetNode = nodes.getOrNull(directTargetIndex) ?: nodes.last()
+        val ndx = directTargetNode.x + 0.5 - player.x
+        val ndz = directTargetNode.z + 0.5 - player.z
+        val targetYaw = Math.toDegrees(atan2(-ndx, ndz)).toFloat()
+
+        // Jump pulse logic uses the current key node, not the direct rotation target.
+        val jumpNode = nodes.getOrNull(minOf(pathNodeCursor, nodes.lastIndex)) ?: nodes.last()
+        val jdx = jumpNode.x + 0.5 - player.x
+        val jdz = jumpNode.z + 0.5 - player.z
+        val ndyRaw = jumpNode.y - player.y
+        val jumpRaw = player.onGround() && ndyRaw > 0.5 && sqrt(jdx * jdx + jdz * jdz) < 2.5
+        if (jumpRaw && player.onGround()) prevJump = false
+        val jumpPulse = jumpRaw && !prevJump
+        prevJump = jumpRaw
 
         val cmd = PathCommand(
             forward = true,
             back = false,
             jump = jumpPulse,
             sneak = false,
-            sprint = !lowHeadroom && !tightCorridor,
+            sprint = !lowHeadroom && !tightCorridor && distToGoal > SPRINT_SUPPRESS_NEAR_GOAL,
             targetYaw = targetYaw,
             targetPitch = 0f,
             status = state,
             activeAction = activeAction,
-            distanceToTarget = distToGoal.toFloat(),
-            forwardOnly = noStrafe || tightCorridor
+            distanceToTarget = distToGoal.toFloat()
         )
 
         // AOTV / Etherwarp fire on rotation convergence
@@ -396,7 +490,7 @@ object NativePathfinder {
             val pitchErr = abs(player.xRot - cmd.targetPitch)
             val aligned = yawErr < TELEPORT_YAW_THRESHOLD &&
                 (cmd.activeAction == ActionType.AOTV || pitchErr < TELEPORT_PITCH_THRESHOLD)
-            val nodeKey = cachedPathNodes.getOrNull(pathNodeCursor)
+            val nodeKey = cachedPathNodes.getOrNull(directTargetIndex)
                 ?.let { n -> (n.x.toLong() and 0x1FFFFF) or ((n.z.toLong() and 0x1FFFFF) shl 21) }
                 ?: -1L
             if (aligned && nodeKey != teleportFiredNodeKey && aotvSlot >= 0) {
@@ -414,58 +508,148 @@ object NativePathfinder {
         return cmd
     }
 
-    private fun buildAvoidMeta(): IntArray {
-        if (stuckPositions.isEmpty()) return intArrayOf()
-        val meta = IntArray(stuckPositions.size * 5)
+    fun setSearchVariantSeed(seed: Int) {
+        searchVariantSeed = seed.coerceAtLeast(0)
+    }
+
+    private fun advanceRouteOrArrive(): Boolean {
+        if (routeWaypoints.isNotEmpty()) {
+            routeWpIndex++
+            val totalWp = routeWaypoints.size
+            val nextIndex = if (routeLoop) routeWpIndex % totalWp else routeWpIndex
+            if (nextIndex < totalWp) {
+                routeWpIndex = nextIndex
+                val wp = routeWaypoints[nextIndex]
+                goalX = wp.first; goalY = wp.second; goalZ = wp.third
+                arrivalRadius = routeArrivalRadius
+                startSearch()
+                return true
+            }
+        }
+        state = PathStatus.ARRIVED
+        cachedFullPathNodes = emptyList()
+        cachedPathNodes = emptyList()
+        pathNodeCursor = 0
+        releaseGuidedControl()
+        return true
+    }
+
+    fun addTransientAvoidPoint(
+        x: Int,
+        y: Int,
+        z: Int,
+        radius: Int = 2,
+        penalty: Double = 36.0,
+        ttlSearches: Int = 2,
+        maxYDiff: Int = 2
+    ) {
+        transientAvoidPoints += AvoidPoint(
+            x = x,
+            y = y,
+            z = z,
+            radiusSq = (radius.coerceAtLeast(1) * radius.coerceAtLeast(1)),
+            maxYDiff = maxYDiff.coerceAtLeast(0),
+            penalty = penalty,
+            ttlSearches = ttlSearches.coerceAtLeast(1)
+        )
+    }
+
+    fun clearTransientAvoidPoints() {
+        transientAvoidPoints.clear()
+    }
+
+    private fun buildAvoidInputs(): Pair<IntArray, DoubleArray> {
+        val total = stuckPositions.size + transientAvoidPoints.size
+        if (total == 0) return intArrayOf() to doubleArrayOf()
+
+        val meta = IntArray(total * 5)
+        val penalties = DoubleArray(total)
         var i = 0
+        var p = 0
         for (pos in stuckPositions) {
             meta[i++] = pos.x
             meta[i++] = pos.y
             meta[i++] = pos.z
             meta[i++] = AVOID_RADIUS_SQ
             meta[i++] = AVOID_MAX_Y_DIFF
+            penalties[p++] = AVOID_PENALTY
         }
-        return meta
+
+        for (point in transientAvoidPoints) {
+            meta[i++] = point.x
+            meta[i++] = point.y
+            meta[i++] = point.z
+            meta[i++] = point.radiusSq
+            meta[i++] = point.maxYDiff
+            penalties[p++] = point.penalty
+        }
+
+        transientAvoidPoints.removeAll { point ->
+            point.ttlSearches--
+            point.ttlSearches <= 0
+        }
+
+        return meta to penalties
     }
 
-    private fun submitSearch(sx: Int, sy: Int, sz: Int, gx: Int, gy: Int, gz: Int, isFly: Boolean) {
-        val avoidMeta = buildAvoidMeta()
-        val avoidPenalty = DoubleArray(stuckPositions.size) { AVOID_PENALTY }
+    private fun submitSearch(starts: List<SearchPoint>, goals: List<SearchPoint>, isFly: Boolean) {
+        val (avoidMeta, avoidPenalty) = buildAvoidInputs()
+        val moveOrderOffset = searchVariantSeed.coerceAtLeast(0)
+        val flatStarts = starts.toFlatIntArray()
+        val flatGoals = goals.toFlatIntArray()
         searchFuture = searchExecutor.submit {
             try {
                 val result = NativePathfinderJNI.findPath(
-                    startPoints = intArrayOf(sx, sy, sz),
-                    endPoints = intArrayOf(gx, gy, gz),
+                    startPoints = flatStarts,
+                    endPoints = flatGoals,
                     isFly = isFly,
                     maxIterations = MAX_ITERATIONS,
                     heuristicWeight = HEURISTIC_WEIGHT,
-                    nonPrimaryStartPenalty = 0.0,
-                    moveOrderOffset = 0,
+                    nonPrimaryStartPenalty = NON_PRIMARY_START_PENALTY,
+                    moveOrderOffset = moveOrderOffset,
                     avoidMeta = avoidMeta,
                     avoidPenalty = avoidPenalty
                 )
                 if (result != null && result.keyPath.size >= 3) {
                     searchResult = result
                 } else {
+                    lastError = "findPath returned no result"
                     searchFailed = true
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                lastError = e.message ?: "Native path search failed"
                 searchFailed = true
             }
         }
     }
 
-    private fun startSearch() {
+    private fun startSearch(isFly: Boolean = routeProfile == MovementProfile.FLY): Boolean {
         cancelSearch()
         stuckPositions.clear()
         cleanExecTicks = 0
         state = PathStatus.PLANNING
-        val player = Minecraft.getInstance().player ?: return
+        val player = Minecraft.getInstance().player ?: run {
+            lastError = "Player is missing"
+            state = PathStatus.FAILED
+            return false
+        }
+        val startY = if (isFly) player.blockY else player.blockY
+        val goalYAdjusted = if (isFly) goalY else goalY
         submitSearch(
-            player.blockX, player.blockY, player.blockZ,
-            goalX, goalY, goalZ,
-            routeProfile == MovementProfile.FLY
+            starts = listOf(SearchPoint(player.blockX, startY, player.blockZ)),
+            goals = listOf(SearchPoint(goalX, goalYAdjusted, goalZ)),
+            isFly = isFly
         )
+        return true
+    }
+
+    private fun startSearch(starts: List<SearchPoint>, goals: List<SearchPoint>, isFly: Boolean): Boolean {
+        cancelSearch()
+        stuckPositions.clear()
+        cleanExecTicks = 0
+        state = PathStatus.PLANNING
+        submitSearch(starts, goals, isFly)
+        return true
     }
 
     private fun startReplan(playerPos: Vec3) {
@@ -479,33 +663,36 @@ object NativePathfinder {
         stuckPositions.addLast(BlockPos.containing(playerPos))
         val startPos = BlockPos.containing(playerPos)
         submitSearch(
-            startPos.x, startPos.y, startPos.z,
-            goalX, goalY, goalZ,
-            routeProfile == MovementProfile.FLY
+            starts = listOf(SearchPoint(startPos.x, startPos.y, startPos.z)),
+            goals = listOf(SearchPoint(goalX, goalY, goalZ)),
+            isFly = routeProfile == MovementProfile.FLY
         )
     }
 
     private fun applySearchResult(result: NativePathResult) {
-        val flat = result.keyPath
-        val nodes = ArrayList<Vec3>(flat.size / 3)
-        var i = 0
-        while (i + 2 < flat.size) {
-            // Store as integer block coords; PathCommand adds +0.5 for centering
-            nodes.add(Vec3(flat[i].toDouble(), flat[i + 1].toDouble(), flat[i + 2].toDouble()))
-            i += 3
-        }
-        cachedPathNodes = nodes
+        cachedFullPathNodes = result.path.toVec3List()
+        cachedPathNodes = result.keyPath.toVec3List()
+        cachedPathFlags = result.pathFlags
         cachedKeyNodeFlags = result.keyNodeFlags
+        cachedKeyNodeMetrics = result.keyNodeMetrics
+        selectedStartIndex = result.selectedStartIndex
+        lastPathSignature = result.signature
+        lastTimeMs = result.timeMs
+        lastNodesExplored = result.nodesExplored
+        lastNanosecondsPerNode = result.nanosecondsPerNode
+        lastError = ""
         pathNodeCursor = 0
         stuckTicks = 0
         collisionTicks = 0
+        PathExecutorState.reset()
+        PathFlyMovementController.reset()
         state = PathStatus.EXECUTING
         val mc = Minecraft.getInstance()
         val playerPos = mc.player?.position() ?: Vec3.ZERO
         lastStuckCheckPos = playerPos
         lastCollisionCheckPos = playerPos
         ModuleDebug.log("Pathfinding", "Path built in ${result.timeMs}ms")
-        DebugLog.status(mc, "Pathfinding", "Pathfinder: path found: ${nodes.size} nodes, goal ($goalX,$goalY,$goalZ), ${result.timeMs}ms, ${result.nodesExplored} explored")
+        DebugLog.status(mc, "Pathfinding", "Pathfinder: path found: ${cachedPathNodes.size} key nodes, ${cachedFullPathNodes.size} nodes, goal ($goalX,$goalY,$goalZ), ${result.timeMs}ms, ${result.nodesExplored} explored")
     }
 
     private fun cancelSearch() {
@@ -515,6 +702,27 @@ object NativePathfinder {
         searchResult = null
         searchFailed = false
         state = PathStatus.IDLE
+    }
+
+    private fun List<SearchPoint>.toFlatIntArray(): IntArray {
+        val out = IntArray(size * 3)
+        var i = 0
+        for (point in this) {
+            out[i++] = point.x
+            out[i++] = point.y
+            out[i++] = point.z
+        }
+        return out
+    }
+
+    private fun IntArray.toVec3List(): List<Vec3> {
+        val out = ArrayList<Vec3>(size / 3)
+        var i = 0
+        while (i + 2 < size) {
+            out.add(Vec3(this[i].toDouble(), this[i + 1].toDouble(), this[i + 2].toDouble()))
+            i += 3
+        }
+        return out
     }
 
     private fun fireTeleport(isEtherwarp: Boolean, aotvSlot: Int) {
@@ -534,6 +742,51 @@ object NativePathfinder {
             teleportRestoreSlot = -1
         }
     }
+
+    private fun advanceKeyCursor(player: net.minecraft.client.player.LocalPlayer, nodes: List<Vec3>) {
+        if (nodes.isEmpty()) return
+        val playerPos = player.position()
+
+        while (
+            pathNodeCursor < nodes.lastIndex &&
+            isOnBlock(centerNode(nodes[pathNodeCursor]), playerPos, NODE_REACHED_RANGE)
+        ) {
+            pathNodeCursor++
+        }
+
+        while (
+            pathNodeCursor < nodes.lastIndex &&
+            isOnBlock(centerNode(nodes[pathNodeCursor + 1]), playerPos, NODE_REACHED_RANGE)
+        ) {
+            pathNodeCursor++
+        }
+
+        val cursor = pathNodeCursor.coerceIn(0, nodes.lastIndex)
+        val searchEnd = minOf(nodes.lastIndex, cursor + 16)
+        var nearestIdx = cursor
+        var nearestDistSq = Double.POSITIVE_INFINITY
+        for (i in maxOf(0, cursor - 1)..searchEnd) {
+            val n = nodes[i]
+            val dx = n.x + 0.5 - player.x
+            val dz = n.z + 0.5 - player.z
+            val distSq = dx * dx + dz * dz
+            if (distSq < nearestDistSq) {
+                nearestDistSq = distSq
+                nearestIdx = i
+            }
+        }
+        if (nearestIdx > pathNodeCursor) {
+            pathNodeCursor = nearestIdx
+        }
+    }
+
+    private fun isOnBlock(point: Vec3, playerPos: Vec3, range: Double): Boolean {
+        return playerPos.x >= point.x - range && playerPos.x < point.x + range &&
+            playerPos.z >= point.z - range && playerPos.z < point.z + range
+    }
+
+    private fun centerNode(node: Vec3): Vec3 =
+        Vec3(node.x + 0.5, node.y, node.z + 0.5)
 
     /**
      * Decides whether the current path segment warrants an AOTV shot.
@@ -555,12 +808,19 @@ object NativePathfinder {
         return ActionType.WALK
     }
 
+    private fun directRotationTargetIndex(activeAction: ActionType, cursor: Int, lastIndex: Int): Int =
+        when (activeAction) {
+            ActionType.AOTV, ActionType.ETHERWARP -> minOf(cursor + 1, lastIndex)
+            else -> minOf(cursor + 1, lastIndex)
+        }.coerceIn(0, lastIndex)
+
     private fun logFailure(reason: String) {
         val mc = Minecraft.getInstance()
         DebugLog.status(mc, "Pathfinding", "Pathfinder: path failed: $reason")
     }
 
     private fun releaseGuidedControl() {
+        PathFlyMovementController.reset()
         MovementManager.setLookLock(false)
         RotationExecutor.stopIfUsing(PathfinderRotationStrategy)
     }

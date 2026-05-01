@@ -10,11 +10,14 @@ import java.awt.Color
 import java.io.File
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.floor
 import kotlin.math.max
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.Font
 import net.minecraft.client.renderer.LightTexture
 import net.minecraft.core.BlockPos
+import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.HitResult
@@ -27,6 +30,7 @@ import org.cobalt.api.event.impl.client.MouseEvent
 import org.cobalt.api.event.impl.client.TickEvent
 import org.cobalt.api.event.impl.render.WorldRenderEvent
 import org.cobalt.api.module.Module
+import org.cobalt.api.module.ModuleCategory
 import org.cobalt.api.module.setting.impl.ActionSetting
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.InfoSetting
@@ -53,9 +57,12 @@ import org.cobalt.internal.pathfinding.DebugLog
 import org.cobalt.internal.pathfinding.PathfindingModule
 import org.cobalt.internal.rotation.RotationsModule
 import org.cobalt.internal.routes.RouteStore
+import org.cobalt.internal.routes.RouteType
 import org.cobalt.internal.routes.RoutePointType as NewRoutePointType
 
 object RoutesModule : Module("Routes") {
+
+  override val category = ModuleCategory.MINING
 
   enum class RoutePointType(val id: String) {
     NORMAL("normal"),
@@ -246,6 +253,12 @@ object RoutesModule : Module("Routes") {
     false
   )
 
+  private val rdbtRouteWalker = CheckboxSetting(
+    "RDBT Route Walker",
+    "Use the RDBT/V5-style direct walker for walk/etherwarp routes.",
+    true
+  )
+
   private val pointType = ModeSetting(
     "Point Type",
     "Type used when adding points.",
@@ -350,6 +363,7 @@ object RoutesModule : Module("Routes") {
       recordOnRightClick,
       loopRoute,
       startFromNearest,
+      rdbtRouteWalker,
       pointType,
       veinOccupancyRadius,
       openPickerAction,
@@ -417,6 +431,11 @@ object RoutesModule : Module("Routes") {
       return
     }
 
+    if (shouldUseRdbtRouteWalker(routePoints)) {
+      tickRdbtRouteWalker(player, level)
+      return
+    }
+
     if (action == RouteAction.MINE) {
       handleMine(player, level)
       return
@@ -424,6 +443,7 @@ object RoutesModule : Module("Routes") {
 
     if (action == RouteAction.WALK) {
       if (nativeActive()) {
+        val nativeStatus = NativePathfinder.status
         val cmd = NativePathfinder.tick()
         val isTeleportAction = cmd != null &&
           (cmd.activeAction == org.cobalt.api.pathfinder.jni.ActionType.AOTV ||
@@ -433,18 +453,22 @@ object RoutesModule : Module("Routes") {
           if (isTeleportAction) {
             cmd.applyToPlayer(applyRotation = true)
           } else {
+            debug {
+              "walk: cursor=${NativePathfinder.pathNodeCursor}/${NativePathfinder.cachedPathNodes.size} " +
+              "yaw=${player.yRot.toInt()} status=$nativeStatus"
+            }
             cmd.applyToPlayer(applyRotation = false, movementYawOverride = player.yRot)
             applyWalkEdgeSafety(player, level)
           }
         } else {
+          debug { "walk: planning, holding movement (status=$nativeStatus)" }
           holdWalkAutonomousMovement()
         }
         syncWalkKeys()
         if (!handleWalkArrival(player, level)) {
           return
         }
-      }
-      if (awaitingArrival) {
+      } else if (awaitingArrival) {
         applyWalkCameraRotation(player)
         holdWalkAutonomousMovement()
         syncWalkKeys()
@@ -654,6 +678,18 @@ object RoutesModule : Module("Routes") {
     stopRoute(reason)
   }
 
+  internal fun onLevelChange() {
+    stopAnchorPlacement(notify = false)
+    pendingClickPos = null
+    routeRunning = false
+    routeIndex = 0
+    routePoints.clear()
+    lastAutomationCompletionPos = null
+    resetRuntimeState()
+    nativeStop(null)
+    updateStatus()
+  }
+
   private fun findNearestPointIndex(): Int {
     val origin = mc.player?.blockPosition() ?: return 0
     return routePoints.indices.minByOrNull { i ->
@@ -676,8 +712,10 @@ object RoutesModule : Module("Routes") {
     // stale moduleOwnsPath state. stopPath() sets moduleOwnsPath=false without
     // disrupting the route - startWalk will set a fresh target immediately after.
     PathfindingModule.stopPath()
-    PathfindingModule.ensureEnabledForAutomation("routes")
-    routeIndex = if (startFromNearest.value) findNearestPointIndex() else 0
+    if (!shouldUseRdbtRouteWalker(routePoints)) {
+      PathfindingModule.ensureEnabledForAutomation("routes")
+    }
+    routeIndex = if (startFromNearest.value || shouldUseRdbtRouteWalker(routePoints)) findNearestPointIndex() else 0
     routeRunning = true
     resetRuntimeState()
     lastAutomationCompletionPos = null
@@ -703,16 +741,17 @@ object RoutesModule : Module("Routes") {
    * Otherwise starts at the checkpoint nearest to the player.
    * Returns true if the route was loaded and started successfully.
    */
-  fun loadAndStartWalkback(name: String, fromEndOffset: Int = 0, reverse: Boolean = true): Boolean {
+  fun loadAndStartWalkback(
+    name: String,
+    fromEndOffset: Int = 0,
+    reverse: Boolean = true,
+    patrolTravelOnly: Boolean = false
+  ): Boolean {
     // Don't restart if a walkback is already in progress.
     if (routeRunning) return false
     val trimmedName = name.trim()
     if (trimmedName.isEmpty() || !isValidRouteName(trimmedName)) return false
-    val routeFile = routeFileForName(trimmedName)
-    val loaded = when {
-      routeFile.exists() -> readRouteFile(routeFile)
-      else -> readLegacyRoute(trimmedName)
-    } ?: return false
+    val loaded = loadRoutePointsByName(trimmedName, patrolTravelOnly) ?: return false
     if (loaded.isEmpty()) return false
 
     val activeRoute = if (reverse) loaded.asReversed() else loaded
@@ -859,16 +898,9 @@ object RoutesModule : Module("Routes") {
       return
     }
 
-    val routeFile = routeFileForName(name)
-    val loaded = when {
-      routeFile.exists() -> readRouteFile(routeFile) ?: run {
-        ChatUtils.sendMessage("Route file \"${routeFile.name}\" is invalid.")
-        return
-      }
-      else -> readLegacyRoute(name) ?: run {
-        ChatUtils.sendMessage("Route \"$name\" not found.")
-        return
-      }
+    val loaded = loadRoutePointsByName(name) ?: run {
+      ChatUtils.sendMessage("Route \"$name\" not found or invalid.")
+      return
     }
 
     routePoints.clear()
@@ -893,11 +925,11 @@ object RoutesModule : Module("Routes") {
     return File(routesDirectory, "$name.json")
   }
 
-  private fun loadRoutePointsByName(name: String): List<RoutePoint>? {
+  private fun loadRoutePointsByName(name: String, patrolTravelOnly: Boolean = false): List<RoutePoint>? {
     val routeFile = routeFileForName(name)
     return when {
       routeFile.exists() -> readRouteFile(routeFile)
-      else -> readLegacyRoute(name) ?: loadFromRouteStore(name)
+      else -> readLegacyRoute(name) ?: loadFromRouteStore(name, patrolTravelOnly)
     }
   }
 
@@ -906,14 +938,19 @@ object RoutesModule : Module("Routes") {
    * flatten it into this module's legacy [RoutePoint] list so commission / mining
    * macros that still call [loadAndStartAutomationRoute] can use it.
    *
-   * - Dual sub-route types (ORE_MINER / PATROL): concatenates travelRoute + loopOrArea.
+   * - Dual sub-route types (ORE_MINER / PATROL): concatenates travelRoute + loopOrArea,
+   *   unless [patrolTravelOnly] is set for PATROL routes, in which case only travelRoute is used.
    * - Single sub-route types (COMMISSION / GEMSTONE / TUNNEL): uses points.
    * - Point types: WALK → NORMAL, WARP → WARP, MINE/VEIN → MINE, LANTERN/KILL → skipped.
    */
-  private fun loadFromRouteStore(name: String): List<RoutePoint>? {
+  private fun loadFromRouteStore(name: String, patrolTravelOnly: Boolean = false): List<RoutePoint>? {
     val route = RouteStore.loadAll().firstOrNull { it.name.equals(name, ignoreCase = true) }
       ?: return null
-    val source = route.travelRoute + route.loopOrArea + route.points
+    val source = when {
+      patrolTravelOnly && route.type == RouteType.PATROL -> route.travelRoute
+      route.type == RouteType.PATROL || route.type == RouteType.ORE_MINER -> route.travelRoute + route.loopOrArea
+      else -> route.points
+    }
     if (source.isEmpty()) return emptyList()
     val converted = mutableListOf<RoutePoint>()
     source.forEach { p ->
@@ -999,6 +1036,7 @@ object RoutesModule : Module("Routes") {
       obj.addProperty("y", point.pos.y)
       obj.addProperty("z", point.pos.z)
       obj.addProperty("type", point.type.id)
+      obj.addProperty("movements", point.type.toRdbtMovement())
       point.mineBlockId?.let { blockId ->
         obj.addProperty("bid", blockId)
       }
@@ -1038,7 +1076,7 @@ object RoutesModule : Module("Routes") {
       val x = obj.get("x")?.asInt ?: return@forEach
       val y = obj.get("y")?.asInt ?: return@forEach
       val z = obj.get("z")?.asInt ?: return@forEach
-      val type = RoutePointType.fromId(obj.get("type")?.asString)
+      val type = parseRoutePointType(obj)
       val mx = obj.get("mx")?.asInt
       val my = obj.get("my")?.asInt
       val mz = obj.get("mz")?.asInt
@@ -1047,6 +1085,24 @@ object RoutesModule : Module("Routes") {
       loaded.add(RoutePoint(BlockPos(x, y, z), type, mineEnd, mineBlockId))
     }
     return loaded
+  }
+
+  private fun parseRoutePointType(obj: JsonObject): RoutePointType {
+    obj.get("type")?.asString?.let { return RoutePointType.fromId(it) }
+    val movements = obj.get("movements")?.asString?.uppercase().orEmpty()
+    return when {
+      "ETHERWARP" in movements || "WARP" in movements -> RoutePointType.WARP
+      "MINE" in movements -> RoutePointType.MINE
+      else -> RoutePointType.NORMAL
+    }
+  }
+
+  private fun RoutePointType.toRdbtMovement(): String {
+    return when (this) {
+      RoutePointType.NORMAL -> "WALK"
+      RoutePointType.WARP -> "ETHERWARP"
+      RoutePointType.MINE -> "MINE"
+    }
   }
 
   private fun readLegacyRoutesJson(): JsonObject {
@@ -1445,6 +1501,198 @@ object RoutesModule : Module("Routes") {
         startWalkSegment(level)
       }
     }
+  }
+
+  private fun shouldUseRdbtRouteWalker(points: List<RoutePoint>): Boolean {
+    return rdbtRouteWalker.value &&
+      points.isNotEmpty() &&
+      points.none { it.type == RoutePointType.MINE }
+  }
+
+  private fun tickRdbtRouteWalker(player: Player, level: net.minecraft.world.level.Level) {
+    if (!advanceRouteIndexForLoop()) {
+      stopRoute("Route complete.")
+      return
+    }
+    val point = routePoints.getOrNull(routeIndex) ?: run {
+      stopRoute("Route complete.")
+      return
+    }
+    activePoint = point
+    when (point.type) {
+      RoutePointType.WARP -> tickRdbtWarpPoint(player, level, point)
+      RoutePointType.NORMAL -> tickRdbtWalkPoint(player, point)
+      RoutePointType.MINE -> startPointAtCurrentIndex(player, level)
+    }
+  }
+
+  private fun tickRdbtWalkPoint(player: Player, point: RoutePoint) {
+    if (action != RouteAction.WALK || lastTarget != point.pos) {
+      NativePathfinder.stop()
+      PathfindingModule.stopPath()
+      MovementManager.setMovementLock(false)
+      MovementManager.clearForcedMovement()
+      updateWalkArrivalThresholds(RDBT_ROUTE_ARRIVAL_RADIUS)
+      awaitingArrival = false
+      walkCompletePointOnArrival = true
+      walkSegmentEndIndex = -1
+      lastTarget = point.pos
+      lastResolvedTarget = point.pos
+      action = RouteAction.WALK
+    }
+
+    if (hasRdbtArrived(player, point.pos)) {
+      setWalkKeys(false, false, false, false, false, false, false)
+      completePoint()
+      return
+    }
+
+    val lookRotation = AngleUtils.getRotation(
+      Vec3(point.pos.x + 0.5, point.pos.y + 2.0, point.pos.z + 0.5)
+    )
+    setRdbtStraightLineKeys(
+      player,
+      point.pos.x.toDouble(),
+      point.pos.y.toDouble(),
+      point.pos.z.toDouble(),
+      shouldJump = true,
+      ignoreBottomSlab = true
+    )
+    mc.options.keyShift?.setDown(false)
+    mc.options.keySprint?.setDown(true)
+    MovementManager.setLookLock(true)
+    RotationExecutor.rotateTo(Rotation(lookRotation.yaw, player.xRot), routeFollowRotationStrategy)
+  }
+
+  private fun setRdbtStraightLineKeys(
+    player: Player,
+    x: Double,
+    y: Double,
+    z: Double,
+    shouldJump: Boolean,
+    ignoreBottomSlab: Boolean
+  ) {
+    val dx = x - player.x
+    val dz = z - player.z
+    var angle = -Math.toDegrees(atan2(dx, dz)) - player.yRot
+    while (angle < -180.0) angle += 360.0
+    while (angle > 180.0) angle -= 360.0
+
+    var forward = false
+    var backward = false
+    var left = false
+    var right = false
+
+    when {
+      angle >= -22.5 && angle <= 22.5 -> forward = true
+      angle >= -67.5 && angle <= -22.5 -> {
+        forward = true
+        left = true
+      }
+      angle >= -112.5 && angle <= -67.5 -> left = true
+      angle >= -157.5 && angle <= -112.5 -> {
+        left = true
+        backward = true
+      }
+      angle >= -180.0 && angle <= -157.5 -> backward = true
+      angle >= 157.5 && angle <= 180.0 -> backward = true
+      angle >= 22.5 && angle <= 67.5 -> {
+        forward = true
+        right = true
+      }
+      angle >= 67.5 && angle <= 112.5 -> right = true
+      angle >= 112.5 && angle <= 157.5 -> {
+        backward = true
+        right = true
+      }
+    }
+
+    setWalkKeys(
+      forward = forward,
+      backward = backward,
+      left = left,
+      right = right,
+      jump = shouldJump && rdbtPlayerIsCollided(ignoreBottomSlab),
+      shift = false,
+      sprint = true,
+    )
+  }
+
+  private fun rdbtPlayerIsCollided(ignoreBottomSlab: Boolean): Boolean {
+    val player = mc.player ?: return false
+    val level = mc.level ?: return false
+    val box = player.boundingBox.inflate(0.01, 0.0, 0.01)
+    val minX = floor(box.minX).toInt()
+    val minY = floor(box.minY).toInt()
+    val minZ = floor(box.minZ).toInt()
+    val maxX = floor(box.maxX).toInt()
+    val maxY = floor(box.maxY).toInt()
+    val maxZ = floor(box.maxZ).toInt()
+
+    for (x in minX..maxX) {
+      for (y in minY..maxY) {
+        for (z in minZ..maxZ) {
+          val pos = BlockPos(x, y, z)
+          val state = level.getBlockState(pos)
+          if (state.isAir) continue
+
+          val registryPath = BuiltInRegistries.BLOCK.getKey(state.block).path.lowercase(Locale.ROOT)
+          if ("carpet" in registryPath) continue
+          if (ignoreBottomSlab) {
+            if ("farmland" in registryPath) continue
+            if ("slab" in registryPath && "type=bottom" in state.toString().lowercase(Locale.ROOT)) continue
+          }
+
+          if (!state.getCollisionShape(level, pos).isEmpty) return true
+        }
+      }
+    }
+    return false
+  }
+
+  private fun tickRdbtWarpPoint(
+    player: Player,
+    level: net.minecraft.world.level.Level,
+    point: RoutePoint
+  ) {
+    updateWalkArrivalThresholds(RDBT_ROUTE_ARRIVAL_RADIUS)
+    if (hasRdbtArrived(player, point.pos)) {
+      setWalkKeys(false, false, false, false, false, false, false)
+      completePoint()
+      return
+    }
+
+    if (action != RouteAction.WARP || lastTarget != point.pos) {
+      NativePathfinder.stop()
+      PathfindingModule.stopPath()
+      MovementManager.setMovementLock(false)
+      MovementManager.clearForcedMovement()
+      setWalkKeys(false, false, false, false, false, true, false)
+      lastTarget = point.pos
+      lastResolvedTarget = point.pos
+      action = RouteAction.WARP
+    }
+
+    if (!hasEtherwarpAvailable()) {
+      stopRoute("Route failed: no etherwarp item for point ${routeIndex + 1}.")
+      return
+    }
+    if (level.gameTime < warpCooldownUntil) return
+
+    val warpPoint = resolveWarpPoint(level, point.pos) ?: point.pos
+    val directWarp = checkDirectEtherwarp(level, player, warpPoint)
+    if (!directWarp.canWarp) {
+      stopRoute("Route failed: can't see etherwarp point ${routeIndex + 1}.")
+      return
+    }
+    startWarp(warpPoint)
+  }
+
+  private fun hasRdbtArrived(player: Player, target: BlockPos): Boolean {
+    val dx = (target.x + 0.5) - player.x
+    val dy = target.y - player.y
+    val dz = (target.z + 0.5) - player.z
+    return dx * dx + dy * dy + dz * dz < RDBT_ROUTE_ARRIVAL_DISTANCE_SQ
   }
 
   private fun startWalk(
@@ -2779,8 +3027,8 @@ object RoutesModule : Module("Routes") {
         var count = 0
         for (index in startIndex..endIndex) {
           val node = nodes[index]
-          sumX += node.x
-          sumZ += node.z
+          sumX += node.x + 0.5
+          sumZ += node.z + 0.5
           count++
         }
         val refNode = nodes[endIndex]
@@ -3638,6 +3886,8 @@ object RoutesModule : Module("Routes") {
 
   private const val MAX_WALK_RETRIES = 3
   private const val WALK_REPATH_GRACE_TICKS = 8L
+  private const val RDBT_ROUTE_ARRIVAL_RADIUS = 3.0
+  private const val RDBT_ROUTE_ARRIVAL_DISTANCE_SQ = RDBT_ROUTE_ARRIVAL_RADIUS * RDBT_ROUTE_ARRIVAL_RADIUS
   private const val ARRIVAL_DISTANCE_SQ = 1.8 * 1.8
   private const val WALK_EDGE_SLOW_DISTANCE_SQ = 2.15 * 2.15
   private const val WALK_EDGE_ARRIVAL_DISTANCE_SQ = 1.9 * 1.9

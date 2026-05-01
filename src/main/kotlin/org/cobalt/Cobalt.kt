@@ -6,7 +6,6 @@ import org.cobalt.api.command.CommandManager
 import org.cobalt.api.event.EventBus
 import org.cobalt.api.event.annotation.SubscribeEvent
 import org.cobalt.api.event.impl.client.PacketEvent
-import org.cobalt.api.event.impl.render.GuiRenderEvent
 import org.cobalt.api.hud.HudModuleManager
 import org.cobalt.api.hud.modules.WatermarkModule
 import org.cobalt.api.hud.modules.InventoryHudModule
@@ -19,6 +18,12 @@ import org.cobalt.api.util.TickScheduler
 import org.cobalt.internal.combat.CombatHudModule
 import org.cobalt.internal.combat.CombatMacroModule
 import org.cobalt.internal.combat.CombatPatrolModule
+import org.cobalt.internal.combat.slayer.BlazeSlayerMacroModule
+import org.cobalt.internal.combat.slayer.EndermanSlayerMacroModule
+import org.cobalt.internal.combat.slayer.SpiderSlayerMacroModule
+import org.cobalt.internal.combat.slayer.VampireSlayerMacroModule
+import org.cobalt.internal.combat.slayer.WolfSlayerMacroModule
+import org.cobalt.internal.combat.slayer.ZombieSlayerMacroModule
 import org.cobalt.internal.command.MainCommand
 import org.cobalt.internal.dungeons.BloodCampHelperModule
 import org.cobalt.internal.dungeons.DungeonMapModule
@@ -35,7 +40,9 @@ import org.cobalt.internal.mining.RoutesModule
 import org.cobalt.internal.mining.MiningMacroModule
 import org.cobalt.api.hud.modules.MiningHudModule
 import org.cobalt.internal.mining.MiningCoinPopupModule
-import org.cobalt.api.hud.modules.CommissionMacroModule
+import org.cobalt.internal.mining.BlockMinerModule
+import org.cobalt.internal.mining.GemstoneMinerModule
+import org.cobalt.internal.mining.CommissionMacroModule
 import org.cobalt.internal.mining.AutoForgeModule
 import org.cobalt.internal.mining.VeinDirectionModule
 import org.cobalt.internal.mining.AutoLanternModule
@@ -50,7 +57,8 @@ import org.cobalt.internal.qol.QolModule
 import org.cobalt.internal.stats.MacroTimeTracker
 import org.cobalt.internal.visual.BlockOverlayModule
 import org.cobalt.internal.visual.BlockOutlineModule
-import org.cobalt.internal.visual.DarkModeModule
+import org.cobalt.internal.visual.CustomScoreboardModule
+import org.cobalt.internal.visual.DeadEntityCleanerModule
 import org.cobalt.internal.visual.FreecamModule
 import org.cobalt.internal.visual.FullBrightModule
 import org.cobalt.internal.visual.SkyboxChangerModule
@@ -87,7 +95,6 @@ import org.cobalt.internal.routes.RouteStore
 object Cobalt : ClientModInitializer {
 
   private var cobaltSession: CobaltSession = CobaltSession.INVALID
-  private var authStarted = false
 
   override fun onInitializeClient() {
     cobaltSession = CobaltSession.readAndDelete()
@@ -96,6 +103,8 @@ object Cobalt : ClientModInitializer {
         WatermarkModule(),
         InventoryHudModule(),
         MiningModule,
+        BlockMinerModule,
+        GemstoneMinerModule,
         MiningHudModule,
         MiningCoinPopupModule,
         FairyModule,
@@ -108,6 +117,12 @@ object Cobalt : ClientModInitializer {
         AutoLanternModule,
         NoFrillsMiningModule,
         CombatMacroModule,
+        ZombieSlayerMacroModule,
+        WolfSlayerMacroModule,
+        SpiderSlayerMacroModule,
+        EndermanSlayerMacroModule,
+        VampireSlayerMacroModule,
+        BlazeSlayerMacroModule,
         CombatPatrolModule,
         CombatHudModule,
         DungeonsModule,
@@ -120,7 +135,8 @@ object Cobalt : ClientModInitializer {
         PathfindingModule,
         FullBrightModule,
         SkyboxChangerModule,
-        DarkModeModule,
+        CustomScoreboardModule,
+        DeadEntityCleanerModule,
         FreecamModule,
         DeployableHudModule,
         OrbitFreecamModule,
@@ -176,18 +192,9 @@ object Cobalt : ClientModInitializer {
     RouteStore.loadAssignments()
     ItemLockingModule.loadPersistedState()
     WardrobeModule.loadFavorites()
+    CobaltAuthService.start(cobaltSession)
     EventBus.register(this)
     println("Dutt Client Initialized")
-  }
-
-  @SubscribeEvent
-  fun onGuiRender(event: GuiRenderEvent) {
-    if (authStarted) return
-    val screen = net.minecraft.client.Minecraft.getInstance().screen
-    if (screen is net.minecraft.client.gui.screens.TitleScreen) {
-      authStarted = true
-      CobaltAuthService.start(cobaltSession)
-    }
   }
 
   @SubscribeEvent
@@ -195,6 +202,12 @@ object Cobalt : ClientModInitializer {
     if (event.packet is ClientboundRespawnPacket) {
       NativePathfinder.onLevelChange()
       ChunkSerializer.invalidate()
+      RouteStore.clearAllLoaded()
+      RouteEditMode.onLevelChange()
+      CommissionMacroModule.onLevelChange()
+      RoutesModule.onLevelChange()
+      MiningMacroModule.onLevelChange()
+      GemstoneMinerModule.onLevelChange()
       YearOfTheSealModule.onLevelChange()
     }
   }

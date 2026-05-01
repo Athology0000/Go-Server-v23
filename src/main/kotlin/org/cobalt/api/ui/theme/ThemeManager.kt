@@ -2,17 +2,19 @@ package org.cobalt.api.ui.theme
 
 import org.cobalt.api.ui.theme.impl.DarkTheme
 import org.cobalt.api.ui.theme.impl.LightTheme
+import org.cobalt.api.ui.theme.impl.ShadowRealmTheme
 import java.awt.Color
 
 object ThemeManager {
 
   private val themes = mutableListOf<Theme>()
-  var currentTheme: Theme = DarkTheme()
+  var currentTheme: Theme = ShadowRealmTheme()
     private set
 
   private val rainbowStartTime = System.currentTimeMillis()
 
   init {
+    registerTheme(currentTheme)
     registerTheme(DarkTheme())
     registerTheme(LightTheme())
   }

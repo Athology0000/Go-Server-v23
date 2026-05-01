@@ -7,6 +7,7 @@ import org.cobalt.api.event.EventBus
 import org.cobalt.api.event.annotation.SubscribeEvent
 import org.cobalt.api.event.impl.client.TickEvent
 import org.cobalt.api.module.Module
+import org.cobalt.api.module.ModuleCategory
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.KeyBindSetting
 import org.cobalt.api.module.setting.impl.SliderSetting
@@ -27,6 +28,8 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 object YearOfTheSealModule : Module("Year of the Seal") {
+
+    override val category = ModuleCategory.FARMING
 
     private val mc = Minecraft.getInstance()
 

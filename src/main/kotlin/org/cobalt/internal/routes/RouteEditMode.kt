@@ -94,6 +94,16 @@ internal object RouteEditMode {
     /** Returns the current point list (live copy, not the route itself). */
     fun getPoints(): List<RoutePoint> = points.toList()
 
+    internal fun onLevelChange() {
+        if (!isActive) return
+        isActive = false
+        activeRoute = null
+        validModes = emptyList()
+        points.clear()
+        insertAfterIndex = null
+        onDoneCallback = null
+    }
+
     // ── Event handlers ────────────────────────────────────────────────────────
 
     @SubscribeEvent

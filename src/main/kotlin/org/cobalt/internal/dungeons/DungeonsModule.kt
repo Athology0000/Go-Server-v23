@@ -26,6 +26,7 @@ import org.cobalt.api.event.impl.client.ChatEvent
 import org.cobalt.api.event.impl.client.TickEvent
 import org.cobalt.api.event.impl.render.WorldRenderEvent
 import org.cobalt.api.module.Module
+import org.cobalt.api.module.ModuleCategory
 import org.cobalt.api.module.setting.impl.ActionSetting
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.ColorSetting
@@ -37,6 +38,8 @@ import org.cobalt.bridge.module.IBonzoStaffHelper
 import org.cobalt.internal.helper.ClientGlowEspManager
 
 object DungeonsModule : Module("Dungeons"), IBonzoStaffHelper {
+
+  override val category = ModuleCategory.COMBAT
 
   private val mc: Minecraft = Minecraft.getInstance()
 

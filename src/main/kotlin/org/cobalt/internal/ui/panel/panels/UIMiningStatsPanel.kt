@@ -5,7 +5,7 @@ import org.cobalt.api.module.setting.impl.RangeSetting
 import org.cobalt.api.module.setting.impl.SliderSetting
 import org.cobalt.api.ui.theme.ThemeManager
 import org.cobalt.api.util.ui.NVGRenderer
-import org.cobalt.api.hud.modules.CommissionMacroModule
+import org.cobalt.internal.mining.CommissionMacroModule
 import org.cobalt.internal.mining.MiningMacroModule
 import org.cobalt.internal.mining.MiningModule
 import org.cobalt.internal.ui.components.settings.UICheckboxSetting

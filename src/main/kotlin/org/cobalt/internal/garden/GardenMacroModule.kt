@@ -8,6 +8,7 @@ import org.cobalt.api.event.impl.client.TickEvent
 import org.cobalt.api.hud.HudAnchor
 import org.cobalt.api.hud.hudElement
 import org.cobalt.api.module.Module
+import org.cobalt.api.module.ModuleCategory
 import org.cobalt.api.module.setting.inGroup
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.SliderSetting
@@ -36,6 +37,8 @@ import org.cobalt.internal.garden.managers.VisitorManager
 import org.cobalt.internal.garden.managers.WardrobeManager
 
 object GardenMacroModule : Module("Garden Macro") {
+
+    override val category = ModuleCategory.FARMING
 
     private val mc = Minecraft.getInstance()
     val isActive: Boolean get() = enabledSetting.value

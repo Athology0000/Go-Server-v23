@@ -15,7 +15,7 @@ import org.cobalt.internal.combat.CombatMacroModule
 import org.cobalt.internal.diana.DianaMacroModule
 import org.cobalt.internal.farming.FarmingMacroModule
 import org.cobalt.internal.garden.GardenMacroModule
-import org.cobalt.api.hud.modules.CommissionMacroModule
+import org.cobalt.internal.mining.CommissionMacroModule
 import org.cobalt.internal.mining.MiningMacroModule
 import org.cobalt.internal.pig.PigMacroModule
 

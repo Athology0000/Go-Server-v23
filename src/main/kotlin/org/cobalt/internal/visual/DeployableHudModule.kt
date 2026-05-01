@@ -23,6 +23,7 @@ import org.cobalt.api.hud.HudAnchor
 import org.cobalt.api.hud.HudModuleManager
 import org.cobalt.api.hud.hudElement
 import org.cobalt.api.module.Module
+import org.cobalt.api.module.ModuleCategory
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.ModeSetting
 import org.cobalt.api.ui.theme.ThemeManager

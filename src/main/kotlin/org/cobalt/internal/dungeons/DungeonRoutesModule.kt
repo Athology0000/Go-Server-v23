@@ -14,6 +14,7 @@ import org.cobalt.api.event.impl.client.TickEvent
 import org.cobalt.api.event.impl.render.WorldRenderContext
 import org.cobalt.api.event.impl.render.WorldRenderEvent
 import org.cobalt.api.module.Module
+import org.cobalt.api.module.ModuleCategory
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.ColorSetting
 import org.cobalt.api.module.setting.impl.KeyBindSetting
@@ -27,6 +28,8 @@ import org.cobalt.internal.dungeons.map.LoadedRoute
 import org.cobalt.internal.dungeons.map.RouteStep
 
 object DungeonRoutesModule : Module("Dungeon Routes") {
+
+  override val category = ModuleCategory.COMBAT
 
   // ── Constants ──────────────────────────────────────────────────────────────
 

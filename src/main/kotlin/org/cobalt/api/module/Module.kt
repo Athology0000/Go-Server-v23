@@ -17,6 +17,8 @@ import org.cobalt.api.module.setting.inGroup
  */
 abstract class Module(val name: String) : SettingsContainer {
 
+  open val category: ModuleCategory = ModuleCategory.OTHER
+
   private val settingsList = mutableListOf<Setting<*>>()
   private val hudElementsList = mutableListOf<HudElement>()
   private val debugSetting = CheckboxSetting(

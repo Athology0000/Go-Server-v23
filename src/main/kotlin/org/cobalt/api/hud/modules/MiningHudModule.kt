@@ -3,6 +3,7 @@ package org.cobalt.api.hud.modules
 import org.cobalt.api.hud.HudAnchor
 import org.cobalt.api.hud.hudElement
 import org.cobalt.api.module.Module
+import org.cobalt.api.module.ModuleCategory
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.ui.theme.ThemeManager
 import org.cobalt.api.util.ui.NVGRenderer
@@ -11,9 +12,12 @@ import org.cobalt.internal.mining.MiningMacroModule
 import org.cobalt.internal.mining.MiningModule
 import org.cobalt.internal.mining.MiningProfitTracker
 import org.cobalt.internal.mining.RoutesModule
+import org.cobalt.internal.mining.CommissionMacroModule
 import kotlin.math.cos
 
 object MiningHudModule : Module("Mining HUD") {
+
+  override val category = ModuleCategory.MINING
 
   private val textSize = 13f
   private val lineHeight = textSize + 5f

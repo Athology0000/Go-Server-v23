@@ -20,6 +20,7 @@ import org.cobalt.api.event.impl.client.TickEvent
 import org.cobalt.api.hud.HudAnchor
 import org.cobalt.api.hud.hudElement
 import org.cobalt.api.module.Module
+import org.cobalt.api.module.ModuleCategory
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.InfoSetting
 import org.cobalt.api.module.setting.impl.InfoType
@@ -37,6 +38,8 @@ import org.cobalt.api.util.player.MovementManager
 import org.cobalt.internal.pathfinding.OverlayRenderEngine
 
 object PigMacroModule : Module("Pig Macro") {
+
+    override val category = ModuleCategory.FARMING
 
     private val mc = Minecraft.getInstance()
     val isActive: Boolean get() = enabledSetting.value

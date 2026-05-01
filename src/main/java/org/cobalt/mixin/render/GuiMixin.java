@@ -3,7 +3,9 @@ package org.cobalt.mixin.render;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.world.scores.Objective;
 import org.cobalt.api.event.impl.render.GuiRenderEvent;
+import org.cobalt.internal.visual.CustomScoreboardModule;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -16,5 +18,12 @@ public class GuiMixin {
   private void cobaltRenderGui(GuiGraphics graphics, DeltaTracker delta, CallbackInfo ci) {
     org.cobalt.api.event.impl.render.GuiRenderContext.set(graphics, delta);
     new GuiRenderEvent(graphics, delta).post();
+  }
+
+  @Inject(method = "displayScoreboardSidebar", at = @At("HEAD"), cancellable = true)
+  private void cobaltRenderCustomScoreboard(GuiGraphics graphics, Objective objective, CallbackInfo ci) {
+    if (CustomScoreboardModule.INSTANCE.renderCustomSidebar(graphics, objective)) {
+      ci.cancel();
+    }
   }
 }

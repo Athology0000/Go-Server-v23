@@ -8,11 +8,14 @@ import org.cobalt.api.event.annotation.SubscribeEvent
 import org.cobalt.api.event.impl.client.BlockChangeEvent
 import org.cobalt.api.event.impl.render.NvgEvent
 import org.cobalt.api.module.Module
+import org.cobalt.api.module.ModuleCategory
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.SliderSetting
 import org.cobalt.api.util.ui.NVGRenderer
 
 object MiningCoinPopupModule : Module("Mining Coin Popups") {
+
+    override val category = ModuleCategory.MINING
 
     private val enabled = CheckboxSetting(
         "Enabled",

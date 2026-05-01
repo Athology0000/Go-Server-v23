@@ -11,6 +11,7 @@ import org.cobalt.api.rotation.strategy.TimedEaseStrategy
 import org.cobalt.api.util.ChatUtils
 import org.cobalt.api.util.helper.Rotation
 import org.cobalt.internal.pathfinding.PathfindingModule
+import org.cobalt.internal.qol.CraftHelperModule
 import org.cobalt.internal.stats.MacroTimeTracker
 import org.cobalt.internal.ui.screen.UIConfig
 
@@ -84,6 +85,21 @@ internal object MainCommand : Command(name = "dutt", aliases = arrayOf("cobalt",
   }
 
   @SubCommand
+  fun sendcoords() {
+    val mc = net.minecraft.client.Minecraft.getInstance()
+    val player = mc.player
+    if (player == null) {
+      ChatUtils.sendMessage("No world loaded.")
+      return
+    }
+
+    val pos = player.blockPosition()
+    val message = "x: ${pos.x}, y: ${pos.y}, z: ${pos.z}"
+    player.connection.sendChat(message)
+    ChatUtils.sendMessage("Sent coordinates: $message")
+  }
+
+  @SubCommand
   fun today() {
     val snapshot = MacroTimeTracker.snapshot()
     ChatUtils.sendMessage("Today: ${formatDuration(snapshot.todayTotalMs)}")
@@ -129,6 +145,30 @@ internal object MainCommand : Command(name = "dutt", aliases = arrayOf("cobalt",
     }
 
     ChatUtils.sendMessage("[EntityScan] Found $count entities within $range blocks.")
+  }
+
+  @SubCommand
+  fun craftheld() {
+    CraftHelperModule.setTargetFromHeld()
+  }
+
+  @SubCommand
+  fun craftset(id: String) {
+    CraftHelperModule.setTarget(id)
+  }
+
+  @SubCommand
+  fun craftamount(amount: Int) {
+    if (amount <= 0) {
+      ChatUtils.sendMessage("Craft Helper: Amount must be greater than 0.")
+      return
+    }
+    CraftHelperModule.setTargetAmount(amount)
+  }
+
+  @SubCommand
+  fun craftclear() {
+    CraftHelperModule.clearTarget()
   }
 
   private fun emitBreakdown(title: String, durations: List<MacroTimeTracker.MacroDuration>) {

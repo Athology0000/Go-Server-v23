@@ -33,6 +33,10 @@ object SpotifyModule : Module("Spotify") {
         "Gradient", "Progress bar gradient direction.",
         0, arrayOf("Left->Right", "Top->Bottom")
     )
+    private val styleModeSetting = ModeSetting(
+        "Mode", "Spotify HUD style.",
+        0, arrayOf("Default", "Glass", "Compact")
+    )
     private val autoColorSetting  = CheckboxSetting("Auto Color",  "Derive gradient color from album art.", true)
     private val glowSetting       = CheckboxSetting("Glow",        "Animated glow border.",                 true)
     private val particlesSetting  = CheckboxSetting("Particles",   "Sparkle particle effects.",             true)
@@ -56,6 +60,13 @@ object SpotifyModule : Module("Spotify") {
 
     private val color1 get() = if (autoColorSetting.value) artDominantC1 else manualColor1
     private val color2 get() = if (autoColorSetting.value) artDominantC2 else manualColor2
+    private val isGlassMode get() = styleModeSetting.value == STYLE_GLASS
+    private val isCompactMode get() = styleModeSetting.value == STYLE_COMPACT
+    private val currentHudWidth get() = if (isCompactMode) COMPACT_W else W
+    private val currentHudHeight get() = if (isCompactMode) COMPACT_H else H
+    private val currentArtSize get() = if (isCompactMode) COMPACT_ART else ART
+    private val currentArtFrame get() = currentArtSize
+    private val currentTextX get() = PAD + currentArtFrame + 8f
 
     // -- Art cache + crossfade -------------------------------------------------
 
@@ -108,6 +119,9 @@ object SpotifyModule : Module("Spotify") {
     private const val W              = 305f
     private const val H              = 90f
     private const val ART            = 60f
+    private const val COMPACT_W      = 260f
+    private const val COMPACT_H      = 62f
+    private const val COMPACT_ART    = 46f
     private const val ART_FRAME      = ART      // ART_PAD = 0
     private const val CORNER         = 10f
     private const val PAD            = 8f
@@ -133,8 +147,8 @@ object SpotifyModule : Module("Spotify") {
         offsetX = 10f
         offsetY = 10f
 
-        width  { W }
-        height { H }
+        width  { currentHudWidth }
+        height { currentHudHeight }
 
         render { x, y, scale ->
             // HudModuleManager only calls this when mc.screen == null, so controls are hidden.
@@ -173,6 +187,7 @@ object SpotifyModule : Module("Spotify") {
         if (mc.screen == null) return
         if (mc.level == null) return
         if (!spotifyHud.enabled) return
+        if (isCompactMode) return
         SpotifyPoller.current ?: return
 
         val window  = mc.window
@@ -208,7 +223,7 @@ object SpotifyModule : Module("Spotify") {
     init {
         addSetting(
             color1Setting, color2Setting,
-            gradientDirectionSetting, autoColorSetting,
+            gradientDirectionSetting, styleModeSetting, autoColorSetting,
             glowSetting, particlesSetting, showTimeSetting, waveformSetting,
         )
         EventBus.register(this)
@@ -231,21 +246,27 @@ object SpotifyModule : Module("Spotify") {
         val dt   = ((now - lastRenderMs) / 1000f).coerceIn(0f, 0.1f)
         lastRenderMs = now
         waveformMotionTime = (waveformMotionTime + dt).let { if (it >= 10_000f) it - 10_000f else it }
+        val hudWidth = currentHudWidth
+        val hudHeight = currentHudHeight
+        val artSize = currentArtSize
+        val textX = currentTextX
+        val waveformEnabled = waveformSetting.value && !isCompactMode
+        val showControlsEffective = showControls && !isCompactMode
 
         val c1    = color1
         val c2    = color2
         val track = SpotifyPoller.current
 
         refreshArtCache(now)
-        drawBackground(x, y, W, H, now, c1, c2)
-        drawAlbumArt(x, y, track, now)
+        drawBackground(x, y, hudWidth, hudHeight, now, c1, c2)
+        drawAlbumArt(x, y, track, now, artSize)
 
         val textColor = 0xFFFFFFFF.toInt()
         val dimColor  = 0xBBA8B8D0.toInt()
 
         if (track == null) {
             NVGRenderer.text("Open Spotify and play something",
-                x + TEXT_X, y + H / 2f - 5f, 10f, dimColor)
+                x + textX, y + hudHeight / 2f - 5f, 10f, dimColor)
             updateWaveformState(dt, false, 0f)
             return
         }
@@ -270,27 +291,38 @@ object SpotifyModule : Module("Spotify") {
             }
         }
 
-        val waveformReservedW = if (waveformSetting.value) WAVE_W + WAVE_GAP else 0f
-        val textMaxW = (W - TEXT_X - PAD - waveformReservedW).coerceAtLeast(60f)
+        val waveformReservedW = if (waveformEnabled) WAVE_W + WAVE_GAP else 0f
+        val textMaxW = (hudWidth - textX - PAD - waveformReservedW).coerceAtLeast(60f)
+        val titleY = if (isCompactMode) 16f else 18f
+        val artistY = if (isCompactMode) 30f else 33f
+        val timeY = if (isCompactMode) 44f else 46f
+        val titleSize = if (isCompactMode) 11f else 12f
+        val artistSize = if (isCompactMode) 9f else 10f
 
         // Title row - full width of text area (no time here)
-        drawScrollingTitle(track.name, x + TEXT_X, y + 18f, textMaxW, 12f, textColor, dt)
+        drawScrollingTitle(track.name, x + textX, y + titleY, textMaxW, titleSize, textColor, dt)
 
         // Artist row
-        NVGRenderer.text(truncate(track.artist, textMaxW, 10f), x + TEXT_X, y + 33f, 10f, dimColor)
+        NVGRenderer.text(truncate(track.artist, textMaxW, artistSize), x + textX, y + artistY, artistSize, dimColor)
 
         // Time row - below artist
         if (showTimeSetting.value) {
-            val timeStr = "${formatMs(track.currentProgressMs)} / ${formatMs(track.durationMs)}"
-            NVGRenderer.text(timeStr, x + TEXT_X, y + 46f, 9f, dimColor)
+            val timeStr =
+                if (isCompactMode) {
+                    val remainingMs = (track.durationMs - track.currentProgressMs).coerceAtLeast(0L)
+                    "${formatMs(track.currentProgressMs)} / -${formatMs(remainingMs)}"
+                } else {
+                    "${formatMs(track.currentProgressMs)} / ${formatMs(track.durationMs)}"
+                }
+            NVGRenderer.text(timeStr, x + textX, y + timeY, 9f, dimColor)
         }
 
-        if (waveformSetting.value) {
-            drawWaveform(x + W - PAD - WAVE_W, y + WAVE_Y, WAVE_W, WAVE_H, c1, c2, track.isPlaying)
+        if (waveformEnabled) {
+            drawWaveform(x + hudWidth - PAD - WAVE_W, y + WAVE_Y, WAVE_W, WAVE_H, c1, c2, track.isPlaying)
         }
 
         // Control buttons - only when a screen is open
-        if (showControls) {
+        if (showControlsEffective) {
             ensureIconsLoaded()
 
             val rawMx = mc.mouseHandler.xpos().toFloat()
@@ -299,8 +331,8 @@ object SpotifyModule : Module("Spotify") {
             val lmy   = if (scale > 0f) (rawMy - screenY) / scale else rawMy
 
             val totalBtnW  = BTN_W * 3f + 8f * 2f
-            val textAreaW  = W - TEXT_X - PAD          // width of text column (right of art)
-            val btnStartX  = x + TEXT_X + (textAreaW - totalBtnW) / 2f
+            val textAreaW  = hudWidth - textX - PAD          // width of text column (right of art)
+            val btnStartX  = x + textX + (textAreaW - totalBtnW) / 2f
             val b0x = btnStartX
             val b1x = btnStartX + BTN_W + 8f
             val b2x = btnStartX + (BTN_W + 8f) * 2f
@@ -311,9 +343,15 @@ object SpotifyModule : Module("Spotify") {
                 val localBx = bx - x
                 val hovered = lmx >= localBx && lmx <= localBx + BTN_W &&
                               lmy >= BTN_Y_L  && lmy <= BTN_Y_L + BTN_H
-                val bgAlpha = if (hovered) 0x55 else 0x22
+                val bgAlpha = when {
+                    isGlassMode && hovered -> 0x32
+                    isGlassMode -> 0x14
+                    hovered -> 0x55
+                    else -> 0x22
+                }
+                val strokeColor = if (isGlassMode) 0x44FFFFFF else 0x33FFFFFF
                 NVGRenderer.rect(bx, bY, BTN_W, BTN_H, (bgAlpha shl 24) or 0xFFFFFF, 6f)
-                NVGRenderer.hollowRect(bx, bY, BTN_W, BTN_H, 1f, 0x33FFFFFF, 6f)
+                NVGRenderer.hollowRect(bx, bY, BTN_W, BTN_H, 1f, strokeColor, 6f)
                 if (img != null) {
                     val iconSize = BTN_H - 6f
                     NVGRenderer.image(
@@ -321,18 +359,20 @@ object SpotifyModule : Module("Spotify") {
                         bx + (BTN_W - iconSize) / 2f,
                         bY + (BTN_H - iconSize) / 2f,
                         iconSize, iconSize, 0f,
-                        if (hovered) 0xFFFFFFFF.toInt() else 0xCCFFFFFF.toInt()
+                        if (hovered) 0xFFFFFFFF.toInt() else if (isGlassMode) 0xDDFFFFFF.toInt() else 0xCCFFFFFF.toInt()
                     )
                 }
             }
         }
 
         // Progress bar
-        drawProgressBar(x + PAD, y + BAR_Y, W - PAD * 2f, 6f, track, c1, c2)
+        if (!isCompactMode) {
+            drawProgressBar(x + PAD, y + BAR_Y, hudWidth - PAD * 2f, 6f, track, c1, c2)
+        }
 
         // Particles
-        if (particlesSetting.value) {
-            val fillW = ((W - PAD * 2f) * (track.currentProgressMs.toFloat() / track.durationMs)).coerceIn(0f, W - PAD * 2f)
+        if (particlesSetting.value && !isCompactMode) {
+            val fillW = ((hudWidth - PAD * 2f) * (track.currentProgressMs.toFloat() / track.durationMs)).coerceIn(0f, hudWidth - PAD * 2f)
             SpotifyParticles.update(dt, x + PAD, y + BAR_Y, fillW, c1, c2, track.isPlaying)
             SpotifyParticles.render()
         }
@@ -342,32 +382,50 @@ object SpotifyModule : Module("Spotify") {
 
     private fun drawBackground(x: Float, y: Float, w: Float, h: Float, now: Long, c1: Int, c2: Int) {
         val twoPi = (Math.PI * 2).toFloat()
+        val glassMode = isGlassMode
 
         if (glowSetting.value) {
             val pulse = 0.4f + 0.6f * cos((now % 4000L).toFloat() / 4000f * twoPi)
-            val a2 = (0x18 * pulse).toInt().coerceIn(0, 0x28)
-            val a1 = (0x2A * pulse).toInt().coerceIn(0, 0x40)
+            val outerMax = if (glassMode) 0x1A else 0x28
+            val innerMax = if (glassMode) 0x24 else 0x40
+            val a2 = (outerMax * pulse).toInt().coerceIn(0, outerMax)
+            val a1 = (innerMax * pulse).toInt().coerceIn(0, innerMax)
             NVGRenderer.hollowRect(x - 3f, y - 3f, w + 6f, h + 6f, 2.5f,
                 (a2 shl 24) or (c1 and 0x00FFFFFF), CORNER + 3f)
             NVGRenderer.hollowRect(x - 1.5f, y - 1.5f, w + 3f, h + 3f, 1.5f,
                 (a1 shl 24) or (c1 and 0x00FFFFFF), CORNER + 1.5f)
         }
 
-        NVGRenderer.rect(x, y, w, h, 0xFF0A0E1A.toInt(), CORNER)
-        NVGRenderer.gradientRect(x, y, w, h * 0.5f, 0x14FFFFFF, 0x00000000, Gradient.TopToBottom, CORNER)
-
         val angle  = (now % 10000L).toFloat() / 10000f * twoPi
         val shiftX = cos(angle) * (w * 0.42f)
-        NVGRenderer.hollowGradientRectShifted(x, y, w, h, 1.5f, c1, c2, Gradient.LeftToRight, CORNER, shiftX, 0f)
+
+        if (glassMode) {
+            NVGRenderer.rect(x, y, w, h, 0x72101824.toInt(), CORNER)
+            NVGRenderer.gradientRect(x, y, w, h * 0.56f, 0x34FFFFFF, 0x08000000, Gradient.TopToBottom, CORNER)
+            NVGRenderer.gradientRect(x, y + h * 0.46f, w, h * 0.54f, 0x04000000, 0x26000000, Gradient.TopToBottom, CORNER)
+            NVGRenderer.hollowRect(x, y, w, h, 1f, 0x44FFFFFF, CORNER)
+            NVGRenderer.hollowRect(x + 1f, y + 1f, w - 2f, h - 2f, 1f, 0x16FFFFFF, CORNER - 1f)
+            NVGRenderer.hollowGradientRectShifted(
+                x, y, w, h, 1.2f,
+                withAlpha(c1, 0x54), withAlpha(c2, 0x34),
+                Gradient.LeftToRight, CORNER, shiftX * 0.45f, 0f
+            )
+        } else {
+            NVGRenderer.rect(x, y, w, h, 0xFF0A0E1A.toInt(), CORNER)
+            NVGRenderer.gradientRect(x, y, w, h * 0.5f, 0x14FFFFFF, 0x00000000, Gradient.TopToBottom, CORNER)
+            NVGRenderer.hollowGradientRectShifted(x, y, w, h, 1.5f, c1, c2, Gradient.LeftToRight, CORNER, shiftX, 0f)
+        }
     }
 
     /** Art positioned flush to top-left (PAD from top/left edge). Art ends at y+PAD+ART = y+68. */
-    private fun drawAlbumArt(x: Float, y: Float, track: SpotifyTrack?, now: Long) {
+    private fun drawAlbumArt(x: Float, y: Float, track: SpotifyTrack?, now: Long, artSize: Float) {
         val artX = x + PAD
         val artY = y + PAD
+        val frameColor = if (isGlassMode) 0x4D101521 else 0xFF101521.toInt()
+        val frameBorder = if (isGlassMode) 0x3DFFFFFF else 0x22FFFFFF
 
-        NVGRenderer.rect(artX, artY, ART_FRAME, ART_FRAME, 0xFF101521.toInt(), 8f)
-        NVGRenderer.hollowRect(artX, artY, ART_FRAME, ART_FRAME, 1f, 0x22FFFFFF, 8f)
+        NVGRenderer.rect(artX, artY, artSize, artSize, frameColor, 8f)
+        NVGRenderer.hollowRect(artX, artY, artSize, artSize, 1f, frameBorder, 8f)
 
         val fade = artFadeAlpha(now)
         val prev = prevArtImage
@@ -375,18 +433,18 @@ object SpotifyModule : Module("Spotify") {
 
         if (prev != null && fade < 1f) {
             val a = ((1f - fade) * 0xFF).toInt().coerceIn(0, 0xFF)
-            NVGRenderer.image(prev, artX, artY, ART, ART, 6f, (a shl 24) or 0xFFFFFF)
+            NVGRenderer.image(prev, artX, artY, artSize, artSize, 6f, (a shl 24) or 0xFFFFFF)
         }
         if (curr != null) {
             val a = (fade * 0xFF).toInt().coerceIn(0, 0xFF)
-            NVGRenderer.image(curr, artX, artY, ART, ART, 6f, (a shl 24) or 0xFFFFFF)
+            NVGRenderer.image(curr, artX, artY, artSize, artSize, 6f, (a shl 24) or 0xFFFFFF)
             if (track?.isPlaying == false) {
-                NVGRenderer.rect(artX, artY, ART, ART, 0x55000000, 6f)
+                NVGRenderer.rect(artX, artY, artSize, artSize, if (isGlassMode) 0x38000000 else 0x55000000, 6f)
             }
         } else {
-            NVGRenderer.rect(artX, artY, ART, ART, 0xFF141824.toInt(), 6f)
+            NVGRenderer.rect(artX, artY, artSize, artSize, if (isGlassMode) 0x66141824 else 0xFF141824.toInt(), 6f)
             val noteW = NVGRenderer.textWidth("\u266A", 22f)
-            NVGRenderer.text("\u266A", artX + ART / 2f - noteW / 2f, artY + ART / 2f - 11f, 22f, 0x33FFFFFF)
+            NVGRenderer.text("\u266A", artX + artSize / 2f - noteW / 2f, artY + artSize / 2f - 11f, 22f, 0x33FFFFFF)
         }
 
         if (fade >= 1f && prev != null) {
@@ -403,7 +461,7 @@ object SpotifyModule : Module("Spotify") {
         val prog  = (track.currentProgressMs.toFloat() / track.durationMs).coerceIn(0f, 1f)
         val fillW = (barW * prog).coerceAtLeast(0f)
 
-        NVGRenderer.rect(barX, barY, barW, barH, 0xFF1A2040.toInt(), barR)
+        NVGRenderer.rect(barX, barY, barW, barH, if (isGlassMode) 0x4D1A2040 else 0xFF1A2040.toInt(), barR)
 
         if (fillW > barR * 2f) {
             val gradient = if (gradientDirectionSetting.value == 1) Gradient.TopToBottom else Gradient.LeftToRight
@@ -771,4 +829,7 @@ object SpotifyModule : Module("Spotify") {
         val total = (ms / 1000L).coerceAtLeast(0L)
         return "%d:%02d".format(total / 60L, total % 60L)
     }
+
+    private const val STYLE_GLASS = 1
+    private const val STYLE_COMPACT = 2
 }

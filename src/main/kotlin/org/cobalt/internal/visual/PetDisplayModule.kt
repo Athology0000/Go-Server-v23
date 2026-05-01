@@ -1,10 +1,10 @@
 package org.cobalt.internal.visual
 
 import net.minecraft.client.Minecraft
-import net.minecraft.world.entity.EquipmentSlot
 import net.minecraft.core.component.DataComponents
 import net.minecraft.network.protocol.game.ClientboundContainerSetContentPacket
 import net.minecraft.network.protocol.game.ClientboundContainerSetSlotPacket
+import net.minecraft.world.entity.EquipmentSlot
 import net.minecraft.world.item.ItemStack
 import org.cobalt.api.event.EventBus
 import org.cobalt.api.event.annotation.SubscribeEvent

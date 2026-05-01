@@ -10,11 +10,14 @@ import org.cobalt.api.event.annotation.SubscribeEvent
 import org.cobalt.api.event.impl.client.MouseEvent
 import org.cobalt.api.event.impl.client.TickEvent
 import org.cobalt.api.module.Module
+import org.cobalt.api.module.ModuleCategory
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.SliderSetting
 import org.cobalt.api.util.TickScheduler
 
 object LeftClickEtherwarpModule : Module("Left Click Etherwarp") {
+
+  override val category = ModuleCategory.COMBAT
 
   private val mc = Minecraft.getInstance()
   private val rng = Random.Default

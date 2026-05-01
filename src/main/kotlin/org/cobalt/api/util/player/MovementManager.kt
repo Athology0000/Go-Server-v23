@@ -74,7 +74,9 @@ object MovementManager {
   fun setForcedMovement(
     forward: Boolean,
     backward: Boolean,
+    @Suppress("UNUSED_PARAMETER")
     left: Boolean,
+    @Suppress("UNUSED_PARAMETER")
     right: Boolean,
     jump: Boolean,
     shift: Boolean,
@@ -82,8 +84,8 @@ object MovementManager {
   ) {
     forcedForward = forward
     forcedBackward = backward
-    forcedLeft = left
-    forcedRight = right
+    forcedLeft = false
+    forcedRight = false
     forcedJump = jump
     forcedShift = shift
     forcedSprint = sprint

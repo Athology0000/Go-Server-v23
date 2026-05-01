@@ -25,6 +25,7 @@ internal object RouteStore {
     /** Load all routes from disk, sorted case-insensitively by name. */
     fun loadAll(): List<SavedRoute> {
         ensureDirExists()
+        migrate()
         return loadAllFromDir()
     }
 
@@ -50,6 +51,8 @@ internal object RouteStore {
     }
 
     fun clearLoaded(type: RouteType) { loadedRoutes.remove(type) }
+
+    fun clearAllLoaded() { loadedRoutes.clear() }
 
     /** Returns the armed route for [type], or null if none is armed. */
     fun getLoadedName(type: RouteType): String? = loadedRoutes[type]
@@ -177,11 +180,7 @@ internal object RouteStore {
                 val x = o["x"]?.asInt ?: return@runCatching null
                 val y = o["y"]?.asInt ?: return@runCatching null
                 val z = o["z"]?.asInt ?: return@runCatching null
-                val newType = when (o["type"]?.asString?.lowercase()) {
-                    "warp" -> RoutePointType.WARP
-                    "mine" -> RoutePointType.MINE
-                    else   -> RoutePointType.WALK
-                }
+                val newType = parsePointType(o)
                 RoutePoint(
                     type    = newType,
                     x       = x,
@@ -197,5 +196,15 @@ internal object RouteStore {
 
         // Old format → loopOrArea (points were the mining loop, no separate travel route)
         return SavedRoute(name = name, type = RouteType.ORE_MINER, loopOrArea = points)
+    }
+
+    private fun parsePointType(o: JsonObject): RoutePointType {
+        o["type"]?.asString?.let { return RoutePointType.fromId(it) }
+        val movements = o["movements"]?.asString?.uppercase().orEmpty()
+        return when {
+            "ETHERWARP" in movements || "WARP" in movements -> RoutePointType.WARP
+            "MINE" in movements -> RoutePointType.MINE
+            else -> RoutePointType.WALK
+        }
     }
 }

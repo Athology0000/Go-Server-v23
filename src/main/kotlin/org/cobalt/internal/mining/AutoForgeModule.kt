@@ -14,6 +14,7 @@ import org.cobalt.api.event.EventBus
 import org.cobalt.api.event.annotation.SubscribeEvent
 import org.cobalt.api.event.impl.client.TickEvent
 import org.cobalt.api.module.Module
+import org.cobalt.api.module.ModuleCategory
 import org.cobalt.api.pathfinder.jni.NativePathfinder
 import org.cobalt.api.pathfinder.jni.PathStatus
 import org.cobalt.api.pathfinder.minecraft.MinecraftPathingRules
@@ -29,6 +30,8 @@ import org.cobalt.internal.pathfinding.PathfindingModule
 import org.cobalt.internal.ui.panel.panels.UIModuleList
 
 object AutoForgeModule : Module("Auto Forge") {
+
+  override val category = ModuleCategory.MINING
 
   private enum class State {
     IDLE,

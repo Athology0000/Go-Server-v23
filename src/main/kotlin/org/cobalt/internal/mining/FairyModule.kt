@@ -1,10 +1,13 @@
 package org.cobalt.internal.mining
 
 import org.cobalt.api.module.Module
+import org.cobalt.api.module.ModuleCategory
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.internal.grotto.GrottoIntegration
 
 object FairyModule : Module("Fairy") {
+
+  override val category = ModuleCategory.MINING
 
   val enabled = CheckboxSetting(
     "Enabled",

@@ -6,12 +6,15 @@ import com.mojang.blaze3d.vertex.PoseStack
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.Font
 import net.minecraft.client.renderer.LightTexture
+import net.minecraft.client.renderer.rendertype.RenderTypes
 import net.minecraft.gizmos.GizmoStyle
 import net.minecraft.gizmos.Gizmos
 import net.minecraft.util.ARGB
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import org.cobalt.api.event.impl.render.WorldRenderContext
+import kotlin.math.cos
+import kotlin.math.sin
 
 object Render3D {
 
@@ -80,7 +83,13 @@ object Render3D {
    * The label always faces the camera.
    */
   @JvmStatic
-  fun drawWorldLabel(context: WorldRenderContext, worldPos: Vec3, text: String, color: Color) {
+  fun drawWorldLabel(
+    context: WorldRenderContext,
+    worldPos: Vec3,
+    text: String,
+    color: Color,
+    textScale: Float = 1f,
+  ) {
     val mc = Minecraft.getInstance()
     val camera = context.camera
     val cam = camera.position()
@@ -88,7 +97,7 @@ object Render3D {
     val font = mc.font
     val buffer = mc.renderBuffers().bufferSource()
     val textWidth = font.width(text).toFloat()
-    val scale = 0.025f
+    val scale = 0.025f * textScale.coerceAtLeast(0.1f)
 
     try {
       GlStateManager._enableBlend()
@@ -123,4 +132,94 @@ object Render3D {
     }
   }
 
+  @JvmStatic
+  fun drawCircleSurface(
+    context: WorldRenderContext,
+    center: Vec3,
+    radius: Float,
+    color: Color,
+  ) {
+    if (radius <= 0f) return
+    if (!FrustumUtils.isVisible(
+        context.frustum,
+        center.x - radius, center.y - 0.05, center.z - radius,
+        center.x + radius, center.y + 0.05, center.z + radius
+      )
+    ) return
+
+    val matrices = context.matrixStack ?: PoseStack()
+    val cameraPos = context.camera.position()
+    val buffer = context.consumers.getBuffer(RenderTypes.debugTriangleFan())
+    val argb = ARGB.color(color.alpha, color.red, color.green, color.blue)
+
+    matrices.pushPose()
+    matrices.translate(center.x - cameraPos.x, center.y + SURFACE_RENDER_OFFSET, center.z - cameraPos.z)
+    val pose = matrices.last().pose()
+
+    for (i in 0 until CYLINDER_SEGMENTS) {
+      val rad = Math.toRadians(i.toDouble())
+      val nextRad = Math.toRadians((i + 1).toDouble())
+      val x1 = (radius * cos(rad)).toFloat()
+      val z1 = (radius * sin(rad)).toFloat()
+      val x2 = (radius * cos(nextRad)).toFloat()
+      val z2 = (radius * sin(nextRad)).toFloat()
+
+      buffer.addVertex(pose, 0f, 0f, 0f).setColor(argb)
+      buffer.addVertex(pose, x2, 0f, z2).setColor(argb)
+      buffer.addVertex(pose, x1, 0f, z1).setColor(argb)
+      buffer.addVertex(pose, 0f, 0f, 0f).setColor(argb)
+    }
+
+    matrices.popPose()
+  }
+
+  @JvmStatic
+  fun drawCylinderSurface(
+    context: WorldRenderContext,
+    center: Vec3,
+    radius: Float,
+    height: Float,
+    color: Color,
+  ) {
+    if (radius <= 0f || height <= 0f) return
+    if (!FrustumUtils.isVisible(
+        context.frustum,
+        center.x - radius, center.y, center.z - radius,
+        center.x + radius, center.y + height, center.z + radius
+      )
+    ) return
+
+    val matrices = context.matrixStack ?: PoseStack()
+    val cameraPos = context.camera.position()
+    val buffer = context.consumers.getBuffer(RenderTypes.debugQuads())
+    val argb = ARGB.color(color.alpha, color.red, color.green, color.blue)
+
+    matrices.pushPose()
+    matrices.translate(center.x - cameraPos.x, center.y + SURFACE_RENDER_OFFSET, center.z - cameraPos.z)
+    val pose = matrices.last().pose()
+
+    for (i in 0 until CYLINDER_SEGMENTS) {
+      val rad = Math.toRadians(i.toDouble())
+      val nextRad = Math.toRadians((i + 1).toDouble())
+      val x1 = (radius * cos(rad)).toFloat()
+      val z1 = (radius * sin(rad)).toFloat()
+      val x2 = (radius * cos(nextRad)).toFloat()
+      val z2 = (radius * sin(nextRad)).toFloat()
+
+      buffer.addVertex(pose, x1, 0f, z1).setColor(argb)
+      buffer.addVertex(pose, x2, 0f, z2).setColor(argb)
+      buffer.addVertex(pose, x2, height, z2).setColor(argb)
+      buffer.addVertex(pose, x1, height, z1).setColor(argb)
+
+      buffer.addVertex(pose, x2, 0f, z2).setColor(argb)
+      buffer.addVertex(pose, x1, 0f, z1).setColor(argb)
+      buffer.addVertex(pose, x1, height, z1).setColor(argb)
+      buffer.addVertex(pose, x2, height, z2).setColor(argb)
+    }
+
+    matrices.popPose()
+  }
+
+  private const val CYLINDER_SEGMENTS = 360
+  private const val SURFACE_RENDER_OFFSET = 0.01
 }

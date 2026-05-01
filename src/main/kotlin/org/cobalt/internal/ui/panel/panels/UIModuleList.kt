@@ -7,11 +7,15 @@ import org.cobalt.api.module.setting.impl.*
 import org.cobalt.api.ui.theme.ThemeManager
 import org.cobalt.api.util.ui.NVGRenderer
 import org.cobalt.internal.combat.SlayerLoadoutSetting
+import org.cobalt.internal.mining.BlockMinerModule
+import org.cobalt.internal.mining.GemstoneMinerModule
 import org.cobalt.internal.mining.MiningMacroModule
 import org.cobalt.internal.mining.MiningModule
 import org.cobalt.internal.routes.RoutePickerSetting
+import org.cobalt.api.module.ModuleCategory
 import org.cobalt.internal.ui.UIComponent
 import org.cobalt.internal.ui.components.UIBackButton
+import org.cobalt.internal.ui.components.UICategoryHeader
 import org.cobalt.internal.ui.components.UIModule
 import org.cobalt.internal.ui.components.UITopbar
 import org.cobalt.internal.ui.components.settings.*
@@ -42,22 +46,15 @@ internal class UIModuleList(
   private val topBar = UITopbar("Modules")
   private val backButton = UIBackButton()
 
-  private val allModules = addon.getModules()
-    .withIndex()
-    .map { (index, module) ->
-      UIModule(module, this, index == 0)
-    }
+  private val allModules: List<UIModule> = addon.getModules()
+    .map { module -> UIModule(module, this, false) }
 
-  private var modules = allModules
+  private val allItems: List<UIComponent> = buildCategoryItems(allModules)
+
+  private var modules: List<UIComponent> = allItems
   private val modulesScroll = ScrollHandler()
-  private val modulesLayout = GridLayout(
-    columns = 1,
-    itemWidth = 182.5F,
-    itemHeight = 40F,
-    gap = 5F
-  )
 
-  private var module = modules.first()
+  private var module = allModules.first()
   private var settingsTabs = emptyList<String>()
   private var selectedSettingsTab = Setting.DEFAULT_UI_GROUP
   private var tabHitboxes = emptyList<SettingsTabHitbox>()
@@ -76,17 +73,17 @@ internal class UIModuleList(
   )
 
   init {
-    components.addAll(modules)
+    components.addAll(allItems)
     components.add(backButton)
     components.add(topBar)
 
     refreshTabs(resetSelection = true)
     rebuildSettings(resetScroll = false)
-    updateAuxPanel(modules.first().module)
+    updateAuxPanel(allModules.first().module)
 
     topBar.searchChanged { searchText ->
       modules = if (searchText.isEmpty()) {
-        allModules
+        allItems
       } else {
         val searchLower = searchText.lowercase()
         allModules.filter { uiModule ->
@@ -98,8 +95,9 @@ internal class UIModuleList(
         }
       }
 
-      if (modules.isNotEmpty()) {
-        setModule(modules.first())
+      val firstModule = modules.filterIsInstance<UIModule>().firstOrNull()
+      if (firstModule != null) {
+        setModule(firstModule)
       } else {
         components.removeAll(settings)
         settings = emptyList()
@@ -138,11 +136,11 @@ internal class UIModuleList(
     val startY = y + topBar.height + backButton.height + 40F
     val visibleHeight = height - (topBar.height + backButton.height + 40F)
 
-    modulesScroll.setMaxScroll(modulesLayout.contentHeight(modules.size) + 20F, visibleHeight)
+    modulesScroll.setMaxScroll(modulesItemsHeight(modules) + 20F, visibleHeight)
     NVGRenderer.pushScissor(x, startY, width / 4F, visibleHeight)
 
     val modulesScrollOffset = modulesScroll.getOffset()
-    modulesLayout.layout(x + 20F, startY - modulesScrollOffset, modules)
+    layoutModuleItems(x + 20F, startY - modulesScrollOffset, modules)
     modules.forEach(UIComponent::render)
 
     NVGRenderer.popScissor()
@@ -215,7 +213,7 @@ internal class UIModuleList(
   fun setModule(module: UIModule) {
     val moduleChanged = this.module != module
 
-    modules.forEach {
+    allModules.forEach {
       when {
         it == module -> module.setSelected()
         else -> it.setSelected(false)
@@ -229,7 +227,7 @@ internal class UIModuleList(
   }
 
   private fun updateAuxPanel(module: org.cobalt.api.module.Module) {
-    if (module === MiningModule || module === MiningMacroModule) {
+    if (module === MiningModule || module === MiningMacroModule || module === BlockMinerModule || module === GemstoneMinerModule) {
       UIConfig.setAuxPanel(UIMiningStatsPanel())
     } else {
       UIConfig.clearAuxPanel()
@@ -349,8 +347,34 @@ internal class UIModuleList(
     tabHitboxes = hitboxes
   }
 
+  private fun buildCategoryItems(uiModules: List<UIModule>): List<UIComponent> {
+    val result = mutableListOf<UIComponent>()
+    for (cat in ModuleCategory.entries) {
+      val inCategory = uiModules.filter { it.module.category == cat }
+      if (inCategory.isNotEmpty()) {
+        result.add(UICategoryHeader(cat))
+        result.addAll(inCategory)
+      }
+    }
+    return result
+  }
+
+  private fun modulesItemsHeight(items: List<UIComponent>): Float {
+    if (items.isEmpty()) return 0F
+    return items.sumOf { it.height.toDouble() }.toFloat() + (items.size - 1) * MODULES_ITEM_GAP
+  }
+
+  private fun layoutModuleItems(startX: Float, startY: Float, items: List<UIComponent>) {
+    var currentY = startY
+    items.forEach { item ->
+      item.updateBounds(startX, currentY)
+      currentY += item.height + MODULES_ITEM_GAP
+    }
+  }
+
   companion object {
     const val SIDE_GROUP = "__side__"
+    private const val MODULES_ITEM_GAP = 5F
     private const val TAB_BAR_HEIGHT = 24F
     private const val TAB_HORIZONTAL_PADDING = 10F
     private const val TAB_GAP = 8F

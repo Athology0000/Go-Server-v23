@@ -60,13 +60,15 @@ Six Docker services managed by a single `docker-compose.yml` in `server/`:
 
 ### nginx-admin
 - Image: `nginx:alpine`
-- Serves `server/admin/dist/` as static files on port 3001
+- Bind-mounts `./admin/dist/` (already built) into the container — no rebuild needed
+- Serves on port 3001
 - Config in `server/docker/nginx-admin.conf`: `try_files $uri $uri/ /index.html` for SPA routing
 - No dependency on `api` — starts independently
 
 ### nginx-panel
 - Image: `nginx:alpine`
-- Serves `server/panel/dist/` as static files on port 3002
+- Bind-mounts `./panel/dist/` (already built) into the container — no rebuild needed
+- Serves on port 3002
 - Config in `server/docker/nginx-panel.conf`: same SPA routing
 - No dependency on `api`
 

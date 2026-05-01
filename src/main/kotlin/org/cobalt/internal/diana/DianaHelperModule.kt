@@ -8,6 +8,7 @@ import org.cobalt.api.event.impl.render.WorldRenderEvent
 import org.cobalt.api.hud.HudAnchor
 import org.cobalt.api.hud.hudElement
 import org.cobalt.api.module.Module
+import org.cobalt.api.module.ModuleCategory
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.ColorSetting
 import org.cobalt.api.module.setting.impl.SliderSetting
@@ -24,6 +25,8 @@ import org.cobalt.internal.pathfinding.OverlayRenderEngine.Color as OREColor
  * Each burrow block is pinpointed precisely from a single matching CRIT packet.
  */
 object DianaHelperModule : Module("Diana Helper") {
+
+    override val category = ModuleCategory.COMBAT
 
     private val mc = Minecraft.getInstance()
 

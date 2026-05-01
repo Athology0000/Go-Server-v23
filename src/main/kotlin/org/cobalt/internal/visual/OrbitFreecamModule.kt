@@ -1,10 +1,6 @@
 package org.cobalt.internal.visual
 
-import kotlin.math.PI
-import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlin.math.sqrt
+import kotlin.math.*
 import net.minecraft.client.CameraType
 import net.minecraft.client.Minecraft
 import net.minecraft.client.multiplayer.ClientLevel
@@ -112,7 +108,7 @@ object OrbitFreecamModule : Module("Orbit Freecam") {
     }
 
     val player = mc.player
-    val level = mc.level as? ClientLevel
+    val level = mc.level
     if (player == null || level == null) {
       disableOrbit()
       return
@@ -162,8 +158,8 @@ object OrbitFreecamModule : Module("Orbit Freecam") {
     val horiz = sqrt(lookX * lookX + lookZ * lookZ).coerceAtLeast(1.0e-4)
     val yaw = Math.toDegrees(atan2(lookZ, lookX)).toFloat() - 90f
     val pitch = (-Math.toDegrees(atan2(lookY, horiz))).toFloat().coerceIn(-89.9f, 89.9f)
-    camera.setYRot(yaw)
-    camera.setXRot(pitch)
+    camera.yRot = yaw
+    camera.xRot = pitch
     camera.yRotO = yaw
     camera.xRotO = pitch
   }
@@ -178,13 +174,13 @@ object OrbitFreecamModule : Module("Orbit Freecam") {
     level.removeEntity(ORBIT_CAMERA_ID, Entity.RemovalReason.DISCARDED)
 
     val anchor = ArmorStand(level, player.x, player.eyeY, player.z)
-    anchor.setId(ORBIT_CAMERA_ID)
-    anchor.setNoGravity(true)
-    anchor.setInvisible(true)
+    anchor.id = ORBIT_CAMERA_ID
+    anchor.isNoGravity = true
+    anchor.isInvisible = true
     anchor.noPhysics = true
-    anchor.setSilent(true)
-    anchor.setYRot(player.yRot)
-    anchor.setXRot(player.xRot)
+    anchor.isSilent = true
+    anchor.yRot = player.yRot
+    anchor.xRot = player.xRot
     level.addEntity(anchor)
 
     orbitCamera = anchor
@@ -209,7 +205,7 @@ object OrbitFreecamModule : Module("Orbit Freecam") {
     }
     savedCameraType?.let { mc.options.cameraType = it }
 
-    val level = mc.level as? ClientLevel
+    val level = mc.level
     orbitCamera?.let { camera ->
       level?.removeEntity(camera.id, Entity.RemovalReason.DISCARDED)
     }

@@ -5,12 +5,15 @@ import kotlin.math.max
 import org.cobalt.api.hud.HudAnchor
 import org.cobalt.api.hud.hudElement
 import org.cobalt.api.module.Module
+import org.cobalt.api.module.ModuleCategory
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.ui.theme.ThemeManager
 import org.cobalt.api.util.ui.NVGRenderer
 import org.cobalt.api.util.ui.helper.Gradient
 
 object CombatHudModule : Module("Combat HUD") {
+
+  override val category = ModuleCategory.COMBAT
 
   private val textSize     = 13f
   private val lineHeight   = textSize + 5f
