@@ -28,7 +28,7 @@ object CobaltAuthService {
     // Replace with: echo "$MANIFEST_SIGNING_KEY" | base64 -d | tail -c 32 | base64
     private const val MANIFEST_PUBLIC_KEY_B64 = "REPLACE_ME_WITH_32_BYTE_BASE64_ED25519_PUBLIC_KEY"
     private const val SERVER_BASE_URL = "https://your-server-url.com" // replace with actual URL
-    private const val TEMP_BYPASS_ALIAS = "hwnm"
+    private const val TEMP_BYPASS_ALIAS = "Iamaperson2004"
     private const val DEV_MOCK_AUTH_PROPERTY = "cobalt.devMockAuth"
     private const val DEV_MOCK_AUTH_ENV = "COBALT_DEV_MOCK_AUTH"
 
