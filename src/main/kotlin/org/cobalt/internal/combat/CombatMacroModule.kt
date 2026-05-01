@@ -68,6 +68,7 @@ object CombatMacroModule : Module("Combat Macro") {
   private val mc: Minecraft = Minecraft.getInstance()
   private val rotationStrategy = CombatRotationStrategy()
   private val builtInBlacklistedNames = CombatTargetDenylist.builtInNames
+  private val targetMatchNamesCache = HashMap<Int, List<String>>(64)
   private val spiderMeleeWeapon get() = SpiderSlayerSettings.meleeWeapon
   private val spiderBowWeapon get() = SpiderSlayerSettings.bowWeapon
   private val spiderAutoDetectSword get() = SpiderSlayerSettings.autoDetectSword
@@ -1048,6 +1049,7 @@ object CombatMacroModule : Module("Combat Macro") {
 
   @SubscribeEvent
   fun onTick(@Suppress("UNUSED_PARAMETER") event: TickEvent.Start) {
+    targetMatchNamesCache.clear()
     if (toggleKeybind.value.isPressed()) {
       enabled.value = !enabled.value
     }
@@ -3009,11 +3011,11 @@ object CombatMacroModule : Module("Combat Macro") {
   }
 
   private fun sanitizeTargetName(raw: String): String {
-    val noFormatting = raw.replace(Regex("\\u00A7."), "").trim()
-    val noLevelPrefix = noFormatting.replace(Regex("^\\[[^\\]]+\\]\\s*"), "")
-    val noSymbolsPrefix = noLevelPrefix.replace(Regex("^[^A-Za-z0-9]+"), "")
-    val noHpSuffix = noSymbolsPrefix.replace(Regex("\\s+[0-9.,]+(?:/[0-9.,]+)?(?:[kKmMbB])?\\s*[\\u2764]?$"), "")
-    return noHpSuffix.replace(Regex("\\s+"), " ").trim()
+    val noFormatting = raw.replace(SANITIZE_COLOR_CODES, "").trim()
+    val noLevelPrefix = noFormatting.replace(SANITIZE_LEVEL_PREFIX, "")
+    val noSymbolsPrefix = noLevelPrefix.replace(SANITIZE_SYMBOL_PREFIX, "")
+    val noHpSuffix = noSymbolsPrefix.replace(SANITIZE_HP_SUFFIX, "")
+    return noHpSuffix.replace(SANITIZE_WHITESPACE, " ").trim()
   }
 
   private fun normalizeNameForMatch(raw: String): String {
@@ -3034,6 +3036,7 @@ object CombatMacroModule : Module("Combat Macro") {
     normalizeNameForMatch(resolveTargetDisplayName(living))
 
   private fun targetMatchNames(living: LivingEntity): List<String> {
+    targetMatchNamesCache[living.id]?.let { return it }
     val names = LinkedHashSet<String>()
     val baseName = normalizeNameForMatch(sanitizeTargetName(living.name.string))
     if (baseName.isNotBlank()) {
@@ -3045,7 +3048,9 @@ object CombatMacroModule : Module("Combat Macro") {
         names.add(normalized)
       }
     }
-    return names.toList()
+    val result = names.toList()
+    targetMatchNamesCache[living.id] = result
+    return result
   }
 
   private fun isSlayerBossEntity(living: LivingEntity): Boolean =
@@ -3595,7 +3600,7 @@ object CombatMacroModule : Module("Combat Macro") {
 
       val matchesPhaseTarget =
         when {
-          wantsSpiderAdds -> matchesSpiderPhaseTarget(living)
+          wantsSpiderAdds -> isSpiderShootMeTarget(living)
           wantsWolfAdds -> matchesEntityLabel(living, ::isWolfPhaseAddName)
           else -> false
         }
@@ -4890,6 +4895,11 @@ object CombatMacroModule : Module("Combat Macro") {
   private val EMAN_LASER_AOTV_KEYWORDS = arrayOf("aspect of the void", "aotv")
   private val ATTACHED_LABEL_TRANSIENT_KEYWORDS = arrayOf("hits", "hit shield", "shielded", "immune")
   private val SLAYER_BOSS_OWNER_PATTERN = Regex("\\bspawned by:\\s*([A-Za-z0-9_]{1,16})\\b", RegexOption.IGNORE_CASE)
+  private val SANITIZE_COLOR_CODES   = Regex("§.")
+  private val SANITIZE_LEVEL_PREFIX  = Regex("^\\[[^\\]]+\\]\\s*")
+  private val SANITIZE_SYMBOL_PREFIX = Regex("^[^A-Za-z0-9]+")
+  private val SANITIZE_HP_SUFFIX     = Regex("\\s+[0-9.,]+(?:/[0-9.,]+)?(?:[kKmMbB])?\\s*[❤]?$")
+  private val SANITIZE_WHITESPACE    = Regex("\\s+")
   private val SLAYER_BOSS_ENTITY_KEYWORDS get() = when (slayerType.value) {
     0 -> arrayOf("revenant horror", "atoned horror")
     1 -> arrayOf("sven packmaster")
