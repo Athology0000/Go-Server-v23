@@ -47,6 +47,7 @@ object CobaltAuthService {
     fun start(session: CobaltSession) {
         if (isDevMockAuthEnabled()) {
             logger.warn("Dev mock auth enabled - skipping remote auth, entitlement, and module download flow")
+            Auth.entitledModules = setOf("*")
             markReady("Ready (dev mock auth)")
             return
         }
@@ -58,6 +59,7 @@ object CobaltAuthService {
                 session.alias,
                 mcUsername
             )
+            Auth.entitledModules = setOf("*")
             markReady("Ready (alias bypass)")
             return
         }
@@ -109,6 +111,10 @@ object CobaltAuthService {
             if (!entitlement.authorized) {
                 return fail(entitlement.reason ?: "not_authorized")
             }
+
+            // Publish entitled module set immediately so UIModule can enforce gating
+            // while the manifest/JAR download step runs.
+            Auth.entitledModules = (entitlement.enabledModules ?: emptyList()).toSet()
 
             if (entitlement.manifestUrl.isNullOrBlank()) {
                 Auth.state = AuthState.READY

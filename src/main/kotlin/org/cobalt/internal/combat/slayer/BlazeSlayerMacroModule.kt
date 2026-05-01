@@ -1,3 +1,7 @@
 package org.cobalt.internal.combat.slayer
 
-internal object BlazeSlayerMacroModule : SlayerMacroModule("Blaze Slayer Macro", 5, "Blaze")
+internal object BlazeSlayerMacroModule : SlayerMacroModule("Blaze Slayer Macro", 5, "Blaze") {
+  init {
+    addSetting(*BlazeSlayerSettings.pageSettings)
+  }
+}

@@ -26,9 +26,15 @@ internal class UIModule(
   private val xOffsetAnimation = EaseOutAnimation(200L)
 
   override fun render() {
+    val entitled = module.isEntitled
+
     val opaqueColor = colorAnimation.get(ThemeManager.currentTheme.transparent, ThemeManager.currentTheme.selectedOverlay, !selected)
     val mainColor = colorAnimation.get(ThemeManager.currentTheme.transparent, ThemeManager.currentTheme.accent, !selected)
-    val textColor = colorAnimation.get(ThemeManager.currentTheme.text, ThemeManager.currentTheme.accent, !selected)
+    val textColor = if (entitled) {
+      colorAnimation.get(ThemeManager.currentTheme.text, ThemeManager.currentTheme.accent, !selected)
+    } else {
+      ThemeManager.currentTheme.textDisabled
+    }
     val xOffset = xOffsetAnimation.get(0F, 10F, !selected)
 
     if (selected) {
@@ -40,7 +46,12 @@ internal class UIModule(
       )
     }
 
-    if (module.name.equals("Fairy", ignoreCase = true)) {
+    if (!entitled) {
+      NVGRenderer.image(lockIcon, x + width - 18F, y + height / 2 - 6F, 12F, 12F,
+        colorMask = ThemeManager.currentTheme.textDisabled)
+    }
+
+    if (entitled && module.name.equals("Fairy", ignoreCase = true)) {
       NVGRenderer.textGradient(
         module.name,
         x + 20F + xOffset,
@@ -50,7 +61,7 @@ internal class UIModule(
         0xFF3FE6FF.toInt(),
         Gradient.LeftToRight
       )
-    } else if (module.name.equals("Full Bright", ignoreCase = true)) {
+    } else if (entitled && module.name.equals("Full Bright", ignoreCase = true)) {
       val textX = x + 20F + xOffset
       val textY = y + height / 2F - 6.5F
       val glowColor = 0x80FFF0A0.toInt()
@@ -68,6 +79,7 @@ internal class UIModule(
   }
 
   override fun mouseClicked(button: Int): Boolean {
+    if (!module.isEntitled) return false
     if (isHoveringOver(x, y, width, height) && button == 0) {
       panel.setModule(this)
       return true
@@ -90,6 +102,7 @@ internal class UIModule(
 
   companion object {
     private val selectedIcon = NVGRenderer.createImage("/assets/cobalt/textures/ui/selected.svg")
+    private val lockIcon = NVGRenderer.createImage("/assets/cobalt/textures/ui/lock.svg")
   }
 
 }

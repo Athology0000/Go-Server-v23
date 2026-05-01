@@ -133,6 +133,37 @@ object Render3D {
   }
 
   @JvmStatic
+  fun drawCircleOutline(
+    context: WorldRenderContext,
+    center: Vec3,
+    radius: Float,
+    color: Color,
+    esp: Boolean = false,
+    thickness: Float = 2f,
+  ) {
+    if (radius <= 0f) return
+    if (!FrustumUtils.isVisible(
+        context.frustum,
+        center.x - radius, center.y - 0.05, center.z - radius,
+        center.x + radius, center.y + 0.05, center.z + radius
+      )
+    ) return
+
+    val argbColor = ARGB.color(color.alpha, color.red, color.green, color.blue)
+    for (i in 0 until CIRCLE_OUTLINE_SEGMENTS) {
+      val rad = Math.toRadians(i * CIRCLE_OUTLINE_STEP_DEGREES)
+      val nextRad = Math.toRadians((i + 1) * CIRCLE_OUTLINE_STEP_DEGREES)
+      val start = center.add(radius * cos(rad), SURFACE_RENDER_OFFSET, radius * sin(rad))
+      val end = center.add(radius * cos(nextRad), SURFACE_RENDER_OFFSET, radius * sin(nextRad))
+      val props = Gizmos.line(start, end, argbColor, thickness)
+
+      if (esp) {
+        props.setAlwaysOnTop()
+      }
+    }
+  }
+
+  @JvmStatic
   fun drawCircleSurface(
     context: WorldRenderContext,
     center: Vec3,
@@ -221,5 +252,7 @@ object Render3D {
   }
 
   private const val CYLINDER_SEGMENTS = 360
+  private const val CIRCLE_OUTLINE_SEGMENTS = 96
+  private const val CIRCLE_OUTLINE_STEP_DEGREES = 360.0 / CIRCLE_OUTLINE_SEGMENTS
   private const val SURFACE_RENDER_OFFSET = 0.01
 }

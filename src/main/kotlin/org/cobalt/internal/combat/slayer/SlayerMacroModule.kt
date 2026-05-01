@@ -44,11 +44,12 @@ internal abstract class SlayerMacroModule(
 
   private val warpToLocation = SlayerLocationSettings.warpToLocationSetting(typeIndex)
   private val autoSlayer = SlayerLocationSettings.autoSlayerSetting(typeIndex)
+  private val primordialBelt = SlayerLocationSettings.primordialBeltSetting(typeIndex)
 
   private var lastEnabled: Boolean? = null
 
   init {
-    addSetting(enabled, toggleKeybind, startStopAction, warpToLocation, autoSlayer)
+    addSetting(enabled, toggleKeybind, startStopAction, warpToLocation, autoSlayer, primordialBelt)
     SlayerMacroModuleRegistry.register(this)
   }
 

@@ -29,6 +29,7 @@ import org.cobalt.internal.dungeons.BloodCampHelperModule
 import org.cobalt.internal.dungeons.DungeonMapModule
 import org.cobalt.internal.dungeons.DungeonRoutesModule
 import org.cobalt.internal.dungeons.DungeonsModule
+import org.cobalt.internal.dungeons.MobEspModule as DungeonMobEspModule
 import org.cobalt.internal.etherwarp.EtherwarpHelperModule
 import org.cobalt.internal.etherwarp.LeftClickEtherwarpModule
 import org.cobalt.internal.etherwarp.SmoothAotvModule
@@ -54,6 +55,7 @@ import org.cobalt.internal.qol.CraftHelperModule
 import org.cobalt.internal.qol.ItemLockingModule
 import org.cobalt.internal.qol.PriceTooltipModule
 import org.cobalt.internal.qol.QolModule
+import org.cobalt.internal.qol.RsaAutoGfsModule
 import org.cobalt.internal.stats.MacroTimeTracker
 import org.cobalt.internal.visual.BlockOverlayModule
 import org.cobalt.internal.visual.BlockOutlineModule
@@ -65,9 +67,11 @@ import org.cobalt.internal.visual.SkyboxChangerModule
 import org.cobalt.internal.rotation.RotationsModule
 import org.cobalt.internal.visual.DeployableHudModule
 import org.cobalt.internal.visual.HotbarOverlayModule
-import org.cobalt.internal.visual.MobEspModule
+import org.cobalt.internal.visual.MobEspModule as VisualMobEspModule
 import org.cobalt.internal.visual.OrbitFreecamModule
 import org.cobalt.internal.visual.PetDisplayModule
+import org.cobalt.internal.visual.RsaPresetWaypointsModule
+import org.cobalt.internal.visual.RsaEffectsModule
 import org.cobalt.internal.visual.TitleScreenRenderer
 import org.cobalt.internal.visual.WitherImpactOverlayModule
 import org.cobalt.internal.garden.GardenAnalyzerModule
@@ -126,6 +130,7 @@ object Cobalt : ClientModInitializer {
         CombatPatrolModule,
         CombatHudModule,
         DungeonsModule,
+        DungeonMobEspModule,
         BloodCampHelperModule,
         DungeonMapModule,
         DungeonRoutesModule,
@@ -142,16 +147,19 @@ object Cobalt : ClientModInitializer {
         OrbitFreecamModule,
         BlockOverlayModule,
         BlockOutlineModule,
-        MobEspModule,
+        VisualMobEspModule,
         WitherImpactOverlayModule,
         QolModule,
         ItemLockingModule,
         PriceTooltipModule,
         CraftHelperModule,
         AutoStashModule,
+        RsaAutoGfsModule,
         RotationsModule,
         HotbarOverlayModule,
         PetDisplayModule,
+        RsaEffectsModule,
+        RsaPresetWaypointsModule,
         GardenAnalyzerModule,
         GardenMacroModule,
         PestWarningModule,

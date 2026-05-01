@@ -183,7 +183,7 @@ internal object SpiderSlayerPhase {
   private const val HATCHLING_PHASE_FALLBACK_TICKS = 160L
   private const val HATCHLING_PHASE_REFRESH_TICKS = 40L
   private const val HATCHLING_NO_TARGET_RELEASE_TICKS = 12L
-  private const val HATCHLING_CLEAR_DISTANCE = 0.9
+  private const val HATCHLING_CLEAR_DISTANCE = 12.0
   private const val HATCHLING_MAX_TARGETS = 4
   private const val HATCHLING_MAX_SHOTS_PER_TARGET = 9
   private const val HATCHLING_AIM_Y_OFFSET = 0.9

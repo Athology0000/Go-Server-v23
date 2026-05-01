@@ -173,11 +173,10 @@ object FishingHotspotModule : Module("Fishing Hotspot") {
       val radius = hotspot.radius ?: DEFAULT_HOTSPOT_RADIUS
 
       if (circleOutlineSetting.value) {
-        Render3D.drawCylinderSurface(
+        Render3D.drawCircleOutline(
           event.context,
           pos,
           radius.toFloat(),
-          HOTSPOT_OUTLINE_HEIGHT,
           hotspot.type.outlineColor(outlineTransparencySetting.value.toInt()),
         )
       }

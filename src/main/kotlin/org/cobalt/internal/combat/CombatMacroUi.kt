@@ -39,40 +39,7 @@ internal class CombatMacroUiSettings(
   val slayerMeleeWeapon: Setting<*>,
   val slayerBowWeapon: Setting<*>,
   val slayerMageWeapon: Setting<*>,
-  val sepZombie: Setting<*>,
-  val slayerLocation: Setting<*>,
-  val zombieRoutePicker: Setting<*>,
-  val zombieDynamicCombat: Setting<*>,
-  val zombieSpawnWeapon: Setting<*>,
-  val zombieDynamicSword: Setting<*>,
-  val sepEnderman: Setting<*>,
-  val endermanLocation: Setting<*>,
-  val endermanVoidWarp: Setting<*>,
-  val endermanRoutePicker: Setting<*>,
-  val endermanDynamicCombat: Setting<*>,
-  val emanSpawnWeapon: Setting<*>,
-  val emanSpawnBowWeapon: Setting<*>,
-  val emanSpawnSwordWeapon: Setting<*>,
-  val emanDynamicSwapRange: Setting<*>,
-  val emanHitPhaseStyle: Setting<*>,
-  val emanHitPhaseBowWeapon: Setting<*>,
-  val emanHitPhaseSwordWeapon: Setting<*>,
   val autoReaperScythe: Setting<*>,
-  val emanHitPhaseSneakWhenHitting: Setting<*>,
-  val emanBossWeapon: Setting<*>,
-  val sepWolf: Setting<*>,
-  val wolfLocation: Setting<*>,
-  val wolfRoutePicker: Setting<*>,
-  val wolfIgnorePups: Setting<*>,
-  val sepVampire: Setting<*>,
-  val vampireLocation: Setting<*>,
-  val vampireRoutePicker: Setting<*>,
-  val sepBlaze: Setting<*>,
-  val blazeLocation: Setting<*>,
-  val blazeRoutePicker: Setting<*>,
-  val sepSpider: Setting<*>,
-  val spiderLocation: Setting<*>,
-  val spiderPrimordialBelt: Setting<*>,
   val swordKeepDistance: Setting<*>,
   val slayerSwordKeepDistance: Setting<*>,
   val bowMinRange: Setting<*>,
@@ -135,40 +102,7 @@ internal class CombatMacroUiSettings(
     slayerMeleeWeapon,
     slayerBowWeapon,
     slayerMageWeapon,
-    sepZombie,
-    slayerLocation,
-    zombieRoutePicker,
-    zombieDynamicCombat,
-    zombieSpawnWeapon,
-    zombieDynamicSword,
-    sepEnderman,
-    endermanLocation,
-    endermanVoidWarp,
-    endermanRoutePicker,
-    endermanDynamicCombat,
-    emanSpawnWeapon,
-    emanSpawnBowWeapon,
-    emanSpawnSwordWeapon,
-    emanDynamicSwapRange,
-    emanHitPhaseStyle,
-    emanHitPhaseBowWeapon,
-    emanHitPhaseSwordWeapon,
     autoReaperScythe,
-    emanHitPhaseSneakWhenHitting,
-    emanBossWeapon,
-    sepWolf,
-    wolfLocation,
-    wolfRoutePicker,
-    wolfIgnorePups,
-    sepVampire,
-    vampireLocation,
-    vampireRoutePicker,
-    sepBlaze,
-    blazeLocation,
-    blazeRoutePicker,
-    sepSpider,
-    spiderLocation,
-    spiderPrimordialBelt,
     swordKeepDistance,
     slayerSwordKeepDistance,
     bowMinRange,
@@ -221,16 +155,7 @@ internal object CombatMacroUi {
     group(TAB_LOADOUT_GROUP, loadoutSlayerType, slayerLoadoutBuilder)
 
     group(TAB_SLAYER_WEAPONS_GROUP, sepDefaultSlayerWeapons, slayerMeleeWeapon, slayerBowWeapon, slayerMageWeapon)
-    group(TAB_SLAYER_WEAPONS_GROUP, sepZombie, slayerLocation, zombieRoutePicker, zombieDynamicCombat)
-    group(TAB_SLAYER_WEAPONS_GROUP, zombieSpawnWeapon, zombieDynamicSword)
-    group(TAB_SLAYER_WEAPONS_GROUP, sepEnderman, endermanLocation, endermanVoidWarp, endermanRoutePicker)
-    group(TAB_SLAYER_WEAPONS_GROUP, endermanDynamicCombat, emanSpawnWeapon, emanSpawnBowWeapon, emanSpawnSwordWeapon)
-    group(TAB_SLAYER_WEAPONS_GROUP, emanDynamicSwapRange, emanHitPhaseStyle, emanHitPhaseBowWeapon)
-    group(TAB_SLAYER_WEAPONS_GROUP, emanHitPhaseSwordWeapon, autoReaperScythe, emanHitPhaseSneakWhenHitting, emanBossWeapon)
-    group(TAB_SLAYER_WEAPONS_GROUP, sepWolf, wolfLocation, wolfRoutePicker, wolfIgnorePups)
-    group(TAB_SLAYER_WEAPONS_GROUP, sepVampire, vampireLocation, vampireRoutePicker)
-    group(TAB_SLAYER_WEAPONS_GROUP, sepBlaze, blazeLocation, blazeRoutePicker)
-    group(TAB_SLAYER_WEAPONS_GROUP, sepSpider, spiderLocation, spiderPrimordialBelt)
+    group(TAB_SLAYER_WEAPONS_GROUP, autoReaperScythe)
 
     group(TAB_AUTO_ITEMS_GROUP, autoHeal, autoWandOfAtonement, alwaysUseWandOfAtonement, autoZombieSword)
     group(TAB_AUTO_ITEMS_GROUP, autoHyperion, autoOverflux, autoRagnarok, autoSwordOfBadHealth, healAtHealth)

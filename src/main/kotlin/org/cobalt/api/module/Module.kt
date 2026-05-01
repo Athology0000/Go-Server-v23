@@ -5,6 +5,7 @@ import org.cobalt.api.module.setting.Setting
 import org.cobalt.api.module.setting.SettingsContainer
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.inGroup
+import org.cobalt.internal.auth.Auth
 
 /**
  * Base class for all modules. Extend this to create addon functionality.
@@ -18,6 +19,9 @@ import org.cobalt.api.module.setting.inGroup
 abstract class Module(val name: String) : SettingsContainer {
 
   open val category: ModuleCategory = ModuleCategory.OTHER
+
+  val isEntitled: Boolean
+    get() = Auth.isModuleEntitled(name)
 
   private val settingsList = mutableListOf<Setting<*>>()
   private val hudElementsList = mutableListOf<HudElement>()

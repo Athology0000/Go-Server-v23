@@ -53,13 +53,17 @@ import org.cobalt.api.pathfinder.jni.PathStatus
 import org.cobalt.api.util.player.MovementManager
 import org.cobalt.internal.pathfinding.PathfindingModule
 import org.cobalt.internal.mining.RoutesModule
-import org.cobalt.internal.routes.RoutePickerSetting
 import org.cobalt.internal.routes.RouteStore
 import org.cobalt.internal.routes.RouteType
+import org.cobalt.internal.combat.slayer.BlazeSlayerSettings
+import org.cobalt.internal.combat.slayer.EndermanSlayerSettings
 import org.cobalt.internal.combat.slayer.SlayerLocationSettings
 import org.cobalt.internal.combat.slayer.SlayerQuestSignals
 import org.cobalt.internal.combat.slayer.SpiderSlayerPhase
 import org.cobalt.internal.combat.slayer.SpiderSlayerSettings
+import org.cobalt.internal.combat.slayer.VampireSlayerSettings
+import org.cobalt.internal.combat.slayer.WolfSlayerSettings
+import org.cobalt.internal.combat.slayer.ZombieSlayerSettings
 
 object CombatMacroModule : Module("Combat Macro") {
 
@@ -75,6 +79,27 @@ object CombatMacroModule : Module("Combat Macro") {
   private val spiderAutoDetectBow get() = SpiderSlayerSettings.autoDetectBow
   private val spiderPhaseBowCombat get() = SpiderSlayerSettings.hatchlingsPhase
   private val spiderHyperionBeforeShooting get() = SpiderSlayerSettings.hyperionBeforeShooting
+  private val slayerLocation get() = ZombieSlayerSettings.location
+  private val zombieDynamicCombat get() = ZombieSlayerSettings.dynamicCombat
+  private val zombieSpawnWeapon get() = ZombieSlayerSettings.spawnWeapon
+  private val zombieDynamicSword get() = ZombieSlayerSettings.dynamicSword
+  private val wolfLocation get() = WolfSlayerSettings.location
+  private val wolfIgnorePups get() = WolfSlayerSettings.ignorePups
+  private val spiderLocation get() = SpiderSlayerSettings.location
+  private val endermanLocation get() = EndermanSlayerSettings.location
+  private val endermanVoidWarp get() = EndermanSlayerSettings.voidWarp
+  private val endermanDynamicCombat get() = EndermanSlayerSettings.dynamicCombat
+  private val emanSpawnWeapon get() = EndermanSlayerSettings.spawnWeapon
+  private val emanSpawnBowWeapon get() = EndermanSlayerSettings.spawnBowWeapon
+  private val emanSpawnSwordWeapon get() = EndermanSlayerSettings.spawnSwordWeapon
+  private val emanDynamicSwapRange get() = EndermanSlayerSettings.dynamicSwapRange
+  private val emanHitPhaseStyle get() = EndermanSlayerSettings.hitPhaseStyle
+  private val emanHitPhaseBowWeapon get() = EndermanSlayerSettings.hitPhaseBowWeapon
+  private val emanHitPhaseSwordWeapon get() = EndermanSlayerSettings.hitPhaseSwordWeapon
+  private val emanHitPhaseSneakWhenHitting get() = EndermanSlayerSettings.hitPhaseSneakWhenHitting
+  private val emanBossWeapon get() = EndermanSlayerSettings.bossWeapon
+  private val vampireLocation get() = VampireSlayerSettings.location
+  private val blazeLocation get() = BlazeSlayerSettings.location
 
   private val enabled = CheckboxSetting(
     "Enabled",
@@ -147,62 +172,6 @@ object CombatMacroModule : Module("Combat Macro") {
     true
   )
 
-  private val slayerLocation = ModeSetting(
-    "Zombie Location",
-    "Farming location for Zombie Slayer.",
-    0,
-    arrayOf("Zombie Graveyard", "Zombie Crypt")
-  )
-
-  private val wolfLocation = ModeSetting(
-    "Wolf Location",
-    "Farming location for Wolf Slayer.",
-    0,
-    arrayOf("Park", "Caves", "Castle")
-  )
-
-  private val endermanLocation = ModeSetting(
-    "Enderman Location",
-    "Farming location for Enderman Slayer.",
-    0,
-    arrayOf("The End", "Hideout", "Void Sepulchre")
-  )
-
-  private val endermanVoidWarp = CheckboxSetting(
-    "Warp To Void",
-    "Run /warp void when starting Enderman Slayer at Void Sepulchre.",
-    true
-  )
-
-  private val vampireLocation = ModeSetting(
-    "Vampire Location",
-    "Farming location for Vampire Slayer.",
-    0,
-    arrayOf("Wyld Woods")
-  )
-
-  private val blazeLocation = ModeSetting(
-    "Blaze Location",
-    "Farming location for Blaze Slayer.",
-    0,
-    arrayOf("Blazing Fortress")
-  )
-
-  private val spiderLocation = ModeSetting(
-    "Spider Location",
-    "Farming location for Spider Slayer.",
-    0,
-    arrayOf("Upper Spiders", "Arachne Spider", "Crimson Spider")
-  )
-
-  private val spiderPrimordialBelt = CheckboxSetting(
-    "Primordial Belt",
-    "Use Primordial Belt once when the Slayer boss is active.",
-    false
-  )
-
-  private val sepSpider = InfoSetting("Spider", "", InfoType.SEPARATOR)
-
   private val slayerBossNotification = CheckboxSetting(
     "Boss Spawn Notification",
     "Show a HUD warning when the slayer boss spawns.",
@@ -265,12 +234,6 @@ object CombatMacroModule : Module("Combat Macro") {
     "Color Blaze Slayer outlines by attunement instead of the generic ESP colors.",
     true
   )
-
-  private val zombieRoutePicker   = RoutePickerSetting("Zombie Patrol Route",   "PATROL route for the zombie farming area.",   RouteType.PATROL, "patrol:zombie")
-  private val wolfRoutePicker     = RoutePickerSetting("Wolf Patrol Route",     "PATROL route for the wolf farming area.",     RouteType.PATROL, "patrol:wolf")
-  private val endermanRoutePicker = RoutePickerSetting("Enderman Patrol Route", "PATROL route for the enderman farming area.", RouteType.PATROL, "patrol:enderman")
-  private val vampireRoutePicker  = RoutePickerSetting("Vampire Patrol Route",  "PATROL route for the vampire farming area.",  RouteType.PATROL, "patrol:vampire")
-  private val blazeRoutePicker    = RoutePickerSetting("Blaze Patrol Route",    "PATROL route for the blaze farming area.",    RouteType.PATROL, "patrol:blaze")
 
   private fun walkbackRouteTypeName(type: Int): String = when (type) {
     0 -> "Zombie"
@@ -472,107 +435,12 @@ object CombatMacroModule : Module("Combat Macro") {
     "staff, wand, sceptre, scepter, scythe"
   )
 
-  private val zombieDynamicCombat = CheckboxSetting(
-    "Zombie Auto Swap",
-    "Zombie Slayer only: use the spawn weapon while farming, then swap to Dynamic Sword for the boss.",
-    true
-  )
-
-  private val zombieSpawnWeapon = TextSetting(
-    "Zombie Spawn Weapon",
-    "Comma-separated hotbar keywords in priority order for the zombie spawn weapon. Used before the boss spawns.",
-    "halberd"
-  )
-
-  private val zombieDynamicSword = TextSetting(
-    "Dynamic Sword",
-    "Comma-separated hotbar keywords in priority order for the zombie boss and melee weapon.",
-    "falchion, reaper, shredded, sword"
-  )
-
-  private val endermanDynamicCombat = CheckboxSetting(
-    "Eman Auto Swap",
-    "Enderman Slayer only: use bow for spawn farming and hit-shield phases, then swap to melee for boss DPS phases.",
-    true
-  )
-
-  private val emanSpawnWeapon = ModeSetting(
-    "Eman Spawn Weapon",
-    "Choose the weapon style for Enderman Slayer spawn farming before the boss appears.",
-    3,
-    arrayOf("Terminator", "Shortbow", "Enderman Slayer Sword", "Dynamic")
-  )
-
-  private val emanSpawnBowWeapon = TextSetting(
-    "Eman Spawn Bow Weapon",
-    "Comma-separated hotbar keywords in priority order for Enderman Slayer bow spawn phases.",
-    "terminator, juju, shortbow, bow"
-  )
-
-  private val emanSpawnSwordWeapon = TextSetting(
-    "Eman Spawn Sword Weapon",
-    "Comma-separated hotbar keywords in priority order for Enderman Slayer melee spawn phases.",
-    "atomsplit, vorpal, voidedge, katana"
-  )
-
-  private val emanDynamicSwapRange = SliderSetting(
-    "Eman Dynamic Swap Range",
-    "Enderman Slayer only: in Dynamic spawn mode, switch from bow to sword when the target is within this distance.",
-    4.5,
-    2.0,
-    8.0,
-    step = 0.1
-  )
-
-  private val emanHitPhaseStyle = ModeSetting(
-    "Eman Hit Phase Style",
-    "Choose the weapon style for Enderman Slayer hit-shield phases.",
-    EMAN_HIT_PHASE_WEAPON_TERMINATOR,
-    arrayOf("Shortbow", "Terminator", "End Slayer Sword")
-  )
-
-  private val emanHitPhaseBowWeapon = TextSetting(
-    "Eman Hit Phase Bow Weapon",
-    "Comma-separated hotbar keywords in priority order for Enderman Slayer hit-shield bow phases.",
-    "terminator"
-  )
-
-  private val emanHitPhaseSwordWeapon = TextSetting(
-    "Eman Hit Phase Sword Weapon",
-    "Comma-separated hotbar keywords in priority order for Enderman Slayer hit-shield melee phases.",
-    "atomsplit, vorpal, voidedge, katana"
-  )
-
-  private val emanHitPhaseSneakWhenHitting = CheckboxSetting(
-    "Sneak When Hitting",
-    "Hold sneak while attacking Enderman Slayer hit-shield phases.",
-    false
-  )
-
-  private val emanBossWeapon = TextSetting(
-    "Eman Boss Weapon",
-    "Comma-separated hotbar keywords in priority order for Enderman Slayer boss DPS phases.",
-    "atomsplit, vorpal, voidedge, katana"
-  )
-
   private val loadoutPowerOrbChoice = ModeSetting(
     "Loadout Power Orb Choice",
     "Choose which power orb item the visual loadout should use.",
     0,
     arrayOf("Overflux Power Orb", "Plasmaflux Power Orb", "SOS Flare", "Mana Flux Power Orb")
   )
-
-  private val wolfIgnorePups = CheckboxSetting(
-    "Ignore Wolf Pups",
-    "Wolf Slayer only: during the pups phase, keep tracking the boss instead of retargeting the pups.",
-    false
-  )
-
-  private val sepZombie = InfoSetting("Zombie", "", InfoType.SEPARATOR)
-  private val sepEnderman = InfoSetting("Enderman", "", InfoType.SEPARATOR)
-  private val sepWolf = InfoSetting("Wolf", "", InfoType.SEPARATOR)
-  private val sepVampire = InfoSetting("Vampire", "", InfoType.SEPARATOR)
-  private val sepBlaze = InfoSetting("Blaze", "", InfoType.SEPARATOR)
 
   private val swordKeepDistance = SliderSetting(
     "Sword Keep Distance",
@@ -982,40 +850,7 @@ object CombatMacroModule : Module("Combat Macro") {
         slayerMeleeWeapon,
         slayerBowWeapon,
         slayerMageWeapon,
-        sepZombie,
-        slayerLocation,
-        zombieRoutePicker,
-        zombieDynamicCombat,
-        zombieSpawnWeapon,
-        zombieDynamicSword,
-        sepEnderman,
-        endermanLocation,
-        endermanVoidWarp,
-        endermanRoutePicker,
-        endermanDynamicCombat,
-        emanSpawnWeapon,
-        emanSpawnBowWeapon,
-        emanSpawnSwordWeapon,
-        emanDynamicSwapRange,
-        emanHitPhaseStyle,
-        emanHitPhaseBowWeapon,
-        emanHitPhaseSwordWeapon,
         autoReaperScythe,
-        emanHitPhaseSneakWhenHitting,
-        emanBossWeapon,
-        sepWolf,
-        wolfLocation,
-        wolfRoutePicker,
-        wolfIgnorePups,
-        sepVampire,
-        vampireLocation,
-        vampireRoutePicker,
-        sepBlaze,
-        blazeLocation,
-        blazeRoutePicker,
-        sepSpider,
-        spiderLocation,
-        spiderPrimordialBelt,
         swordKeepDistance,
         slayerSwordKeepDistance,
         bowMinRange,
@@ -1384,7 +1219,7 @@ object CombatMacroModule : Module("Combat Macro") {
       }
     }
     // Walkback owns pathfinding - yield before enforceStartArea can override it.
-    if (slayerNeedsWalkback && false && !slayerBossActive) {
+    if (slayerNeedsWalkback && !slayerBossActive) {
       currentTargetId = null
       return
     }
@@ -1921,7 +1756,7 @@ object CombatMacroModule : Module("Combat Macro") {
       }
     }
 
-    if (spiderPrimordialBelt.value && slayerType.value == 2 && !slayerPrimordialBeltUsedThisBoss) {
+    if (SlayerLocationSettings.shouldUsePrimordialBelt(slayerType.value) && !slayerPrimordialBeltUsedThisBoss) {
       if (useHotbarUtilityItem(player, SLAYER_PRIMORDIAL_BELT_KEYWORDS)) {
         slayerPrimordialBeltUsedThisBoss = true
         return
@@ -3071,6 +2906,7 @@ object CombatMacroModule : Module("Combat Macro") {
     if (level != null) {
       for (offset in 1..SLAYER_OWNER_ENTITY_ID_SCAN_OFFSETS) {
         val stand = level.getEntity(living.id + offset) as? ArmorStand ?: continue
+        if (horizontalDistSq(stand.x, stand.z, living.x, living.z) > SLAYER_OWNER_STAND_MAX_DIST_SQ) continue
         val name = sanitizeTargetName(stand.name.string)
         if (name.isNotBlank()) {
           standNames.add(name)
@@ -4880,6 +4716,7 @@ object CombatMacroModule : Module("Combat Macro") {
   private const val TARGET_BOX_ALPHA = 170
   private const val ATTACHED_NAMEPLATE_HORIZONTAL_RANGE_SQ = 2.25
   private const val SLAYER_OWNER_ENTITY_ID_SCAN_OFFSETS = 4
+  private const val SLAYER_OWNER_STAND_MAX_DIST_SQ = 9.0 // 3-block radius max for owner stand ID scan
   private const val ENDERMAN_HITS_HORIZONTAL_RANGE_SQ = 9.0
   private const val TARGET_BOX_INFLATE = 0.08
   private const val SLAYER_ESP_MID_INFLATE = 0.22
