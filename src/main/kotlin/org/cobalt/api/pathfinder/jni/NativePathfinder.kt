@@ -157,8 +157,8 @@ object NativePathfinder {
     private const val AVOID_PENALTY        = 25.0
     private const val AVOID_RADIUS_SQ      = 4
     private const val AVOID_MAX_Y_DIFF     = 2
-    private const val CLEAN_EXEC_TICKS          = 30
-    private const val SPRINT_SUPPRESS_NEAR_GOAL = 4.0
+    private const val CLEAN_EXEC_TICKS           = 30
+    private const val SPRINT_SUPPRESS_CURVATURE  = 0.4
 
     fun init() {
         // NativePathfinderJNI object init loads the DLL on first access
@@ -475,7 +475,7 @@ object NativePathfinder {
             back = false,
             jump = jumpPulse,
             sneak = false,
-            sprint = !lowHeadroom && !tightCorridor && distToGoal > SPRINT_SUPPRESS_NEAR_GOAL,
+            sprint = !lowHeadroom && !tightCorridor && PathExecutorState.pathCurvature < SPRINT_SUPPRESS_CURVATURE,
             targetYaw = targetYaw,
             targetPitch = 0f,
             status = state,
