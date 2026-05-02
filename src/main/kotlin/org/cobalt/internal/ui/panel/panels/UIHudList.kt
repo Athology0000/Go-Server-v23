@@ -3,16 +3,17 @@ package org.cobalt.internal.ui.panel.panels
 import java.awt.Color
 import org.cobalt.api.hud.HudElement
 import org.cobalt.api.hud.HudModuleManager
+import org.cobalt.api.module.ModuleManager
+import org.cobalt.api.module.setting.impl.*
 import org.cobalt.api.ui.theme.ThemeManager
 import org.cobalt.api.util.ui.NVGRenderer
 import org.cobalt.internal.ui.UIComponent
 import org.cobalt.internal.ui.components.UITopbar
+import org.cobalt.internal.ui.components.settings.*
 import org.cobalt.internal.ui.panel.UIPanel
 import org.cobalt.internal.ui.screen.UIHudEditor
 import org.cobalt.internal.ui.util.ScrollHandler
 import org.cobalt.internal.ui.util.isHoveringOver
-import org.cobalt.internal.ui.components.settings.*
-import org.cobalt.api.module.setting.impl.*
 
 internal class UIHudList : UIPanel(
   x = 0F,
@@ -66,8 +67,8 @@ internal class UIHudList : UIPanel(
       } else {
         val searchLower = searchText.lowercase()
         allEntries.filter {
-    it.module.name.lowercase().contains(searchLower) ||
-             it.module.description.lowercase().contains(searchLower)
+          it.module.name.lowercase().contains(searchLower) ||
+            it.module.description.lowercase().contains(searchLower)
         }
       }
     }
@@ -122,6 +123,53 @@ internal class UIHudList : UIPanel(
     return false
   }
 
+  override fun mouseClicked(button: Int): Boolean {
+    println("[UIHudList] panel mouseClicked button=$button panel=($x,$y,$width,$height)")
+
+    if (editButton.mouseClicked(button)) {
+      println("[UIHudList] edit button clicked")
+      return true
+    }
+
+    if (resetButton.mouseClicked(button)) {
+      println("[UIHudList] reset button clicked")
+      return true
+    }
+
+    val buttonsY = y + topBar.height + 15F
+    val listStartY = buttonsY + editButton.height + 20F
+    val visibleHeight = height - (listStartY - y)
+
+    val insideList = isHoveringOver(x, listStartY, width, visibleHeight)
+    println("[UIHudList] insideList=$insideList listBounds=($x,$listStartY,$width,$visibleHeight) entries=${entries.size}")
+
+    if (!insideList) {
+      return false
+    }
+
+    val entryGap = 10F
+    val scrollOffset = scrollHandler.getOffset()
+    println("[UIHudList] scrollOffset=$scrollOffset")
+
+    entries.forEachIndexed { index, entry ->
+      val entryY = listStartY + 10F + index * (entry.height + entryGap) - scrollOffset
+      entry.updateBounds(x, entryY)
+
+      println(
+        "[UIHudList] forwarding click to entry index=$index name=${entry.module.name} " +
+          "bounds=(${entry.x},${entry.y},${entry.width},${entry.height})"
+      )
+
+      if (entry.mouseClicked(button)) {
+        println("[UIHudList] entry handled click index=$index name=${entry.module.name}")
+        return true
+      }
+    }
+
+    println("[UIHudList] no entry handled click")
+    return false
+  }
+
   private class ActionButton(
     private val label: String,
     width: Float,
@@ -147,10 +195,14 @@ internal class UIHudList : UIPanel(
     }
 
     override fun mouseClicked(button: Int): Boolean {
-      if (button == 0 && isHoveringOver(x, y, width, height)) {
+      val hovering = isHoveringOver(x, y, width, height)
+
+      if (button == 0 && hovering) {
+        println("[UIHudList] ActionButton '$label' clicked")
         onClick()
         return true
       }
+
       return false
     }
   }
@@ -161,6 +213,7 @@ internal class UIHudList : UIPanel(
 
     private var expanded = false
     private val baseHeight = 60F
+
     private val settings = module.getSettings().map {
       when (it) {
         is ActionSetting -> UIActionSetting(it)
@@ -218,6 +271,7 @@ internal class UIHudList : UIPanel(
       } else {
         toggleX + 11F
       }
+
       val knobY = toggleY + toggleHeight / 2F
       NVGRenderer.circle(knobX, knobY, knobRadius, theme.textOnAccent)
 
@@ -236,31 +290,53 @@ internal class UIHudList : UIPanel(
     }
 
     override fun mouseClicked(button: Int): Boolean {
+      println(
+        "[UIHudList] HudElementEntry mouseClicked name=${module.name} button=$button " +
+          "entryBounds=($x,$y,$width,$height)"
+      )
+
       if (button == 0) {
         val toggleWidth = 40F
         val toggleHeight = 22F
         val toggleX = x + width - 20F - toggleWidth
-        val toggleY = y + baseHeight / 2F - toggleHeight / 2F
-        
-        if (isHoveringOver(toggleX, toggleY, toggleWidth, toggleHeight)) {
+        val toggleY = y + height / 2F - toggleHeight / 2F
+
+        val toggleHovered = isHoveringOver(toggleX, toggleY, toggleWidth, toggleHeight)
+        val rowHovered = isHoveringOver(x, y, width, baseHeight)
+        val canToggle = ModuleManager.canToggleModules()
+
+        println(
+          "[UIHudList] name=${module.name} toggleBounds=($toggleX,$toggleY,$toggleWidth,$toggleHeight) " +
+            "toggleHovered=$toggleHovered rowHovered=$rowHovered canToggle=$canToggle enabled=${module.enabled}"
+        )
+
+        if (toggleHovered) {
+          if (!canToggle) {
+            println("[UIHudList] BLOCKED toggle for ${module.name}: ModuleManager.canToggleModules() returned false")
+            return true
+          }
+
           module.enabled = !module.enabled
+          println("[UIHudList] TOGGLED ${module.name} enabled=${module.enabled}")
           return true
         }
-        
-        if (isHoveringOver(x, y, width, baseHeight)) {
+
+        if (rowHovered) {
           expanded = !expanded
+          println("[UIHudList] EXPANDED ${module.name} expanded=$expanded")
           return true
         }
       }
-      
+
       if (expanded && button == 0) {
         for (setting in settings) {
           if (setting.mouseClicked(button)) {
+            println("[UIHudList] setting handled click for ${module.name}")
             return true
           }
         }
       }
-      
+
       return false
     }
   }

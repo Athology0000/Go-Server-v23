@@ -16,6 +16,7 @@ import org.cobalt.internal.auth.Auth
  *
  * @property name Display name shown in the UI.
  */
+
 abstract class Module(val name: String) : SettingsContainer {
 
   open val category: ModuleCategory = ModuleCategory.OTHER
