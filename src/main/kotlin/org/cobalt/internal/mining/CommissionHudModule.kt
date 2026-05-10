@@ -1,9 +1,6 @@
-package org.cobalt.internal.mining
-<<<<<<< Updated upstream
+﻿package org.cobalt.internal.mining
 
 import kotlin.math.cos
-=======
->>>>>>> Stashed changes
 import org.cobalt.api.hud.HudAnchor
 import org.cobalt.api.hud.hudElement
 import org.cobalt.api.module.Module

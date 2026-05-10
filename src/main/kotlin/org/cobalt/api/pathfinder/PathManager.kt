@@ -106,7 +106,7 @@ object PathManager {
     fun findPath(
         startX: Int, startY: Int, startZ: Int,
         endX: Int, endY: Int, endZ: Int,
-        maxIterations: Int = 500_000,
+        maxIterations: Int = 2_000_000,
         isFly: Boolean = false
     ): Boolean = findPath(
         arrayOf(intArrayOf(startX, startY, startZ)),
@@ -119,7 +119,7 @@ object PathManager {
     fun findPathMultipleGoals(
         startX: Int, startY: Int, startZ: Int,
         endGoals: IntArray,
-        maxIterations: Int = 500_000,
+        maxIterations: Int = 2_000_000,
         isFly: Boolean = false
     ): Boolean {
         val endPoints = unpackFlatPoints("End goals", endGoals) ?: return false
@@ -131,7 +131,7 @@ object PathManager {
     fun findPath(
         startPoints: Array<IntArray>,
         endPoints: Array<IntArray>,
-        maxIterations: Int = 500_000,
+        maxIterations: Int = 2_000_000,
         isFly: Boolean = false
     ): Boolean {
         cancelSearch()

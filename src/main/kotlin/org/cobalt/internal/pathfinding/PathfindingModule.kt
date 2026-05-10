@@ -1,4 +1,4 @@
-package org.cobalt.internal.pathfinding
+﻿package org.cobalt.internal.pathfinding
 
 import java.util.Locale
 import net.minecraft.client.Minecraft
@@ -14,6 +14,10 @@ import net.minecraft.world.InteractionHand
 import net.minecraft.world.phys.Vec3
 import org.cobalt.internal.pathfinding.OverlayRenderEngine
 import org.cobalt.internal.pathfinding.PathSplineRenderer
+import org.cobalt.api.pathfinder.PathFailReason
+import org.cobalt.api.pathfinder.PathOwner
+import org.cobalt.api.pathfinder.PathRequest
+import org.cobalt.api.pathfinder.PathService
 import org.cobalt.api.pathfinder.jni.MovementProfile
 import org.cobalt.api.module.setting.impl.SliderSetting
 import org.cobalt.api.module.Module
@@ -122,70 +126,11 @@ object PathfindingModule : Module("Pathfinding") {
     false
   )
 
-<<<<<<< Updated upstream
   private val aotvSlot = ModeSetting(
     "AOTV Slot",
     "Hotbar slot (1-9) holding your AOTV item.",
     0,
     arrayOf("1","2","3","4","5","6","7","8","9")
-=======
-
-  private val v5EtherwarpEnabled = CheckboxSetting(
-    "V5 Etherwarp Pathing",
-    "Use the v5-style path executor to etherwarp across valid straight path sections when an Etherwarp/AOTV item is available.",
-    true
-  )
-
-  private val v5AotvEnabled = CheckboxSetting(
-    "V5 AOTV Pathing",
-    "Use the v5-style AOTV/AOTE skip logic on long straight path sections.",
-    true
-  )
-
-  private val minTeleportGain = SliderSetting(
-    "Teleport Min Gain",
-    "Minimum path distance gained before the walker tries an AOTV/Etherwarp skip.",
-    12.0,
-    4.0,
-    40.0,
-    1.0
-  )
-
-  private val finalNoTeleportRadius = SliderSetting(
-    "Final No Teleport Radius",
-    "Distance from the final destination where path teleporting is disabled to prevent overshooting.",
-    18.0,
-    4.0,
-    40.0,
-    1.0
-  )
-
-  private val teleportCooldownTicks = SliderSetting(
-    "Teleport Cooldown Ticks",
-    "Delay after each AOTV/Etherwarp use before trying another path teleport.",
-    10.0,
-    2.0,
-    40.0,
-    1.0
-  )
-
-  private val teleportLookAheadNodes = SliderSetting(
-    "Teleport Lookahead Nodes",
-    "How far ahead in the key-node path the v5 teleport selector may scan.",
-    18.0,
-    4.0,
-    48.0,
-    1.0
-  )
-
-  private val teleportStraightnessTolerance = SliderSetting(
-    "Teleport Straightness",
-    "Maximum sideways deviation allowed for AOTV path skips. Lower is stricter.",
-    2.25,
-    0.5,
-    6.0,
-    0.25
->>>>>>> Stashed changes
   )
 
   private val startAction = ActionSetting(
@@ -364,17 +309,7 @@ object PathfindingModule : Module("Pathfinding") {
       cacheHudCellSize,
       cacheHudShowGrid,
       debugFileLogging,
-<<<<<<< Updated upstream
       aotvSlot,
-=======
-      v5EtherwarpEnabled,
-      v5AotvEnabled,
-      minTeleportGain,
-      finalNoTeleportRadius,
-      teleportCooldownTicks,
-      teleportLookAheadNodes,
-      teleportStraightnessTolerance,
->>>>>>> Stashed changes
       startAction,
       stopAction,
       patrolModeEnabled,
@@ -410,18 +345,7 @@ object PathfindingModule : Module("Pathfinding") {
     org.cobalt.internal.pathfinding.DebugLog.debugFileEnabled = debugFileLogging.value
     org.cobalt.internal.pathfinding.DebugLog.debugChatEnabled = debugFileLogging.value || isDebugEnabled()
 
-<<<<<<< Updated upstream
     // Update live info settings
-=======
-    PathTeleportConfig.v5EtherwarpEnabled = v5EtherwarpEnabled.value
-    PathTeleportConfig.v5AotvEnabled = v5AotvEnabled.value
-    PathTeleportConfig.minTeleportGain = minTeleportGain.value
-    PathTeleportConfig.finalNoTeleportRadius = finalNoTeleportRadius.value
-    PathTeleportConfig.teleportCooldownTicks = teleportCooldownTicks.value.toInt().coerceAtLeast(1)
-    PathTeleportConfig.maxLookAheadNodes = teleportLookAheadNodes.value.toInt().coerceAtLeast(1)
-    PathTeleportConfig.teleportStraightnessTolerance = teleportStraightnessTolerance.value
-
->>>>>>> Stashed changes
     routeCountInfo.value = "${localRouteWaypoints.size} points"
     killCountInfo.value  = "${localKillWaypoints.size} points"
     statusInfo.value = if (!NativePathfinder.isInitialized) "Not initialized" else {
@@ -657,17 +581,13 @@ object PathfindingModule : Module("Pathfinding") {
   }
 
   fun startTo(x: Double, y: Double, z: Double) {
-<<<<<<< Updated upstream
     val resolved = resolvePathTarget(x, y, z) ?: return invalidPathTarget(x, y, z)
     setTarget(resolved.x, resolved.y, resolved.z, null)
-=======
-    startTo(
-      x = x,
-      y = y,
-      z = z,
-      owner = PathOwner.USER,
-      source = "PathfindingModule.startTo"
-    )
+    if (!enabled.value) {
+      ensureEnabledForAutomation("pathfinding")
+    }
+    NativePathfinder.setTarget(resolved.x, resolved.y, resolved.z)
+    moduleOwnsPath = true
   }
 
   fun startTo(
@@ -679,56 +599,25 @@ object PathfindingModule : Module("Pathfinding") {
     timeoutTicks: Int = 1200,
     arrivalRadius: Double = 1.8,
     onArrive: () -> Unit = {},
-    onFail: (PathFailReason) -> Unit = {}
+    onFail: (PathFailReason) -> Unit = {},
   ): Boolean {
-    val level = mc.level
-    val rawPos = BlockPos.containing(x, y, z)
-    val walkablePos = if (level != null) MinecraftPathingRules.resolveTarget(level, rawPos) else null
-    val targetPos = walkablePos ?: rawPos
-    val tx = targetPos.x + 0.5
-    val ty = targetPos.y.toDouble()
-    val tz = targetPos.z + 0.5
-
-    setTarget(tx, ty, tz, null)
-
->>>>>>> Stashed changes
-    if (!enabled.value) {
-      ensureEnabledForAutomation("pathfinding")
+    val resolved = resolvePathTarget(x, y, z)
+    if (resolved == null) {
+      invalidPathTarget(x, y, z)
+      onFail(PathFailReason.PATHFINDER_FAILED)
+      return false
     }
-<<<<<<< Updated upstream
-    NativePathfinder.setTarget(resolved.x, resolved.y, resolved.z)
-    moduleOwnsPath = true
-=======
 
-    return requestPathTo(
-      x = tx,
-      y = ty,
-      z = tz,
-      owner = owner,
-      source = source,
-      timeoutTicks = timeoutTicks,
-      arrivalRadius = arrivalRadius,
-      onArrive = onArrive,
-      onFail = onFail
-    )
-  }
+    setTarget(resolved.x, resolved.y, resolved.z, null)
+    if (!enabled.value) {
+      ensureEnabledForAutomation(source)
+    }
 
-  private fun requestPathTo(
-    x: Double,
-    y: Double,
-    z: Double,
-    owner: PathOwner,
-    source: String,
-    timeoutTicks: Int = 1200,
-    arrivalRadius: Double = 1.8,
-    onArrive: () -> Unit = {},
-    onFail: (PathFailReason) -> Unit = {}
-  ): Boolean {
     val accepted = PathService.requestPath(
       PathRequest(
-        x = x,
-        y = y,
-        z = z,
+        x = resolved.x,
+        y = resolved.y,
+        z = resolved.z,
         owner = owner,
         source = source,
         timeoutTicks = timeoutTicks,
@@ -740,16 +629,15 @@ object PathfindingModule : Module("Pathfinding") {
         onFail = { reason ->
           moduleOwnsPath = false
           onFail(reason)
-        }
+        },
       )
     )
-
     moduleOwnsPath = accepted
     return accepted
->>>>>>> Stashed changes
   }
 
   fun stopPath() {
+    PathService.forceCancel(PathFailReason.USER_CANCELLED)
     NativePathfinder.stop()
     moduleOwnsPath = false
     MovementManager.setMovementLock(false)

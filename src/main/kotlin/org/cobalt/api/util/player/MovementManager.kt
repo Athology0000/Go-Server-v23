@@ -50,15 +50,10 @@ object MovementManager {
   @Volatile
   var forcedUse = false
 
-  /** When true, the mixin intercepts keyAttack/keyUse and returns the forced values.
-   *  Must be set by callers that need to control those keys (e.g. DianaModule).
-   *  Cleared automatically by clearForcedMovement(). */
   @JvmField
   @Volatile
   var forcedActionsEnabled = false
 
-<<<<<<< Updated upstream
-=======
   @Volatile
   var movementOwner: MovementOwner = MovementOwner.NONE
     private set
@@ -86,7 +81,6 @@ object MovementManager {
   @JvmStatic
   fun requestMovement(owner: MovementOwner): Boolean {
     if (!canTakeMovement(owner)) return false
-
     movementOwner = owner
     isMovementLocked = true
     return true
@@ -95,7 +89,6 @@ object MovementManager {
   @JvmStatic
   fun requestLook(owner: MovementOwner): Boolean {
     if (!canTakeLook(owner)) return false
-
     lookOwner = owner
     isLookLocked = true
     return true
@@ -104,7 +97,6 @@ object MovementManager {
   @JvmStatic
   fun releaseMovement(owner: MovementOwner) {
     if (owner != MovementOwner.PATHFINDER && owner != MovementOwner.FAILSAFE && movementOwner != owner) return
-
     movementOwner = MovementOwner.NONE
     isMovementLocked = false
     clearForcedMovement()
@@ -113,12 +105,10 @@ object MovementManager {
   @JvmStatic
   fun releaseLook(owner: MovementOwner) {
     if (owner != MovementOwner.PATHFINDER && owner != MovementOwner.FAILSAFE && lookOwner != owner) return
-
     lookOwner = MovementOwner.NONE
     isLookLocked = false
   }
 
->>>>>>> Stashed changes
   @JvmStatic
   fun setLookLock(state: Boolean = true) {
     isLookLocked = state
@@ -144,19 +134,6 @@ object MovementManager {
     shift: Boolean,
     sprint: Boolean
   ) {
-<<<<<<< Updated upstream
-    forcedForward = forward
-    forcedBackward = backward
-    forcedLeft = false
-    forcedRight = false
-    forcedJump = jump
-    forcedShift = shift
-    forcedSprint = sprint
-    hasForcedMovement = true
-=======
-    // Old DUSk/V5 behavior. This overload is intentionally raw and authoritative.
-    // Newer wrappers can still use the owner overload, but the path executor uses this
-    // so another module owner cannot prevent the walker from physically pressing keys.
     movementOwner = MovementOwner.PATHFINDER
     isMovementLocked = true
 
@@ -172,6 +149,31 @@ object MovementManager {
   }
 
   @JvmStatic
+  fun setForcedMovement(
+    owner: MovementOwner,
+    forward: Boolean,
+    backward: Boolean,
+    left: Boolean,
+    right: Boolean,
+    jump: Boolean,
+    shift: Boolean,
+    sprint: Boolean
+  ): Boolean {
+    if (!requestMovement(owner)) return false
+
+    forcedForward = forward
+    forcedBackward = backward
+    forcedLeft = left
+    forcedRight = right
+    forcedJump = jump
+    forcedShift = shift
+    forcedSprint = sprint
+
+    hasForcedMovement = true
+    return true
+  }
+
+  @JvmStatic
   fun setForcedActions(
     owner: MovementOwner,
     attack: Boolean = false,
@@ -184,7 +186,6 @@ object MovementManager {
     forcedUse = use
 
     return true
->>>>>>> Stashed changes
   }
 
   @JvmStatic
@@ -199,13 +200,10 @@ object MovementManager {
     forcedShift = false
     forcedSprint = false
     forcedAttack = false
-    forcedUse    = false
+    forcedUse = false
     forcedActionsEnabled = false
   }
 
-<<<<<<< Updated upstream
-}
-=======
   @JvmStatic
   fun clearForcedMovement(owner: MovementOwner) {
     if (owner != MovementOwner.PATHFINDER && owner != MovementOwner.FAILSAFE && movementOwner != owner) return
@@ -222,79 +220,42 @@ object MovementManager {
   fun forceClearAll() {
     movementOwner = MovementOwner.NONE
     lookOwner = MovementOwner.NONE
-
     isMovementLocked = false
     isLookLocked = false
-
     clearForcedMovement()
   }
 
   @JvmStatic
-  fun currentMovementOwnerName(): String {
-    return movementOwner.name
-  }
+  fun currentMovementOwnerName(): String = movementOwner.name
 
   @JvmStatic
-  fun currentLookOwnerName(): String {
-    return lookOwner.name
-  }
-
-  // ── Recovery helpers ────────────────────────────────────────────────────
+  fun currentLookOwnerName(): String = lookOwner.name
 
   @JvmStatic
-  fun forceRecoveryJump(): Boolean {
-    return setForcedMovement(
-      owner = MovementOwner.RECOVERY,
-      forward = true,
-      backward = false,
-      left = false,
-      right = false,
-      jump = true,
-      shift = false,
-      sprint = false
-    )
-  }
+  fun forceRecoveryJump(): Boolean = setForcedMovement(
+    owner = MovementOwner.RECOVERY,
+    forward = true, backward = false, left = false, right = false,
+    jump = true, shift = false, sprint = false
+  )
 
   @JvmStatic
-  fun forceRecoveryBackup(): Boolean {
-    return setForcedMovement(
-      owner = MovementOwner.RECOVERY,
-      forward = false,
-      backward = true,
-      left = false,
-      right = false,
-      jump = false,
-      shift = false,
-      sprint = false
-    )
-  }
+  fun forceRecoveryBackup(): Boolean = setForcedMovement(
+    owner = MovementOwner.RECOVERY,
+    forward = false, backward = true, left = false, right = false,
+    jump = false, shift = false, sprint = false
+  )
 
   @JvmStatic
-  fun forceRecoveryStrafeLeft(): Boolean {
-    return setForcedMovement(
-      owner = MovementOwner.RECOVERY,
-      forward = false,
-      backward = false,
-      left = true,
-      right = false,
-      jump = false,
-      shift = false,
-      sprint = false
-    )
-  }
+  fun forceRecoveryStrafeLeft(): Boolean = setForcedMovement(
+    owner = MovementOwner.RECOVERY,
+    forward = false, backward = false, left = true, right = false,
+    jump = false, shift = false, sprint = false
+  )
 
   @JvmStatic
-  fun forceRecoveryStrafeRight(): Boolean {
-    return setForcedMovement(
-      owner = MovementOwner.RECOVERY,
-      forward = false,
-      backward = false,
-      left = false,
-      right = true,
-      jump = false,
-      shift = false,
-      sprint = false
-    )
-  }
+  fun forceRecoveryStrafeRight(): Boolean = setForcedMovement(
+    owner = MovementOwner.RECOVERY,
+    forward = false, backward = false, left = false, right = true,
+    jump = false, shift = false, sprint = false
+  )
 }
->>>>>>> Stashed changes

@@ -20,7 +20,7 @@ struct SearchParams {
   std::vector<Int3> starts;
   std::vector<Int3> goals;
   bool isFly = false;
-  int maxIterations = 500000;
+  int maxIterations = 2000000;
   double heuristicWeight = 1.05;
   double initialStartPenalty = 0.0;
   double nonPrimaryStartPenalty = 0.0;

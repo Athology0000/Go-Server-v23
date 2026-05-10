@@ -121,7 +121,13 @@ object CommissionData {
     commissionData.firstOrNull { task -> task.names.any { it.equals(name, ignoreCase = true) } }
 
   fun miningWaypoints(): List<BlockPos> =
-    commissionData
+    (commissionData
       .filter { it.type == CommissionTaskType.MINING && !it.useAllMiningWaypoints }
-      .flatMap { it.waypoints }
+      .flatMap { it.waypoints } + VeinScanStore.loadAllCommissionWaypoints())
+      .distinct()
+
+  fun miningWaypointsFor(task: CommissionTask): List<BlockPos> {
+    val base = if (task.useAllMiningWaypoints) miningWaypoints() else task.waypoints
+    return (VeinScanStore.loadCommissionWaypointsFor(task) + base).distinct()
+  }
 }

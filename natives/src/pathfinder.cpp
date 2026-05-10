@@ -44,7 +44,7 @@ std::optional<SearchResult> findPathSingle(
   const auto startTime = std::chrono::steady_clock::now();
   detail::Runtime runtime(world, params);
 
-  const int reserveTarget = std::clamp(params.maxIterations / 2, 16384, 262144);
+  const int reserveTarget = std::clamp(params.maxIterations / 2, 16384, 524288);
   const size_t reserveSize = static_cast<size_t>(reserveTarget);
 
   std::vector<int> nodeX;

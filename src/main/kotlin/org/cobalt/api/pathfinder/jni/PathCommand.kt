@@ -1,6 +1,7 @@
 package org.cobalt.api.pathfinder.jni
 
 import net.minecraft.client.Minecraft
+import net.minecraft.client.player.LocalPlayer
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
 import net.minecraft.world.level.Level
@@ -39,12 +40,9 @@ data class PathCommand(
 
         val shouldJump = jump || (player != null && detectJump(player))
         val movement = resolveMovementInputs(player, targetRotation, effectiveMovementYaw)
-<<<<<<< Updated upstream
-=======
 
         // Old DUSk/V5 execution core: take the movement lock and write raw forced inputs.
         // Do not let the newer owner layer reject PATHFINDER while mining/combat wrappers are active.
->>>>>>> Stashed changes
         MovementManager.setMovementLock(true)
         MovementManager.setForcedMovement(
             movement.forward,
@@ -104,22 +102,15 @@ data class PathCommand(
         )
     }
 
-<<<<<<< Updated upstream
-    /** Movement guide point — nearest upcoming node with a small fixed lookahead. */
-    // ── Jump detection — V5 PathJumps port ───────────────────────────────
-=======
     private fun detectJump(player: LocalPlayer): Boolean {
         val state = PathExecutorState
         blockCache.clear()
->>>>>>> Stashed changes
 
-    /**
-     * Port of V5 PathJumps.detectJump(). Exact V5 check order:
-     *   suppress ticks → FLAG_LOW_HEADROOM → fluid → not-on-ground guard →
-     *   low ceiling → FLAG_STEP_UP_NEXT + preemptive climb → gap → snow → obstacle
-     */
-    private fun detectJump(player: net.minecraft.client.player.LocalPlayer): Boolean {
-        val state = PathExecutorState
+        /**
+         * Port of V5 PathJumps.detectJump(). Exact V5 check order:
+         *   suppress ticks → FLAG_LOW_HEADROOM → fluid → not-on-ground guard →
+         *   low ceiling → FLAG_STEP_UP_NEXT + preemptive climb → gap → snow → obstacle
+         */
         if (state.jumpSuppressTicks > 0) return false
 
         val mc = Minecraft.getInstance()
@@ -165,14 +156,8 @@ data class PathCommand(
         // 7. Snow jump (V5 checkSnowJump)
         if (checkSnowJump(level, nodes, nearIdx, playerFloorY)) return true
 
-<<<<<<< Updated upstream
         // 8. Obstacle jump (V5 checkObstacleJump)
-        if (checkObstacleJump(level, nodes, nearIdx, playerFloorY)) return true
-=======
-        if (checkObstacleJump(level, player, nodes, nearIdx, playerFloorY)) {
-            return true
-        }
->>>>>>> Stashed changes
+        if (checkObstacleJump(level, player, nodes, nearIdx, playerFloorY)) return true
 
         return false
     }
@@ -181,15 +166,9 @@ data class PathCommand(
     private fun hasLowCeiling(level: Level, x: Int, y: Int, z: Int): Boolean {
         for (offset in 2..3) {
             val pos = BlockPos(x, y + offset, z)
-<<<<<<< Updated upstream
-            val state = level.getBlockState(pos)
-            if (state.block is StairBlock) continue
-            if (!state.getCollisionShape(level, pos).isEmpty) return true
-=======
             val bs = cachedBlock(level, pos)
             if (bs.block is StairBlock) continue
             if (!bs.getCollisionShape(level, pos).isEmpty) return true
->>>>>>> Stashed changes
         }
         return false
     }
@@ -263,16 +242,6 @@ data class PathCommand(
     ): Boolean {
         val nextIdx = (nearIdx + 1).coerceAtMost(nodes.lastIndex)
         val n = nodes[nextIdx]
-<<<<<<< Updated upstream
-        val floorPos = BlockPos(Math.floor(n.x).toInt(), Math.round(n.y).toInt(), Math.floor(n.z).toInt())
-        val blockState = level.getBlockState(floorPos)
-        // Check if this is a snow block with many layers
-        val block = blockState.block
-        val blockName = block.descriptionId
-        if (!blockName.contains("snow")) return false
-        // Snow layer height check: layers property if available; approximate with shape
-        val shape = blockState.getCollisionShape(level, floorPos)
-=======
 
         val floorPos = BlockPos(
             Math.floor(n.x).toInt(),
@@ -284,7 +253,6 @@ data class PathCommand(
         if (!bs.block.descriptionId.contains("snow")) return false
 
         val shape = bs.getCollisionShape(level, floorPos)
->>>>>>> Stashed changes
         if (shape.isEmpty) return false
         val topY = shape.bounds().maxY   // 0..1 range
         val heightAboveFloor = (Math.round(n.y).toInt() + topY) - (playerFloorY + 1)
@@ -304,13 +272,6 @@ data class PathCommand(
         nearIdx: Int,
         playerFloorY: Int
     ): Boolean {
-<<<<<<< Updated upstream
-        // Check if player is standing on a partial block (stair/slab) — affects step limit
-        val standingPos = BlockPos(
-            Math.floor(player().x).toInt(), playerFloorY, Math.floor(player().z).toInt()
-        )
-        val standingBlock = level.getBlockState(standingPos).block
-=======
         val standingPos = BlockPos(
             Math.floor(player.x).toInt(),
             playerFloorY,
@@ -318,7 +279,6 @@ data class PathCommand(
         )
 
         val standingBlock = cachedBlock(level, standingPos).block
->>>>>>> Stashed changes
         val standingOnPartial = standingBlock is StairBlock || standingBlock is SlabBlock
         val stepLimit = if (standingOnPartial) 1.05 else STEP_HEIGHT
 
@@ -328,20 +288,6 @@ data class PathCommand(
         for (i in (nearIdx + 1)..lookEnd) {
             val n = nodes[i]
             val floorY = Math.round(n.y).toInt()
-<<<<<<< Updated upstream
-            val floorPos = BlockPos(Math.floor(n.x).toInt(), floorY, Math.floor(n.z).toInt())
-            val blockState = level.getBlockState(floorPos)
-            val block = blockState.block
-            val name = block.descriptionId
-            if (name.contains("snow")) continue  // V5 skips snow in obstacle check
-            // Only consider solid blocks
-            if (blockState.getCollisionShape(level, floorPos).isEmpty) continue
-            val heightDiff = floorY - playerFloorY
-            if (heightDiff > stepLimit) needsJump = true
-            when {
-                name.contains("slab") -> canWalkInstead = true
-                name.contains("stair") -> canWalkInstead = true  // simplified (V5 checks facing)
-=======
             val floorPos = BlockPos(
                 Math.floor(n.x).toInt(),
                 floorY,
@@ -379,15 +325,11 @@ data class PathCommand(
                         canWalkInstead = true
                     }
                 }
->>>>>>> Stashed changes
             }
         }
         if (!needsJump || canWalkInstead) return false
         return jumpTrue(JUMP_SUPPRESS_TICKS)
     }
-
-    private fun player(): net.minecraft.client.player.LocalPlayer =
-        Minecraft.getInstance().player!!
 
     private fun jumpTrue(suppressTicks: Int): Boolean {
         PathExecutorState.jumpSuppressTicks = suppressTicks

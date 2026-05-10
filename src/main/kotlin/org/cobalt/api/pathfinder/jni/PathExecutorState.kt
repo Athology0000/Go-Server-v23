@@ -302,13 +302,16 @@ object PathExecutorState {
         val adaptiveLookahead = getAdaptiveLookahead(eye, pts)
 
         // ── Find visible lookahead point (with LOS check) ──
+        // Cap lookahead to remaining path so the look target never goes past the final node.
+        val remainingPathForLookahead = pts.lastIndex.toDouble() - currentPathPosition
+        val effectiveLookahead = minOf(adaptiveLookahead, remainingPathForLookahead.coerceAtLeast(0.1))
         var findResult = if (level != null)
-            findVisibleLookahead(eye, pts, adaptiveLookahead, level)
+            findVisibleLookahead(eye, pts, effectiveLookahead, level)
         else
-            FindResult(getInterpolatedPoint(pts, minOf(pts.lastIndex.toDouble(), currentPathPosition + adaptiveLookahead)), adaptiveLookahead)
+            FindResult(getInterpolatedPoint(pts, minOf(pts.lastIndex.toDouble(), currentPathPosition + effectiveLookahead)), effectiveLookahead)
 
         val effectiveMin = if (isInRecoveryMode()) RECOVERY_MIN_LOOKAHEAD else MIN_LOOKAHEAD
-        val targetVisible = level == null || isPointVisible(eye, findResult.point, level)
+        var targetVisible = findResult.visible && (level == null || isPointVisible(eye, findResult.point, level))
 
         // ── Unseen rollback: if no visible target for 600ms, rewind path position ──
         val now = System.currentTimeMillis()
@@ -327,6 +330,7 @@ object PathExecutorState {
                         unseenSinceMs = 0L
                         unseenStartPathPosition = currentPathPosition
                         findResult = findVisibleLookahead(eye, pts, adaptiveLookahead, level)
+                        targetVisible = findResult.visible && isPointVisible(eye, findResult.point, level)
                         break
                     }
                     attempts++
@@ -335,6 +339,11 @@ object PathExecutorState {
         } else {
             unseenSinceMs = 0L
             unseenStartPathPosition = currentPathPosition
+        }
+
+        if (!targetVisible && findResult.lookahead <= 0.0) {
+            currentTargetPoint = null
+            return
         }
 
         // ── Pitch clamping for steep upward angles ──
@@ -350,7 +359,10 @@ object PathExecutorState {
             targetPoint = Vec3(targetPoint.x, eye.y + newDy, targetPoint.z)
         }
         if (isFalling && rawHorz < 0.5) {
-            targetPoint = getInterpolatedPoint(pts, minOf(pts.lastIndex.toDouble(), currentPathPosition + 2.5))
+            val fallTarget = getInterpolatedPoint(pts, minOf(pts.lastIndex.toDouble(), currentPathPosition + 2.5))
+            if (level == null || isPointVisible(eye, fallTarget, level)) {
+                targetPoint = fallTarget
+            }
         }
 
         // ── Clamp look distance ──
@@ -373,32 +385,23 @@ object PathExecutorState {
         val targetYaw = Math.toDegrees(atan2(-tdx, tdz)).toFloat()
         val targetPitch = -Math.toDegrees(atan2(tdy, tHorz)).toFloat()
 
-        // ── Apply smooth yaw/pitch with deadzone ──
+        // ── Feed look-target directly to the PD controller ──
+        // The PD controller in PathfinderRotationStrategy provides all frame-level smoothing via
+        // its acceleration/friction physics. Tick-level exponential decay caused stutter:
+        // the PD would sprint to each 10%-step then idle until the next tick (20 Hz micro-jitter).
         val lastIndex = pts.lastIndex
         val remainingPath = lastIndex - currentPathPosition
         val finishFactor = if (remainingPath < 3.0) maxOf(0.1, remainingPath / 3.0) else 1.0
         val isStraight = pathCurvature < 0.15
-
-        val yawDelta = AngleUtils.getRotationDelta(rawTargetYaw, targetYaw)
-        val boostFactor = initialTurnBoostFactor(yawDelta)
-        val dynamicSmooth = minOf(1.0f, ((if (isStraight) SMOOTH_FACTOR * 0.5 else SMOOTH_FACTOR) / finishFactor * boostFactor).toFloat())
         val dynamicYawDeadzone = (if (isStraight) YAW_DEADZONE * 1.5f else YAW_DEADZONE) * finishFactor.toFloat()
 
+        val yawDelta = AngleUtils.getRotationDelta(rawTargetYaw, targetYaw)
         if (abs(yawDelta) > dynamicYawDeadzone) {
-            rawTargetYaw = AngleUtils.normalizeAngle(rawTargetYaw + yawDelta * minOf(1f, dynamicSmooth))
+            rawTargetYaw = targetYaw
         }
         val pitchDelta = targetPitch - rawTargetPitch
         if (abs(pitchDelta) > PITCH_DEADZONE * finishFactor) {
-            rawTargetPitch += pitchDelta * minOf(1f, dynamicSmooth)
-        }
-
-        // Tick turn boost
-        if (initialTurnBoostTicks > 0) {
-            if (abs(AngleUtils.getRotationDelta(currentYaw, rawTargetYaw)) <= maxOf(10f, YAW_DEADZONE * 2f)) {
-                initialTurnBoostTicks = 0
-            } else {
-                initialTurnBoostTicks--
-            }
+            rawTargetPitch = targetPitch
         }
 
         // ── Completion ──
@@ -547,7 +550,7 @@ object PathExecutorState {
     // LOS + visible lookahead finder
     // =========================================================================
 
-    private data class FindResult(val point: Vec3, val lookahead: Double)
+    private data class FindResult(val point: Vec3, val lookahead: Double, val visible: Boolean = true)
 
     private fun findVisibleLookahead(
         eye: Vec3,
@@ -595,8 +598,7 @@ object PathExecutorState {
             close -= RECOVERY_LOOKAHEAD_STEP
         }
 
-        val t = minOf(pts.lastIndex.toDouble(), currentPathPosition + effectiveMin)
-        return FindResult(getInterpolatedPoint(pts, t), effectiveMin)
+        return FindResult(currentTargetPoint ?: eye, 0.0, visible = false)
     }
 
     private fun isPointVisible(from: Vec3, to: Vec3, level: net.minecraft.world.level.Level): Boolean {

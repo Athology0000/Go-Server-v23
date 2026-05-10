@@ -12,6 +12,7 @@ import org.cobalt.api.util.ChatUtils
 import org.cobalt.api.util.helper.Rotation
 import org.cobalt.api.util.player.MovementManager
 import org.cobalt.internal.pathfinding.PathfindingModule
+import org.cobalt.internal.mining.VeinScannerModule
 import org.cobalt.internal.qol.CraftHelperModule
 import org.cobalt.internal.stats.MacroTimeTracker
 import org.cobalt.internal.ui.screen.UIConfig
@@ -80,6 +81,10 @@ internal object MainCommand : Command(name = "dutt", aliases = arrayOf("cobalt",
     PathfindingModule.setTargetAtPlayer()
   }
 
+  @SubCommand
+  fun vein() {
+    VeinScannerModule.enterScannerMode()
+  }
 
   @SubCommand
   fun unlock() {

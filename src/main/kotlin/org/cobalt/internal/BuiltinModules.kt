@@ -24,7 +24,6 @@ import org.cobalt.internal.dungeons.DungeonRoutesModule
 import org.cobalt.internal.dungeons.DungeonsModule
 import org.cobalt.internal.dungeons.MobEspModule as DungeonMobEspModule
 import org.cobalt.internal.etherwarp.EtherwarpHelperModule
-import org.cobalt.internal.etherwarp.EtherwarpTargetRenderModule
 import org.cobalt.internal.etherwarp.LeftClickEtherwarpModule
 import org.cobalt.internal.etherwarp.SmoothAotvModule
 import org.cobalt.internal.farming.FarmingMacroModule
@@ -39,10 +38,8 @@ import org.cobalt.internal.grotto.GrottoModule
 import org.cobalt.internal.mining.AutoForgeModule
 import org.cobalt.internal.mining.AutoLanternModule
 import org.cobalt.internal.mining.BlockMinerModule
-import org.cobalt.internal.mining.CommissionDebugHudModul
 import org.cobalt.internal.mining.CommissionHudModule
 import org.cobalt.internal.mining.CommissionMacroModule
-import org.cobalt.internal.mining.CommissionRouteAssignmentModule
 import org.cobalt.internal.mining.FairyModule
 import org.cobalt.internal.mining.GemstoneMinerModule
 import org.cobalt.internal.mining.MiningCoinPopupModule
@@ -50,24 +47,15 @@ import org.cobalt.internal.mining.MiningMacroModule
 import org.cobalt.internal.mining.MiningModule
 import org.cobalt.internal.mining.NoFrillsMiningModule
 import org.cobalt.internal.mining.RoutesModule
-import org.cobalt.internal.mining.StrictMiningAttackBlockGuardModule
+import org.cobalt.internal.mining.VeinScannerModule
 import org.cobalt.internal.mining.VeinDirectionModule
-import org.cobalt.internal.mining.bot.MiningBotDebugHudModule
-import org.cobalt.internal.mining.bot.MiningBotModule
-import org.cobalt.internal.mining.bot.MiningBotTargetRenderModule
 import org.cobalt.internal.mining.excavator.ExcavatorMacroModule
 import org.cobalt.internal.mining.failsafe.MiningFailsafeHudModule
-import org.cobalt.internal.mining.gemstone.GemstoneDebugHudModule
-import org.cobalt.internal.mining.gemstone.GemstoneMinerModule as AdvancedGemstoneMinerModule
 import org.cobalt.internal.mining.lobby.LobbyHopperModule
 import org.cobalt.internal.mining.ore.OreMacroModule
 import org.cobalt.internal.mining.pingless.PinglessMiningModule
 import org.cobalt.internal.mining.powder.PowderMacroModule
-import org.cobalt.internal.mining.routes.OrderedMiningRouteDebugModule
 import org.cobalt.internal.mining.scatha.ScathaMacroModule
-import org.cobalt.internal.mining.tunnels.TunnelDebugHudModule
-import org.cobalt.internal.mining.tunnels.TunnelMinerModule
-import org.cobalt.internal.pathfinding.PathDebugHudModule
 import org.cobalt.internal.pathfinding.PathfindingModule
 import org.cobalt.internal.pathfinding.debug.PathPreviewRenderModule
 import org.cobalt.internal.pig.PigMacroModule
@@ -122,7 +110,6 @@ internal object BuiltinModules {
 
     // Pathfinding
     PathfindingModule,
-    PathDebugHudModule,
     PathPreviewRenderModule,
     RotationsModule,
 
@@ -144,21 +131,11 @@ internal object BuiltinModules {
     MiningMacroModule,
     MiningCoinPopupModule,
     RoutesModule,
+    VeinScannerModule,
     BlockMinerModule,
     GemstoneMinerModule,
-    AdvancedGemstoneMinerModule,
-    GemstoneDebugHudModule,
-    TunnelMinerModule,
-    TunnelDebugHudModule,
-    MiningBotModule,
-    MiningBotDebugHudModule,
-    MiningBotTargetRenderModule,
     CommissionMacroModule,
     CommissionHudModule,
-    CommissionDebugHudModul,
-    CommissionRouteAssignmentModule,
-    OrderedMiningRouteDebugModule,
-    StrictMiningAttackBlockGuardModule,
     AutoForgeModule,
     AutoLanternModule,
     FairyModule,
@@ -196,7 +173,6 @@ internal object BuiltinModules {
 
     // Etherwarp / movement helpers
     EtherwarpHelperModule,
-    EtherwarpTargetRenderModule,
     LeftClickEtherwarpModule,
     SmoothAotvModule,
 
