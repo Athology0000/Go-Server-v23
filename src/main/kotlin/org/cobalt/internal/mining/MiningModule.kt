@@ -117,6 +117,12 @@ object MiningModule : Module("Mining") {
     false
   )
 
+  val autoGetInMiningRange = CheckboxSetting(
+    "Auto Get In Mining Range",
+    "Let mining macros walk to a valid stand point that is inside mining range and has camera line of sight to the block.",
+    true
+  )
+
   val frontLoadedActive = CheckboxSetting(
     "Front Loaded Active",
     "Front Loaded active (+250 mining speed).",
@@ -281,6 +287,7 @@ object MiningModule : Module("Mining") {
     precisionActive.uiGroup    = side
     speedBoostActive.uiGroup          = side
     autoActivateSpeedBoost.uiGroup    = side
+    autoGetInMiningRange.uiGroup      = side
     frontLoadedActive.uiGroup         = side
     skymallActive.uiGroup      = side
     miningUmberTungsten.uiGroup = side
@@ -308,6 +315,7 @@ object MiningModule : Module("Mining") {
       precisionActive,
       speedBoostActive,
       autoActivateSpeedBoost,
+      autoGetInMiningRange,
       frontLoadedActive,
       skymallActive,
       miningUmberTungsten,

@@ -10,6 +10,7 @@ import org.cobalt.api.rotation.RotationExecutor
 import org.cobalt.api.rotation.strategy.TimedEaseStrategy
 import org.cobalt.api.util.ChatUtils
 import org.cobalt.api.util.helper.Rotation
+import org.cobalt.api.util.player.MovementManager
 import org.cobalt.internal.pathfinding.PathfindingModule
 import org.cobalt.internal.qol.CraftHelperModule
 import org.cobalt.internal.stats.MacroTimeTracker
@@ -77,6 +78,20 @@ internal object MainCommand : Command(name = "dutt", aliases = arrayOf("cobalt",
   @SubCommand
   fun setposhere() {
     PathfindingModule.setTargetAtPlayer()
+  }
+
+
+  @SubCommand
+  fun unlock() {
+    PathfindingModule.stopPath()
+    MovementManager.forceClearAll()
+    RotationExecutor.stopRotating()
+    ChatUtils.sendMessage("Cobalt: cleared movement/look locks and released forced inputs.")
+  }
+
+  @SubCommand
+  fun moveclear() {
+    unlock()
   }
 
   @SubCommand

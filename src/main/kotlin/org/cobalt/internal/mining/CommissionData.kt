@@ -42,7 +42,7 @@ object CommissionData {
 
   val commissionData = listOf(
     CommissionTask(
-      names = listOf("Royal Mines Titanium", "Royal Mines Mithril"),
+      names = listOf("Royal Mines Mithril", "Royal Mines Titanium", "Royal Mines Mithril Miner"),
       type = CommissionTaskType.MINING,
       cost = 5,
       waypoints = listOf(
@@ -52,7 +52,7 @@ object CommissionData {
       ),
     ),
     CommissionTask(
-      names = listOf("Cliffside Veins Mithril", "Cliffside Veins Titanium"),
+      names = listOf("Cliffside Veins Mithril", "Cliffside Veins Titanium", "Cliffside Veins Mithril Miner"),
       type = CommissionTaskType.MINING,
       cost = 10,
       waypoints = listOf(
@@ -62,7 +62,7 @@ object CommissionData {
       ),
     ),
     CommissionTask(
-      names = listOf("Upper Mines Titanium", "Upper Mines Mithril"),
+      names = listOf("Upper Mines Mithril", "Upper Mines Titanium", "Upper Mines Mithril Miner"),
       type = CommissionTaskType.MINING,
       cost = 15,
       waypoints = listOf(
@@ -72,7 +72,7 @@ object CommissionData {
       ),
     ),
     CommissionTask(
-      names = listOf("Rampart's Quarry Titanium", "Rampart's Quarry Mithril"),
+      names = listOf("Rampart's Quarry Mithril", "Rampart's Quarry Titanium", "Rampart's Quarry Mithril Miner"),
       type = CommissionTaskType.MINING,
       cost = 15,
       waypoints = listOf(
@@ -82,7 +82,7 @@ object CommissionData {
       ),
     ),
     CommissionTask(
-      names = listOf("Lava Springs Mithril", "Lava Springs Titanium"),
+      names = listOf("Lava Springs Mithril", "Lava Springs Titanium", "Lava Springs Mithril Miner"),
       type = CommissionTaskType.MINING,
       cost = 20,
       waypoints = listOf(

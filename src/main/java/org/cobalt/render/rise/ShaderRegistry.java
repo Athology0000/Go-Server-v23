@@ -10,6 +10,7 @@ public final class ShaderRegistry {
     public static final BlurPass BLOOM_B = new BlurPass("/assets/minecraft/rise/shader/bloom.frag", 23, 24);
     public static final BloomPass BLOOM = new BloomPass(BLOOM_A, BLOOM_B);
     public static final MainMenuBackgroundPass MAIN_MENU_BACKGROUND = new MainMenuBackgroundPass();
+    public static final WorldGlowPass         WORLD_GLOW_PASS       = new WorldGlowPass();
 
     public static final ShaderProgram ROUNDED_RECT =
         ShaderProgram.fromResources("/assets/cobalt/shaders/rise/quad.vert", "/assets/minecraft/rise/shader/rq.frag");
@@ -34,6 +35,7 @@ public final class ShaderRegistry {
         BLOOM_A.cleanup();
         BLOOM_B.cleanup();
         MAIN_MENU_BACKGROUND.cleanup();
+        WORLD_GLOW_PASS.cleanup();
         ROUNDED_RECT.cleanup();
         GRADIENT_ROUNDED_RECT.cleanup();
         ANIMATED_GRADIENT_ROUNDED_RECT.cleanup();

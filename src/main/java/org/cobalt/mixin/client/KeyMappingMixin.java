@@ -30,7 +30,9 @@ public class KeyMappingMixin {
       }
       return;
     }
-    if (!MovementManager.isMovementLocked) {
+    // Only override user movement when automation is actively forcing a movement state.
+    // A stale movement lock with no forced inputs used to make the player unable to move.
+    if (!MovementManager.isMovementLocked || !MovementManager.hasForcedMovement) {
       return;
     }
     if (self == mc.options.keyUp) {

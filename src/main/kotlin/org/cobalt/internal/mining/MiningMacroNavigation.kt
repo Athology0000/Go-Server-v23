@@ -13,6 +13,7 @@ import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import org.cobalt.api.pathfinder.minecraft.MinecraftPathingRules
 import org.cobalt.api.pathfinder.jni.NativePathfinder
+import org.cobalt.api.pathfinder.jni.PathStatus
 import org.cobalt.api.rotation.RotationExecutor
 import org.cobalt.api.util.AngleUtils
 import org.cobalt.api.util.ChatUtils
@@ -471,6 +472,11 @@ internal fun MiningMacroModule.moveToward(
     approachTarget = target
     approachStartTick = level.gameTime
     approachStartDistance = currentDistance
+  } else if (NativePathfinder.status == PathStatus.PLANNING) {
+    // Pathfinder is still searching — defer the timeout clock so planning latency
+    // doesn't eat into the execution budget.
+    approachStartTick = level.gameTime
+    approachStartDistance = currentDistance
   } else if (
     level.gameTime - approachStartTick >= APPROACH_TIMEOUT_TICKS &&
     approachStartDistance - currentDistance < APPROACH_MIN_PROGRESS_BLOCKS
@@ -498,7 +504,9 @@ internal fun MiningMacroModule.moveToward(
     preferredStandOff = holdDistance,
     maxTravelDistance = maxTravelDistance,
   ) ?: run {
-    stopApproachMovement()
+    // No valid approach position found; nudge toward the target as a last resort
+    // and let the approach timeout decide when to abandon.
+    nudgeToward(player, target)
     return
   }
   if (currentDistance <= holdDistance + 0.85) {
@@ -550,6 +558,7 @@ internal fun MiningMacroModule.focusApproachTarget(player: Player, target: Block
     if (aim.usesPrecisionPoint) (precisionPointRotationSpeed.value / 100.0).coerceAtLeast(0.1)
     else 1.0
   frameRotTarget = aim.point
+  setAimRenderTarget(target, aim.point)
   frameRotSnapThreshold = RotationsModule.bezierSnapThreshold.value.toFloat()
   frameRotSpeedScale = (RotationsModule.sample(RotationsModule.miningSpeedScale.value) * precisionRotScale).toFloat()
   frameRotAccelScale = (RotationsModule.sample(RotationsModule.miningAccelScale.value) * precisionRotScale).toFloat()
@@ -615,7 +624,34 @@ internal fun MiningMacroModule.findApproach(
   }
 
   if (best != null) return best
-  return null
+
+  // Wide fallback for hard-to-reach blocks: expand the search region and relax the
+  // center-to-center distance bound by 0.65 (block half-width + eye height offset mean
+  // the actual aim point can be within mine range even when centers are further apart).
+  // Only visits positions outside the already-scanned narrow region.
+  val wideMineDistMax = mineRange.value + 0.65
+  var wdy = -APPROACH_SCAN_VERTICAL_WIDE
+  while (wdy <= APPROACH_SCAN_VERTICAL_WIDE) {
+    var wdx = -APPROACH_SCAN_RADIUS_WIDE
+    while (wdx <= APPROACH_SCAN_RADIUS_WIDE) {
+      var wdz = -APPROACH_SCAN_RADIUS_WIDE
+      while (wdz <= APPROACH_SCAN_RADIUS_WIDE) {
+        if (abs(wdx) > APPROACH_SCAN_RADIUS || abs(wdy) > APPROACH_SCAN_VERTICAL || abs(wdz) > APPROACH_SCAN_RADIUS) {
+          val candidate = target.offset(wdx, wdy, wdz)
+          val score = approachScore(level, player, candidate, target, avoidPlayer, preferredStandOff, maxTravelDistance, wideMineDistMax)
+          if (score < bestScore) {
+            bestScore = score
+            best = candidate
+          }
+        }
+        wdz++
+      }
+      wdx++
+    }
+    wdy++
+  }
+
+  return best
 }
 
 internal fun MiningMacroModule.isApproachUsable(
@@ -637,6 +673,7 @@ internal fun MiningMacroModule.approachScore(
   avoidPlayer: Player? = null,
   preferredStandOff: Double = preferredApproachDistance(),
   maxTravelDistance: Double = Double.POSITIVE_INFINITY,
+  maxMineDistOverride: Double? = null,
 ): Double {
   if (!MinecraftPathingRules.isWalkable(level, candidate)) {
     return Double.POSITIVE_INFINITY
@@ -648,13 +685,21 @@ internal fun MiningMacroModule.approachScore(
   val targetDistSq = centerDx * centerDx + centerDy * centerDy + centerDz * centerDz
   val targetDist = sqrt(targetDistSq)
   val standOff = preferredStandOff.coerceAtLeast(0.5)
-  val maxMineDist = (mineRange.value - APPROACH_EDGE_MARGIN).coerceAtLeast(0.5)
+  val maxMineDist = (maxMineDistOverride ?: (mineRange.value - APPROACH_EDGE_MARGIN)).coerceAtLeast(0.5)
   val minMineDist = (standOff - APPROACH_EDGE_WINDOW).coerceAtLeast(0.0)
   if (targetDist < minMineDist || targetDist > maxMineDist) {
     return Double.POSITIVE_INFINITY
   }
 
-  if (REQUIRE_MINE_LOS && !hasLineOfSightFrom(level, player, candidate, target)) {
+  val candidateEye = standingEyePosition(player, candidate)
+  val candidateAim = findVisibleAimPoint(level, player, candidateEye, target, ignorePlayerObstructions = true)
+  if (REQUIRE_MINE_LOS && candidateAim == null) {
+    return Double.POSITIVE_INFINITY
+  }
+
+  val aimDistanceSq = candidateAim?.distanceToSqr(candidateEye) ?: targetDistSq
+  val maxMineRange = (mineRange.value - 0.05).coerceAtLeast(0.5)
+  if (aimDistanceSq > maxMineRange * maxMineRange) {
     return Double.POSITIVE_INFINITY
   }
 
@@ -704,15 +749,18 @@ internal fun MiningMacroModule.angularDistanceTo(player: Player, point: Vec3): F
   return sqrt(yawDelta * yawDelta + pitchDelta * pitchDelta)
 }
 
+internal fun MiningMacroModule.standingEyePosition(player: Player, from: BlockPos): Vec3 {
+  val eyeY = from.y + if (player.isShiftKeyDown) 1.54 else 1.62
+  return Vec3(from.x + 0.5, eyeY, from.z + 0.5)
+}
+
 internal fun MiningMacroModule.hasLineOfSightFrom(
   level: net.minecraft.world.level.Level,
   player: Player,
   from: BlockPos,
   target: BlockPos
 ): Boolean {
-  val eyeY = from.y + if (player.isShiftKeyDown) 1.54 else 1.62
-  val eye = Vec3(from.x + 0.5, eyeY, from.z + 0.5)
-  return losCheck(level, player, eye, target)
+  return losCheck(level, player, standingEyePosition(player, from), target)
 }
 
 internal fun MiningMacroModule.losCheck(

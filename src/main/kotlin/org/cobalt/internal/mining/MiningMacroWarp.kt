@@ -257,6 +257,8 @@ internal fun MiningMacroModule.resetWarp() {
   warpStageTicks = 0
   frameRotTarget = null
   frameRotSnapThreshold = 0f
+  frameRotInitialDist = 0f
+  frameRotLastNs = 0L
 }
 
 internal fun MiningMacroModule.ensureEtherwarpHotbarSelected(): Boolean {

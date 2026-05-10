@@ -3,8 +3,13 @@ package org.cobalt.internal.fishing
 import java.awt.Color
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.ceil
+import kotlin.math.cos
+import kotlin.math.sin
 import net.minecraft.ChatFormatting
 import net.minecraft.client.Minecraft
+import net.minecraft.core.BlockPos
+import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket
 import net.minecraft.network.protocol.game.ClientboundSoundPacket
 import net.minecraft.sounds.SoundEvents
 import net.minecraft.world.entity.decoration.ArmorStand
@@ -18,6 +23,7 @@ import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.Vec3
 import org.cobalt.api.event.EventBus
 import org.cobalt.api.event.annotation.SubscribeEvent
+import org.cobalt.api.event.impl.client.ChatEvent
 import org.cobalt.api.event.impl.client.PacketEvent
 import org.cobalt.api.event.impl.client.TickEvent
 import org.cobalt.api.event.impl.render.WorldRenderEvent
@@ -31,15 +37,21 @@ import org.cobalt.api.module.setting.impl.ModeSetting
 import org.cobalt.api.module.setting.impl.SliderSetting
 import org.cobalt.api.module.setting.impl.TextSetting
 import org.cobalt.api.module.setting.inGroup
+import org.cobalt.api.pathfinder.jni.NativePathfinder
 import org.cobalt.api.rotation.RotationExecutor
 import org.cobalt.api.rotation.strategy.BezierTrackingRotationStrategy
+import org.cobalt.api.util.player.MovementManager
 import org.cobalt.api.util.AngleUtils
 import org.cobalt.api.util.ChatUtils
+import org.cobalt.api.util.TickScheduler
 import org.cobalt.api.util.InventoryUtils
 import org.cobalt.api.util.MouseUtils
 import org.cobalt.api.util.helper.KeyBind
 import org.cobalt.api.util.helper.Rotation
 import org.cobalt.api.util.render.Render3D
+import org.cobalt.internal.etherwarp.EtherwarpLogic
+import org.cobalt.internal.wardrobe.WardrobeModule
+import org.cobalt.mixin.client.FishingHookAccessor
 
 object FishingMacroModule : Module("Fishing Macro") {
 
@@ -51,6 +63,8 @@ object FishingMacroModule : Module("Fishing Macro") {
     WAITING_BITE,
     REELING,
     RECAST_DELAY,
+    MOVING_TO_HOTSPOT,
+    ETHERWARPING_TO_HOTSPOT,
     SWITCHING_TO_WEAPON,
     KILLING,
     SWITCHING_BACK,
@@ -174,9 +188,9 @@ object FishingMacroModule : Module("Fishing Macro") {
 
   private val hookTimeoutTicksSetting = SliderSetting(
     "Hook Timeout",
-    "Maximum ticks to leave the bobber out before reeling and recasting.",
-    220.0,
-    40.0,
+    "Fail-safe ticks before recasting if no bite is confirmed.",
+    700.0,
+    300.0,
     1200.0,
     5.0,
   )
@@ -317,6 +331,109 @@ object FishingMacroModule : Module("Fishing Macro") {
     0.5,
   ).inGroup(COMBAT_GROUP)
 
+  private val lavaBurstSetting = CheckboxSetting(
+    "Lava Burst",
+    "On spawn-chat triggers, fire 2 Hyperion right-clicks, wait 1 s, then 2 more.",
+    false,
+  ).inGroup(COMBAT_GROUP)
+
+  private val lavaBurstKeywordsSetting = TextSetting(
+    "Lava Burst Keywords",
+    "Comma-separated chat phrases that trigger the lava burst combo.",
+    DEFAULT_LAVA_BURST_KEYWORDS,
+  ).inGroup(COMBAT_GROUP)
+
+  private val hotspotNavModeSetting = ModeSetting(
+    "Hotspot Nav",
+    "Navigate to a fishing hotspot before casting.",
+    0,
+    arrayOf("Off", "Center", "Bank"),
+  ).inGroup(HOTSPOT_NAV_GROUP)
+
+  private val useEtherwarpNavSetting = CheckboxSetting(
+    "Use Etherwarp",
+    "Etherwarp to the hotspot target instead of walking, when in range.",
+    false,
+  ).inGroup(HOTSPOT_NAV_GROUP)
+
+  private val navTimeoutTicksSetting = SliderSetting(
+    "Nav Timeout",
+    "Ticks before aborting hotspot navigation and casting in place.",
+    200.0, 40.0, 600.0, 10.0,
+  ).inGroup(HOTSPOT_NAV_GROUP)
+
+  private val navArrivalBlocksSetting = SliderSetting(
+    "Arrival Distance",
+    "Blocks from target counted as arrived.",
+    2.0, 0.5, 5.0, 0.5,
+  ).inGroup(HOTSPOT_NAV_GROUP)
+
+  private val etherwarpNavTimeoutTicksSetting = SliderSetting(
+    "Etherwarp Timeout",
+    "Ticks to wait for etherwarp confirmation before falling back to walking.",
+    60.0, 20.0, 200.0, 5.0,
+  ).inGroup(HOTSPOT_NAV_GROUP)
+
+  private val smoothnessSetting = SliderSetting(
+    "Smoothness",
+    "Preset that writes curve/snap values below. 0 = snappy, 1 = fluid.",
+    0.5, 0.0, 1.0, 0.01,
+  ).inGroup(ROTATION_SETTINGS_GROUP)
+
+  private val curveInSetting = SliderSetting(
+    "Curve In",
+    "Bezier ease-in control point for combat rotation.",
+    0.18, 0.0, 1.0, 0.01,
+  ).inGroup(ROTATION_SETTINGS_GROUP)
+
+  private val curveOutSetting = SliderSetting(
+    "Curve Out",
+    "Bezier ease-out control point for combat rotation.",
+    0.92, 0.0, 1.0, 0.01,
+  ).inGroup(ROTATION_SETTINGS_GROUP)
+
+  private val minScaleSetting = SliderSetting(
+    "Min Scale",
+    "Minimum speed scale at the start of a rotation arc.",
+    0.22, 0.0, 1.0, 0.01,
+  ).inGroup(ROTATION_SETTINGS_GROUP)
+
+  private val snapThresholdSetting = SliderSetting(
+    "Snap Threshold",
+    "Delta angle below which rotation snaps instantly (degrees).",
+    0.35, 0.05, 5.0, 0.05,
+  ).inGroup(ROTATION_SETTINGS_GROUP)
+
+  private val rareLoadoutEnabledSetting = CheckboxSetting(
+    "Rare Mob Loadout",
+    "Swap wardrobe and run a pet command when a boss sea creature's HP drops below threshold.",
+    false,
+  ).inGroup(RARE_MOB_GROUP)
+
+  private val rareMobKeywordsSetting = TextSetting(
+    "Rare Mob Keywords",
+    "Comma-separated keywords that mark a sea creature as a boss.",
+    DEFAULT_RARE_MOB_KEYWORDS,
+  ).inGroup(RARE_MOB_GROUP)
+
+  private val rareWardrobeSetSetting = SliderSetting(
+    "Rare Wardrobe Set",
+    "Wardrobe set to equip when boss HP is low (0 = skip).",
+    0.0, 0.0, 27.0, 1.0,
+  ).inGroup(RARE_MOB_GROUP)
+
+  private val rarePetCommandSetting = TextSetting(
+    "Rare Pet Command",
+    "Command to run when boss HP is low, e.g. 'pets' to open pets menu.",
+    "",
+  ).inGroup(RARE_MOB_GROUP)
+
+  private val rareHpThresholdSetting = SliderSetting(
+    "Boss HP Threshold",
+    "Boss HP percentage below which the wardrobe and pet swap triggers.",
+    30.0, 0.0, 100.0, 5.0,
+  ).inGroup(RARE_MOB_GROUP)
+
   private val lockRotationSetting = CheckboxSetting(
     "Lock Rotation",
     "Lock camera to the cast direction while waiting for a bite, so the macro runs without needing focus.",
@@ -344,10 +461,19 @@ object FishingMacroModule : Module("Fishing Macro") {
   private val combatRotationStrategy = BezierTrackingRotationStrategy(
     yawStepSampler = { combatRotationSpeedSetting.value.toFloat().coerceAtLeast(1f) },
     pitchStepSampler = { (combatRotationSpeedSetting.value * 0.78).toFloat().coerceAtLeast(1f) },
-    curveIn = 0.18f,
-    curveOut = 0.92f,
-    minScale = 0.22f,
-    snapThreshold = 0.35f,
+    curveInProvider = { curveInSetting.value.toFloat() },
+    curveOutProvider = { curveOutSetting.value.toFloat() },
+    minScaleProvider = { minScaleSetting.value.toFloat() },
+    snapThresholdProvider = { snapThresholdSetting.value.toFloat() },
+  )
+
+  private val etherwarpNavRotationStrategy = BezierTrackingRotationStrategy(
+    yawStepSampler = { 20f },
+    pitchStepSampler = { 15f },
+    curveInProvider = { curveInSetting.value.toFloat() },
+    curveOutProvider = { curveOutSetting.value.toFloat() },
+    minScaleProvider = { minScaleSetting.value.toFloat() },
+    snapThresholdProvider = { snapThresholdSetting.value.toFloat() },
   )
 
   private var wasEnabled = false
@@ -363,6 +489,12 @@ object FishingMacroModule : Module("Fishing Macro") {
   private var macroSneakHeld = false
   private var castTargetPos: Vec3? = null
   private var hyperionDownClicksRemaining = 0
+  private var navTargetPos: Vec3? = null
+  private var navStartTick = 0L
+  private var etherwarpNavTriggered = false
+  private var etherwarpNavConfirmed = false
+  private var lastSmoothnessApplied = -1.0
+  private var rareLoadoutTriggered = false
 
   init {
     addSetting(
@@ -397,6 +529,23 @@ object FishingMacroModule : Module("Fishing Macro") {
       hyperionTargetKeywordsSetting,
       hyperionDownClicksSetting,
       hyperionDownMinRangeSetting,
+      lavaBurstSetting,
+      lavaBurstKeywordsSetting,
+      hotspotNavModeSetting,
+      useEtherwarpNavSetting,
+      navTimeoutTicksSetting,
+      navArrivalBlocksSetting,
+      etherwarpNavTimeoutTicksSetting,
+      smoothnessSetting,
+      curveInSetting,
+      curveOutSetting,
+      minScaleSetting,
+      snapThresholdSetting,
+      rareLoadoutEnabledSetting,
+      rareMobKeywordsSetting,
+      rareWardrobeSetSetting,
+      rarePetCommandSetting,
+      rareHpThresholdSetting,
       lockRotationSetting,
       ungrabMouseSetting,
       showCastBoxSetting,
@@ -427,6 +576,7 @@ object FishingMacroModule : Module("Fishing Macro") {
       rememberedWeaponSlot = player.inventory.selectedSlot
     }
     wasEnabled = true
+    syncSmoothnessSliders()
 
     if (mc.screen != null) {
       RotationExecutor.stopIfUsing(combatRotationStrategy)
@@ -452,6 +602,14 @@ object FishingMacroModule : Module("Fishing Macro") {
     }
 
     when (state) {
+      State.MOVING_TO_HOTSPOT -> {
+        handleMovingToHotspot(player, rodSlot, level.gameTime)
+        return
+      }
+      State.ETHERWARPING_TO_HOTSPOT -> {
+        handleEtherwarpingToHotspot(player, rodSlot, level.gameTime)
+        return
+      }
       State.REELING -> {
         handleReeling(player, rodSlot, level.gameTime)
         return
@@ -485,14 +643,14 @@ object FishingMacroModule : Module("Fishing Macro") {
     }
 
     if (hook != null) {
-      if (hook.tickCount >= MIN_SPLASH_HOOK_AGE_TICKS && hasHookedFishMarker(hook)) {
+      if (hook.tickCount >= MIN_SPLASH_HOOK_AGE_TICKS && hasConfirmedBite(hook)) {
         if (!canReelForFishingType(hook)) {
           setState(State.WAITING_BITE)
           return
         }
         combatAnchorPos = hook.position()
-        startReeling(rodSlot, level.gameTime)
-      } else if (hook.tickCount >= hookTimeoutTicksSetting.value.toInt() && level.gameTime >= nextActionTick) {
+        queueReel(hook, level.gameTime)
+      } else if (hook.tickCount >= hookTimeoutTicks() && level.gameTime >= nextActionTick) {
         combatAnchorPos = combatAnchorPos ?: hook.position()
         startReeling(rodSlot, level.gameTime)
       } else {
@@ -506,6 +664,33 @@ object FishingMacroModule : Module("Fishing Macro") {
       return
     }
 
+    if (hotspotNavModeSetting.value != 0) {
+      val hotspotPos = FishingHotspotModule.nearestHotspotPos(player.position())
+      if (hotspotPos != null) {
+        val navTarget = computeNavTarget(player, hotspotPos)
+        val arrivalSq = navArrivalBlocksSetting.value * navArrivalBlocksSetting.value
+        if (navTarget != null && player.distanceToSqr(navTarget) > arrivalSq) {
+          navTargetPos = navTarget
+          navStartTick = level.gameTime
+          if (useEtherwarpNavSetting.value) {
+            val ewSlot = EtherwarpLogic.findEtherwarpHotbarSlot()
+            val targetBlock = BlockPos.containing(navTarget)
+            val ewResult = EtherwarpLogic.getEtherwarpResultTo(targetBlock)
+            if (ewSlot >= 0 && ewResult.succeeded) {
+              InventoryUtils.holdHotbarSlot(ewSlot)
+              etherwarpNavTriggered = false
+              etherwarpNavConfirmed = false
+              setState(State.ETHERWARPING_TO_HOTSPOT)
+              return
+            }
+          }
+          NativePathfinder.setTargetWithRadius(navTarget.x, navTarget.y, navTarget.z, navArrivalBlocksSetting.value)
+          setState(State.MOVING_TO_HOTSPOT)
+          return
+        }
+      }
+    }
+
     castTargetPos = computeCastTarget(player)
     enterRotationLock(player)
     useRod(rodSlot)
@@ -516,6 +701,12 @@ object FishingMacroModule : Module("Fishing Macro") {
   @SubscribeEvent
   fun onPacket(event: PacketEvent.Incoming) {
     if (!enabledSetting.value) return
+
+    if (state == State.ETHERWARPING_TO_HOTSPOT && etherwarpNavTriggered && event.packet is ClientboundPlayerPositionPacket) {
+      etherwarpNavConfirmed = true
+      return
+    }
+
     if (state != State.WAITING_BITE && state != State.CASTING && state != State.RECAST_DELAY) return
 
     val packet = event.packet as? ClientboundSoundPacket ?: return
@@ -533,6 +724,18 @@ object FishingMacroModule : Module("Fishing Macro") {
     if ((dx * dx) + (dy * dy) + (dz * dz) > radiusSq) return
 
     queueReel(hook, mc.level?.gameTime ?: return)
+  }
+
+  @SubscribeEvent
+  fun onChat(event: ChatEvent.Receive) {
+    if (!enabledSetting.value || !lavaBurstSetting.value) return
+    val raw = normalizeText(event.message ?: return)
+    val keywords = parseTargetKeywords(lavaBurstKeywordsSetting.value)
+    if (keywords.none { raw.contains(it) }) return
+    MouseUtils.rightClick()
+    TickScheduler.schedule(1) { MouseUtils.rightClick() }
+    TickScheduler.schedule(21) { MouseUtils.rightClick() }
+    TickScheduler.schedule(22) { MouseUtils.rightClick() }
   }
 
   @SubscribeEvent
@@ -598,6 +801,12 @@ object FishingMacroModule : Module("Fishing Macro") {
     }
 
     if (gameTick < nextActionTick) {
+      setState(State.WAITING_BITE)
+      return
+    }
+
+    if (!hasConfirmedBite(hook)) {
+      pendingReel = false
       setState(State.WAITING_BITE)
       return
     }
@@ -669,13 +878,15 @@ object FishingMacroModule : Module("Fishing Macro") {
     RotationExecutor.rotateTo(rotation, combatRotationStrategy)
 
     val attackInterval = attackIntervalTicksSetting.value.toLong().coerceAtLeast(1L)
-    if (isAimedAt(rotation) && gameTick - lastAttackTick >= attackInterval) {
+    if (gameTick - lastAttackTick >= attackInterval) {
       when (method) {
         CombatMethod.MELEE -> {
-          val attackRangeSq = attackRangeSetting.value * attackRangeSetting.value
-          if (player.distanceToSqr(target) <= attackRangeSq) {
-            MouseUtils.leftClick()
-            lastAttackTick = gameTick
+          if (isAimedAt(rotation)) {
+            val attackRangeSq = attackRangeSetting.value * attackRangeSetting.value
+            if (player.distanceToSqr(target) <= attackRangeSq) {
+              MouseUtils.leftClick()
+              lastAttackTick = gameTick
+            }
           }
         }
         CombatMethod.SOUL_WHIP -> {
@@ -689,9 +900,19 @@ object FishingMacroModule : Module("Fishing Macro") {
         }
         CombatMethod.HYPERION,
         CombatMethod.HYPERION_DOWN -> {
-          MouseUtils.rightClick()
-          lastAttackTick = gameTick
+          if (isAimedAt(rotation)) {
+            MouseUtils.rightClick()
+            lastAttackTick = gameTick
+          }
         }
+      }
+    }
+
+    if (rareLoadoutEnabledSetting.value && !rareLoadoutTriggered && isRareMob(target)) {
+      val maxHp = target.maxHealth
+      if (maxHp > 0f && (target.health / maxHp * 100f) <= rareHpThresholdSetting.value) {
+        triggerRareLoadout()
+        rareLoadoutTriggered = true
       }
     }
 
@@ -775,6 +996,7 @@ object FishingMacroModule : Module("Fishing Macro") {
     killStartTick = 0L
     lastAttackTick = Long.MIN_VALUE
     hyperionDownClicksRemaining = 0
+    rareLoadoutTriggered = false
     nextActionTick = gameTick + weaponSwapDelayTicksSetting.value.toLong()
     setState(State.SWITCHING_BACK)
   }
@@ -792,6 +1014,7 @@ object FishingMacroModule : Module("Fishing Macro") {
     combatAnchorPos = null
     killStartTick = 0L
     lastAttackTick = Long.MIN_VALUE
+    rareLoadoutTriggered = false
     nextActionTick = gameTick + recastDelayTicksSetting.value.toLong()
     setState(State.RECAST_DELAY)
   }
@@ -998,6 +1221,174 @@ object FishingMacroModule : Module("Fishing Macro") {
     return !stack.isEmpty && stack.item is FishingRodItem
   }
 
+  private fun handleMovingToHotspot(player: Player, rodSlot: Int, gameTick: Long) {
+    val target = navTargetPos ?: run { scheduleRecast(gameTick); return }
+
+    if (gameTick - navStartTick >= navTimeoutTicksSetting.value.toLong()) {
+      NativePathfinder.stop()
+      MovementManager.setMovementLock(false)
+      navTargetPos = null
+      scheduleRecast(gameTick)
+      return
+    }
+
+    val arrivalSq = navArrivalBlocksSetting.value * navArrivalBlocksSetting.value
+    if (player.distanceToSqr(target) <= arrivalSq) {
+      NativePathfinder.stop()
+      MovementManager.setMovementLock(false)
+      navTargetPos = null
+      castTargetPos = FishingHotspotModule.nearestHotspotPos(player.position()) ?: computeCastTarget(player)
+      enterRotationLock(player)
+      useRod(rodSlot)
+      nextActionTick = gameTick + castSettleTicksSetting.value.toLong()
+      setState(State.CASTING)
+      return
+    }
+
+    NativePathfinder.tick()?.applyToPlayer()
+    setState(State.MOVING_TO_HOTSPOT)
+  }
+
+  private fun handleEtherwarpingToHotspot(player: Player, rodSlot: Int, gameTick: Long) {
+    val target = navTargetPos ?: run {
+      InventoryUtils.holdHotbarSlot(rodSlot)
+      scheduleRecast(gameTick)
+      return
+    }
+
+    if (etherwarpNavConfirmed) {
+      etherwarpNavConfirmed = false
+      etherwarpNavTriggered = false
+      navTargetPos = null
+      RotationExecutor.stopIfUsing(etherwarpNavRotationStrategy)
+      InventoryUtils.holdHotbarSlot(rodSlot)
+      castTargetPos = FishingHotspotModule.nearestHotspotPos(player.position()) ?: computeCastTarget(player)
+      nextActionTick = gameTick + 5L
+      setState(State.RECAST_DELAY)
+      return
+    }
+
+    if (gameTick - navStartTick >= etherwarpNavTimeoutTicksSetting.value.toLong()) {
+      RotationExecutor.stopIfUsing(etherwarpNavRotationStrategy)
+      etherwarpNavTriggered = false
+      InventoryUtils.holdHotbarSlot(rodSlot)
+      NativePathfinder.setTargetWithRadius(target.x, target.y, target.z, navArrivalBlocksSetting.value)
+      setState(State.MOVING_TO_HOTSPOT)
+      return
+    }
+
+    val ewSlot = EtherwarpLogic.findEtherwarpHotbarSlot()
+    if (ewSlot < 0) {
+      RotationExecutor.stopIfUsing(etherwarpNavRotationStrategy)
+      etherwarpNavTriggered = false
+      navTargetPos = null
+      InventoryUtils.holdHotbarSlot(rodSlot)
+      scheduleRecast(gameTick)
+      return
+    }
+
+    if (!etherwarpNavTriggered) {
+      InventoryUtils.holdHotbarSlot(ewSlot)
+      val targetCenter = Vec3(
+        kotlin.math.floor(target.x) + 0.5,
+        kotlin.math.floor(target.y) + 0.5,
+        kotlin.math.floor(target.z) + 0.5,
+      )
+      val aimRot = AngleUtils.getRotation(player.eyePosition, targetCenter)
+      RotationExecutor.rotateTo(aimRot, etherwarpNavRotationStrategy)
+
+      if (isAimedAt(aimRot)) {
+        etherwarpNavTriggered = true
+        mc.options.keyShift.setDown(true)
+        TickScheduler.schedule(2) {
+          MouseUtils.rightClick()
+          TickScheduler.schedule(3) { mc.options.keyShift.setDown(false) }
+        }
+      }
+    }
+
+    setState(State.ETHERWARPING_TO_HOTSPOT)
+  }
+
+  private fun computeNavTarget(player: Player, hotspotPos: Vec3): Vec3? {
+    return when (hotspotNavModeSetting.value) {
+      1 -> hotspotPos
+      2 -> computeBankTarget(player, hotspotPos)
+      else -> null
+    }
+  }
+
+  private fun computeBankTarget(player: Player, hotspotPos: Vec3): Vec3? {
+    val level = mc.level ?: return null
+    data class Candidate(val pos: Vec3, val distToPlayer: Double)
+
+    val candidates = ArrayList<Candidate>()
+
+    for (i in 0 until BANK_SEARCH_ANGLES) {
+      val angle = i * (2.0 * Math.PI / BANK_SEARCH_ANGLES)
+      val dx = cos(angle)
+      val dz = sin(angle)
+
+      var r = BANK_SEARCH_MIN_RADIUS
+      while (r <= BANK_SEARCH_MAX_RADIUS) {
+        val cx = hotspotPos.x + dx * r
+        val cz = hotspotPos.z + dz * r
+        val blockPos = BlockPos.containing(cx, hotspotPos.y, cz)
+
+        val fluidBelow = level.getFluidState(blockPos.below())
+        if (!fluidBelow.isEmpty) { r += 1.0; continue }
+
+        val foot = level.getBlockState(blockPos)
+        val head = level.getBlockState(blockPos.above())
+        val head2 = level.getBlockState(blockPos.above(2))
+
+        if (!foot.isSolid || !head.isAir || !head2.isAir) { r += 1.0; continue }
+
+        val standPos = Vec3(cx, blockPos.y + 1.0, cz)
+        val eyePos = standPos.add(0.0, 1.62, 0.0)
+        val losResult = level.clip(
+          ClipContext(eyePos, hotspotPos.add(0.0, 0.5, 0.0), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player),
+        )
+        if (losResult.type != HitResult.Type.BLOCK) {
+          candidates += Candidate(standPos, player.distanceToSqr(standPos))
+          break
+        }
+        r += 1.0
+      }
+    }
+
+    return candidates.minByOrNull { it.distToPlayer }?.pos
+  }
+
+  private fun syncSmoothnessSliders() {
+    val s = smoothnessSetting.value
+    if (s == lastSmoothnessApplied) return
+    lastSmoothnessApplied = s
+    curveInSetting.value = lerp(0.10, 0.60, s)
+    curveOutSetting.value = 0.92
+    minScaleSetting.value = lerp(0.35, 0.12, s)
+    snapThresholdSetting.value = lerp(0.50, 0.05, s)
+  }
+
+  private fun lerp(a: Double, b: Double, t: Double): Double = a + (b - a) * t.coerceIn(0.0, 1.0)
+
+  private fun isRareMob(mob: Mob): Boolean {
+    val keywords = parseTargetKeywords(rareMobKeywordsSetting.value)
+    if (keywords.isEmpty()) return false
+    return matchesTargetKeyword(mob, keywords)
+  }
+
+  private fun triggerRareLoadout() {
+    val setId = rareWardrobeSetSetting.value.toInt()
+    if (setId in 1..27) {
+      WardrobeModule.requestEquip(setId)
+    }
+    val petCmd = rarePetCommandSetting.value.trim().trimStart('/')
+    if (petCmd.isNotBlank()) {
+      mc.player?.connection?.sendCommand(petCmd)
+    }
+  }
+
   private fun resolveOwnedHook(player: Player): FishingHook? {
     val hook = player.fishing ?: return null
     if (!hook.isAlive) return null
@@ -1015,6 +1406,18 @@ object FishingMacroModule : Module("Fishing Macro") {
       name == HOOKED_FISH_MARKER_NAME &&
         stand.position().distanceToSqr(hook.position()) <= HOOKED_FISH_MARKER_RANGE_SQ
     }
+  }
+
+  private fun hasConfirmedBite(hook: FishingHook): Boolean {
+    return isHookBiting(hook) || hasHookedFishMarker(hook)
+  }
+
+  private fun isHookBiting(hook: FishingHook): Boolean {
+    return (hook as? FishingHookAccessor)?.isBiting() == true
+  }
+
+  private fun hookTimeoutTicks(): Int {
+    return hookTimeoutTicksSetting.value.toInt().coerceAtLeast(MIN_HOOK_TIMEOUT_TICKS)
   }
 
   private fun useRod(slot: Int) {
@@ -1062,7 +1465,15 @@ object FishingMacroModule : Module("Fishing Macro") {
     combatAnchorPos = null
     killStartTick = 0L
     lastAttackTick = Long.MIN_VALUE
+    navTargetPos = null
+    navStartTick = 0L
+    etherwarpNavTriggered = false
+    etherwarpNavConfirmed = false
+    rareLoadoutTriggered = false
+    NativePathfinder.stop()
+    MovementManager.setMovementLock(false)
     RotationExecutor.stopIfUsing(combatRotationStrategy)
+    RotationExecutor.stopIfUsing(etherwarpNavRotationStrategy)
     setState(State.IDLE)
   }
 
@@ -1074,6 +1485,8 @@ object FishingMacroModule : Module("Fishing Macro") {
       State.WAITING_BITE -> "Waiting Bite"
       State.REELING -> "Reeling"
       State.RECAST_DELAY -> "Recast Delay"
+      State.MOVING_TO_HOTSPOT -> "Moving to Hotspot"
+      State.ETHERWARPING_TO_HOTSPOT -> "Etherwarping"
       State.SWITCHING_TO_WEAPON -> "Switch Weapon"
       State.KILLING -> "Killing"
       State.SWITCHING_BACK -> "Switch Rod"
@@ -1085,7 +1498,16 @@ object FishingMacroModule : Module("Fishing Macro") {
   private const val COMBAT_GROUP = "Combat"
   private const val TROPHY_GROUP = "Trophy Fishing"
   private const val ROTATION_LOCK_GROUP = "Rotation Lock"
+  private const val HOTSPOT_NAV_GROUP = "Hotspot Navigation"
+  private const val ROTATION_SETTINGS_GROUP = "Rotation Settings"
+  private const val RARE_MOB_GROUP = "Rare Mob"
+  private const val BANK_SEARCH_ANGLES = 16
+  private const val BANK_SEARCH_MIN_RADIUS = 3.0
+  private const val BANK_SEARCH_MAX_RADIUS = 9.0
+  private const val DEFAULT_RARE_MOB_KEYWORDS =
+    "lord jawbus,jawbus,thunder,vanquisher,water hydra,deep sea protector"
   private const val MIN_SPLASH_HOOK_AGE_TICKS = 8
+  private const val MIN_HOOK_TIMEOUT_TICKS = 700
   private const val MISSING_ROD_NOTICE_TICKS = 60L
   private const val MISSING_WEAPON_NOTICE_TICKS = 60L
   private const val HOOKED_FISH_MARKER_NAME = "!!!"
@@ -1108,6 +1530,7 @@ object FishingMacroModule : Module("Fishing Macro") {
       "thunder,lord jawbus,jawbus,squid,guardian,drowned,phantom,shark," +
       "moogma,magma slug,lava leech"
   private const val DEFAULT_HYPERION_TARGET_KEYWORDS = "moogma,magma slug,lava leech"
+  private const val DEFAULT_LAVA_BURST_KEYWORDS = "from beneath the lava appears"
   private const val CAST_RAYCAST_RANGE = 30.0
   private const val CAST_BOX_HALF = 0.15
   private const val BOBBER_BOX_HALF = 0.2

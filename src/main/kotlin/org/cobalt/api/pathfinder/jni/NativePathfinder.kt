@@ -10,6 +10,7 @@ import org.cobalt.api.util.InventoryUtils
 import org.cobalt.api.util.TickScheduler
 import org.cobalt.api.util.player.MovementManager
 import org.cobalt.internal.etherwarp.EtherwarpLogic
+import org.cobalt.internal.pathfinding.PathTeleportConfig
 import org.cobalt.internal.pathfinding.DebugLog
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -121,6 +122,11 @@ object NativePathfinder {
     private var prevJump: Boolean = false
     private var teleportFiredNodeKey: Long = -1L
     private var teleportRestoreSlot: Int = -1
+    private var teleportCooldownTicks: Int = 0
+    private var selectedTeleportIndex: Int = -1
+    private var selectedTeleportYaw: Float = 0f
+    private var selectedTeleportPitch: Float = 0f
+    private var selectedTeleportAction: ActionType = ActionType.WALK
 
     private var stuckTicks: Int = 0
     private var lastStuckCheckPos: Vec3 = Vec3.ZERO
@@ -130,6 +136,10 @@ object NativePathfinder {
     private var lastVerticalCheckPos: Vec3 = Vec3.ZERO
     private val stuckPositions: ArrayDeque<BlockPos> = ArrayDeque(4)
     private var cleanExecTicks: Int = 0
+    private var lastSearchGoalX: Int = Int.MIN_VALUE
+    private var lastSearchGoalY: Int = Int.MIN_VALUE
+    private var lastSearchGoalZ: Int = Int.MIN_VALUE
+    private var sprintSuppressHysteresisTicks: Int = 0
 
     private const val STUCK_CHECK_INTERVAL = 20
     private const val STUCK_THRESHOLD = 0.5
@@ -144,6 +154,9 @@ object NativePathfinder {
     private const val AOTV_NODE_DISTANCE_MIN = 6.0
     /** Maximum horizontal distance for AOTV — beyond this the shot is out of range. */
     private const val AOTV_NODE_DISTANCE_MAX = 54.0
+    private const val AOTV_MIN_TOTAL_PATH_LENGTH = 40.0
+    private const val AOTV_FLUID_STRAIGHTNESS_BONUS = 10.0
+    private const val AOTV_FLUID_MIN_GAIN_FACTOR = 0.7
     private const val NODE_REACHED_RANGE = 0.75
 
     // Per-node flag bits — mirrored from natives/src/path_annotations.cpp
@@ -153,12 +166,22 @@ object NativePathfinder {
 
     private const val VERTICAL_STALL_CHECK_INTERVAL = 15
     private const val VERTICAL_STALL_MIN_RISE = 0.2
+<<<<<<< Updated upstream
     private const val STUCK_POSITIONS_MAX  = 4
     private const val AVOID_PENALTY        = 25.0
     private const val AVOID_RADIUS_SQ      = 4
     private const val AVOID_MAX_Y_DIFF     = 2
     private const val CLEAN_EXEC_TICKS           = 30
     private const val SPRINT_SUPPRESS_CURVATURE  = 0.4
+=======
+    private const val STUCK_POSITIONS_MAX = 4
+    private const val AVOID_PENALTY = 25.0
+    private const val AVOID_RADIUS_SQ = 4
+    private const val AVOID_MAX_Y_DIFF = 2
+    private const val CLEAN_EXEC_TICKS = 30
+    private const val SPRINT_SUPPRESS_CURVATURE = 0.4
+    private const val SPRINT_SUPPRESS_HYSTERESIS_TICKS = 6
+>>>>>>> Stashed changes
 
     fun init() {
         // NativePathfinderJNI object init loads the DLL on first access
@@ -238,6 +261,7 @@ object NativePathfinder {
 
     fun stop() {
         cancelSearch()
+<<<<<<< Updated upstream
         state = PathStatus.IDLE
         cachedFullPathNodes = emptyList()
         cachedPathNodes = emptyList()
@@ -263,11 +287,22 @@ object NativePathfinder {
         cleanExecTicks = 0
         PathExecutorState.reset()
         releaseGuidedControl()
+=======
+        resetPathState()
+        lastSearchGoalX = Int.MIN_VALUE
+        lastSearchGoalY = Int.MIN_VALUE
+        lastSearchGoalZ = Int.MIN_VALUE
+        sprintSuppressHysteresisTicks = 0
+>>>>>>> Stashed changes
     }
 
     fun onLevelChange() {
         cancelSearch()
         ChunkSerializer.invalidate()
+        resetPathState()
+    }
+
+    private fun resetPathState() {
         state = PathStatus.IDLE
         cachedFullPathNodes = emptyList()
         cachedPathNodes = emptyList()
@@ -279,6 +314,8 @@ object NativePathfinder {
         pathNodeCursor = 0
         prevJump = false
         teleportFiredNodeKey = -1L
+        teleportCooldownTicks = 0
+        resetSelectedTeleport()
         availabilityFlagsOverride = null
         noTunnelCenter = false
         routeWpIndex = 0
@@ -299,9 +336,17 @@ object NativePathfinder {
 
     fun tick(): PathCommand? {
         val mc = Minecraft.getInstance()
+<<<<<<< Updated upstream
         val player = mc.player ?: run { releaseGuidedControl(); return null }
 
         // Consume completed search result on game thread
+=======
+        val player = mc.player ?: run {
+            releaseGuidedControl()
+            return null
+        }
+
+>>>>>>> Stashed changes
         if (searchFailed) {
             searchFailed = false
             searchFuture = null
@@ -337,7 +382,20 @@ object NativePathfinder {
                 lastTickStatus = state
                 return null
             }
+<<<<<<< Updated upstream
             else -> {}
+=======
+
+            PathStatus.RECOVERING -> {
+                // Old DUSk/V5 core did not run a separate recovery controller here.
+                // Fall back to EXECUTING so the normal replan/stuck logic keeps control.
+                state = PathStatus.EXECUTING
+            }
+
+            else -> {
+                // EXECUTING or REPLANNING.
+            }
+>>>>>>> Stashed changes
         }
 
         // EXECUTING or REPLANNING
@@ -442,8 +500,22 @@ object NativePathfinder {
         // Update V5-style dense path progress for rotations, while keeping the key-node
         // cursor forward-only for flags, AOTV decisions, and jump annotations.
         val rotationNodes = cachedFullPathNodes.ifEmpty { nodes }
+        PathExecutorState.tickOverrides()
+        PathExecutorState.updateLookPoints(rotationNodes, lastPathSignature)
         PathExecutorState.update(player, rotationNodes)
         advanceKeyCursor(player, nodes)
+
+        if (state == PathStatus.EXECUTING &&
+            PathExecutorState.trackNonChangeProgress(PathExecutorState.currentPathPosition)
+        ) {
+            startRecovery("nonchange", AvoidReason.STUCK, playerPos)
+            lastTickStatus = state
+            return null
+        }
+
+        if (teleportCooldownTicks > 0) {
+            teleportCooldownTicks--
+        }
 
         val aotvSlot = EtherwarpLogic.findEtherwarpHotbarSlot()
         val computedFlags = if (aotvSlot >= 0) 0x1 or 0x2 else 0
@@ -456,9 +528,25 @@ object NativePathfinder {
         val activeAction = computeActiveAction(nodes, pathNodeCursor, aotvSlot >= 0, flagsAtCursor)
         val directTargetIndex = directRotationTargetIndex(activeAction, pathNodeCursor, nodes.lastIndex)
         val directTargetNode = nodes.getOrNull(directTargetIndex) ?: nodes.last()
+<<<<<<< Updated upstream
         val ndx = directTargetNode.x + 0.5 - player.x
         val ndz = directTargetNode.z + 0.5 - player.z
         val targetYaw = Math.toDegrees(atan2(-ndx, ndz)).toFloat()
+=======
+
+        val targetYaw = if (activeAction == ActionType.ETHERWARP || activeAction == ActionType.AOTV) {
+            selectedTeleportYaw
+        } else {
+            val ndx = directTargetNode.x + 0.5 - player.x
+            val ndz = directTargetNode.z + 0.5 - player.z
+            Math.toDegrees(atan2(-ndx, ndz)).toFloat()
+        }
+        val targetPitch = if (activeAction == ActionType.ETHERWARP || activeAction == ActionType.AOTV) {
+            selectedTeleportPitch
+        } else {
+            0f
+        }
+>>>>>>> Stashed changes
 
         // Jump pulse logic uses the current key node, not the direct rotation target.
         val jumpNode = nodes.getOrNull(minOf(pathNodeCursor, nodes.lastIndex)) ?: nodes.last()
@@ -470,14 +558,28 @@ object NativePathfinder {
         val jumpPulse = jumpRaw && !prevJump
         prevJump = jumpRaw
 
+        val highCurvature = PathExecutorState.pathCurvature >= SPRINT_SUPPRESS_CURVATURE
+        if (highCurvature) {
+            sprintSuppressHysteresisTicks = SPRINT_SUPPRESS_HYSTERESIS_TICKS
+        } else if (sprintSuppressHysteresisTicks > 0) {
+            sprintSuppressHysteresisTicks--
+        }
+
         val cmd = PathCommand(
             forward = true,
             back = false,
             jump = jumpPulse,
             sneak = false,
+<<<<<<< Updated upstream
             sprint = !lowHeadroom && !tightCorridor && PathExecutorState.pathCurvature < SPRINT_SUPPRESS_CURVATURE,
+=======
+            sprint = !lowHeadroom &&
+                !tightCorridor &&
+                !highCurvature &&
+                sprintSuppressHysteresisTicks == 0,
+>>>>>>> Stashed changes
             targetYaw = targetYaw,
-            targetPitch = 0f,
+            targetPitch = targetPitch,
             status = state,
             activeAction = activeAction,
             distanceToTarget = distToGoal.toFloat()
@@ -493,9 +595,17 @@ object NativePathfinder {
             val nodeKey = cachedPathNodes.getOrNull(directTargetIndex)
                 ?.let { n -> (n.x.toLong() and 0x1FFFFF) or ((n.z.toLong() and 0x1FFFFF) shl 21) }
                 ?: -1L
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
             if (aligned && nodeKey != teleportFiredNodeKey && aotvSlot >= 0) {
                 teleportFiredNodeKey = nodeKey
                 fireTeleport(cmd.activeAction == ActionType.ETHERWARP, aotvSlot)
+                teleportCooldownTicks = PathTeleportConfig.teleportCooldownTicks.coerceAtLeast(1)
+                if (selectedTeleportIndex > pathNodeCursor) {
+                    pathNodeCursor = selectedTeleportIndex.coerceIn(0, nodes.lastIndex)
+                }
             }
         } else if (cmd.activeAction != ActionType.AOTV && cmd.activeAction != ActionType.ETHERWARP) {
             teleportFiredNodeKey = -1L
@@ -625,16 +735,45 @@ object NativePathfinder {
 
     private fun startSearch(isFly: Boolean = routeProfile == MovementProfile.FLY): Boolean {
         cancelSearch()
+<<<<<<< Updated upstream
         stuckPositions.clear()
         cleanExecTicks = 0
+=======
+
+        val sameGoal = goalX == lastSearchGoalX && goalY == lastSearchGoalY && goalZ == lastSearchGoalZ
+        val preserveAvoidance = sameGoal && state == PathStatus.FAILED
+        lastSearchGoalX = goalX
+        lastSearchGoalY = goalY
+        lastSearchGoalZ = goalZ
+
+        if (!preserveAvoidance) {
+            stuckPositions.clear()
+            transientAvoidPoints.clear()
+            debugAvoidPoints = emptyList()
+        }
+        cleanExecTicks = 0
+        debugReplanCount = 0
+        debugLastRecoveryReason = "none"
+        debugLastAvoidPoint = null
+        PathRecoveryController.reset()
+        TeleportValidationController.reset()
+
+>>>>>>> Stashed changes
         state = PathStatus.PLANNING
         val player = Minecraft.getInstance().player ?: run {
             lastError = "Player is missing"
             state = PathStatus.FAILED
             return false
         }
+<<<<<<< Updated upstream
         val startY = if (isFly) player.blockY else player.blockY
         val goalYAdjusted = if (isFly) goalY else goalY
+=======
+
+        val startY = player.blockY
+        val goalYAdjusted = goalY
+
+>>>>>>> Stashed changes
         submitSearch(
             starts = listOf(SearchPoint(player.blockX, startY, player.blockZ)),
             goals = listOf(SearchPoint(goalX, goalYAdjusted, goalZ)),
@@ -652,6 +791,23 @@ object NativePathfinder {
         return true
     }
 
+<<<<<<< Updated upstream
+=======
+    private fun startRecovery(reason: String, avoidReason: AvoidReason, playerPos: Vec3) {
+        // Old DUSk/V5 behavior: do not enter a separate recovery state.
+        // Add the avoid point, then immediately replan from the current player position.
+        debugLastRecoveryReason = reason
+        addDebugAvoidPoint(
+            pos = BlockPos.containing(playerPos),
+            reason = avoidReason,
+            radius = 2,
+            penalty = 36.0,
+            ttlSearches = 2
+        )
+        startReplan(playerPos)
+    }
+
+>>>>>>> Stashed changes
     private fun startReplan(playerPos: Vec3) {
         if (state == PathStatus.REPLANNING) return
         state = PathStatus.REPLANNING
@@ -728,6 +884,12 @@ object NativePathfinder {
     private fun fireTeleport(isEtherwarp: Boolean, aotvSlot: Int) {
         val mc = Minecraft.getInstance()
         val player = mc.player ?: return
+<<<<<<< Updated upstream
+=======
+
+        PathExecutorState.onTeleportTriggered(selectedTeleportIndex.toDouble())
+
+>>>>>>> Stashed changes
         teleportRestoreSlot = player.inventory.selectedSlot
         InventoryUtils.holdHotbarSlot(aotvSlot)
         if (isEtherwarp) mc.options.keyShift?.setDown(true)
@@ -788,6 +950,7 @@ object NativePathfinder {
     private fun centerNode(node: Vec3): Vec3 =
         Vec3(node.x + 0.5, node.y, node.z + 0.5)
 
+<<<<<<< Updated upstream
     /**
      * Decides whether the current path segment warrants an AOTV shot.
      * When consecutive key nodes are far apart the path simplifier has left a long straight
@@ -802,15 +965,172 @@ object NativePathfinder {
                 val dz = next.z - current.z
                 val horizDist = sqrt(dx * dx + dz * dz)
                 if (horizDist in AOTV_NODE_DISTANCE_MIN..AOTV_NODE_DISTANCE_MAX) return ActionType.AOTV
+=======
+    private fun computeActiveAction(
+        nodes: List<Vec3>,
+        cursor: Int,
+        aotvAvailable: Boolean,
+        nodeFlags: Int
+    ): ActionType {
+        resetSelectedTeleport()
+
+        if (aotvAvailable && nodes.size >= 2 && teleportCooldownTicks <= 0) {
+            val teleport = selectV5TeleportCandidate(nodes, cursor)
+            if (teleport != null) {
+                selectedTeleportIndex = teleport.index
+                selectedTeleportYaw = teleport.yaw
+                selectedTeleportPitch = teleport.pitch
+                selectedTeleportAction = teleport.action
+                return teleport.action
+>>>>>>> Stashed changes
             }
         }
         if (nodeFlags and FLAG_STEP_UP_NEXT != 0) return ActionType.SPRINT_JUMP
         return ActionType.WALK
     }
 
+<<<<<<< Updated upstream
     private fun directRotationTargetIndex(activeAction: ActionType, cursor: Int, lastIndex: Int): Int =
         when (activeAction) {
             ActionType.AOTV, ActionType.ETHERWARP -> minOf(cursor + 1, lastIndex)
+=======
+    private data class TeleportCandidate(
+        val index: Int,
+        val yaw: Float,
+        val pitch: Float,
+        val action: ActionType
+    )
+
+    private fun selectV5TeleportCandidate(nodes: List<Vec3>, cursor: Int): TeleportCandidate? {
+        val player = Minecraft.getInstance().player ?: return null
+        if (nodes.isEmpty()) return null
+
+        val distanceToFinal = player.position().distanceTo(centerNode(nodes.last()))
+        if (distanceToFinal <= PathTeleportConfig.finalNoTeleportRadius) return null
+
+        // V5 gate: total arc length of remaining path must be >= 40 blocks before teleporting.
+        val remainingLength = estimatePathGain(nodes, cursor, nodes.lastIndex)
+        if (remainingLength < AOTV_MIN_TOTAL_PATH_LENGTH) return null
+
+        // V5 fluid mode: relax constraints when the player is in water or lava.
+        val inFluid = player.isInWater || player.isInLava
+        val effectiveStraightnessTolerance = if (inFluid)
+            PathTeleportConfig.teleportStraightnessTolerance + AOTV_FLUID_STRAIGHTNESS_BONUS
+        else
+            PathTeleportConfig.teleportStraightnessTolerance
+        val effectiveMinGain = if (inFluid)
+            PathTeleportConfig.minTeleportGain * AOTV_FLUID_MIN_GAIN_FACTOR
+        else
+            PathTeleportConfig.minTeleportGain
+
+        val maxRange = EtherwarpLogic.getEtherwarpRange().toDouble().coerceAtLeast(AOTV_NODE_DISTANCE_MAX)
+        val maxIndex = minOf(nodes.lastIndex, cursor + PathTeleportConfig.maxLookAheadNodes.coerceAtLeast(1))
+
+        var best: TeleportCandidate? = null
+        var bestGain = 0.0
+
+        for (i in maxIndex downTo cursor + 1) {
+            val node = nodes[i]
+            val aimBlock = BlockPos(
+                Math.floor(node.x).toInt(),
+                Math.floor(node.y - 1.0).toInt(),
+                Math.floor(node.z).toInt()
+            )
+            val aimPoint = Vec3(aimBlock.x + 0.5, aimBlock.y + 0.92, aimBlock.z + 0.5)
+            val gain = estimatePathGain(nodes, cursor, i)
+            if (gain < effectiveMinGain) continue
+
+            val dx = aimPoint.x - player.eyePosition.x
+            val dy = aimPoint.y - player.eyePosition.y
+            val dz = aimPoint.z - player.eyePosition.z
+            val dist = sqrt(dx * dx + dy * dy + dz * dz)
+            if (dist > maxRange + 0.75) continue
+
+            val yaw = Math.toDegrees(atan2(-dx, dz)).toFloat()
+            val pitch = Math.toDegrees(-atan2(dy, sqrt(dx * dx + dz * dz))).toFloat()
+
+            if (PathTeleportConfig.v5EtherwarpEnabled) {
+                val direct = EtherwarpLogic.getEtherwarpResultTo(aimBlock, aimPoint)
+                if (direct.succeeded && direct.pos == aimBlock) {
+                    best = TeleportCandidate(i, yaw, pitch, ActionType.ETHERWARP)
+                    bestGain = gain
+                    break
+                }
+            }
+
+            if (PathTeleportConfig.v5AotvEnabled && gain >= AOTV_NODE_DISTANCE_MIN && gain <= AOTV_NODE_DISTANCE_MAX) {
+                // V5: only use AOTV on straight-ish path chunks; fluid mode uses relaxed tolerance.
+                if (isTeleportSegmentStraightEnough(nodes, cursor, i, effectiveStraightnessTolerance)) {
+                    best = TeleportCandidate(i, yaw, 0f, ActionType.AOTV)
+                    bestGain = gain
+                    break
+                }
+            }
+        }
+
+        return best
+    }
+
+    private fun estimatePathGain(nodes: List<Vec3>, start: Int, end: Int): Double {
+        if (start >= end) return 0.0
+        var total = 0.0
+        var prev = nodes[start]
+        for (i in (start + 1)..end) {
+            val next = nodes[i]
+            val dx = next.x - prev.x
+            val dy = next.y - prev.y
+            val dz = next.z - prev.z
+            total += sqrt(dx * dx + dy * dy + dz * dz)
+            prev = next
+        }
+        return total
+    }
+
+    private fun isTeleportSegmentStraightEnough(
+        nodes: List<Vec3>,
+        start: Int,
+        end: Int,
+        tolerance: Double = PathTeleportConfig.teleportStraightnessTolerance
+    ): Boolean {
+        if (end <= start + 1) return true
+        val a = nodes[start]
+        val b = nodes[end]
+        val baseX = b.x - a.x
+        val baseZ = b.z - a.z
+        val baseLen = sqrt(baseX * baseX + baseZ * baseZ)
+        if (baseLen < 0.001) return false
+
+        val nx = -baseZ / baseLen
+        val nz = baseX / baseLen
+        var maxOffset = 0.0
+
+        for (i in start + 1 until end) {
+            val p = nodes[i]
+            val ox = p.x - a.x
+            val oz = p.z - a.z
+            maxOffset = maxOf(maxOffset, abs(ox * nx + oz * nz))
+        }
+
+        return maxOffset <= tolerance
+    }
+
+    private fun resetSelectedTeleport() {
+        selectedTeleportIndex = -1
+        selectedTeleportYaw = 0f
+        selectedTeleportPitch = 0f
+        selectedTeleportAction = ActionType.WALK
+    }
+
+    private fun directRotationTargetIndex(
+        activeAction: ActionType,
+        cursor: Int,
+        lastIndex: Int
+    ): Int {
+        return when (activeAction) {
+            ActionType.AOTV,
+            ActionType.ETHERWARP -> if (selectedTeleportIndex >= 0) selectedTeleportIndex else minOf(cursor + 1, lastIndex)
+
+>>>>>>> Stashed changes
             else -> minOf(cursor + 1, lastIndex)
         }.coerceIn(0, lastIndex)
 

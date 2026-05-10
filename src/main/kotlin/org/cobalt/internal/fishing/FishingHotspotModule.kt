@@ -291,6 +291,12 @@ object FishingHotspotModule : Module("Fishing Hotspot") {
     return circleSurfaceSetting.value || circleOutlineSetting.value
   }
 
+  fun nearestHotspotPos(from: Vec3): Vec3? =
+    hotspotsById.values
+      .asSequence()
+      .mapNotNull { it.pos }
+      .minByOrNull { it.distanceToSqr(from) }
+
   private fun clearState() {
     hotspotsById.clear()
     lastHotspotFishAtMs = 0L

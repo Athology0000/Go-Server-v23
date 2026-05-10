@@ -8,6 +8,7 @@ import net.minecraft.client.gui.screens.TitleScreen;
 import org.cobalt.api.addon.Addon;
 import org.cobalt.api.addon.AddonMetadata;
 import org.cobalt.api.event.impl.client.TickEvent;
+import org.cobalt.internal.dungeons.gambling.DungeonChestGamblingModule;
 import org.cobalt.internal.loader.AddonLoader;
 import org.cobalt.internal.visual.DuttStartupGate;
 import org.cobalt.internal.visual.DuttWelcomeScreen;
@@ -46,6 +47,8 @@ public class MinecraftMixin {
 
   @Inject(method = "setScreen", at = @At("HEAD"), cancellable = true)
   private void cobalt$showWelcomeBeforeTitle(Screen screen, CallbackInfo callbackInfo) {
+    DungeonChestGamblingModule.INSTANCE.onScreenChanged(screen);
+
     if (
       cobalt$redirectingWelcome ||
       screen == null ||

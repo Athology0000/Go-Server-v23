@@ -9,8 +9,8 @@ enum class AuthState {
 }
 
 object Auth {
-  @Volatile var state: AuthState = AuthState.PENDING
-  @Volatile var statusMessage: String = "Waiting…"
+  @Volatile var state: AuthState = AuthState.READY
+  @Volatile var statusMessage: String = "Ready (auth disabled)"
   @Volatile var failureReason: String = ""
 
   @Volatile var modulesLoaded: Int = 0
@@ -37,8 +37,8 @@ object Auth {
   }
 
   fun reset() {
-    state = AuthState.PENDING
-    statusMessage = "Waiting…"
+    state = AuthState.READY
+    statusMessage = "Ready (auth disabled)"
     failureReason = ""
 
     modulesLoaded = 0

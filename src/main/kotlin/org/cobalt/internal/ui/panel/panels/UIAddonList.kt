@@ -4,6 +4,7 @@ import net.fabricmc.loader.api.FabricLoader
 import org.cobalt.api.addon.Addon
 import org.cobalt.api.addon.AddonMetadata
 import org.cobalt.api.module.Module
+import org.cobalt.api.module.ModuleCategory
 import org.cobalt.api.module.ModuleManager
 import org.cobalt.api.ui.theme.ThemeManager
 import org.cobalt.api.util.ui.NVGRenderer
@@ -127,10 +128,20 @@ internal class UIAddonList : UIPanel(
       .map { it.metadata.version.friendlyString }
       .orElse("builtin")
 
-    val miningModules = builtinModules.filter {
-      it == MiningModule || it == BlockMinerModule || it == MiningHudModule || it == MiningMacroModule || it == CommissionHudModule || it == FairyModule ||
-        it == RoutesModule || it == CommissionMacroModule ||
-        it == VeinDirectionModule || it == AutoLanternModule
+    val miningModules = builtinModules.filter { module ->
+      module.category == ModuleCategory.MINING ||
+        module.javaClass.name.startsWith("org.cobalt.internal.mining.") ||
+        module == MiningHudModule ||
+        module.name.contains("Mining", ignoreCase = true) ||
+        module.name.contains("Miner", ignoreCase = true) ||
+        module.name.contains("Gemstone", ignoreCase = true) ||
+        module.name.contains("Tunnel", ignoreCase = true) ||
+        module.name.contains("Powder", ignoreCase = true) ||
+        module.name.contains("Scatha", ignoreCase = true) ||
+        module.name.contains("Commission", ignoreCase = true) ||
+        module.name.contains("Ore", ignoreCase = true) ||
+        module.name.contains("Forge", ignoreCase = true) ||
+        module.name.contains("Lantern", ignoreCase = true)
     }
 
     val combatModules = builtinModules.filter {
@@ -199,78 +210,152 @@ internal class UIAddonList : UIPanel(
   }
 
   private fun createMiningSection(version: String, miningModules: List<Module>): AddonSection? {
-    val blockMinerTargets = setOf(
-      BlockMinerModule,
-      MiningModule
-    )
-    val gemstoneTargets = setOf(
-      GemstoneMinerModule,
-      MiningModule,
-      MiningHudModule,
-      MiningMacroModule,
-      RoutesModule,
-      VeinDirectionModule
-    )
-    val tunnelTargets = setOf(
-      MiningModule,
-      MiningHudModule,
-      MiningMacroModule,
-      RoutesModule,
-      VeinDirectionModule,
-      AutoLanternModule,
-      FairyModule
-    )
-    val dwarvenTargets = setOf(
-      CommissionMacroModule,
-      CommissionHudModule,
-      MiningModule,
-      MiningHudModule,
-      RoutesModule
-    )
-    val glaciteTargets = setOf(
-      CommissionMacroModule,
-      CommissionHudModule,
-      MiningModule,
-      MiningHudModule,
-      RoutesModule,
-      CombatMacroModule,
-      AutoLanternModule
+    fun moduleName(module: Module): String = module.name.trim()
+
+    fun matchingModules(vararg patterns: String): List<Module> {
+      val normalizedPatterns = patterns.map { it.lowercase() }
+      return miningModules.filter { module ->
+        val name = moduleName(module).lowercase()
+        normalizedPatterns.any { pattern -> name.contains(pattern) }
+      }
+    }
+
+    fun exactModules(vararg names: String): List<Module> {
+      val normalizedNames = names.map { it.lowercase() }.toSet()
+      return miningModules.filter { module -> moduleName(module).lowercase() in normalizedNames }
+    }
+
+    val coreMining = miningModules.filter { module ->
+      module == MiningModule ||
+        module == MiningHudModule ||
+        module == RoutesModule ||
+        moduleName(module).equals("Mining", ignoreCase = true) ||
+        moduleName(module).equals("Mining Macro", ignoreCase = true) ||
+        moduleName(module).equals("Routes", ignoreCase = true) ||
+        moduleName(module).equals("Mining Coin Popups", ignoreCase = true) ||
+        moduleName(module).equals("Mining Failsafes", ignoreCase = true) ||
+        moduleName(module).equals("Ordered Route Debug HUD", ignoreCase = true) ||
+        moduleName(module).equals("Strict Mining Block Guard", ignoreCase = true)
+    }
+
+    val commissionModules = miningModules.filter { module ->
+      moduleName(module).contains("Commission", ignoreCase = true)
+    }
+
+    val gemstoneModules = miningModules.filter { module ->
+      val name = moduleName(module)
+      name.contains("Gemstone", ignoreCase = true) ||
+        name.equals("Vein Direction Setter", ignoreCase = true) ||
+        name.equals("Routes", ignoreCase = true)
+    }
+
+    val tunnelModules = miningModules.filter { module ->
+      val name = moduleName(module)
+      name.contains("Tunnel", ignoreCase = true) ||
+        name.equals("Auto Lantern", ignoreCase = true) ||
+        name.equals("Fairy", ignoreCase = true) ||
+        name.equals("Vein Direction Setter", ignoreCase = true) ||
+        name.equals("Routes", ignoreCase = true)
+    }
+
+    val blockMinerModules = exactModules("Block Miner", "Mining")
+    val miningBotModules = matchingModules("mining bot")
+    val oreModules = matchingModules("ore macro")
+    val powderModules = matchingModules("powder")
+    val scathaModules = matchingModules("scatha")
+    val excavatorModules = matchingModules("excavator")
+    val pinglessModules = matchingModules("pingless")
+    val utilityModules = matchingModules("forge", "lantern", "fairy", "nofrills", "lobby hopper", "strict mining")
+
+    val covered = (coreMining + blockMinerModules + gemstoneModules + tunnelModules + miningBotModules +
+      commissionModules + oreModules + powderModules + scathaModules + excavatorModules +
+      pinglessModules + utilityModules).toSet()
+    val otherMiningModules = miningModules.filter { it !in covered }
+
+    val finalEntries = listOfNotNull(
+      createBuiltinEntry(
+        "cobalt-mining-core",
+        "Mining Core",
+        version,
+        coreMining
+      ),
+      createBuiltinEntry(
+        "cobalt-mining-block",
+        "Block Miner",
+        version,
+        blockMinerModules
+      ),
+      createBuiltinEntry(
+        "cobalt-mining-gemstone",
+        "Gemstone Miner",
+        version,
+        gemstoneModules
+      ),
+      createBuiltinEntry(
+        "cobalt-mining-tunnel",
+        "Tunnel Miner",
+        version,
+        tunnelModules
+      ),
+      createBuiltinEntry(
+        "cobalt-mining-bot",
+        "Mining Bot",
+        version,
+        miningBotModules
+      ),
+      createBuiltinEntry(
+        "cobalt-mining-commission",
+        "Commission Macros",
+        version,
+        commissionModules
+      ),
+      createBuiltinEntry(
+        "cobalt-mining-ore",
+        "Ore Macro",
+        version,
+        oreModules
+      ),
+      createBuiltinEntry(
+        "cobalt-mining-powder",
+        "Powder Macro",
+        version,
+        powderModules
+      ),
+      createBuiltinEntry(
+        "cobalt-mining-scatha",
+        "Scatha Macro",
+        version,
+        scathaModules
+      ),
+      createBuiltinEntry(
+        "cobalt-mining-excavator",
+        "Excavator Macro",
+        version,
+        excavatorModules
+      ),
+      createBuiltinEntry(
+        "cobalt-mining-pingless",
+        "Pingless Mining",
+        version,
+        pinglessModules
+      ),
+      createBuiltinEntry(
+        "cobalt-mining-forge",
+        "Forge / Utility",
+        version,
+        utilityModules
+      ),
+      createBuiltinEntry(
+        "cobalt-mining-other",
+        "Other Mining",
+        version,
+        otherMiningModules
+      )
     )
 
     return createSection(
       title = "Mining",
-      entries = listOfNotNull(
-        createBuiltinEntry(
-          "cobalt-mining-block",
-          "Block Miner",
-          version,
-          miningModules.filter { it in blockMinerTargets }
-        ),
-        createBuiltinEntry(
-          "cobalt-mining-gemstone",
-          "Gemstone Miner",
-          version,
-          miningModules.filter { it in gemstoneTargets }
-        ),
-        createBuiltinEntry(
-          "cobalt-mining-tunnel",
-          "Tunnel Miner",
-          version,
-          miningModules.filter { it in tunnelTargets }
-        ),
-        createBuiltinEntry(
-          "cobalt-mining-commission-dwarven",
-          "Commission Macro (Dwarven)",
-          version,
-          miningModules.filter { it in dwarvenTargets }
-        ),
-        createBuiltinEntry(
-          "cobalt-mining-commission-glacite",
-          "Commission Macro (Glacite)",
-          version,
-          miningModules.filter { it in glaciteTargets }
-        )
-      )
+      entries = finalEntries
     )
   }
 

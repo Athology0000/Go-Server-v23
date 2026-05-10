@@ -29,12 +29,18 @@ import org.cobalt.api.module.setting.impl.TextSetting
 import org.cobalt.api.pathfinder.jni.NativePathfinder
 import org.cobalt.api.pathfinder.jni.PathStatus
 import org.cobalt.api.pathfinder.minecraft.MinecraftPathingRules
+import org.cobalt.api.rotation.EasingType
 import org.cobalt.api.rotation.RotationExecutor
+<<<<<<< Updated upstream
 import org.cobalt.api.util.AngleUtils
 import org.cobalt.api.util.ChatUtils
 import org.cobalt.api.util.InventoryUtils
 import org.cobalt.api.util.MouseClickType
 import org.cobalt.api.util.getLoreLines
+=======
+import org.cobalt.api.rotation.strategy.TimedEaseStrategy
+import org.cobalt.api.util.*
+>>>>>>> Stashed changes
 import org.cobalt.api.util.player.MovementManager
 import org.cobalt.internal.combat.CombatMacroModule
 import org.cobalt.internal.pathfinding.PathfindingModule
@@ -73,6 +79,12 @@ object CommissionMacroModule : Module("Commission Macro") {
     1.0,
     8.0,
     1.0,
+  )
+
+  private val debugMode = CheckboxSetting(
+    "Debug Parser",
+    "Logs what the commission parser sees from tab list and GUI to chat.",
+    false,
   )
 
   private val statusText = TextSetting("Status", "Current macro state.", "Idle")
@@ -138,6 +150,46 @@ object CommissionMacroModule : Module("Commission Macro") {
     val selected: TabCommission?,
   )
 
+<<<<<<< Updated upstream
+=======
+  private enum class DetectionTier { TAB, PIGEON, EMISSARY, KING }
+
+  private var state = State.IDLE
+  private var travelModeState = TravelMode.NONE
+  private var pauseTicks = 0
+  private var lastAreaWarpAt = 0L
+  private var commissions: List<TabCommission> = emptyList()
+  private var currentCommission: TabCommission? = null
+  private var currentTask: CommissionTask? = null
+  private var currentWaypoint: BlockPos? = null
+  private var currentWaypoints: List<BlockPos> = emptyList()
+  private var currentRouteChoice: CommissionRouteResolver.CommissionRouteChoice? = null
+  private var activeRouteName: String? = null
+  private var pathActivated = false
+  private var travelPurpose: CommissionTaskType? = null
+  private var pathingAvoidanceBreachAt = 0L
+  private var lastAvoidanceRepathAt = 0L
+  private var completedCommissions = 0
+  private var sessionStartMs = 0L
+  private var lastCommissionName: String? = null
+  private var lastCompletedCommissionName: String? = null
+  private var firstPigeonAttemptAt = 0L
+  private var pigeonAttempts = 0
+  private var pendingUseRelease = false
+  private var openAttempts = 0
+  private var claimAttempts = 0
+  private var detectorAttempts = 0
+  private var npcRotationPending = false
+  private var detectionTier = DetectionTier.TAB
+  private var detectionTierStartedAt = 0L
+  private var triedEmissaryPositions = mutableSetOf<BlockPos>()
+  private var claimCooldownUntil = 0L
+  private var lastDebugLogAt = 0L
+  private var utilityPathTarget: BlockPos? = null
+  private var travelPreRotating = false
+  private var commissionsLastSetAt = 0L
+
+>>>>>>> Stashed changes
   private val miningObjectivePrefixes = listOf("mine ", "collect ")
   private val combatObjectivePrefixes = listOf("kill ", "slay ", "defeat ", "punch ", "damage ")
   private val commissionObjectivePrefixes = listOf(
@@ -181,7 +233,23 @@ object CommissionMacroModule : Module("Commission Macro") {
     }
 
   init {
+<<<<<<< Updated upstream
     addSetting(enabled, info, avoidanceRadius, goblinWeaponSlot, statusText, commissionText, progressText, toolText)
+=======
+    addSetting(
+      enabled,
+      info,
+      routeMode,
+      avoidanceRadius,
+      goblinWeaponSlot,
+      debugMode,
+      statusText,
+      commissionText,
+      progressText,
+      toolText,
+    )
+
+>>>>>>> Stashed changes
     EventBus.register(this)
   }
 
@@ -210,10 +278,16 @@ object CommissionMacroModule : Module("Commission Macro") {
     }
 
     val tick = mc.level?.gameTime ?: 0L
+<<<<<<< Updated upstream
     if (tick - lastTabReadTick >= 20L) {
       updateCommissionsIfChanged(readCommissionsFromTabList())
       lastTabReadTick = tick
     }
+=======
+
+    // V5 reads tab every step (every tick)
+    updateCommissionsIfChanged(readCommissionsFromTabList())
+>>>>>>> Stashed changes
 
     handlePathingAvoidance()
 
@@ -267,11 +341,56 @@ object CommissionMacroModule : Module("Commission Macro") {
     setState(State.CHOOSING)
   }
 
+<<<<<<< Updated upstream
+=======
+  private fun ensureDrillEquippedForClaim(): Boolean {
+    val player = mc.player ?: return true
+    val toolSlot = findMiningToolSlot(player)
+    if (toolSlot < 0) return true
+    if (player.inventory.selectedSlot != toolSlot) {
+      InventoryUtils.holdHotbarSlot(toolSlot)
+      delay(3)
+      return false
+    }
+    return true
+  }
+
+  private fun updateCommissionsFromGui(screen: AbstractContainerScreen<*>) {
+    val parsed = parseCommissionSelectionFromGui(screen)
+    if (parsed.commissions.isEmpty()) return
+    commissions = parsed.commissions
+    val currentName = currentCommission?.name
+    val matching = if (currentName != null) commissions.firstOrNull { it.name == currentName } else null
+    if (matching == null || matching.progress >= 1.0) currentCommission = null
+  }
+
+>>>>>>> Stashed changes
   private fun handleChoosing() {
     val screen = mc.screen as? AbstractContainerScreen<*>
     if (screen != null) {
+      // Tab list is read every tick regardless — if it already has active commissions, bail out of GUI
+      if (getActiveCommissions().isNotEmpty()) {
+        mc.player?.closeContainer()
+        detectorAttempts = 0
+        setStatus("Commissions found in tab, closing GUI.")
+        delay(2)
+        return
+      }
+
+      if (debugMode.value && detectorAttempts == 0) {
+        val slots = getCommissionCandidateSlots(screen)
+        val preview = slots.filter { it.hasItem() }.take(9).joinToString(" | ") { slot ->
+          val lines = buildGuiTextLines(slot.item)
+          "[${lines.firstOrNull().orEmpty().take(30)}]"
+        }
+        ChatUtils.sendMessage("[Debug] GUI slots (${slots.count { it.hasItem() }}): $preview")
+      }
+
       val parsed = parseCommissionSelectionFromGui(screen)
       if (parsed.commissions.isNotEmpty()) {
+        if (debugMode.value) {
+          ChatUtils.sendMessage("[Debug] GUI parsed: ${parsed.commissions.joinToString { "${it.name}=${(it.progress * 100).toInt()}%" }}")
+        }
         updateCommissionsIfChanged(parsed.commissions)
         mc.player?.closeContainer()
         detectorAttempts = 0
@@ -279,10 +398,26 @@ object CommissionMacroModule : Module("Commission Macro") {
         delay(2)
         return
       }
+<<<<<<< Updated upstream
+=======
+
+      if (tryAcceptCommissionOption(screen)) {
+        detectorAttempts = 0
+        setStatus("Accepting commission from GUI...")
+        delay(10)
+        return
+      }
+
+>>>>>>> Stashed changes
       detectorAttempts++
       if (detectorAttempts >= 30) {
         mc.player?.closeContainer()
         detectorAttempts = 0
+        // Pigeon GUI timed out without finding commissions — advance past pigeon tier
+        if (detectionTier == DetectionTier.PIGEON) {
+          detectionTier = DetectionTier.EMISSARY
+          detectionTierStartedAt = System.currentTimeMillis()
+        }
         setStatus("No commissions detected.")
         return
       }
@@ -302,7 +437,12 @@ object CommissionMacroModule : Module("Commission Macro") {
     }
 
     val completed = findCompletedCommission()
+<<<<<<< Updated upstream
     if (completed != null && !awaitingTabUpdate) {
+=======
+
+    if (completed != null) {
+>>>>>>> Stashed changes
       currentCommission = completed
       onCommissionComplete()
       return
@@ -311,12 +451,54 @@ object CommissionMacroModule : Module("Commission Macro") {
 
     val active = getActiveCommissions()
     if (active.isEmpty()) {
-      if (tryOpenOldCommissionDetector()) return
-      setStatus("No commissions detected.")
+      if (now < claimCooldownUntil) {
+        setStatus("Waiting after claim...")
+        return
+      }
+
+      if (detectionTierStartedAt == 0L) detectionTierStartedAt = now
+
+      when (detectionTier) {
+        DetectionTier.TAB -> {
+          if (now - detectionTierStartedAt < 3_000L) {
+            setStatus("Waiting for tab list...")
+            return
+          }
+          detectionTier = DetectionTier.PIGEON
+          detectionTierStartedAt = now
+        }
+
+        DetectionTier.PIGEON -> {
+          if (tryOpenOldCommissionDetector()) return
+          detectionTier = DetectionTier.EMISSARY
+          detectionTierStartedAt = now
+          detectorAttempts = 0
+        }
+
+        DetectionTier.EMISSARY -> {
+          tryEmissaryForMissingCommissions()
+        }
+
+        DetectionTier.KING -> {
+          tryWalkToKing()
+        }
+      }
       return
     }
 
+    if (debugMode.value) {
+      ChatUtils.sendMessage("[Debug] Active: ${active.joinToString { "${it.name}=${(it.progress * 100).toInt()}%" }}")
+    }
+
     val supportedTasks = getSupportedTasks(active)
+<<<<<<< Updated upstream
+=======
+
+    if (debugMode.value) {
+      ChatUtils.sendMessage("[Debug] Supported: ${supportedTasks.joinToString { it.second.primaryName }.ifEmpty { "NONE — resolveTask returned null for one or more names" }}")
+    }
+
+>>>>>>> Stashed changes
     if (supportedTasks.isEmpty()) {
       ChatUtils.sendMessage("Commission Macro: no supported commissions available.")
       enabled.value = false
@@ -325,6 +507,14 @@ object CommissionMacroModule : Module("Commission Macro") {
 
     val avoidEntities = getAvoidanceEntities()
     val chosen = findAvailableCommission(supportedTasks, avoidEntities)
+<<<<<<< Updated upstream
+=======
+
+    if (debugMode.value && chosen == null) {
+      ChatUtils.sendMessage("[Debug] No waypoints available — avoidance radius may be blocking all spots.")
+    }
+
+>>>>>>> Stashed changes
     if (chosen == null) {
       ChatUtils.sendMessage("Commission Macro: no available spots, finding new lobby.")
       sendCommand("hub")
@@ -332,7 +522,183 @@ object CommissionMacroModule : Module("Commission Macro") {
       return
     }
 
+    if (debugMode.value) {
+      ChatUtils.sendMessage("[Debug] Starting commission: ${chosen.first.name}")
+    }
+
     startCommission(chosen.first, chosen.second)
+  }
+
+  private fun tryAcceptCommissionOption(screen: AbstractContainerScreen<*>): Boolean {
+    for (slot in getCommissionCandidateSlots(screen)) {
+      if (!slot.hasItem()) continue
+      val lines = buildGuiTextLines(slot.item)
+      if (lines.isEmpty()) continue
+      val combined = lines.joinToString("\n")
+      if (!looksLikeUnacceptedCommissionOption(lines, combined)) continue
+      InventoryUtils.clickSlot(slot.index, MouseClickType.LEFT, ClickType.PICKUP)
+      return true
+    }
+    return false
+  }
+
+  private fun looksLikeUnacceptedCommissionOption(lines: List<String>, combined: String): Boolean {
+    val firstLine = lines.firstOrNull().orEmpty()
+    if (firstLine.contains("close") || firstLine.contains("back") || firstLine.contains("next page")) return false
+    if (isClaimCommissionText(combined)) return false
+    if (combined.contains("royal pigeon")) return false
+    val hasObjective = lines.any { line -> commissionObjectivePrefixes.any(line::startsWith) }
+    if (!hasObjective) return false
+    val hasProgress = Regex("([0-9,]+)\\s*/\\s*([0-9,]+)").containsMatchIn(combined) ||
+      Regex("([0-9]{1,3}(?:\\.[0-9]+)?)\\s*%").containsMatchIn(combined)
+    return !hasProgress
+  }
+
+  private fun tryEmissaryForMissingCommissions() {
+    val player = mc.player ?: return
+    val emissaryOnly = CommissionData.emissaryLocations.drop(1)
+      .filter { it !in triedEmissaryPositions }
+
+    if (emissaryOnly.isEmpty()) {
+      detectionTier = DetectionTier.KING
+      detectionTierStartedAt = System.currentTimeMillis()
+      openAttempts = 0
+      npcRotationPending = false
+      utilityPathTarget = null
+      travelPreRotating = false
+      return
+    }
+
+    val target = emissaryOnly.minByOrNull { distance(player.x, player.y, player.z, it) }
+      ?: run {
+        detectionTier = DetectionTier.KING
+        return
+      }
+
+    if (!hasArrivedAt(target, 4.0)) {
+      if (utilityPathTarget != target) {
+        if (!travelPreRotating) {
+          RotationExecutor.rotateTo(
+            AngleUtils.getRotation(Vec3(target.x + 0.5, target.y.toDouble(), target.z + 0.5)),
+            TimedEaseStrategy(EasingType.EASE_OUT_SINE, EasingType.EASE_OUT_SINE, 150L),
+          )
+          travelPreRotating = true
+          setStatus("Rotating toward emissary...")
+          return
+        }
+        if (RotationExecutor.isRotating()) {
+          setStatus("Rotating toward emissary...")
+          return
+        }
+        travelPreRotating = false
+        utilityPathTarget = target
+        startUtilityPath(target, 2.5)
+      }
+      setStatus("Traveling to emissary for commissions...")
+      return
+    }
+
+    if (utilityPathTarget != null) openAttempts = 0  // reset once on first arrival tick
+    utilityPathTarget = null
+    travelPreRotating = false
+
+    val emissary = findNearestEmissary(player)
+
+    if (!npcRotationPending) {
+      val emissaryTarget = if (emissary != null) {
+        Vec3(emissary.x, emissary.eyeY, emissary.z)
+      } else {
+        Vec3(target.x + 0.5, target.y + 1.5, target.z + 0.5)
+      }
+      RotationExecutor.rotateTo(
+        AngleUtils.getRotation(emissaryTarget),
+        TimedEaseStrategy(EasingType.EASE_OUT_SINE, EasingType.EASE_OUT_SINE, 150L),
+      )
+      npcRotationPending = true
+      setStatus("Rotating to emissary...")
+      return
+    }
+
+    if (RotationExecutor.isRotating()) return
+
+    npcRotationPending = false
+
+    if (openAttempts >= 5) {
+      openAttempts = 0
+      npcRotationPending = false
+      utilityPathTarget = null
+      travelPreRotating = false
+      triedEmissaryPositions.add(target)
+      ChatUtils.sendMessage("Commission Macro: emissary unresponsive, trying next.")
+      return
+    }
+
+    rightClick()
+    delay(10)
+    setStatus("Opening emissary...")
+  }
+
+  private fun tryWalkToKing() {
+    val player = mc.player ?: return
+    val king = CommissionData.emissaryLocations.first()
+
+    if (!hasArrivedAt(king, 4.0)) {
+      if (utilityPathTarget != king) {
+        if (!travelPreRotating) {
+          RotationExecutor.rotateTo(
+            AngleUtils.getRotation(Vec3(king.x + 0.5, king.y.toDouble(), king.z + 0.5)),
+            TimedEaseStrategy(EasingType.EASE_OUT_SINE, EasingType.EASE_OUT_SINE, 150L),
+          )
+          travelPreRotating = true
+          setStatus("Rotating toward King...")
+          return
+        }
+        if (RotationExecutor.isRotating()) {
+          setStatus("Rotating toward King...")
+          return
+        }
+        travelPreRotating = false
+        utilityPathTarget = king
+        startUtilityPath(king, 2.5)
+      }
+      setStatus("Traveling to King for commissions...")
+      return
+    }
+
+    utilityPathTarget = null
+    travelPreRotating = false
+
+    val npc = findNearestEmissary(player)
+
+    if (!npcRotationPending) {
+      val kingTarget = if (npc != null) {
+        Vec3(npc.x, npc.eyeY, npc.z)
+      } else {
+        Vec3(king.x + 0.5, king.y + 1.5, king.z + 0.5)
+      }
+      RotationExecutor.rotateTo(
+        AngleUtils.getRotation(kingTarget),
+        TimedEaseStrategy(EasingType.EASE_OUT_SINE, EasingType.EASE_OUT_SINE, 150L),
+      )
+      npcRotationPending = true
+      setStatus("Rotating to King...")
+      return
+    }
+
+    if (RotationExecutor.isRotating()) return
+
+    npcRotationPending = false
+
+    if (openAttempts >= 5) {
+      openAttempts = 0
+      npcRotationPending = false
+      setStatus("King unresponsive, waiting...")
+      return
+    }
+
+    rightClick()
+    delay(10)
+    setStatus("Opening King...")
   }
 
   private fun tryOpenOldCommissionDetector(): Boolean {
@@ -341,7 +707,8 @@ object CommissionMacroModule : Module("Commission Macro") {
     if (pigeonSlot !in 0..8) return false
 
     if (detectorAttempts >= 6) {
-      setStatus("No commissions detected.")
+      detectorAttempts = 0
+      setStatus("Royal Pigeon exhausted, trying emissary.")
       return false
     }
 
@@ -436,6 +803,7 @@ object CommissionMacroModule : Module("Commission Macro") {
 
     val player = mc.player ?: return
     val pigeonSlot = InventoryUtils.findItemInHotbar("Royal Pigeon")
+<<<<<<< Updated upstream
     if (pigeonSlot >= 0) {
       if (player.inventory.selectedSlot != pigeonSlot) {
         InventoryUtils.holdHotbarSlot(pigeonSlot)
@@ -446,17 +814,60 @@ object CommissionMacroModule : Module("Commission Macro") {
       }
       setStatus("Opening Royal Pigeon...")
       return
+=======
+
+    if (pigeonSlot >= 0) {
+      if (openAttempts >= 5) {
+        openAttempts = 0
+        // Fall through to emissary
+      } else {
+        if (player.inventory.selectedSlot != pigeonSlot) {
+          InventoryUtils.holdHotbarSlot(pigeonSlot)
+          delay(3)
+        } else {
+          rightClick()
+          delay(10)
+        }
+        setStatus("Opening Royal Pigeon...")
+        return
+      }
+>>>>>>> Stashed changes
     }
 
     val target = getClosestEmissaryLocation(player)
     if (!hasArrivedAt(target, 4.0)) {
       travelPurpose = null
+<<<<<<< Updated upstream
       startPath(target, 2.5)
+=======
+      if (utilityPathTarget != target) {
+        if (!travelPreRotating) {
+          RotationExecutor.rotateTo(
+            AngleUtils.getRotation(Vec3(target.x + 0.5, target.y.toDouble(), target.z + 0.5)),
+            TimedEaseStrategy(EasingType.EASE_OUT_SINE, EasingType.EASE_OUT_SINE, 150L),
+          )
+          travelPreRotating = true
+          setStatus("Rotating toward emissary...")
+          return
+        }
+        if (RotationExecutor.isRotating()) {
+          setStatus("Rotating toward emissary...")
+          return
+        }
+        travelPreRotating = false
+        utilityPathTarget = target
+        startUtilityPath(target, 2.5)
+      }
+>>>>>>> Stashed changes
       setStatus("Traveling to emissary...")
       return
     }
 
+    utilityPathTarget = null
+    travelPreRotating = false
+
     val emissary = findNearestEmissary(player)
+<<<<<<< Updated upstream
     if (emissary == null && emissariesUnlocked) {
       emissariesUnlocked = false
       ChatUtils.sendMessage("Commission Macro: emissary not found, reverting to King.")
@@ -465,6 +876,27 @@ object CommissionMacroModule : Module("Commission Macro") {
     }
 
     if (emissary != null) faceEntity(emissary) else faceBlock(target)
+=======
+
+    if (!npcRotationPending) {
+      val emissaryTarget = if (emissary != null) {
+        Vec3(emissary.x, emissary.eyeY, emissary.z)
+      } else {
+        Vec3(target.x + 0.5, target.y + 1.5, target.z + 0.5)
+      }
+      RotationExecutor.rotateTo(
+        AngleUtils.getRotation(emissaryTarget),
+        TimedEaseStrategy(EasingType.EASE_OUT_SINE, EasingType.EASE_OUT_SINE, 150L),
+      )
+      npcRotationPending = true
+      setStatus("Rotating to emissary...")
+      return
+    }
+
+    if (RotationExecutor.isRotating()) return
+
+    npcRotationPending = false
+>>>>>>> Stashed changes
     rightClick()
     delay(10)
     setStatus("Opening emissary...")
@@ -546,7 +978,14 @@ object CommissionMacroModule : Module("Commission Macro") {
     MiningMacroModule.stopForAutomation()
     CombatMacroModule.stopForAutomation()
     lastCommissionName = currentCommission?.name
+<<<<<<< Updated upstream
     awaitingTabUpdate = true
+=======
+    lastCompletedCommissionName = currentCommission?.name
+    firstPigeonAttemptAt = 0L
+    pigeonAttempts = 0
+    claimCooldownUntil = System.currentTimeMillis() + 4_000L
+>>>>>>> Stashed changes
     claimAttempts = 0
     setState(State.CLAIMING)
   }
@@ -584,11 +1023,26 @@ object CommissionMacroModule : Module("Commission Macro") {
     travelPurpose = null
     pathingAvoidanceBreachAt = 0L
     lastAvoidanceRepathAt = 0L
+<<<<<<< Updated upstream
     awaitingTabUpdate = false
+=======
+    lastCompletedCommissionName = null
+    firstPigeonAttemptAt = 0L
+    pigeonAttempts = 0
+>>>>>>> Stashed changes
     pendingUseRelease = false
     openAttempts = 0
     claimAttempts = 0
     detectorAttempts = 0
+    npcRotationPending = false
+    detectionTier = DetectionTier.TAB
+    detectionTierStartedAt = 0L
+    triedEmissaryPositions = mutableSetOf()
+    claimCooldownUntil = 0L
+    lastDebugLogAt = 0L
+    utilityPathTarget = null
+    travelPreRotating = false
+    commissionsLastSetAt = 0L
     sessionStartMs = 0L
     setStatus(State.IDLE.label)
     commissionText.value = "None"
@@ -601,9 +1055,31 @@ object CommissionMacroModule : Module("Commission Macro") {
     currentTask = null
     currentWaypoint = null
     currentWaypoints = emptyList()
+<<<<<<< Updated upstream
     awaitingTabUpdate = false
+=======
+    currentRouteChoice = null
+    activeRouteName = null
+    travelModeState = TravelMode.NONE
+    lastCompletedCommissionName = null
+    firstPigeonAttemptAt = 0L
+    pigeonAttempts = 0
+>>>>>>> Stashed changes
     claimAttempts = 0
+    openAttempts = 0
     detectorAttempts = 0
+<<<<<<< Updated upstream
+=======
+    npcRotationPending = false
+    detectionTier = DetectionTier.TAB
+    detectionTierStartedAt = 0L
+    triedEmissaryPositions = mutableSetOf()
+    utilityPathTarget = null
+    travelPreRotating = false
+    commissionsLastSetAt = 0L
+    CommissionMaintenanceController.reset()
+    CommissionMacroWatchdog.clearClaim()
+>>>>>>> Stashed changes
   }
 
   private fun setState(newState: State) {
@@ -683,8 +1159,18 @@ object CommissionMacroModule : Module("Commission Macro") {
   private fun getAvoidanceEntities(): List<Entity> {
     val level = mc.level ?: return emptyList()
     val player = mc.player ?: return emptyList()
+<<<<<<< Updated upstream
     if (avoidanceRadius.value <= 0.0) return emptyList()
     return level.players().filter { it.uuid != player.uuid }
+=======
+    val radius = avoidanceRadius.value
+    if (radius <= 0.0) return emptyList()
+
+    val players = level.players().filter { it.uuid != player.uuid }
+    val sentries = level.getEntities(player, player.boundingBox.inflate(512.0, 128.0, 512.0))
+      .filter { it.name.string.contains("Crystal Sentry", ignoreCase = true) }
+    return players + sentries
+>>>>>>> Stashed changes
   }
 
   private fun getClosestWaypoint(waypoints: List<BlockPos>): BlockPos? {
@@ -737,6 +1223,16 @@ object CommissionMacroModule : Module("Commission Macro") {
   private fun readCommissionsFromTabList(): List<TabCommission> {
     val lines = readTabLines()
     val found = linkedMapOf<String, TabCommission>()
+<<<<<<< Updated upstream
+=======
+
+    val now = System.currentTimeMillis()
+    if (debugMode.value && lines.isNotEmpty() && now - lastDebugLogAt > 3_000L) {
+      lastDebugLogAt = now
+      ChatUtils.sendMessage("[Debug] Tab lines (${lines.size}): ${lines.take(20).joinToString(" | ")}")
+    }
+
+>>>>>>> Stashed changes
     for (line in lines) {
       val normalized = normalize(line)
       for (task in CommissionData.commissionData) {
@@ -747,29 +1243,61 @@ object CommissionMacroModule : Module("Commission Macro") {
         }
       }
     }
+<<<<<<< Updated upstream
+=======
+
+    if (debugMode.value && found.isNotEmpty()) {
+      ChatUtils.sendMessage("[Debug] Tab matched: ${found.values.joinToString { "${it.name}=${(it.progress * 100).toInt()}%" }}")
+    }
+
+>>>>>>> Stashed changes
     return found.values.toList()
   }
 
   private fun updateCommissionsIfChanged(newCommissions: List<TabCommission>) {
     if (commissions == newCommissions) return
+<<<<<<< Updated upstream
     if (newCommissions.isNotEmpty()) detectorAttempts = 0
     if (awaitingTabUpdate && lastCommissionName != null) {
       val stillCompleted = newCommissions.any { it.name == lastCommissionName && it.progress >= 1.0 }
       if (!stillCompleted) awaitingTabUpdate = false
+=======
+    val now = System.currentTimeMillis()
+    // Don't let an empty tab read wipe commissions that were recently detected (pigeon/GUI latency)
+    if (newCommissions.isEmpty() && commissions.isNotEmpty() && now - commissionsLastSetAt < 8_000L) return
+    commissions = newCommissions
+    if (newCommissions.isNotEmpty()) {
+      commissionsLastSetAt = now
+      detectionTier = DetectionTier.TAB
+      detectionTierStartedAt = now
+>>>>>>> Stashed changes
     }
     commissions = newCommissions
   }
 
   private fun parseProgress(line: String): Double {
+<<<<<<< Updated upstream
     if (line.contains("done") || line.contains("completed") || line.contains("complete")) return 1.0
     Regex("([0-9]{1,3}(?:\\.[0-9]+)?)\\s*%").find(line)?.let { match ->
       return ((match.groupValues[1].toDoubleOrNull() ?: 0.0) / 100.0).coerceIn(0.0, 1.0)
     }
+=======
+>>>>>>> Stashed changes
     Regex("([0-9,]+)\\s*/\\s*([0-9,]+)").find(line)?.let { match ->
       val current = match.groupValues[1].replace(",", "").toDoubleOrNull() ?: 0.0
       val max = match.groupValues[2].replace(",", "").toDoubleOrNull() ?: 1.0
       return if (max <= 0.0) 0.0 else (current / max).coerceIn(0.0, 1.0)
     }
+<<<<<<< Updated upstream
+=======
+
+    Regex("([0-9]{1,3}(?:\\.[0-9]+)?)\\s*%").find(line)?.let { match ->
+      return ((match.groupValues[1].toDoubleOrNull() ?: 0.0) / 100.0).coerceIn(0.0, 1.0)
+    }
+
+    if (line.contains("done") || line.contains("completed") || line.contains("complete")) return 1.0
+
+>>>>>>> Stashed changes
     return 0.0
   }
 
@@ -983,6 +1511,7 @@ object CommissionMacroModule : Module("Commission Macro") {
 
   private fun buildMiningCommissionLabel(lines: List<String>, miningKeyword: String): String {
     val area = extractMiningAreaLabel(lines)
+<<<<<<< Updated upstream
     val suffix = when (miningKeyword) {
       "titanium" -> "Titanium"
       "mithril" -> "Mithril"
@@ -993,6 +1522,21 @@ object CommissionMacroModule : Module("Commission Macro") {
       "Titanium" -> "Titanium Miner"
       "Mithril" -> "Mithril Miner"
       else -> suffix
+=======
+
+    if (area != null) {
+      val suffix = when (miningKeyword) {
+        "titanium" -> "Titanium"
+        else -> titleCase(miningKeyword)
+      }
+      return "$area $suffix"
+    }
+
+    return when (miningKeyword) {
+      "titanium" -> "Titanium Miner"
+      "mithril" -> "Mithril Miner"
+      else -> titleCase(miningKeyword)
+>>>>>>> Stashed changes
     }
   }
 
@@ -1062,11 +1606,13 @@ object CommissionMacroModule : Module("Commission Macro") {
   }
 
   private fun getClosestEmissaryLocation(player: Player): BlockPos =
+<<<<<<< Updated upstream
     getAvailableEmissaryLocations().minByOrNull { distance(player.x, player.y, player.z, it) }
+=======
+    CommissionData.emissaryLocations
+      .minByOrNull { distance(player.x, player.y, player.z, it) }
+>>>>>>> Stashed changes
       ?: CommissionData.emissaryLocations.first()
-
-  private fun getAvailableEmissaryLocations(): List<BlockPos> =
-    if (emissariesUnlocked) CommissionData.emissaryLocations else listOf(CommissionData.emissaryLocations.first())
 
   private fun findNearestEmissary(player: Player): Entity? {
     val level = mc.level ?: return null

@@ -377,63 +377,67 @@ JNIEXPORT jobject JNICALL Java_org_cobalt_api_pathfinder_jni_NativePathfinderJNI
     const auto packedKeyNodeMetrics = toJIntVector(result->keyNodeMetrics);
 
     jintArray pathArray = env->NewIntArray(static_cast<jsize>(packedPath.size()));
-    if (pathArray == nullptr) {
-      return nullptr;
-    }
+    if (pathArray == nullptr) return nullptr;
     env->SetIntArrayRegion(pathArray, 0, static_cast<jsize>(packedPath.size()), packedPath.data());
 
     jintArray keyPathArray = env->NewIntArray(static_cast<jsize>(packedKeyPath.size()));
     if (keyPathArray == nullptr) {
+      env->DeleteLocalRef(pathArray);
       return nullptr;
     }
     env->SetIntArrayRegion(keyPathArray, 0, static_cast<jsize>(packedKeyPath.size()), packedKeyPath.data());
 
     jintArray pathFlagsArray = env->NewIntArray(static_cast<jsize>(packedPathFlags.size()));
     if (pathFlagsArray == nullptr) {
+      env->DeleteLocalRef(pathArray);
+      env->DeleteLocalRef(keyPathArray);
       return nullptr;
     }
     if (!packedPathFlags.empty()) {
-      env->SetIntArrayRegion(
-        pathFlagsArray,
-        0,
-        static_cast<jsize>(packedPathFlags.size()),
-        packedPathFlags.data()
-      );
+      env->SetIntArrayRegion(pathFlagsArray, 0, static_cast<jsize>(packedPathFlags.size()), packedPathFlags.data());
     }
 
     jintArray keyNodeFlagsArray = env->NewIntArray(static_cast<jsize>(packedKeyNodeFlags.size()));
     if (keyNodeFlagsArray == nullptr) {
+      env->DeleteLocalRef(pathArray);
+      env->DeleteLocalRef(keyPathArray);
+      env->DeleteLocalRef(pathFlagsArray);
       return nullptr;
     }
     if (!packedKeyNodeFlags.empty()) {
-      env->SetIntArrayRegion(
-        keyNodeFlagsArray,
-        0,
-        static_cast<jsize>(packedKeyNodeFlags.size()),
-        packedKeyNodeFlags.data()
-      );
+      env->SetIntArrayRegion(keyNodeFlagsArray, 0, static_cast<jsize>(packedKeyNodeFlags.size()), packedKeyNodeFlags.data());
     }
 
     jintArray keyNodeMetricsArray = env->NewIntArray(static_cast<jsize>(packedKeyNodeMetrics.size()));
     if (keyNodeMetricsArray == nullptr) {
+      env->DeleteLocalRef(pathArray);
+      env->DeleteLocalRef(keyPathArray);
+      env->DeleteLocalRef(pathFlagsArray);
+      env->DeleteLocalRef(keyNodeFlagsArray);
       return nullptr;
     }
     if (!packedKeyNodeMetrics.empty()) {
-      env->SetIntArrayRegion(
-        keyNodeMetricsArray,
-        0,
-        static_cast<jsize>(packedKeyNodeMetrics.size()),
-        packedKeyNodeMetrics.data()
-      );
+      env->SetIntArrayRegion(keyNodeMetricsArray, 0, static_cast<jsize>(packedKeyNodeMetrics.size()), packedKeyNodeMetrics.data());
     }
 
     jstring signature = env->NewStringUTF(result->signatureHex.c_str());
     if (signature == nullptr) {
+      env->DeleteLocalRef(pathArray);
+      env->DeleteLocalRef(keyPathArray);
+      env->DeleteLocalRef(pathFlagsArray);
+      env->DeleteLocalRef(keyNodeFlagsArray);
+      env->DeleteLocalRef(keyNodeMetricsArray);
       return nullptr;
     }
 
     jclass resultClass = env->FindClass("org/cobalt/api/pathfinder/jni/NativePathResult");
     if (resultClass == nullptr) {
+      env->DeleteLocalRef(pathArray);
+      env->DeleteLocalRef(keyPathArray);
+      env->DeleteLocalRef(pathFlagsArray);
+      env->DeleteLocalRef(keyNodeFlagsArray);
+      env->DeleteLocalRef(keyNodeMetricsArray);
+      env->DeleteLocalRef(signature);
       return nullptr;
     }
 
@@ -443,6 +447,12 @@ JNIEXPORT jobject JNICALL Java_org_cobalt_api_pathfinder_jni_NativePathfinderJNI
       "([I[IJIDI[I[I[ILjava/lang/String;)V"
     );
     if (ctor == nullptr) {
+      env->DeleteLocalRef(pathArray);
+      env->DeleteLocalRef(keyPathArray);
+      env->DeleteLocalRef(pathFlagsArray);
+      env->DeleteLocalRef(keyNodeFlagsArray);
+      env->DeleteLocalRef(keyNodeMetricsArray);
+      env->DeleteLocalRef(signature);
       return nullptr;
     }
 

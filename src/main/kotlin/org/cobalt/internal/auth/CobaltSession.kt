@@ -16,7 +16,9 @@ data class CobaltSession(
   val normalizedAlias: String
     get() = alias.trim().lowercase(Locale.US)
 
-  fun isTempAliasBypass(): Boolean = normalizedAlias == TEMP_BYPASS_ALIAS
+  fun isTempAliasBypass(): Boolean {
+    return normalizedAlias == TEMP_BYPASS_ALIAS.lowercase(Locale.US)
+  }
 
   companion object {
     val INVALID = CobaltSession("")
@@ -32,22 +34,36 @@ data class CobaltSession(
       CobaltAuthDebug.info("session load start")
 
       val fallbackAlias = readLaunchAlias().ifBlank { readStoredAlias() }
-      CobaltAuthDebug.info("fallback alias present=${fallbackAlias.isNotBlank()} alias=$fallbackAlias")
+
+      CobaltAuthDebug.info(
+        "fallback alias present=${fallbackAlias.isNotBlank()} alias=$fallbackAlias"
+      )
+
+      if (fallbackAlias.equals(TEMP_BYPASS_ALIAS, ignoreCase = true)) {
+        CobaltAuthDebug.warn("dev bypass alias detected, returning alias-only session")
+        return CobaltSession("", fallbackAlias)
+      }
 
       val propValue = System.getProperty("cobalt.session")?.trim()
-      CobaltAuthDebug.info("system property cobalt.session present=${!propValue.isNullOrBlank()}")
+
+      CobaltAuthDebug.info(
+        "system property cobalt.session present=${!propValue.isNullOrBlank()}"
+      )
 
       if (!propValue.isNullOrBlank()) {
         val propSession = readFromProperty(propValue, fallbackAlias)
+
         if (propSession.isValid || propSession.alias.isNotBlank()) {
           CobaltAuthDebug.info(
             "loaded session from cobalt.session property valid=${propSession.isValid} alias=${propSession.alias}"
           )
+
           return propSession
         }
       }
 
       val fallbackFile = File(SESSION_TOKEN_PATH)
+
       CobaltAuthDebug.info(
         "checking fallback session token file=${fallbackFile.absolutePath} exists=${fallbackFile.exists()}"
       )

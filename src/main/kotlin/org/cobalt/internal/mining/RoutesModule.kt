@@ -95,28 +95,6 @@ object RoutesModule : Module("Routes") {
     val pointCount: Int,
   )
 
-  private data class WarpCheck(
-    val canWarp: Boolean,
-    val reason: String,
-    val aimPoint: Vec3,
-    val hitBlock: BlockPos?,
-    val raycastTarget: BlockPos? = null
-  )
-
-  private enum class RouteAction {
-    NONE,
-    WALK,
-    WARP,
-    MINE
-  }
-
-  private enum class RouteMineMode {
-    NONE,
-    LEGACY_VEIN,
-    ANCHOR_LIST,
-    SINGLE_ANCHOR_MACRO
-  }
-
   private val mc: Minecraft = Minecraft.getInstance()
   private val gson = GsonBuilder().setPrettyPrinting().create()
   private val routesDirectory = File(mc.gameDirectory, "config/cobalt/routes")
@@ -3884,72 +3862,4 @@ object RoutesModule : Module("Routes") {
     return mc.options.keyShift?.isDown == true && shouldKeepEtherwarpForNextPoint()
   }
 
-  private const val MAX_WALK_RETRIES = 3
-  private const val WALK_REPATH_GRACE_TICKS = 8L
-  private const val RDBT_ROUTE_ARRIVAL_RADIUS = 3.0
-  private const val RDBT_ROUTE_ARRIVAL_DISTANCE_SQ = RDBT_ROUTE_ARRIVAL_RADIUS * RDBT_ROUTE_ARRIVAL_RADIUS
-  private const val ARRIVAL_DISTANCE_SQ = 1.8 * 1.8
-  private const val WALK_EDGE_SLOW_DISTANCE_SQ = 2.15 * 2.15
-  private const val WALK_EDGE_ARRIVAL_DISTANCE_SQ = 1.9 * 1.9
-  private const val WALK_EDGE_ARRIVAL_VERTICAL = 1.35
-  private const val WALK_CAMERA_FORWARD_SEARCH_WINDOW = 16
-  private const val WALK_EDGE_NODE_LOOKAHEAD = 2
-  private const val ROUTE_SEGMENT_ARRIVAL_RADIUS = 0.95
-  private const val RISKY_ROUTE_SEGMENT_ARRIVAL_RADIUS = 0.7
-  private const val ROUTE_SINGLE_WALK_ARRIVAL_RADIUS = 1.05
-  private const val RISKY_ROUTE_SINGLE_WALK_ARRIVAL_RADIUS = 0.8
-  private const val WALK_EDGE_ARRIVAL_EXTRA_RADIUS = 0.25
-  private const val MIN_WALK_EDGE_ARRIVAL_RADIUS = 0.95
-  private const val SHARP_TURN_COS_THRESHOLD = 0.78
-  private const val SHARP_TURN_MIN_VECTOR = 0.2
-  private const val APPROX_SCAN_RADIUS = 6
-  private const val APPROX_SCAN_VERTICAL = 4
-  private const val MINE_APPROACH_AT_DIST_SQ = 2.25  // 1.5 blocks — already adjacent, no re-path
-  private const val MINE_RANGE = 4.5
-  private const val MINE_ANCHOR_SCAN_RADIUS = 4
-  private const val MINE_REQUIRE_LOS = true
-  private const val MINE_MAX_BLOCKS = 768
-  private const val MINE_VEIN_SCAN_RADIUS = 18
-  private const val MINE_WARP_MAX_CANDIDATES = 220
-  private const val MINE_DRILL_WARN_INTERVAL_TICKS = 60L
-  private const val WARP_AIM_TOLERANCE = 6.0
-  private const val WARP_LOOK_YAW_SPEED_DPS = 360.0
-  private const val WARP_LOOK_PITCH_SPEED_DPS = 300.0
-  private const val WARP_ALIGN_MS = 170.0
-  private const val WARP_SNEAK_MS = 85.0
-  private const val WARP_POST_MS = 70.0
-  private const val WARP_CHAIN_POST_MS = 28.0
-  private const val WARP_COOLDOWN_TICKS = 1L
-  private const val WARP_STAGE1_TIMEOUT_MS = 240.0
-  private const val WARP_RETRY_COOLDOWN_TICKS = 4L
-  private const val WARP_REPEAT_BLOCK_SUPPRESS_TICKS = 10L
-  private const val WARP_RESOLVE_RADIUS = 2
-  private const val WARP_RESOLVE_VERTICAL = 2
-
-  private data class MineVein(
-    val blockId: String,
-    val blocks: MutableSet<BlockPos>
-  )
-
-  private data class MineOrderEntry(
-    val pos: BlockPos,
-    val progress: Double,
-    val lateralDistSq: Double,
-    val startDistSq: Double
-  )
-
-  private data class MineSegment(
-    val startIndex: Int,
-    val endIndex: Int,
-    val anchors: List<BlockPos>,
-    val waypoints: List<BlockPos>,
-    val anchorBlockIds: Map<BlockPos, String?>,
-    val legacyVein: Boolean
-  )
-
-  private data class RouteRenderNode(
-    val pos: BlockPos,
-    val color: Color,
-    val label: String?
-  )
 }

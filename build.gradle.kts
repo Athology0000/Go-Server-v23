@@ -73,6 +73,7 @@ repositories {
   mavenCentral()
   maven("https://maven.meteordev.org/releases")
   maven("https://pkgs.dev.azure.com/djtheredstoner/DevAuth/_packaging/public/maven/v1")
+  maven("https://repo.hypixel.net/repository/Hypixel/")
 }
 
 dependencies {
@@ -88,6 +89,8 @@ dependencies {
       include(this)
     }
   }
+
+  modImplementation(libs.hypixel.api) { include(this) }
 
   runtimeOnly(libs.httpclient)
   modRuntimeOnly(libs.devauth)

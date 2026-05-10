@@ -4,6 +4,8 @@ import org.cobalt.api.hud.HudElement
 import org.cobalt.api.module.setting.Setting
 import org.cobalt.api.module.setting.SettingsContainer
 import org.cobalt.api.module.setting.impl.CheckboxSetting
+import org.cobalt.api.module.setting.impl.SliderSetting
+import org.cobalt.api.module.setting.impl.TextSetting
 import org.cobalt.api.module.setting.inGroup
 import org.cobalt.internal.auth.Auth
 
@@ -20,6 +22,23 @@ import org.cobalt.internal.auth.Auth
 abstract class Module(val name: String) : SettingsContainer {
 
   open val category: ModuleCategory = ModuleCategory.OTHER
+
+  /**
+   * True for automation-style modules that should be tracked by MacroState,
+   * scheduler overlays, and global failsafes. Existing modules keep the
+   * default false until they opt in.
+   */
+  open val isMacro: Boolean = false
+
+  /**
+   * Lets harmless helper modules keep running while global failsafes are armed.
+   */
+  open val ignoreFailsafes: Boolean = false
+
+  /**
+   * Modules with world-sensitive state can opt into being stopped on unload.
+   */
+  open val autoDisableOnWorldUnload: Boolean = false
 
   val isEntitled: Boolean
     get() = Auth.isModuleEntitled(name)
@@ -69,6 +88,50 @@ abstract class Module(val name: String) : SettingsContainer {
 
   fun debugError(message: String): Boolean {
     return ModuleDebug.error(this, message)
+  }
+
+
+  /** Called by future lifecycle-aware toggles when this module starts. */
+  open fun onEnable() {}
+
+  /** Called by future lifecycle-aware toggles when this module stops. */
+  open fun onDisable() {}
+
+  /** Optional per-client-tick hook for modules that use lifecycle registration. */
+  open fun onTick() {}
+
+  /**
+   * Convenience setting helpers inspired by V5's direct settings API. They keep
+   * module code compact while still registering through the existing settings UI.
+   */
+  protected fun toggleSetting(
+    name: String,
+    description: String,
+    defaultValue: Boolean = false,
+    group: String = Setting.DEFAULT_UI_GROUP,
+  ): CheckboxSetting {
+    return CheckboxSetting(name, description, defaultValue).inGroup(group).also { addSetting(it) }
+  }
+
+  protected fun sliderSetting(
+    name: String,
+    description: String,
+    defaultValue: Double,
+    min: Double,
+    max: Double,
+    step: Double = 0.0,
+    group: String = Setting.DEFAULT_UI_GROUP,
+  ): SliderSetting {
+    return SliderSetting(name, description, defaultValue, min, max, step).inGroup(group).also { addSetting(it) }
+  }
+
+  protected fun textSetting(
+    name: String,
+    description: String,
+    defaultValue: String = "",
+    group: String = Setting.DEFAULT_UI_GROUP,
+  ): TextSetting {
+    return TextSetting(name, description, defaultValue).inGroup(group).also { addSetting(it) }
   }
 
   companion object {

@@ -99,7 +99,7 @@ internal fun MiningMacroModule.selectMineTarget(
   for (pos in vein.blocks) {
     if (!isMineableTarget(level, player, pos, vein.targetIds)) continue
     if (REQUIRE_MINE_LOS && !hasLineOfSight(level, player, pos)) continue
-    val distSq = distanceToBlockSq(player, pos)
+    val distSq = miningTargetScore(player, pos)
     if (distSq < bestDist) {
       bestDist = distSq
       best = pos
@@ -285,6 +285,22 @@ internal fun MiningMacroModule.selectForwardDirectionalTarget(
   return best
 }
 
+internal fun MiningMacroModule.miningTargetScore(
+  player: Player,
+  pos: net.minecraft.core.BlockPos,
+): Double {
+  val eye = player.eyePosition
+  val dx = (pos.x + 0.5) - eye.x
+  val dy = (pos.y + 0.5) - eye.y
+  val dz = (pos.z + 0.5) - eye.z
+
+  // Do not let the selector over-prefer blocks below the visible vein just because
+  // they are close to the player's feet. If they are truly the only remaining valid
+  // blocks, they can still be selected after visible blocks are gone.
+  val belowPenalty = if (pos.y < player.blockY - 1) 16.0 else 0.0
+  return dx * dx + dy * dy + dz * dz + belowPenalty
+}
+
 internal fun MiningMacroModule.selectNearestBlock(
   level: net.minecraft.world.level.Level,
   player: Player,
@@ -295,7 +311,7 @@ internal fun MiningMacroModule.selectNearestBlock(
   var bestDist = Double.POSITIVE_INFINITY
   for (pos in blocks) {
     if (!isMineableTarget(level, player, pos, allowedIds)) continue
-    val distSq = distanceToBlockSq(player, pos)
+    val distSq = miningTargetScore(player, pos)
     if (distSq < bestDist) {
       bestDist = distSq
       best = pos
@@ -321,7 +337,7 @@ internal fun MiningMacroModule.resolvePreviewTarget(
     if (pos == active) continue
     if (!isMineableTarget(level, player, pos, vein.targetIds)) continue
     if (REQUIRE_MINE_LOS && !hasLineOfSight(level, player, pos)) continue
-    val distSq = distanceToBlockSq(player, pos)
+    val distSq = miningTargetScore(player, pos)
     if (distSq < bestDist) {
       bestDist = distSq
       best = pos
@@ -356,6 +372,7 @@ internal fun MiningMacroModule.startMining(player: Player, target: net.minecraft
     else 1.0
   frameRotSnapThreshold = RotationsModule.bezierSnapThreshold.value.toFloat()
   frameRotTarget = aim.point
+  setAimRenderTarget(target, aim.point)
   frameRotSpeedScale = (RotationsModule.sample(RotationsModule.miningSpeedScale.value) * precisionRotScale).toFloat()
   frameRotAccelScale = (RotationsModule.sample(RotationsModule.miningAccelScale.value) * precisionRotScale).toFloat()
   frameRotPitchStep = (RotationsModule.sample(RotationsModule.miningPitchStep.value) * precisionRotScale).toFloat()
@@ -400,6 +417,7 @@ internal fun MiningMacroModule.stopMiningKeys() {
   }
   frameRotTarget = null
   frameRotSnapThreshold = 0f
+  setAimRenderTarget(null, null)
   miningOnTarget = null
   miningOnTargetTicks = 0
   miningLockedTicks = 0

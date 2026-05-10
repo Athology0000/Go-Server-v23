@@ -19,6 +19,7 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties
 import net.minecraft.world.phys.Vec3
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket
 import net.minecraft.network.protocol.game.ClientboundRespawnPacket
+import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket
 import org.cobalt.api.event.EventBus
 import org.cobalt.api.event.annotation.SubscribeEvent
 import org.cobalt.api.event.impl.client.MouseEvent
@@ -68,6 +69,12 @@ object SmoothAotvModule : Module("Smooth AOTV") {
     step = 1.0
   )
 
+  private val zpew = CheckboxSetting(
+    "ZPEW",
+    "Zero Ping Etherwarp — instantly apply predicted etherwarp position client-side and send a position packet, skipping camera animation.",
+    false
+  )
+
   private var startTimeMs = 0L
   private var startPos: Vec3? = null
   private var cameraStartPos: Vec3? = null
@@ -84,6 +91,7 @@ object SmoothAotvModule : Module("Smooth AOTV") {
       instantTransmission,
       etherTransmission,
       maxAddedLag,
+      zpew,
     )
     EventBus.register(this)
   }
@@ -149,6 +157,17 @@ object SmoothAotvModule : Module("Smooth AOTV") {
     if (mc.options.cameraType != CameraType.FIRST_PERSON) return
 
     val teleport = resolveTeleport(player.mainHandItem, player.isShiftKeyDown) ?: return
+
+    if (zpew.value && player.isShiftKeyDown) {
+      val eyePos = player.getEyePosition()
+      val destEye = eyePos.add(teleport)
+      val footX = roundToCenter(destEye.x)
+      val footY = ceil(destEye.y) - 1.0
+      val footZ = roundToCenter(destEye.z)
+      player.setPos(footX, footY, footZ)
+      mc.connection?.send(ServerboundMovePlayerPacket.PosRot(footX, footY, footZ, player.yRot, player.xRot, player.onGround(), false))
+      return
+    }
 
     val nextStartPos: Vec3
     val nextCameraStartPos: Vec3

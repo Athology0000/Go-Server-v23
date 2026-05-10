@@ -158,8 +158,10 @@ void WorldState::setWorld(std::string worldKey, const int minY, const int maxY) 
 
 void WorldState::clear() {
   std::lock_guard lock(mutex_);
-  auto next = std::make_shared<WorldData>(*data_);
-  next->chunks.clear();
+  auto next = std::make_shared<WorldData>();
+  next->worldKey = data_->worldKey;
+  next->minY = data_->minY;
+  next->maxY = data_->maxY;
   data_ = std::move(next);
 }
 
@@ -198,9 +200,11 @@ void WorldState::upsertChunk(
   }
 
   std::lock_guard lock(mutex_);
-  auto next = std::make_shared<WorldData>(*data_);
-  next->minY = minY;
-  next->maxY = maxY;
+  auto next = std::make_shared<WorldData>();
+  next->worldKey = data_->worldKey;
+  next->minY = data_->minY;
+  next->maxY = data_->maxY;
+  next->chunks = data_->chunks;
   next->chunks[chunkKey(chunkX, chunkZ)] = std::make_shared<ChunkData>(std::move(chunk));
   data_ = std::move(next);
 }

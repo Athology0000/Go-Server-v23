@@ -1,4 +1,4 @@
-﻿package org.cobalt.internal.mining
+package org.cobalt.internal.mining
 
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -60,12 +60,18 @@ object MiningMacroModule : Module("Mining Macro") {
 
   // Frame-based rotation - target set in onTick, applied every render frame via onFrame.
   internal var frameRotTarget:     Vec3?  = null
+  internal var aimRenderPoint:     Vec3?  = null
+  internal var aimRenderBlock:     BlockPos? = null
   internal var frameRotSpeedScale: Float  = 1f
   internal var frameRotAccelScale: Float  = 1f
   internal var frameRotPitchStep:  Float  = 3.5f
   internal var frameRotMaxSpeed:   Float  = 100f
   internal var frameRotMaxAccel:   Float  = 220f
   internal var frameRotSnapThreshold: Float = 0f
+  // Constant-speed rotation: initial angular distance captured when block changes.
+  internal var frameRotInitialDist: Float = 0f
+  internal var frameRotPrevBlock:   BlockPos? = null
+  internal var frameRotLastNs:      Long = 0L
 
   private val enabled = CheckboxSetting(
     "Enabled",
@@ -136,9 +142,25 @@ object MiningMacroModule : Module("Mining Macro") {
   internal val maxVeinBlocks = SliderSetting(
     "Max Vein Blocks",
     "Maximum blocks collected per vein.",
-    256.0,
+    512.0,
     32.0,
-    512.0
+    2048.0,
+    1.0
+  )
+
+  private val highlightPossibleBlocks = CheckboxSetting(
+    "Highlight Possible Blocks",
+    "Outline every currently valid block the mining macro can choose from.",
+    true
+  )
+
+  private val highlightPossibleLimit = SliderSetting(
+    "Highlight Limit",
+    "Maximum possible blocks to outline at once. Lower this if FPS drops.",
+    384.0,
+    16.0,
+    2048.0,
+    1.0
   )
 
   internal val mineRange = SliderSetting(
@@ -147,6 +169,12 @@ object MiningMacroModule : Module("Mining Macro") {
     4.5,
     2.0,
     6.0
+  )
+
+  private val highlightAimPoint = CheckboxSetting(
+    "Highlight Aim Point",
+    "Show the exact point on the block face the macro is rotating toward.",
+    true
   )
 
   internal val stepToNearbyBlocks = CheckboxSetting(
@@ -273,7 +301,10 @@ object MiningMacroModule : Module("Mining Macro") {
       scanVertical,
       scanPerTick,
       maxVeinBlocks,
+      highlightPossibleBlocks,
+      highlightPossibleLimit,
       mineRange,
+      highlightAimPoint,
       stepToNearbyBlocks,
       anchorRadius,
       goldenGoblinInterrupt,
@@ -310,6 +341,8 @@ object MiningMacroModule : Module("Mining Macro") {
     scanVertical.uiGroup = targetsGroup
     scanPerTick.uiGroup = targetsGroup
     maxVeinBlocks.uiGroup = targetsGroup
+    highlightPossibleBlocks.uiGroup = targetsGroup
+    highlightPossibleLimit.uiGroup = targetsGroup
 
     oreMinerRoutePicker.uiGroup = routingGroup
     anchorRadius.uiGroup = routingGroup
@@ -317,6 +350,7 @@ object MiningMacroModule : Module("Mining Macro") {
     useVeinDirection.uiGroup = routingGroup
 
     mineRange.uiGroup = miningGroup
+    highlightAimPoint.uiGroup = miningGroup
     stepToNearbyBlocks.uiGroup = miningGroup
 
     precisionPointRotationSpeed.uiGroup = rotationGroup
@@ -471,7 +505,9 @@ object MiningMacroModule : Module("Mining Macro") {
   internal const val TARGET_STICKY_RANGE_EXTRA = 1.4
   internal const val APPROACH_SCAN_RADIUS = 3
   internal const val APPROACH_SCAN_VERTICAL = 2
-  internal const val APPROACH_TIMEOUT_TICKS = 18L
+  internal const val APPROACH_SCAN_RADIUS_WIDE = 6
+  internal const val APPROACH_SCAN_VERTICAL_WIDE = 4
+  internal const val APPROACH_TIMEOUT_TICKS = 30L
   internal const val APPROACH_MIN_PROGRESS_BLOCKS = 1.0
   internal const val APPROACH_HOLD_DISTANCE = 4.0
   internal const val APPROACH_EDGE_MARGIN = 0.15
@@ -684,7 +720,7 @@ object MiningMacroModule : Module("Mining Macro") {
               }
             }
             usePathfinding.value -> {
-              moveToward(level, player, nearest)
+              moveToward(level, player, nearest, maxTravelDistance = shortStepLimit)
             }
             else -> {
               MovementManager.clearForcedMovement()
@@ -763,12 +799,21 @@ object MiningMacroModule : Module("Mining Macro") {
           if (aim.usesPrecisionPoint) (precisionPointRotationSpeed.value / 100.0).coerceAtLeast(0.1)
           else 1.0
         frameRotSnapThreshold = RotationsModule.bezierSnapThreshold.value.toFloat()
-        frameRotTarget     = aim.point
         frameRotSpeedScale = (RotationsModule.sample(RotationsModule.miningSpeedScale.value) * precisionRotScale).toFloat()
         frameRotAccelScale = (RotationsModule.sample(RotationsModule.miningAccelScale.value) * precisionRotScale).toFloat()
         frameRotPitchStep  = (RotationsModule.sample(RotationsModule.miningPitchStep.value) * precisionRotScale).toFloat()
         frameRotMaxSpeed   = (RotationsModule.sample(RotationsModule.miningMaxSpeed.value) * precisionRotScale).toFloat()
         frameRotMaxAccel   = (RotationsModule.sample(RotationsModule.miningMaxAccel.value) * precisionRotScale).toFloat()
+        // Capture initial angular distance once per new block so onFrame can hold constant speed.
+        if (target != frameRotPrevBlock) {
+          val initRot = AngleUtils.getRotation(aim.point)
+          val initYaw = abs(AngleUtils.getRotationDelta(player.yRot, initRot.yaw).toFloat())
+          val initPitch = abs(initRot.pitch - player.xRot)
+          frameRotInitialDist = maxOf(initYaw, initPitch).coerceAtLeast(1f)
+          frameRotPrevBlock = target
+          frameRotLastNs = 0L
+        }
+        frameRotTarget     = aim.point
       }
     } else {
       stopMiningKeys()
@@ -868,26 +913,49 @@ object MiningMacroModule : Module("Mining Macro") {
 
   @SubscribeEvent
   fun onFrame(@Suppress("UNUSED_PARAMETER") event: WorldRenderEvent.Last) {
-    val target = frameRotTarget ?: return
+    val target = frameRotTarget
     val player = mc.player ?: return
 
-    // Inversely scale speed with angular distance: small deltas get the largest boost so that
-    // adjacent-block rotations (typically 5-20 deg) are not glacially slow.
-    val targetRot  = AngleUtils.getRotation(target)
-    val yawDelta   = abs(AngleUtils.getRotationDelta(player.yRot, targetRot.yaw).toFloat())
-    val pitchDelta = abs(targetRot.pitch - player.xRot)
-    val maxDelta   = maxOf(yawDelta, pitchDelta).coerceAtLeast(1f)
-    val distScale  = (60f / maxDelta).coerceIn(1f, 6f)
+    if (target == null) {
+      frameRotLastNs = 0L
+      frameRotPrevBlock = null
+      return
+    }
 
-    applyHeadRotation(
-      player, target,
-      maxSpeedScale = frameRotSpeedScale * distScale,
-      accelScale    = frameRotAccelScale * distScale,
-      maxPitchStep  = frameRotPitchStep,
-      maxTurnSpeed  = frameRotMaxSpeed,
-      maxTurnAccel  = frameRotMaxAccel,
-      snapThreshold = frameRotSnapThreshold,
-    )
+    val targetRot = AngleUtils.getRotation(target)
+    val yawDelta  = AngleUtils.getRotationDelta(player.yRot, targetRot.yaw)
+    val pitchDelta = targetRot.pitch - player.xRot
+    val absYaw   = abs(yawDelta)
+    val absPitch = abs(pitchDelta)
+
+    val snapThresh = frameRotSnapThreshold.coerceAtLeast(0.5f)
+    if (absYaw <= snapThresh && absPitch <= snapThresh) {
+      player.yRot    = AngleUtils.normalizeAngle(targetRot.yaw)
+      player.yHeadRot = player.yRot
+      player.yBodyRot = player.yRot
+      player.xRot    = targetRot.pitch.coerceIn(-89.9f, 89.9f)
+      frameRotLastNs = 0L
+      return
+    }
+
+    val nowNs = System.nanoTime()
+    val dt = if (frameRotLastNs == 0L) 1f / 60f
+             else ((nowNs - frameRotLastNs) / 1_000_000_000f).coerceIn(1f / 240f, 1f / 10f)
+    frameRotLastNs = nowNs
+
+    // Constant speed proportional to initial angular distance to this block.
+    // frameRotMaxSpeed (deg/s) is the reference speed at 30° — far blocks rotate faster,
+    // close blocks rotate slower, but each rotation holds one speed end-to-end.
+    val degsPerSec = (frameRotInitialDist / 30f) * frameRotMaxSpeed * frameRotSpeedScale
+    val step = degsPerSec * dt
+
+    val yawStep = if (absYaw <= step) yawDelta else step * (if (yawDelta >= 0f) 1f else -1f)
+    player.yRot    = AngleUtils.normalizeAngle(player.yRot + yawStep)
+    player.yHeadRot = player.yRot
+    player.yBodyRot = player.yRot
+
+    val pitchStep = if (absPitch <= step) pitchDelta else step * (if (pitchDelta >= 0f) 1f else -1f)
+    player.xRot = (player.xRot + pitchStep).coerceIn(-89.9f, 89.9f)
   }
 
   @SubscribeEvent
@@ -913,16 +981,25 @@ object MiningMacroModule : Module("Mining Macro") {
     }
     val preview = cachedPreviewTarget
     val returnPos = goldenGoblinReturnPos
+    val connectedBlocks = collectConnectedHighlightBlocks(level, player, active, preview)
+    val vein = currentVein
+    val aimPoint = aimRenderPoint?.takeIf { highlightAimPoint.value && aimRenderBlock != null }
+    val aimBlock = aimRenderBlock
 
     OverlayRenderEngine.clearTag(OVERLAY_TAG)
-    if (active == null && preview == null && returnPos == null) {
+    if (active == null && preview == null && returnPos == null && connectedBlocks.isEmpty() && vein == null && aimPoint == null) {
       return
     }
 
     val activeFill = OverlayRenderEngine.Color(0x2D, 0xE2, 0xFF, 0x44)
     val activeOutline = OverlayRenderEngine.Color(0x2D, 0xE2, 0xFF, 0xFF)
     val previewOutline = OverlayRenderEngine.Color(0xFF, 0xD8, 0x4C, 0xFF)
+    val possibleOutline = OverlayRenderEngine.Color(0x2D, 0xE2, 0xFF, 0xA0)
     val returnOutline = OverlayRenderEngine.Color(0x6E, 0xEA, 0x92, 0xFF)
+    val aimFill = OverlayRenderEngine.Color(0xFF, 0x5A, 0xD6, 0x99)
+    val aimOutline = OverlayRenderEngine.Color(0xFF, 0x5A, 0xD6, 0xFF)
+
+    renderSingleVeinOutline(level, vein, connectedBlocks, possibleOutline)
 
     if (active != null) {
       val pad = 0.002
@@ -944,8 +1021,257 @@ object MiningMacroModule : Module("Mining Macro") {
     if (preview != null && preview != active) {
       OverlayRenderEngine.outlineBlockColor(level, preview, previewOutline, 2, OVERLAY_TAG, 2.0f)
     }
+    if (aimPoint != null && aimBlock != null) {
+      renderAimPointMarker(level, player, aimBlock, aimPoint, aimFill, aimOutline)
+    }
     if (returnPos != null) {
       renderReturnSpotMarker(level, returnPos, returnOutline)
+    }
+  }
+
+
+  internal fun setAimRenderTarget(block: BlockPos?, point: Vec3?) {
+    aimRenderBlock = block
+    aimRenderPoint = point
+  }
+
+  private fun renderAimPointMarker(
+    level: net.minecraft.world.level.Level,
+    player: Player,
+    block: BlockPos,
+    point: Vec3,
+    fill: OverlayRenderEngine.Color,
+    outline: OverlayRenderEngine.Color,
+  ) {
+    val size = 0.075
+    OverlayRenderEngine.addBox(
+      level,
+      point.x - size, point.y - size, point.z - size,
+      point.x + size, point.y + size, point.z + size,
+      fill,
+      outline,
+      2.0f,
+      2,
+      OVERLAY_TAG,
+      true,
+    )
+    val eye = player.eyePosition
+    OverlayRenderEngine.addLine(
+      level,
+      eye.x, eye.y, eye.z,
+      point.x, point.y, point.z,
+      outline.withAlpha(0xB8),
+      1.25f,
+      2,
+      OVERLAY_TAG,
+      true,
+    )
+  }
+
+  private fun renderSingleVeinOutline(
+    level: net.minecraft.world.level.Level,
+    vein: Vein?,
+    fallbackBlocks: Set<BlockPos>,
+    color: OverlayRenderEngine.Color,
+  ) {
+    if (!highlightPossibleBlocks.value) return
+
+    val bounds = when {
+      vein != null && vein.blocks.isNotEmpty() -> boundsForBlocks(vein.blocks)
+      fallbackBlocks.isNotEmpty() -> boundsForBlocks(fallbackBlocks)
+      else -> return
+    }
+
+    // One big outline for the full vein. This intentionally does NOT draw one box
+    // per block, so the scan preview looks like one connected vein shell instead
+    // of a pile of separate cubes.
+    val pad = 0.025
+    OverlayRenderEngine.addBox(
+      level,
+      bounds.minX - pad,
+      bounds.minY - pad,
+      bounds.minZ - pad,
+      bounds.maxX + pad,
+      bounds.maxY + pad,
+      bounds.maxZ + pad,
+      null,
+      color,
+      2.6f,
+      2,
+      OVERLAY_TAG,
+      forceRender = true,
+    )
+  }
+
+  private fun boundsForBlocks(blocks: Collection<BlockPos>): AABB {
+    var minX = Int.MAX_VALUE
+    var minY = Int.MAX_VALUE
+    var minZ = Int.MAX_VALUE
+    var maxX = Int.MIN_VALUE
+    var maxY = Int.MIN_VALUE
+    var maxZ = Int.MIN_VALUE
+
+    for (pos in blocks) {
+      if (pos.x < minX) minX = pos.x
+      if (pos.y < minY) minY = pos.y
+      if (pos.z < minZ) minZ = pos.z
+      if (pos.x > maxX) maxX = pos.x
+      if (pos.y > maxY) maxY = pos.y
+      if (pos.z > maxZ) maxZ = pos.z
+    }
+
+    return AABB(
+      minX.toDouble(),
+      minY.toDouble(),
+      minZ.toDouble(),
+      maxX + 1.0,
+      maxY + 1.0,
+      maxZ + 1.0,
+    )
+  }
+
+  private data class RenderEdge(
+    val x1: Int,
+    val y1: Int,
+    val z1: Int,
+    val x2: Int,
+    val y2: Int,
+    val z2: Int,
+  )
+
+  private fun collectConnectedHighlightBlocks(
+    level: net.minecraft.world.level.Level,
+    player: Player,
+    active: BlockPos?,
+    preview: BlockPos?,
+  ): Set<BlockPos> {
+    if (!highlightPossibleBlocks.value) return emptySet()
+    val vein = currentVein ?: return emptySet()
+    val limit = highlightPossibleLimit.value.toInt().coerceAtLeast(1)
+    val result = LinkedHashSet<BlockPos>(minOf(limit, vein.blocks.size))
+
+    // Always include the active and preview blocks first so the connected shell does not
+    // draw a fake seam between the block being mined and the rest of the vein.
+    if (active != null && vein.blocks.contains(active) && isMineableTarget(level, player, active, vein.targetIds)) {
+      result.add(active)
+    }
+    if (preview != null && vein.blocks.contains(preview) && isMineableTarget(level, player, preview, vein.targetIds)) {
+      result.add(preview)
+    }
+
+    val sorted = vein.blocks
+      .asSequence()
+      .filter { it != active && it != preview }
+      .filter { isMineableTarget(level, player, it, vein.targetIds) }
+      .sortedBy { highlightSortScore(player, it) }
+
+    for (pos in sorted) {
+      result.add(pos)
+      if (result.size >= limit) break
+    }
+
+    return result
+  }
+
+  private fun highlightSortScore(player: Player, pos: BlockPos): Double {
+    val dx = (pos.x + 0.5) - player.eyePosition.x
+    val dy = (pos.y + 0.5) - player.eyePosition.y
+    val dz = (pos.z + 0.5) - player.eyePosition.z
+    val belowPenalty = if (pos.y < player.blockY - 1) 16.0 else 0.0
+    return dx * dx + dy * dy + dz * dz + belowPenalty
+  }
+
+  private fun renderConnectedBlockShell(
+    level: net.minecraft.world.level.Level,
+    blocks: Set<BlockPos>,
+    color: OverlayRenderEngine.Color,
+  ) {
+    if (blocks.isEmpty()) return
+    val edges = LinkedHashSet<RenderEdge>()
+    for (pos in blocks) {
+      for (dir in Direction.values()) {
+        if (blocks.contains(pos.relative(dir))) continue
+        addFaceEdges(edges, pos, dir)
+      }
+    }
+    for (edge in edges) {
+      OverlayRenderEngine.addLine(
+        level,
+        edge.x1.toDouble(), edge.y1.toDouble(), edge.z1.toDouble(),
+        edge.x2.toDouble(), edge.y2.toDouble(), edge.z2.toDouble(),
+        color,
+        1.35f,
+        2,
+        OVERLAY_TAG,
+      )
+    }
+  }
+
+  private fun addFaceEdges(edges: MutableSet<RenderEdge>, pos: BlockPos, dir: Direction) {
+    val x0 = pos.x
+    val y0 = pos.y
+    val z0 = pos.z
+    val x1 = pos.x + 1
+    val y1 = pos.y + 1
+    val z1 = pos.z + 1
+
+    when (dir) {
+      Direction.DOWN -> {
+        addEdge(edges, x0, y0, z0, x1, y0, z0)
+        addEdge(edges, x1, y0, z0, x1, y0, z1)
+        addEdge(edges, x1, y0, z1, x0, y0, z1)
+        addEdge(edges, x0, y0, z1, x0, y0, z0)
+      }
+      Direction.UP -> {
+        addEdge(edges, x0, y1, z0, x1, y1, z0)
+        addEdge(edges, x1, y1, z0, x1, y1, z1)
+        addEdge(edges, x1, y1, z1, x0, y1, z1)
+        addEdge(edges, x0, y1, z1, x0, y1, z0)
+      }
+      Direction.NORTH -> {
+        addEdge(edges, x0, y0, z0, x1, y0, z0)
+        addEdge(edges, x1, y0, z0, x1, y1, z0)
+        addEdge(edges, x1, y1, z0, x0, y1, z0)
+        addEdge(edges, x0, y1, z0, x0, y0, z0)
+      }
+      Direction.SOUTH -> {
+        addEdge(edges, x0, y0, z1, x1, y0, z1)
+        addEdge(edges, x1, y0, z1, x1, y1, z1)
+        addEdge(edges, x1, y1, z1, x0, y1, z1)
+        addEdge(edges, x0, y1, z1, x0, y0, z1)
+      }
+      Direction.WEST -> {
+        addEdge(edges, x0, y0, z0, x0, y0, z1)
+        addEdge(edges, x0, y0, z1, x0, y1, z1)
+        addEdge(edges, x0, y1, z1, x0, y1, z0)
+        addEdge(edges, x0, y1, z0, x0, y0, z0)
+      }
+      Direction.EAST -> {
+        addEdge(edges, x1, y0, z0, x1, y0, z1)
+        addEdge(edges, x1, y0, z1, x1, y1, z1)
+        addEdge(edges, x1, y1, z1, x1, y1, z0)
+        addEdge(edges, x1, y1, z0, x1, y0, z0)
+      }
+    }
+  }
+
+  private fun addEdge(
+    edges: MutableSet<RenderEdge>,
+    ax: Int,
+    ay: Int,
+    az: Int,
+    bx: Int,
+    by: Int,
+    bz: Int,
+  ) {
+    val forward =
+      ax < bx ||
+        (ax == bx && ay < by) ||
+        (ax == bx && ay == by && az <= bz)
+    if (forward) {
+      edges.add(RenderEdge(ax, ay, az, bx, by, bz))
+    } else {
+      edges.add(RenderEdge(bx, by, bz, ax, ay, az))
     }
   }
 

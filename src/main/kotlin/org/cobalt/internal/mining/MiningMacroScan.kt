@@ -1,8 +1,8 @@
 package org.cobalt.internal.mining
 
 import net.minecraft.ChatFormatting
+import kotlin.math.abs
 import net.minecraft.core.BlockPos
-import net.minecraft.core.Direction
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.phys.AABB
 import org.cobalt.api.util.ChatUtils
@@ -191,7 +191,27 @@ internal fun MiningMacroModule.buildOffsets(radius: Int, vertical: Int): List<Sc
       }
     }
   }
-  list.sortWith(compareBy({ it.distSq }, { it.dy }))
+  // Prefer same-height / visible-nearby seeds before lower blocks. The old dy sort
+  // favored negative Y on ties, which made the macro often start on the block under
+  // the visible vein instead of the visible face you are looking at.
+  list.sortWith(compareBy<ScanOffset>({ it.distSq }, { abs(it.dy) }, { -it.dy }))
+  return list
+}
+
+internal fun MiningMacroModule.veinNeighborOffsets26(): List<ScanOffset> {
+  val list = ArrayList<ScanOffset>(26)
+  for (dy in -1..1) {
+    for (dx in -1..1) {
+      for (dz in -1..1) {
+        if (dx == 0 && dy == 0 && dz == 0) continue
+        val distSq = dx * dx + dy * dy + dz * dz
+        list.add(ScanOffset(dx, dy, dz, distSq))
+      }
+    }
+  }
+  // Straight neighbors first, then diagonal/corner neighbors. This still collects
+  // diagonal vein pieces, but it keeps the main connected body stable.
+  list.sortWith(compareBy<ScanOffset>({ it.distSq }, { abs(it.dy) }, { -it.dy }))
   return list
 }
 
@@ -215,10 +235,11 @@ internal fun MiningMacroModule.buildVein(
   var maxY = seed.y
   var maxZ = seed.z
 
+  val neighborOffsets = veinNeighborOffsets26()
   while (queue.isNotEmpty() && blocks.size < maxBlocks) {
     val pos = queue.removeFirst()
-    for (dir in Direction.values()) {
-      val next = pos.relative(dir)
+    for (off in neighborOffsets) {
+      val next = pos.offset(off.dx, off.dy, off.dz)
       if (blocks.contains(next)) continue
       if (!isMineableTarget(level, player, next, selection.ids)) continue
       blocks.add(next)

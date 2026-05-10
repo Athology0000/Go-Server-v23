@@ -18,6 +18,7 @@ import org.cobalt.api.event.impl.render.WorldRenderContext;
 import org.cobalt.api.event.impl.render.WorldRenderEvent;
 import org.cobalt.internal.pathfinding.OverlayRenderEngine;
 import org.cobalt.internal.visual.SkyboxChangerModule;
+import org.cobalt.render.rise.ShaderRegistry;
 import org.joml.Matrix4f;
 import org.joml.Vector4f;
 import org.spongepowered.asm.mixin.Final;
@@ -34,6 +35,11 @@ public class LevelRendererMixin {
   @Unique
   private final WorldRenderContext ctx = new WorldRenderContext();
 
+  @Unique
+  private Matrix4f cobalt$savedModelView;
+  @Unique
+  private Matrix4f cobalt$savedProjection;
+
   @Shadow
   @Final
   private RenderBuffers renderBuffers;
@@ -42,6 +48,8 @@ public class LevelRendererMixin {
   private void render(GraphicsResourceAllocator allocator, DeltaTracker tickCounter, boolean renderBlockOutline, Camera camera, Matrix4f positionMatrix, Matrix4f matrix4f, Matrix4f projectionMatrix, GpuBufferSlice fogBuffer, Vector4f fogColor, boolean renderSky, CallbackInfo callbackInfo) {
     ctx.setConsumers(renderBuffers.bufferSource());
     ctx.setCamera(camera);
+    cobalt$savedModelView  = new Matrix4f(matrix4f);
+    cobalt$savedProjection = new Matrix4f(projectionMatrix);
     new WorldRenderEvent.Start(ctx).post();
   }
 
@@ -56,6 +64,9 @@ public class LevelRendererMixin {
   private void postRender(GpuBufferSlice gpuBufferSlice, LevelRenderState levelRenderState, ProfilerFiller profilerFiller, Matrix4f matrix4f, ResourceHandle resourceHandle, ResourceHandle resourceHandle2, boolean bl, ResourceHandle resourceHandle3, ResourceHandle resourceHandle4, CallbackInfo callbackInfo) {
     new WorldRenderEvent.Last(ctx).post();
     OverlayRenderEngine.INSTANCE.render(ctx);
+    if (cobalt$savedProjection != null && cobalt$savedModelView != null) {
+      ShaderRegistry.WORLD_GLOW_PASS.flush(cobalt$savedProjection, cobalt$savedModelView);
+    }
   }
 
   @ModifyExpressionValue(method = "method_62214", at = @At(value = "NEW", target = "()Lcom/mojang/blaze3d/vertex/PoseStack;"))

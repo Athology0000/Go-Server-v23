@@ -51,6 +51,7 @@ import org.cobalt.api.pathfinder.jni.MovementProfile
 import org.cobalt.api.pathfinder.jni.NativePathfinder
 import org.cobalt.api.pathfinder.jni.PathStatus
 import org.cobalt.api.util.player.MovementManager
+import org.cobalt.api.util.player.MovementOwner
 import org.cobalt.internal.pathfinding.PathfindingModule
 import org.cobalt.internal.mining.RoutesModule
 import org.cobalt.internal.routes.RouteStore
@@ -455,6 +456,24 @@ object CombatMacroModule : Module("Combat Macro") {
     step = 0.1
   )
 
+  private val combatDistance = SliderSetting(
+    "Combat Distance",
+    "Target distance to maintain from the mob.",
+    4.0,
+    1.0,
+    20.0,
+    0.5,
+  )
+
+  private val distanceTolerance = SliderSetting(
+    "Distance Tolerance",
+    "Acceptable deviation from Combat Distance before correcting position.",
+    1.0,
+    0.5,
+    5.0,
+    0.5,
+  )
+
   private val slayerSwordKeepDistance = SliderSetting(
     "Slayer Sword Keep Distance",
     "Preferred stand-off distance in melee mode while the Slayer macro is active. Lower = closer. 0 = close in fully.",
@@ -718,6 +737,7 @@ object CombatMacroModule : Module("Combat Macro") {
   private var stuckTicks = 0
   private var nextAttackNs = 0L
   private var startedPath = false
+  private var backingAway = false
   private var currentTargetId: UUID? = null
   private var automationBypassWhitelist = false
   private var closeChaseActive = false
@@ -862,6 +882,8 @@ object CombatMacroModule : Module("Combat Macro") {
         slayerMageWeapon,
         autoReaperScythe,
         swordKeepDistance,
+        combatDistance,
+        distanceTolerance,
         slayerSwordKeepDistance,
         bowMinRange,
         bowElevationPerBlock,
@@ -1322,6 +1344,7 @@ object CombatMacroModule : Module("Combat Macro") {
         0 -> dist <= keepDistance
         else -> hasLos && dist <= keepDistance
       }
+    val tooClose = dist < (combatDistance.value - distanceTolerance.value).coerceAtLeast(0.5)
     val inCloseChaseRange = dist <= engageRange + chaseStopBuffer.value
 
     ensurePreferredWeapon(player, target, level.gameTime)
@@ -1407,7 +1430,7 @@ object CombatMacroModule : Module("Combat Macro") {
         )
       } else {
         holdStillNoStrafe()
-        if (hasLos) attemptAttack(player, target, 1)
+        attemptAttack(player, target, 1)
       }
     } else if (slayerNeedsWalkback) {
       // Walkback owns movement - don't chase, just rotate toward target so we can attack when it comes in range.
@@ -1449,6 +1472,25 @@ object CombatMacroModule : Module("Combat Macro") {
           }
         }
       }
+    }
+
+    if (tooClose && !phaseMovementActive) {
+      if (startedPath && nativeActive()) nativeStop()
+      startedPath = false
+      MovementManager.setForcedMovement(
+        owner = MovementOwner.COMBAT,
+        forward = false,
+        backward = true,
+        left = false,
+        right = false,
+        jump = false,
+        shift = false,
+        sprint = false
+      )
+      backingAway = true
+    } else if (backingAway) {
+      MovementManager.releaseMovement(MovementOwner.COMBAT)
+      backingAway = false
     }
 
     updateStuck(player, inAttackRange || inKeepDistanceZone, level)
@@ -1570,6 +1612,7 @@ object CombatMacroModule : Module("Combat Macro") {
     var bestPriorityMobDist = Double.POSITIVE_INFINITY
     var bestFarmMob: LivingEntity? = null
     var bestFarmMobDist = Double.POSITIVE_INFINITY
+    var bestBossHighlightState: SlayerHighlightState? = null
 
     val newHighlightCache = mutableMapOf<UUID, SlayerHighlightState>()
     for (entity in level.entitiesForRendering()) {
@@ -1584,10 +1627,8 @@ object CombatMacroModule : Module("Combat Macro") {
       val isFarmMob = isSlayerFarmMobNames(names)
       if (!isBoss && !isPriority && !isFarmMob) continue
 
-      // Populate highlight cache so renderSlayerHighlights can skip its own entity scan.
-      if (isBoss) {
-        newHighlightCache[living.uuid] = buildSlayerHighlightState(names, SlayerHighlightType.BOSS)
-      } else if (isPriority && slayerHighlightMiniBosses.value) {
+      // Populate miniboss highlights here, but add the boss only after the best candidate is known.
+      if (!isBoss && isPriority && slayerHighlightMiniBosses.value) {
         val type =
           if (names.any(::isHighTierSlayerPriorityMobName)) SlayerHighlightType.HIGH_TIER_MINIBOSS
           else SlayerHighlightType.MINIBOSS
@@ -1610,6 +1651,7 @@ object CombatMacroModule : Module("Combat Macro") {
       if (isBoss && distSq < bestBossDist) {
         bestBoss = living
         bestBossDist = distSq
+        bestBossHighlightState = buildSlayerHighlightState(names, SlayerHighlightType.BOSS)
       }
       if (isPriority && distSq < bestPriorityMobDist) {
         bestPriorityMob = living
@@ -1619,6 +1661,10 @@ object CombatMacroModule : Module("Combat Macro") {
         bestFarmMob = living
         bestFarmMobDist = distSq
       }
+    }
+    if (bestBoss != null) {
+      newHighlightCache[bestBoss.uuid] =
+        bestBossHighlightState ?: buildSlayerHighlightState(targetMatchNames(bestBoss), SlayerHighlightType.BOSS)
     }
     slayerHighlightCache = newHighlightCache
     if (slayerBossEsp.value && slayerEspStyle.value == SLAYER_ESP_STYLE_GLOW) {
@@ -2735,7 +2781,10 @@ object CombatMacroModule : Module("Combat Macro") {
   }
 
   private fun isRangedAttackReady(player: Player, target: LivingEntity, activeCombatMode: Int): Boolean {
-    if (!player.hasLineOfSight(target)) return false
+    val isHatchlingTarget = shouldUseSpiderPhaseBowCombat() &&
+      isSpiderBossHatchlingsPhaseActive() &&
+      matchesSpiderPhaseTarget(target)
+    if (!isHatchlingTarget && !player.hasLineOfSight(target)) return false
     val aimed = rangedAimRotation(player, target, activeCombatMode)
     val yawError = abs(AngleUtils.getRotationDelta(player.yRot, aimed.yaw))
     val pitchError = abs(aimed.pitch - player.xRot)
@@ -3441,7 +3490,12 @@ object CombatMacroModule : Module("Combat Macro") {
 
     for (entity in level.entitiesForRendering()) {
       val living = entity as? LivingEntity ?: continue
-      if (!isValidTarget(living, player, blacklisted, "", true, ignoreWhitelist = true)) continue
+      if (living is ArmorStand) {
+        // "shoot me" targets are armor stands — allow them only during spider hatchlings phase
+        if (!wantsSpiderAdds || !living.isAlive) continue
+      } else {
+        if (!isValidTarget(living, player, blacklisted, "", true, ignoreWhitelist = true)) continue
+      }
       if (isSlayerBossEntity(living)) continue
 
       val matchesPhaseTarget =
@@ -4613,6 +4667,7 @@ object CombatMacroModule : Module("Combat Macro") {
     stuckTicks = 0
     nextAttackNs = 0L
     startedPath = false
+    backingAway = false
     currentTargetId = null
     resetCloseChase()
     lastPathStartTick = 0L
@@ -4908,75 +4963,4 @@ object CombatMacroModule : Module("Combat Macro") {
       else -> ""
     }
   }
-  // Reference positions spread across the crypt - used only for "is player inside crypt?" proximity checks.
-  private val CRYPT_PATROL_WAYPOINTS = listOf(
-    BlockPos(-152, 57, -102), BlockPos(-133, 50, -101), BlockPos(-132, 45, -121),
-    BlockPos(-129, 41, -134), BlockPos(-129, 41, -143), BlockPos(-119, 41, -136),
-    BlockPos(-106, 46, -129), BlockPos(-102, 48, -119), BlockPos(-89, 46, -104),
-    BlockPos(-77, 46, -105),  BlockPos(-65, 50, -120),  BlockPos(-48, 55, -136),
-    BlockPos(-48, 57, -141),  BlockPos(-46, 55, -136),  BlockPos(-80, 46, -101),
-    BlockPos(-88, 42, -88),   BlockPos(-96, 38, -86),   BlockPos(-106, 38, -87),
-    BlockPos(-114, 43, -89),  BlockPos(-133, 50, -105), BlockPos(-147, 56, -100),
-    BlockPos(-145, 57, -114), BlockPos(-136, 58, -127), BlockPos(-121, 55, -126),
-    BlockPos(-109, 50, -119), BlockPos(-102, 48, -119),
-  )
-
-  private val CYAN_COLOR = Color(0, 255, 255)
-  private val PINK_COLOR = Color(255, 105, 180)
-  private val SPIDER_HATCHLING_TARGET_COLOR = Color(255, 180, 30, 210)
-
-  private data class SlayerHighlightState(
-    val type: SlayerHighlightType,
-    val attunement: BlazeAttunement?,
-  )
-
-  private enum class SlayerHighlightType {
-    BOSS,
-    MINIBOSS,
-    HIGH_TIER_MINIBOSS
-  }
-
-  private enum class BlazeAttunement(val argb: Int) {
-    ASHEN(0xFFFF6B6B.toInt()),
-    SPIRIT(0xFF5AE6FF.toInt()),
-    AURIC(0xFFFFD54A.toInt()),
-    CRYSTAL(0xFFC88CFF.toInt()),
-  }
-
-  private data class SlayerEspPalette(
-    val stroke: Color,
-    val fill: Color,
-    val outerStroke: Color,
-    val outerFill: Color,
-  )
-
-  private val CHAT_FORMATTING_COLORS = listOf(
-    ChatFormatting.BLACK to Color(0x000000),
-    ChatFormatting.DARK_BLUE to Color(0x0000AA),
-    ChatFormatting.DARK_GREEN to Color(0x00AA00),
-    ChatFormatting.DARK_AQUA to Color(0x00AAAA),
-    ChatFormatting.DARK_RED to Color(0xAA0000),
-    ChatFormatting.DARK_PURPLE to Color(0xAA00AA),
-    ChatFormatting.GOLD to Color(0xFFAA00),
-    ChatFormatting.GRAY to Color(0xAAAAAA),
-    ChatFormatting.DARK_GRAY to Color(0x555555),
-    ChatFormatting.BLUE to Color(0x5555FF),
-    ChatFormatting.GREEN to Color(0x55FF55),
-    ChatFormatting.AQUA to Color(0x55FFFF),
-    ChatFormatting.RED to Color(0xFF5555),
-    ChatFormatting.LIGHT_PURPLE to Color(0xFF55FF),
-    ChatFormatting.YELLOW to Color(0xFFFF55),
-    ChatFormatting.WHITE to Color(0xFFFFFF),
-  )
-
-  private const val SLAYER_ESP_STYLE_GLOW = 0
-  private const val SLAYER_ESP_STYLE_BOX = 1
-  private const val SLAYER_GLOW_TEAM_PREFIX = "cbsl_"
-  private const val SLAYER_GLOW_TEAM_BOSS = "cbsl_boss"
-  private const val SLAYER_GLOW_TEAM_MINI = "cbsl_mini"
-  private const val SLAYER_GLOW_TEAM_HIGH = "cbsl_high"
-  private const val SLAYER_GLOW_TEAM_ASHEN = "cbsl_ash"
-  private const val SLAYER_GLOW_TEAM_SPIRIT = "cbsl_spi"
-  private const val SLAYER_GLOW_TEAM_AURIC = "cbsl_aur"
-  private const val SLAYER_GLOW_TEAM_CRYSTAL = "cbsl_crys"
 }

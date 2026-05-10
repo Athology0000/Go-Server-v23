@@ -51,6 +51,12 @@ object WardrobeModule : Module("Wardrobe GUI") {
         EventBus.register(this)
     }
 
+    fun requestEquip(setId: Int) {
+        if (setId !in 1..27) return
+        pendingEquipSetId = setId
+        mc.execute { mc.player?.connection?.sendCommand("wd") }
+    }
+
     /** Call this from Cobalt.kt after Config.loadModulesConfig() to hydrate WardrobeState.favorites. */
     fun loadFavorites() {
         WardrobeState.favorites.clear()

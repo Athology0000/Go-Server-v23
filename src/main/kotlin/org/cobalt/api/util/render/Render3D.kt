@@ -180,24 +180,25 @@ object Render3D {
 
     val matrices = context.matrixStack ?: PoseStack()
     val cameraPos = context.camera.position()
-    val buffer = context.consumers.getBuffer(RenderTypes.debugTriangleFan())
+    val buffer = context.consumers.getBuffer(RenderTypes.debugQuads())
     val argb = ARGB.color(color.alpha, color.red, color.green, color.blue)
 
     matrices.pushPose()
     matrices.translate(center.x - cameraPos.x, center.y + SURFACE_RENDER_OFFSET, center.z - cameraPos.z)
     val pose = matrices.last().pose()
 
-    for (i in 0 until CYLINDER_SEGMENTS) {
-      val rad = Math.toRadians(i.toDouble())
-      val nextRad = Math.toRadians((i + 1).toDouble())
+    for (i in 0 until CIRCLE_OUTLINE_SEGMENTS) {
+      val rad = Math.toRadians(i * CIRCLE_OUTLINE_STEP_DEGREES)
+      val nextRad = Math.toRadians((i + 1) * CIRCLE_OUTLINE_STEP_DEGREES)
       val x1 = (radius * cos(rad)).toFloat()
       val z1 = (radius * sin(rad)).toFloat()
       val x2 = (radius * cos(nextRad)).toFloat()
       val z2 = (radius * sin(nextRad)).toFloat()
 
+      // Degenerate quad (v0=v3=center) → one filled triangle per segment
       buffer.addVertex(pose, 0f, 0f, 0f).setColor(argb)
-      buffer.addVertex(pose, x2, 0f, z2).setColor(argb)
       buffer.addVertex(pose, x1, 0f, z1).setColor(argb)
+      buffer.addVertex(pose, x2, 0f, z2).setColor(argb)
       buffer.addVertex(pose, 0f, 0f, 0f).setColor(argb)
     }
 

@@ -5,10 +5,12 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
+import org.cobalt.internal.dungeons.gambling.DungeonChestGamblingModule;
 import org.cobalt.internal.qol.AutoStashModule;
 import org.cobalt.internal.qol.ItemLockingModule;
 import org.spongepowered.asm.mixin.Final;
@@ -65,11 +67,44 @@ public abstract class AbstractContainerScreenMixin<T extends AbstractContainerMe
 
     @Inject(method = "keyPressed", at = @At("HEAD"), cancellable = true)
     private void cobalt$handleItemLockKeybinds(KeyEvent input, CallbackInfoReturnable<Boolean> cir) {
+        if (DungeonChestGamblingModule.INSTANCE.onKeyPressed(input.key())) {
+            cir.setReturnValue(true);
+            return;
+        }
+
         if (hoveredSlot == null || minecraft == null || minecraft.player == null) {
             return;
         }
 
         if (ItemLockingModule.INSTANCE.handleContainerKeyPressed(hoveredSlot, input)) {
+            cir.setReturnValue(true);
+        }
+    }
+
+    @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
+    private void cobalt$cancelDungeonChestGamblingMouseClicked(MouseButtonEvent input, boolean doubleClick, CallbackInfoReturnable<Boolean> cir) {
+        if (DungeonChestGamblingModule.INSTANCE.isRendering()) {
+            cir.setReturnValue(true);
+        }
+    }
+
+    @Inject(method = "mouseReleased", at = @At("HEAD"), cancellable = true)
+    private void cobalt$cancelDungeonChestGamblingMouseReleased(MouseButtonEvent input, CallbackInfoReturnable<Boolean> cir) {
+        if (DungeonChestGamblingModule.INSTANCE.isRendering()) {
+            cir.setReturnValue(true);
+        }
+    }
+
+    @Inject(method = "mouseDragged", at = @At("HEAD"), cancellable = true)
+    private void cobalt$cancelDungeonChestGamblingMouseDragged(MouseButtonEvent input, double dragX, double dragY, CallbackInfoReturnable<Boolean> cir) {
+        if (DungeonChestGamblingModule.INSTANCE.isRendering()) {
+            cir.setReturnValue(true);
+        }
+    }
+
+    @Inject(method = "mouseScrolled", at = @At("HEAD"), cancellable = true)
+    private void cobalt$cancelDungeonChestGamblingMouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY, CallbackInfoReturnable<Boolean> cir) {
+        if (DungeonChestGamblingModule.INSTANCE.isRendering()) {
             cir.setReturnValue(true);
         }
     }
@@ -80,6 +115,11 @@ public abstract class AbstractContainerScreenMixin<T extends AbstractContainerMe
         cancellable = true
     )
     private void cobalt$preventLockedInteractions(Slot slot, int slotId, int button, ClickType clickType, CallbackInfo ci) {
+        if (DungeonChestGamblingModule.INSTANCE.isRendering()) {
+            ci.cancel();
+            return;
+        }
+
         if (ItemLockingModule.INSTANCE.shouldCancelContainerClick(getTitle().getString(), menu, slot, slotId, button, clickType)) {
             ci.cancel();
         }

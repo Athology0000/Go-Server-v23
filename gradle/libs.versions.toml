@@ -11,6 +11,7 @@ discord-ipc = "1.1"
 reflections = "0.10.2"
 httpclient = "4.5.14"
 devauth = "1.2.2"
+hypixel-api = "1.0.1"
 
 # Plugins Versions
 kotlin = "2.3.0"
@@ -28,6 +29,7 @@ discord-ipc = { group = "meteordevelopment", name = "discord-ipc", version.ref =
 reflections = { group = "org.reflections", name = "reflections", version.ref = "reflections" }
 httpclient = { group = "org.apache.httpcomponents", name = "httpclient", version.ref = "httpclient" }
 devauth = { group = "me.djtheredstoner", name = "DevAuth-fabric", version.ref = "devauth" }
+hypixel-api = { group = "net.hypixel", name = "mod-api", version.ref = "hypixel-api" }
 
 [bundles]
 fabric = ["fabric-api", "fabric-loader", "fabric-kotlin"]
