@@ -1,12 +1,12 @@
 package org.cobalt.render;
 
-import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.opengl.GlDevice;
 import com.mojang.blaze3d.opengl.GlTexture;
+import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
+import org.cobalt.render.rise.ShaderRegistry;
 import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL12;
 import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
@@ -17,15 +17,20 @@ public class HudGlassBlurRenderer {
 
   private static HudGlassBlurShader blurShader;
   private static boolean initialized = false;
+  private static final boolean ENABLE_SHADER_BLUR = false;
 
   private static int quadVao;
   private static int quadVbo;
 
-  private static int captureTexture;
-  private static int captureWidth;
-  private static int captureHeight;
+  private static final org.cobalt.render.rise.RenderTarget sourceTarget = new org.cobalt.render.rise.RenderTarget();
+  private static final org.cobalt.render.rise.RenderTarget blurTempTarget = new org.cobalt.render.rise.RenderTarget();
+  private static final org.cobalt.render.rise.RenderTarget blurredTarget = new org.cobalt.render.rise.RenderTarget();
 
   public static void renderBlurRect(float x, float y, float width, float height, float cornerRadius, float blurStrength) {
+    if (!ENABLE_SHADER_BLUR) {
+      return;
+    }
+
     if (width <= 1f || height <= 1f) {
       return;
     }
@@ -61,12 +66,10 @@ public class HudGlassBlurRenderer {
     float framebufferWidth = width * scaleX;
     float framebufferHeight = height * scaleY;
     float framebufferRadius = cornerRadius * Math.max(scaleX, scaleY);
-    int mainFramebuffer = ((GlTexture) framebuffer.getColorTexture()).getFbo(
-      ((GlDevice) RenderSystem.getDevice()).directStateAccess(),
-      null
-    );
-
-    ensureCaptureTexture(fbWidth, fbHeight);
+    int mainFramebuffer = getMainFramebufferId(framebuffer);
+    if (mainFramebuffer == 0) {
+      return;
+    }
 
     int prevFramebuffer = 0;
     int prevProgram = 0;
@@ -107,12 +110,17 @@ public class HudGlassBlurRenderer {
       GL11.glGetIntegerv(GL11.GL_VIEWPORT, viewport);
       stateCaptured = true;
 
-      GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, mainFramebuffer);
-      GL11.glViewport(0, 0, fbWidth, fbHeight);
+      sourceTarget.ensureSize(fbWidth, fbHeight);
+      blurTempTarget.ensureSize(fbWidth, fbHeight);
+      blurredTarget.ensureSize(fbWidth, fbHeight);
+      GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, prevFramebuffer);
 
-      GL13.glActiveTexture(GL13.GL_TEXTURE0);
-      GL11.glBindTexture(GL11.GL_TEXTURE_2D, captureTexture);
-      GL11.glCopyTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, 0, 0, 0, fbWidth, fbHeight);
+      GL11.glViewport(0, 0, fbWidth, fbHeight);
+      copyFramebufferToTarget(mainFramebuffer, sourceTarget, fbWidth, fbHeight);
+      int radius = Math.max(8, Math.min(56, Math.round(blurStrength * Math.max(scaleX, scaleY) * 2.6f)));
+      ShaderRegistry.BLUR_A.render(sourceTarget, blurTempTarget, radius, 1.0f, 0.0f);
+      ShaderRegistry.BLUR_B.render(blurTempTarget, blurredTarget, radius, 0.0f, 1.0f);
+      GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, mainFramebuffer);
 
       if (scissorEnabled) {
         GL11.glDisable(GL11.GL_SCISSOR_TEST);
@@ -130,10 +138,11 @@ public class HudGlassBlurRenderer {
       }
 
       blurShader.setTexture(0);
+      GL13.glActiveTexture(GL13.GL_TEXTURE0);
+      GL11.glBindTexture(GL11.GL_TEXTURE_2D, blurredTarget.getTextureId());
       blurShader.setScreenSize(fbWidth, fbHeight);
       blurShader.setRect(framebufferX, framebufferY, framebufferWidth, framebufferHeight);
       blurShader.setCornerRadius(Math.max(0f, Math.min(framebufferRadius, Math.min(framebufferWidth, framebufferHeight) * 0.5f)));
-      blurShader.setBlurStrength(Math.max(1.0f, blurStrength * Math.max(scaleX, scaleY)));
 
       GL30.glBindVertexArray(quadVao);
       GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 6);
@@ -170,12 +179,11 @@ public class HudGlassBlurRenderer {
     }
     if (quadVao != 0) GL30.glDeleteVertexArrays(quadVao);
     if (quadVbo != 0) GL20.glDeleteBuffers(quadVbo);
-    if (captureTexture != 0) GL11.glDeleteTextures(captureTexture);
+    sourceTarget.cleanup();
+    blurTempTarget.cleanup();
+    blurredTarget.cleanup();
     quadVao = 0;
     quadVbo = 0;
-    captureTexture = 0;
-    captureWidth = 0;
-    captureHeight = 0;
     initialized = false;
   }
 
@@ -220,24 +228,49 @@ public class HudGlassBlurRenderer {
     GL30.glBindVertexArray(0);
   }
 
-  private static void ensureCaptureTexture(int width, int height) {
-    if (captureTexture == 0) {
-      captureTexture = GL11.glGenTextures();
+  private static int getMainFramebufferId(RenderTarget framebuffer) {
+    try {
+      if (!(framebuffer.getColorTexture() instanceof GlTexture texture)) {
+        return 0;
+      }
+      return texture.getFbo(((GlDevice) RenderSystem.getDevice()).directStateAccess(), null);
+    } catch (Exception exception) {
+      System.err.println("[HudGlassBlurRenderer] Failed to resolve main framebuffer: " + exception.getMessage());
+      return 0;
     }
+  }
 
-    if (captureWidth == width && captureHeight == height) {
+  private static void copyFramebufferToTarget(
+    int sourceFramebuffer,
+    org.cobalt.render.rise.RenderTarget target,
+    int width,
+    int height
+  ) {
+    if (target == null || !target.isReady()) {
       return;
     }
 
-    GL11.glBindTexture(GL11.GL_TEXTURE_2D, captureTexture);
-    GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA, width, height, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, 0);
-    GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
-    GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
-    GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL12.GL_CLAMP_TO_EDGE);
-    GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
-    GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+    int prevReadFramebuffer = GL11.glGetInteger(GL30.GL_READ_FRAMEBUFFER_BINDING);
+    int prevDrawFramebuffer = GL11.glGetInteger(GL30.GL_DRAW_FRAMEBUFFER_BINDING);
+    int prevReadBuffer = GL11.glGetInteger(GL11.GL_READ_BUFFER);
+    int prevDrawBuffer = GL11.glGetInteger(GL11.GL_DRAW_BUFFER);
 
-    captureWidth = width;
-    captureHeight = height;
+    try {
+      GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, sourceFramebuffer);
+      GL30.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, target.getFboId());
+      GL11.glReadBuffer(GL30.GL_COLOR_ATTACHMENT0);
+      GL11.glDrawBuffer(GL30.GL_COLOR_ATTACHMENT0);
+      GL30.glBlitFramebuffer(
+        0, 0, width, height,
+        0, 0, width, height,
+        GL11.GL_COLOR_BUFFER_BIT,
+        GL11.GL_NEAREST
+      );
+    } finally {
+      GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, prevReadFramebuffer);
+      GL30.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, prevDrawFramebuffer);
+      GL11.glReadBuffer(prevReadBuffer);
+      GL11.glDrawBuffer(prevDrawBuffer);
+    }
   }
 }

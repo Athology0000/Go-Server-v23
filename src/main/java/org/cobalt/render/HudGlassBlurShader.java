@@ -15,7 +15,6 @@ public class HudGlassBlurShader {
   private int uScreenSize;
   private int uRect;
   private int uCornerRadius;
-  private int uBlurStrength;
 
   private static final String VERTEX_SHADER = """
       #version 150
@@ -40,31 +39,12 @@ public class HudGlassBlurShader {
       uniform vec2 uScreenSize;
       uniform vec4 uRect;
       uniform float uCornerRadius;
-      uniform float uBlurStrength;
 
       out vec4 fragColor;
 
       float roundedBoxSdf(vec2 p, vec2 halfSize, float radius) {
           vec2 q = abs(p) - halfSize + vec2(radius);
           return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
-      }
-
-      vec3 sampleGaussianBlur(vec2 uv, vec2 texel) {
-          float sigma = 6.75;
-          vec3 accum = vec3(0.0);
-          float total = 0.0;
-
-          for (int x = -8; x <= 8; x++) {
-              for (int y = -8; y <= 8; y++) {
-                  float dist2 = float(x * x + y * y);
-                  float weight = exp(-dist2 / (2.0 * sigma * sigma));
-                  vec2 offset = vec2(float(x), float(y)) * texel * uBlurStrength;
-                  accum += texture(uTexture, uv + offset).rgb * weight;
-                  total += weight;
-              }
-          }
-
-          return accum / max(total, 0.0001);
       }
 
       void main() {
@@ -81,8 +61,7 @@ public class HudGlassBlurShader {
               discard;
           }
 
-          vec2 texel = vec2(1.0 / uScreenSize.x, 1.0 / uScreenSize.y);
-          vec3 blurred = sampleGaussianBlur(fragTexCoord, texel);
+          vec3 blurred = texture(uTexture, fragTexCoord).rgb;
           fragColor = vec4(blurred, mask);
       }
       """;
@@ -133,7 +112,6 @@ public class HudGlassBlurShader {
       uScreenSize = GL20.glGetUniformLocation(programId, "uScreenSize");
       uRect = GL20.glGetUniformLocation(programId, "uRect");
       uCornerRadius = GL20.glGetUniformLocation(programId, "uCornerRadius");
-      uBlurStrength = GL20.glGetUniformLocation(programId, "uBlurStrength");
       linked = true;
     } catch (Exception e) {
       System.err.println("[HudGlassBlurShader] Failed to compile shader: " + e.getMessage());
@@ -164,10 +142,6 @@ public class HudGlassBlurShader {
 
   public void setCornerRadius(float radius) {
     GL20.glUniform1f(uCornerRadius, radius);
-  }
-
-  public void setBlurStrength(float blurStrength) {
-    GL20.glUniform1f(uBlurStrength, blurStrength);
   }
 
   public boolean isValid() {

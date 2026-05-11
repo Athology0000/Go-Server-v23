@@ -1,9 +1,6 @@
 package org.cobalt.render;
 
-import com.mojang.blaze3d.opengl.GlDevice;
-import com.mojang.blaze3d.opengl.GlTexture;
 import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
@@ -21,6 +18,20 @@ public class HudGlowRenderer {
   private static int quadVbo;
 
   public static void renderGlowRect(
+    float x,
+    float y,
+    float width,
+    float height,
+    float cornerRadius,
+    float glowSize,
+    int colorA,
+    int colorB,
+    float alpha
+  ) {
+    return;
+  }
+
+  public static void renderGlowRectDisabled(
     float x,
     float y,
     float width,
@@ -61,10 +72,6 @@ public class HudGlowRenderer {
     float framebufferHeight = height * scaleY;
     float framebufferRadius = cornerRadius * Math.max(scaleX, scaleY);
     float framebufferGlow = glowSize * Math.max(scaleX, scaleY);
-    int mainFramebuffer = ((GlTexture) framebuffer.getColorTexture()).getFbo(
-      ((GlDevice) RenderSystem.getDevice()).directStateAccess(),
-      null
-    );
 
     int prevFramebuffer = 0;
     int prevProgram = 0;
@@ -105,7 +112,6 @@ public class HudGlowRenderer {
       GL11.glGetIntegerv(GL11.GL_VIEWPORT, viewport);
       stateCaptured = true;
 
-      GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, mainFramebuffer);
       GL11.glViewport(0, 0, framebuffer.width, framebuffer.height);
 
       if (scissorEnabled) {

@@ -67,11 +67,12 @@ public class HudGlowShader {
           float aa = max(fwidth(sdf), 1.0);
           float inside = 1.0 - smoothstep(-aa, aa, sdf);
           float outside = max(sdf, 0.0);
-          float falloff = exp(-outside / max(uGlowSize, 1.0));
-          float cutoff = 1.0 - smoothstep(uGlowSize * 1.75, uGlowSize * 2.5, outside);
+          float falloff = exp(-outside / max(uGlowSize * 0.48, 1.0));
+          float cutoff = 1.0 - smoothstep(uGlowSize * 0.85, uGlowSize * 1.25, outside);
           float halo = falloff * cutoff * (1.0 - inside);
-          float edge = 1.0 - smoothstep(0.0, aa * 2.75, abs(sdf));
-          float alpha = (halo * 0.72 + edge * 0.52) * uAlpha;
+          float edge = 1.0 - smoothstep(0.0, aa * 3.25, abs(sdf));
+          float innerEdge = (1.0 - smoothstep(0.0, uGlowSize * 0.38, max(-sdf, 0.0))) * inside;
+          float alpha = (halo * 0.95 + edge * 0.9 + innerEdge * 0.32) * uAlpha;
 
           if (alpha <= 0.002) {
               discard;

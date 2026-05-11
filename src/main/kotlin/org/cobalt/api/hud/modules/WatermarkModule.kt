@@ -24,7 +24,6 @@ import org.cobalt.api.ui.theme.ThemeManager
 import org.cobalt.api.ui.theme.ThemeSurface
 import org.cobalt.api.util.ui.NVGRenderer
 import org.cobalt.api.util.ui.helper.Gradient
-import org.cobalt.render.HudGlassBlurRenderer
 
 class WatermarkModule : Module("Watermark") {
 
@@ -77,7 +76,6 @@ class WatermarkModule : Module("Watermark") {
     private const val KEY_PILL_TEXT_SIZE = 9.4f
     private const val WHITE_TEXT = 0xFFF2EFF6.toInt()
     private const val MUTED_TEXT = 0x998E8995.toInt()
-    private const val GLASS_BLUR_STRENGTH = 14.0f
   }
 
   private val mc = Minecraft.getInstance()
@@ -124,6 +122,8 @@ class WatermarkModule : Module("Watermark") {
     anchor = HudAnchor.TOP_LEFT
     offsetX = 10f
     offsetY = 10f
+    blurBackground = true
+    blurStrength = 14.0
 
     val text = setting(TextSetting("Text", "Display text", "Dutt Client"))
     val color = setting(ColorSetting("Color", "Accent color", ThemeManager.currentTheme.accent))
@@ -168,20 +168,6 @@ class WatermarkModule : Module("Watermark") {
       renderWatermarkCard(screenX, screenY, layout, text.value, color.value, rows)
     }
 
-    preRender { screenX, screenY, scale ->
-      if (!background.value) return@preRender
-
-      val rows = macroRowsForLayout(macroPanel.value)
-      val layout = computeLayout(text.value, macroPanel.value, true, rows)
-      HudGlassBlurRenderer.renderBlurRect(
-        screenX,
-        screenY,
-        layout.width * scale,
-        layout.totalHeight * scale,
-        CARD_CORNER * scale,
-        GLASS_BLUR_STRENGTH,
-      )
-    }
   }
 
   private fun computeLayout(

@@ -16,7 +16,6 @@ import org.cobalt.api.ui.theme.ThemeGradient
 import org.cobalt.api.ui.theme.ThemeSurface
 import org.cobalt.api.util.ui.NVGRenderer
 import org.cobalt.api.util.ui.helper.Gradient
-import org.cobalt.render.HudGlassBlurRenderer
 
 class InventoryHudModule : Module("Inventory HUD") {
 
@@ -32,7 +31,6 @@ class InventoryHudModule : Module("Inventory HUD") {
   private val borderRadius    = 9f
   private val borderThickness = 1.5f
   private val itemOffset      = 2f
-  private val blurStrength    = 16.0f
 
   private lateinit var backgroundSetting: CheckboxSetting
 
@@ -44,6 +42,8 @@ class InventoryHudModule : Module("Inventory HUD") {
     anchor   = HudAnchor.BOTTOM_CENTER
     offsetX  = 0f
     offsetY  = 24f
+    blurBackground = true
+    blurStrength = 16.0
 
     val background = setting(CheckboxSetting("Background", "Show panel background", true))
     backgroundSetting = background
@@ -60,26 +60,6 @@ class InventoryHudModule : Module("Inventory HUD") {
       val sg = slotGap  * baseScale
       val p  = padding  * baseScale
       p * 2 + ROWS * ss + (ROWS - 1) * sg
-    }
-
-    preRender { screenX, screenY, scale ->
-      if (!background.value) return@preRender
-
-      val ss = slotSize     * baseScale
-      val sg = slotGap      * baseScale
-      val p  = padding      * baseScale
-      val br = borderRadius * baseScale
-      val totalW = p * 2 + COLS * ss + (COLS - 1) * sg
-      val totalH = p * 2 + ROWS * ss + (ROWS - 1) * sg
-
-      HudGlassBlurRenderer.renderBlurRect(
-        screenX,
-        screenY,
-        totalW * scale,
-        totalH * scale,
-        br * scale,
-        blurStrength,
-      )
     }
 
     // -- NVG render - smooth rounded fills + gradient border -------------------
