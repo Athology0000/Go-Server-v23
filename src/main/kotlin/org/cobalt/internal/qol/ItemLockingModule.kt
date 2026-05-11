@@ -26,7 +26,6 @@ import org.cobalt.api.util.tagString
 import org.cobalt.api.util.helper.KeyBind
 import org.cobalt.internal.helper.Config
 import org.cobalt.internal.visual.HotbarOverlayModule
-import org.lwjgl.glfw.GLFW
 import java.util.TreeSet
 
 object ItemLockingModule : Module("Item Locking") {
@@ -51,7 +50,7 @@ object ItemLockingModule : Module("Item Locking") {
   private val enabled = CheckboxSetting(
     "Enabled",
     "Enable item protection, hotbar locking, and Firmament-style slot swapping.",
-    true
+    false
   ).inGroup("General")
 
   private val protectItems = CheckboxSetting(
@@ -87,13 +86,13 @@ object ItemLockingModule : Module("Item Locking") {
   private val protectItemKey = KeyBindSetting(
     "Protect Item Key",
     "Toggle protection on the held item, or the hovered item in a container screen.",
-    KeyBind(GLFW.GLFW_KEY_V)
+    KeyBind(-1)
   ).inGroup("Keybinds")
 
   private val lockSlotKey = KeyBindSetting(
     "Lock Slot Key",
     "Tap a hovered hotbar slot to lock it, or drag between hotbar and inventory slots to bind swapping.",
-    KeyBind(GLFW.GLFW_KEY_H)
+    KeyBind(-1)
   ).inGroup("Keybinds")
 
   private val lockedSlotsData = TextSetting(

@@ -21,7 +21,7 @@ object WardrobeModule : Module("Wardrobe GUI") {
 
     private val mc = Minecraft.getInstance()
 
-    val enabled    by CheckboxSetting("Enabled",     "Replace vanilla wardrobe with custom GUI", true)
+    val enabled    by CheckboxSetting("Enabled",     "Replace vanilla wardrobe with custom GUI", false)
     val page1Slots by TextSetting("Page 1 Slots", "Comma-separated set numbers (1–27) for page 1", "1")
     val page2Slots by TextSetting("Page 2 Slots", "Comma-separated set numbers (1–27) for page 2", "")
     // Hidden setting — persists favorites as comma-separated IDs. Never shown in UI.

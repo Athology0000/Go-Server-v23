@@ -78,7 +78,7 @@ object CraftHelperModule : Module("Craft Helper") {
   private val enabledSetting = CheckboxSetting(
     "Enabled",
     "Enable the SkyOcean-style craft helper overlay.",
-    true,
+    false,
   )
 
   private val selectionInfo = InfoSetting(

@@ -21,21 +21,22 @@ import kotlin.random.Random
 object PathfinderRotationStrategy : IRotationStrategy {
 
     // ── PD constants (V5 walker values) ──────────────────────────────────
-    private const val BASE_KP = 0.05
-    private const val KD = 0.55
-    private const val MAX_VELOCITY = 8.0
-    private const val ACCEL_LIMIT = 1.2
-    private const val FRICTION = 0.92
+    private const val BASE_KP = 0.042
+    private const val KD = 0.62
+    private const val MAX_VELOCITY = 5.6
+    private const val ACCEL_LIMIT = 0.78
+    private const val FRICTION = 0.88
     private const val SETTLE_THRESHOLD = 0.15
     private const val SETTLE_VELOCITY = 0.02
 
     // ── Humanization ─────────────────────────────────────────────────────
-    private const val DRIFT_BLEND_SPEED = 7.5
+    private const val DRIFT_BLEND_SPEED = 2.5
     private const val HUMANIZATION_SUPPRESS_ERROR = 32f
-    private const val MAX_YAW_DRIFT = 0.22f
-    private const val MAX_PITCH_DRIFT = 0.12f
-    private const val RETARGET_MIN_NS = 180_000_000L
-    private const val RETARGET_MAX_NS = 420_000_000L
+    private const val HUMANIZATION_MIN_ERROR = 4f
+    private const val MAX_YAW_DRIFT = 0.03f
+    private const val MAX_PITCH_DRIFT = 0.015f
+    private const val RETARGET_MIN_NS = 450_000_000L
+    private const val RETARGET_MAX_NS = 900_000_000L
 
     private var driftYaw: Float = 0f
     private var driftPitch: Float = 0f
@@ -120,8 +121,7 @@ object PathfinderRotationStrategy : IRotationStrategy {
         val boostFactor = state.initialTurnBoostFactor(yawError.toFloat())
 
         if (absYawError < SETTLE_THRESHOLD && abs(state.yawVelocity) < SETTLE_VELOCITY) {
-            state.currentYaw = state.rawTargetYaw
-            state.yawVelocity = 0.0
+            state.yawVelocity *= 0.25
         } else {
             val errorMult = (absYawError / 10.0).coerceIn(0.6, 1.5)
             val dynamicKp = BASE_KP * errorMult * boostFactor
@@ -141,8 +141,7 @@ object PathfinderRotationStrategy : IRotationStrategy {
         val absPitchError = abs(pitchError)
 
         if (absPitchError < SETTLE_THRESHOLD && abs(state.pitchVelocity) < SETTLE_VELOCITY) {
-            state.currentPitch = state.rawTargetPitch
-            state.pitchVelocity = 0.0
+            state.pitchVelocity *= 0.25
         } else {
             val errorMult = (absPitchError / 10.0).coerceIn(0.6, 1.5)
             val dynamicKp = BASE_KP * errorMult * boostFactor
@@ -166,7 +165,8 @@ object PathfinderRotationStrategy : IRotationStrategy {
             abs(AngleUtils.getRotationDelta(player.yRot, targetYaw)),
             abs(targetPitch - player.xRot)
         )
-        val calmScale = 1f - (trackingError / HUMANIZATION_SUPPRESS_ERROR).coerceIn(0f, 1f)
+        val nearTargetScale = ((trackingError - HUMANIZATION_MIN_ERROR) / HUMANIZATION_MIN_ERROR).coerceIn(0f, 1f)
+        val calmScale = (1f - (trackingError / HUMANIZATION_SUPPRESS_ERROR).coerceIn(0f, 1f)) * nearTargetScale
         if (nextRetargetNs == 0L || nowNs >= nextRetargetNs) {
             driftYawTarget = randomCentered(MAX_YAW_DRIFT * calmScale)
             driftPitchTarget = randomCentered(MAX_PITCH_DRIFT * calmScale)

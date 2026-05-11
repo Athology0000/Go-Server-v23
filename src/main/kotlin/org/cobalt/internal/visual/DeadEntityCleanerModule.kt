@@ -21,7 +21,7 @@ object DeadEntityCleanerModule : Module("Dead Entity Cleaner") {
   private val enabled = CheckboxSetting(
     "Enabled",
     "Hide or remove dying entities client-side for better performance.",
-    true,
+    false,
   )
 
   private val action = ModeSetting(

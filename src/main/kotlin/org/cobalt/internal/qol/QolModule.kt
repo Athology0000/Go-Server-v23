@@ -14,6 +14,8 @@ import org.cobalt.api.module.setting.impl.InfoType
 import org.cobalt.api.module.setting.impl.CommandHotkeySetting
 import org.cobalt.api.module.setting.impl.CommandHotkeyValue
 import org.cobalt.api.util.ChatUtils
+import org.cobalt.api.util.helper.KeyBind
+import org.lwjgl.glfw.GLFW
 
 object QolModule : Module("QoL") {
 
@@ -53,9 +55,8 @@ object QolModule : Module("QoL") {
 
   @SubscribeEvent
   fun onTick(@Suppress("UNUSED_PARAMETER") event: TickEvent.Start) {
-    if (!enabled.value) return
-
-    commandHotkeys.forEach { entry ->
+    commandHotkeys.forEachIndexed { index, entry ->
+      if (!enabled.value && !isDefaultCobaltMenuHotkey(index, entry.value)) return@forEachIndexed
       if (entry.value.keyBind.isPressed()) {
         runCommand(entry.value.command)
       }
@@ -82,10 +83,24 @@ object QolModule : Module("QoL") {
     val setting = CommandHotkeySetting(
       "Command Hotkey $nextIndex",
       "Keybind + command row $nextIndex.",
-      CommandHotkeyValue()
+      defaultCommandHotkeyValue(nextIndex)
     )
     commandHotkeys.add(setting)
     addSetting(setting)
+  }
+
+  private fun defaultCommandHotkeyValue(index: Int): CommandHotkeyValue {
+    return if (index == 1) {
+      CommandHotkeyValue(KeyBind(GLFW.GLFW_KEY_P), "/cb")
+    } else {
+      CommandHotkeyValue()
+    }
+  }
+
+  private fun isDefaultCobaltMenuHotkey(index: Int, value: CommandHotkeyValue): Boolean {
+    return index == 0 &&
+      value.keyBind.keyCode == GLFW.GLFW_KEY_P &&
+      value.command.trim().removePrefix("/").equals("cb", ignoreCase = true)
   }
 
   private fun loadSavedHotkeyCount(): Int {

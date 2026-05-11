@@ -29,7 +29,7 @@ object PetDisplayModule : Module("Pet Display") {
 
     // -- Settings --------------------------------------------------------------
 
-    private val enabledSetting      = CheckboxSetting("Enabled",        "Show the pet info HUD.",         true)
+    private val enabledSetting      = CheckboxSetting("Enabled",        "Show the pet info HUD.",         false)
     private val glowSetting         = CheckboxSetting("Glow",           "Animated glow border.",          true)
     private val showHeldItemSetting = CheckboxSetting("Show Held Item", "Show the pet's held item line.", true)
 

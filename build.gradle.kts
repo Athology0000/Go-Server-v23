@@ -18,7 +18,7 @@ val requestedTaskNames = gradle.startParameter.taskNames.map { it.substringAfter
 val buildChannel =
   providers.gradleProperty("cobaltBuildChannel").orNull?.trim()?.lowercase()
     ?: when {
-      requestedTaskNames.any { it in setOf("buildDev", "deployDev") } -> "dev"
+      requestedTaskNames.any { it in setOf("buildDev", "deployDev", "deploydev") } -> "dev"
       else -> "release"
     }
 
@@ -170,7 +170,7 @@ tasks.named("processResources") {
 }
 
 // ── Deploy JAR to Prism mods folder ──────────────────────────────────────────
-val modsDir = file("C:/Users/aeare/AppData/Roaming/PrismLauncher/instances/1.21.11(1)/minecraft/mods")
+val modsDir = file("C:/Users/rohan/AppData/Roaming/PrismLauncher/instances/dutt/minecraft/mods")
 val releaseBranchName = "release"
 
 tasks.register("buildDev") {
@@ -213,6 +213,16 @@ tasks.register("copyBuiltMod") {
     val tempJar = modsDir.toPath().resolve("$jarName.tmp")
 
     Files.createDirectories(modsDir.toPath())
+    Files.newDirectoryStream(modsDir.toPath(), "${modName}*.jar").use { existingJars ->
+      existingJars
+        .filter { it.fileName.toString() != jarName }
+        .forEach {
+          runCatching { Files.deleteIfExists(it) }
+            .onFailure { error ->
+              logger.warn("Could not delete old mod jar ${it.fileName}: ${error.message}")
+            }
+        }
+    }
     Files.copy(sourceJar, tempJar, StandardCopyOption.REPLACE_EXISTING)
     runCatching {
       Files.move(
@@ -231,6 +241,12 @@ tasks.register("deployDev") {
   group = "build"
   description = "Builds and copies the dev artifact to the Prism Launcher mods folder."
   dependsOn("copyBuiltMod")
+}
+
+tasks.register("deploydev") {
+  group = "build"
+  description = "Alias for deployDev."
+  dependsOn("deployDev")
 }
 
 tasks.register("deploy") {

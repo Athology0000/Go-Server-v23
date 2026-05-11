@@ -13,7 +13,7 @@ object MiningFailsafeHudModule : Module("Mining Failsafes") {
   private val enabled = CheckboxSetting(
     "Enabled",
     "Track mining failsafe state for the parity modules.",
-    true,
+    false,
   )
 
   init {

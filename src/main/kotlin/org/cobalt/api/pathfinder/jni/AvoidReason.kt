@@ -4,4 +4,5 @@ enum class AvoidReason {
   STUCK,
   COLLISION,
   VERTICAL_STALL,
+  HAZARD,
 }

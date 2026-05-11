@@ -152,7 +152,7 @@ object DungeonsModule : Module("Dungeons"), IBonzoStaffHelper {
   private val witherKeyEspEnabled = CheckboxSetting(
     "Wither Key ESP",
     "Highlight dropped Wither Keys in dungeons.",
-    true
+    false
   )
 
   private val witherKeyTracer = CheckboxSetting(

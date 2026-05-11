@@ -43,7 +43,7 @@ object CustomScoreboardModule : Module("Custom Scoreboard") {
       "RIFT,SERVER_RESTART,SPOOKY,TRAPPER,VOTING,WINTER"
   private const val DEFAULT_CHUNKED_STATS = "PURSE,BANK,BITS,GEMS,COPPER,MOTES,NORTH_STARS,SOULFLOW,SOWDUST"
 
-  private val enabled = CheckboxSetting("Main Toggle", "Enable or disable the custom scoreboard.", true)
+  private val enabled = CheckboxSetting("Main Toggle", "Enable or disable the custom scoreboard.", false)
   private val hideWhenTab = CheckboxSetting("Hide While Tablist Open", "Hide while the tablist is open.", true)
   private val hideWhenChat = CheckboxSetting("Hide While Chat Open", "Hide while chat is open.", false)
   private val hideHypixelScoreboard = CheckboxSetting("Hide Hypixel Scoreboard", "Hide the vanilla Hypixel scoreboard.", true)

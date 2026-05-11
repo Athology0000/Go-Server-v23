@@ -32,7 +32,7 @@ object DianaHelperModule : Module("Diana Helper") {
 
     // -- Settings --------------------------------------------------------------
 
-    val enabled       = CheckboxSetting("Enabled",        "Show Diana burrow waypoints and direction HUD.", true)
+    val enabled       = CheckboxSetting("Enabled",        "Show Diana burrow waypoints and direction HUD.", false)
     val showWaypoint  = CheckboxSetting("Show Waypoint",  "Render a highlighted box + beam at each detected burrow.", true)
     val showLine      = CheckboxSetting("Show Line",      "Draw a path line from your position to the nearest burrow.", true)
     val showHud       = CheckboxSetting("Show HUD",       "Show the burrow direction compass HUD.", true)

@@ -39,7 +39,7 @@ object DeployableHudModule : Module("Deployable HUD") {
   private val enabledSetting = CheckboxSetting(
     "Enabled",
     "Show the active SkyBlock deployable HUD.",
-    true
+    false
   )
 
   private val displayStyle = ModeSetting(

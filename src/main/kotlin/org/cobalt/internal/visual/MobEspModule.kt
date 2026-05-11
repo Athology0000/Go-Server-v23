@@ -21,7 +21,7 @@ object MobEspModule : Module("Mob ESP") {
   private val enabled = CheckboxSetting(
     "Enabled",
     "Render mobs with a white outline through walls and a translucent model fill.",
-    true
+    false
   )
 
   private val outlineColor = ColorSetting(

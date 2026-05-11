@@ -99,7 +99,17 @@ internal object BuiltinModules {
     if (registered) return
     registered = true
 
-    ModuleManager.addModules(all())
+    val modules = all()
+    applyDefaultHudVisibility(modules)
+    ModuleManager.addModules(modules)
+  }
+
+  private fun applyDefaultHudVisibility(modules: List<Module>) {
+    modules
+      .flatMap { it.getHudElements() }
+      .forEach { hudElement ->
+        hudElement.enabled = hudElement.id == DEFAULT_ENABLED_HUD_ID
+      }
   }
 
   fun all(): List<Module> = listOf(
@@ -207,4 +217,6 @@ internal object BuiltinModules {
     ChatFilterModule,
     RngDropDisplayModule,
   ).distinctBy { it.name.trim().lowercase() }
+
+  private const val DEFAULT_ENABLED_HUD_ID = "watermark"
 }

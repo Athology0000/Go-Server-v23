@@ -75,7 +75,7 @@ object MiningHudModule : Module("Mining HUD") {
     offsetX = 10f
     offsetY = 80f
 
-    val onlyWhenActive = setting(CheckboxSetting("Only When Active", "Hide when mining tracking is idle", false))
+    val onlyWhenActive = setting(CheckboxSetting("Only When Active", "Hide when mining tracking is idle", true))
     val showProfit = setting(CheckboxSetting("Show Profit", "Show active macro, coins/hr, and runtime.", true))
 
     width { panelWidth() }

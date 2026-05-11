@@ -151,13 +151,16 @@ data class PathCommand(
             if (checkPreemptiveClimbJump(player, nodes, nearIdx, playerFloorY)) return true
         }
 
-        // 6. Gap jump (V5 checkGapJump)
+        // 6. Hazard jump: jump over one/two harmful blocks only when the landing is safe.
+        if (checkHazardJump(level, player, nodes, nearIdx)) return true
+
+        // 7. Gap jump (V5 checkGapJump)
         if (checkGapJump(player, nodes, nearIdx, playerFloorY)) return true
 
-        // 7. Snow jump (V5 checkSnowJump)
+        // 8. Snow jump (V5 checkSnowJump)
         if (checkSnowJump(level, nodes, nearIdx, playerFloorY)) return true
 
-        // 8. Obstacle jump (V5 checkObstacleJump)
+        // 9. Obstacle jump (V5 checkObstacleJump)
         if (checkObstacleJump(level, player, nodes, nearIdx, playerFloorY)) return true
 
         return false
@@ -202,6 +205,42 @@ data class PathCommand(
      * with horizontal gap ≤ sqrt(20) ≈ 4.5 blocks, triggers when player is within
      * 1.35 blocks of the last node before the drop.
      */
+    private fun checkHazardJump(
+        level: Level,
+        player: LocalPlayer,
+        nodes: List<Vec3>,
+        nearIdx: Int
+    ): Boolean {
+        val lookEnd = minOf(nodes.lastIndex, nearIdx + HAZARD_LOOKAHEAD_NODES)
+        for (hazardIdx in (nearIdx + 1)..lookEnd) {
+            val hazardPos = PathHazards.walkPosForNode(nodes[hazardIdx])
+            if (!PathHazards.isHarmfulStandPosition(level, hazardPos)) continue
+
+            val landingIdx = findHazardLanding(level, nodes, hazardIdx) ?: return false
+            val takeoffNode = nodes[(hazardIdx - 1).coerceAtLeast(nearIdx)]
+            val landingNode = nodes[landingIdx]
+            val spanDx = landingNode.x - takeoffNode.x
+            val spanDz = landingNode.z - takeoffNode.z
+            if (spanDx * spanDx + spanDz * spanDz > HAZARD_JUMP_MAX_DIST_SQ) return false
+
+            val triggerDx = player.x - (takeoffNode.x + 0.5)
+            val triggerDz = player.z - (takeoffNode.z + 0.5)
+            if (triggerDx * triggerDx + triggerDz * triggerDz > HAZARD_JUMP_TRIGGER_DIST_SQ) return false
+
+            return jumpTrue(HAZARD_JUMP_SUPPRESS_TICKS)
+        }
+        return false
+    }
+
+    private fun findHazardLanding(level: Level, nodes: List<Vec3>, hazardIdx: Int): Int? {
+        val end = minOf(nodes.lastIndex, hazardIdx + HAZARD_MAX_JUMP_NODES)
+        for (i in (hazardIdx + 1)..end) {
+            val landingPos = PathHazards.walkPosForNode(nodes[i])
+            if (PathHazards.isReasonableLandingPosition(level, landingPos)) return i
+        }
+        return null
+    }
+
     private fun checkGapJump(
         player: net.minecraft.client.player.LocalPlayer,
         nodes: List<Vec3>,
@@ -228,7 +267,7 @@ data class PathCommand(
         if (gapDistSq <= 0.0 || gapDistSq > 20.0) return false
         val pdx = player.x - (edgeNode.x + 0.5); val pdz = player.z - (edgeNode.z + 0.5)
         if (pdx * pdx + pdz * pdz > GAP_TRIGGER_DIST_SQ) return false
-        return jumpTrue(JUMP_SUPPRESS_TICKS)
+        return jumpTrue(GAP_JUMP_SUPPRESS_TICKS)
     }
 
     /**
@@ -283,8 +322,6 @@ data class PathCommand(
         val standingOnPartial = standingBlock is StairBlock || standingBlock is SlabBlock
         val stepLimit = if (standingOnPartial) 1.05 else STEP_HEIGHT
 
-        var needsJump = false
-        var canWalkInstead = false
         val lookEnd = minOf(nodes.lastIndex, nearIdx + LOOKAHEAD_NODES)
         for (i in (nearIdx + 1)..lookEnd) {
             val n = nodes[i]
@@ -299,37 +336,38 @@ data class PathCommand(
             val block = bs.block
             val name = block.descriptionId
 
+            val dx = n.x + 0.5 - player.x
+            val dz = n.z + 0.5 - player.z
+            if (dx * dx + dz * dz > OBSTACLE_TRIGGER_DIST_SQ) continue
             if (name.contains("snow")) continue
             if (bs.getCollisionShape(level, floorPos).isEmpty) continue
-
-            if (floorY - playerFloorY > stepLimit) needsJump = true
+            if (floorY - playerFloorY <= stepLimit) continue
 
             when {
-                name.contains("slab") -> canWalkInstead = true
+                name.contains("slab") -> return false
                 name.contains("stair") -> {
                     // Only bottom stairs are walkable ramps; top-half stairs need a jump.
                     if (block is StairBlock) {
                         try {
                             if (bs.getValue(StairBlock.HALF) != Half.BOTTOM) continue
                             val facing = bs.getValue(StairBlock.FACING)
-                            val dx = n.x + 0.5 - player.x
-                            val dz = n.z + 0.5 - player.z
                             val approach = if (abs(dx) > abs(dz)) {
                                 if (dx > 0) Direction.WEST else Direction.EAST
                             } else {
                                 if (dz > 0) Direction.NORTH else Direction.SOUTH
                             }
-                            if (approach == facing.opposite) canWalkInstead = true
+                            if (approach == facing.opposite) return false
                         } catch (_: Exception) {
                         }
                     } else {
-                        canWalkInstead = true
+                        return false
                     }
                 }
             }
+
+            return jumpTrue(OBSTACLE_JUMP_SUPPRESS_TICKS)
         }
-        if (!needsJump || canWalkInstead) return false
-        return jumpTrue(JUMP_SUPPRESS_TICKS)
+        return false
     }
 
     private fun jumpTrue(suppressTicks: Int): Boolean {
@@ -358,6 +396,14 @@ data class PathCommand(
         private const val PREEMPTIVE_JUMP_DIST_SQ = PREEMPTIVE_JUMP_DISTANCE * PREEMPTIVE_JUMP_DISTANCE
         private const val GAP_TRIGGER_DIST_SQ = 1.35 * 1.35
         private const val JUMP_SUPPRESS_TICKS = 3
+        private const val GAP_JUMP_SUPPRESS_TICKS = 2
+        private const val OBSTACLE_JUMP_SUPPRESS_TICKS = 2
+        private const val HAZARD_LOOKAHEAD_NODES = 4
+        private const val HAZARD_MAX_JUMP_NODES = 3
+        private const val HAZARD_JUMP_TRIGGER_DIST_SQ = 1.55 * 1.55
+        private const val HAZARD_JUMP_MAX_DIST_SQ = 3.25 * 3.25
+        private const val HAZARD_JUMP_SUPPRESS_TICKS = 2
+        private const val OBSTACLE_TRIGGER_DIST_SQ = 1.45 * 1.45
 
         // Per-tick block state cache shared across all jump checks in one detectJump call
         private val blockCache = HashMap<Long, BlockState>(32)

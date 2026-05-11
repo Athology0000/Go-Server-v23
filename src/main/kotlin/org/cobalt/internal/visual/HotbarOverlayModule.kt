@@ -26,7 +26,7 @@ object HotbarOverlayModule : Module("Liquid Hotbar") {
   private val enabledSetting = CheckboxSetting(
     "Enabled",
     "Replace the vanilla hotbar with a liquid glass panel.",
-    true
+    false
   )
 
   val isEnabled: Boolean get() = enabledSetting.value

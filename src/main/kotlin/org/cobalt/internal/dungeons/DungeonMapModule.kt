@@ -100,7 +100,7 @@ object DungeonMapModule : Module("Dungeon Map") {
   private val enabled = CheckboxSetting(
     "Enabled",
     "Render the dungeon map HUD.",
-    true
+    false
   )
 
   private val showWitherKeyRoom = CheckboxSetting(

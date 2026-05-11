@@ -54,7 +54,7 @@ object WitherImpactOverlayModule : Module("Wither Impact Overlay") {
   private val enabled = CheckboxSetting(
     "Enabled",
     "Show the predicted Wither Impact landing block while holding a Wither blade.",
-    true
+    false
   )
 
   private val renderMode = ModeSetting(
