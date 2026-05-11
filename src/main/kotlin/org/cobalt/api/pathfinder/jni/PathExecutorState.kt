@@ -7,6 +7,10 @@ import net.minecraft.world.level.ClipContext
 import net.minecraft.world.level.Level
 import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.Vec3
+import org.cobalt.api.pathfinder.jni.executor.SplineProjection
+import org.cobalt.api.pathfinder.jni.executor.SplinePath
+import org.cobalt.api.pathfinder.jni.executor.buildLookPoints
+import org.cobalt.api.pathfinder.jni.executor.buildSplinePath
 import org.cobalt.api.util.AngleUtils
 import org.cobalt.api.util.helper.Rotation
 import java.util.Locale
@@ -140,15 +144,6 @@ object PathExecutorState {
     private const val UNSEEN_ROLLBACK_MS = 600L
     private const val NON_CHANGE_PATH_DELTA = 0.45
     private const val NON_CHANGE_TICKS_THRESHOLD = 35
-
-    // Look point generation
-    private const val SPLINE_STEPS = 10
-    private const val LOOK_EYE_OFFSET = PLAYER_LOOK_HEIGHT
-    private const val OUTWARD_OFFSET_STRENGTH = 0.6
-    private const val LOOK_WINDOW = 4
-    private const val MIN_LOOK_SPACING_SQ = 0.64
-    private const val LOOK_MIN_INTERVAL = 1.2
-    private const val LOOK_MAX_INTERVAL = 8.0
 
     // =========================================================================
     // Public API
@@ -716,175 +711,6 @@ object PathExecutorState {
     }
 
     // =========================================================================
-    // Dense look point generation
-    // =========================================================================
-
-    private fun buildLookPoints(nodes: List<Vec3>): List<Vec3> {
-        val result = mutableListOf<Vec3>()
-        val first = nodes[0]
-        result.add(Vec3(first.x + 0.5, first.y + LOOK_EYE_OFFSET, first.z + 0.5))
-        var lastPlaced = nodes[0]
-
-        for (i in 1 until nodes.lastIndex) {
-            val curr = nodes[i]
-            val dist = dist3d(curr, lastPlaced)
-
-            // Curvature + outward offset
-            val prev = nodes[maxOf(0, i - LOOK_WINDOW)]
-            val next = nodes[minOf(nodes.lastIndex, i + LOOK_WINDOW)]
-            val v1x = curr.x - prev.x; val v1z = curr.z - prev.z
-            val v2x = next.x - curr.x; val v2z = next.z - curr.z
-            val m1 = sqrt(v1x * v1x + v1z * v1z); val m2 = sqrt(v2x * v2x + v2z * v2z)
-
-            var curvature = 0.0
-            var offsetX = 0.0; var offsetZ = 0.0
-
-            if (m1 > 0.05 && m2 > 0.05) {
-                val dot = ((v1x * v2x + v1z * v2z) / (m1 * m2)).coerceIn(-1.0, 1.0)
-                val angle = acos(dot)
-                curvature = (angle / (PI / 2.5)).coerceAtMost(1.0)
-                val cross = v1x * v2z - v1z * v2x
-                val dir = if (cross > 0) 1.0 else -1.0
-                val fwdX = v1x / m1 + v2x / m2; val fwdZ = v1z / m1 + v2z / m2
-                val fMag = sqrt(fwdX * fwdX + fwdZ * fwdZ)
-                if (fMag > 0.01) {
-                    offsetX = -(fwdZ / fMag) * dir * curvature * OUTWARD_OFFSET_STRENGTH
-                    offsetZ = (fwdX / fMag) * dir * curvature * OUTWARD_OFFSET_STRENGTH
-                }
-            }
-
-            val dynamicInterval = LOOK_MAX_INTERVAL - curvature * (LOOK_MAX_INTERVAL - LOOK_MIN_INTERVAL)
-            if (dist < dynamicInterval) continue
-
-            val raw = Vec3(curr.x + 0.5 + offsetX, curr.y + LOOK_EYE_OFFSET, curr.z + 0.5 + offsetZ)
-            val last = result.last()
-            val sdx = raw.x - last.x; val sdz = raw.z - last.z
-            if (sdx * sdx + sdz * sdz >= MIN_LOOK_SPACING_SQ) {
-                result.add(raw)
-            } else {
-                result[result.lastIndex] = raw
-            }
-            lastPlaced = curr
-        }
-
-        val last = nodes.last()
-        result.add(Vec3(last.x + 0.5, last.y + LOOK_EYE_OFFSET, last.z + 0.5))
-        return result
-    }
-
-    private data class SplineProjection(val distance: Double, val point: Vec3, val distSq: Double)
-
-    private data class SplinePath(
-        val controlPoints: List<Vec3>,
-        val samples: List<Vec3>,
-        val cumulative: DoubleArray
-    ) {
-        val totalLength: Double = cumulative.lastOrNull() ?: 0.0
-
-        fun sample(distance: Double): Vec3 {
-            if (samples.isEmpty()) return Vec3.ZERO
-            if (samples.size == 1 || totalLength <= 0.0) return samples.first()
-            val d = distance.coerceIn(0.0, totalLength)
-            val rawIndex = cumulative.binarySearch(d)
-            val upper = if (rawIndex >= 0) rawIndex else (-rawIndex - 1).coerceIn(1, cumulative.lastIndex)
-            val lower = (upper - 1).coerceAtLeast(0)
-            val span = cumulative[upper] - cumulative[lower]
-            if (span <= 1e-6) return samples[upper]
-            val t = (d - cumulative[lower]) / span
-            return lerp(samples[lower], samples[upper], t)
-        }
-
-        fun project(
-            point: Vec3,
-            hintDistance: Double,
-            searchBack: Double,
-            searchForward: Double,
-            horizontalOnly: Boolean
-        ): SplineProjection {
-            if (samples.size < 2) return SplineProjection(0.0, samples.firstOrNull() ?: Vec3.ZERO, Double.POSITIVE_INFINITY)
-            val startDistance = (hintDistance - searchBack).coerceAtLeast(0.0)
-            val endDistance = (hintDistance + searchForward).coerceAtMost(totalLength)
-            var bestDistance = hintDistance.coerceIn(0.0, totalLength)
-            var bestPoint = sample(bestDistance)
-            var bestDistSq = Double.POSITIVE_INFINITY
-
-            for (i in 0 until samples.lastIndex) {
-                val segStart = cumulative[i]
-                val segEnd = cumulative[i + 1]
-                if (segEnd < startDistance || segStart > endDistance) continue
-
-                val a = samples[i]
-                val b = samples[i + 1]
-                val frac = if (horizontalOnly) closestHorizontalFraction(point, a, b) else closestFraction(point, a, b)
-                val projected = lerp(a, b, frac)
-                val distance = (segStart + (segEnd - segStart) * frac).coerceIn(startDistance, endDistance)
-                val distSq = if (horizontalOnly) {
-                    val dx = point.x - projected.x
-                    val dz = point.z - projected.z
-                    dx * dx + dz * dz
-                } else {
-                    point.distanceToSqr(projected)
-                }
-
-                if (distSq < bestDistSq) {
-                    bestDistSq = distSq
-                    bestDistance = distance
-                    bestPoint = projected
-                }
-            }
-
-            return SplineProjection(bestDistance, bestPoint, bestDistSq)
-        }
-
-        fun distanceAtControlIndex(indexFloat: Double): Double {
-            if (controlPoints.isEmpty() || samples.isEmpty()) return indexFloat
-            val control = sampleControl(indexFloat)
-            return project(control, indexFloat.coerceAtLeast(0.0), searchBack = 12.0, searchForward = 18.0, horizontalOnly = false).distance
-        }
-
-        private fun sampleControl(indexFloat: Double): Vec3 {
-            val safe = indexFloat.coerceIn(0.0, controlPoints.lastIndex.toDouble())
-            val index = safe.toInt().coerceIn(0, controlPoints.lastIndex)
-            val frac = safe - index
-            val a = controlPoints[index]
-            val b = controlPoints[minOf(index + 1, controlPoints.lastIndex)]
-            return lerp(a, b, frac)
-        }
-    }
-
-    private fun buildSplinePath(points: List<Vec3>): SplinePath {
-        if (points.size < 2) return SplinePath(points, points, DoubleArray(points.size) { 0.0 })
-
-        val samples = ArrayList<Vec3>((points.size - 1) * SPLINE_STEPS + 1)
-        for (i in 0 until points.lastIndex) {
-            val p0 = points[(i - 1).coerceAtLeast(0)]
-            val p1 = points[i]
-            val p2 = points[i + 1]
-            val p3 = points[(i + 2).coerceAtMost(points.lastIndex)]
-            for (step in 0 until SPLINE_STEPS) {
-                samples.add(catmullRom(p0, p1, p2, p3, step.toDouble() / SPLINE_STEPS))
-            }
-        }
-        samples.add(points.last())
-
-        val cumulative = DoubleArray(samples.size)
-        for (i in 1 until samples.size) {
-            cumulative[i] = cumulative[i - 1] + samples[i - 1].distanceTo(samples[i])
-        }
-        return SplinePath(points, samples, cumulative)
-    }
-
-    private fun catmullRom(p0: Vec3, p1: Vec3, p2: Vec3, p3: Vec3, t: Double): Vec3 {
-        val t2 = t * t
-        val t3 = t2 * t
-        return Vec3(
-            0.5 * (2 * p1.x + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3),
-            0.5 * (2 * p1.y + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3),
-            0.5 * (2 * p1.z + (-p0.z + p2.z) * t + (2 * p0.z - 5 * p1.z + 4 * p2.z - p3.z) * t2 + (-p0.z + 3 * p1.z - 3 * p2.z + p3.z) * t3)
-        )
-    }
-
-    // =========================================================================
     // Adaptive lookahead
     // =========================================================================
 
@@ -1427,26 +1253,6 @@ object PathExecutorState {
         return (((p.x - p1.x) * dx + (p.z - p1.z) * dz) / dSq).coerceIn(0.0, 1.0)
     }
 
-    private fun closestFraction(p: Vec3, a: Vec3, b: Vec3): Double {
-        val dx = b.x - a.x
-        val dy = b.y - a.y
-        val dz = b.z - a.z
-        val lenSq = dx * dx + dy * dy + dz * dz
-        if (lenSq <= 1e-8) return 0.0
-        return (((p.x - a.x) * dx + (p.y - a.y) * dy + (p.z - a.z) * dz) / lenSq).coerceIn(0.0, 1.0)
-    }
-
-    private fun closestHorizontalFraction(p: Vec3, a: Vec3, b: Vec3): Double {
-        val dx = b.x - a.x
-        val dz = b.z - a.z
-        val lenSq = dx * dx + dz * dz
-        if (lenSq <= 1e-8) return 0.0
-        return (((p.x - a.x) * dx + (p.z - a.z) * dz) / lenSq).coerceIn(0.0, 1.0)
-    }
-
-    private fun lerp(a: Vec3, b: Vec3, t: Double): Vec3 =
-        Vec3(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t)
-
     private fun projectLookPathPositionHorizontal(x: Double, z: Double, hint: Double, pts: List<Vec3>): Double {
         if (pts.size < 2) return 0.0
         val lastSeg = pts.size - 2
@@ -1514,8 +1320,4 @@ object PathExecutorState {
         return Rotation(Math.toDegrees(atan2(-dx, dz)).toFloat(), -Math.toDegrees(atan2(dy, h)).toFloat())
     }
 
-    private fun dist3d(a: Vec3, b: Vec3): Double {
-        val dx = a.x - b.x; val dy = a.y - b.y; val dz = a.z - b.z
-        return sqrt(dx * dx + dy * dy + dz * dz)
-    }
 }
