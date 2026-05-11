@@ -13,6 +13,7 @@ import org.cobalt.api.module.Module
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.ModeSetting
 import org.cobalt.api.module.setting.impl.TextSetting
+import org.cobalt.api.ui.theme.ThemeSurface
 import org.cobalt.api.util.ui.NVGRenderer
 import org.cobalt.api.util.ui.helper.Gradient
 import org.cobalt.api.util.ui.helper.Image
@@ -150,6 +151,16 @@ object SpotifyModule : Module("Spotify") {
         width  { currentHudWidth }
         height { currentHudHeight }
 
+        setting(color1Setting)
+        setting(color2Setting)
+        setting(gradientDirectionSetting)
+        setting(styleModeSetting)
+        setting(autoColorSetting)
+        setting(glowSetting)
+        setting(particlesSetting)
+        setting(showTimeSetting)
+        setting(waveformSetting)
+
         render { x, y, scale ->
             // HudModuleManager only calls this when mc.screen == null, so controls are hidden.
             // No mouse-to-screen conversion is needed on this path.
@@ -221,11 +232,6 @@ object SpotifyModule : Module("Spotify") {
     // -- Init ------------------------------------------------------------------
 
     init {
-        addSetting(
-            color1Setting, color2Setting,
-            gradientDirectionSetting, styleModeSetting, autoColorSetting,
-            glowSetting, particlesSetting, showTimeSetting, waveformSetting,
-        )
         EventBus.register(this)
     }
 
@@ -253,8 +259,8 @@ object SpotifyModule : Module("Spotify") {
         val waveformEnabled = waveformSetting.value && !isCompactMode
         val showControlsEffective = showControls && !isCompactMode
 
-        val c1    = color1
-        val c2    = color2
+        val c1 = color1
+        val c2 = color2
         val track = SpotifyPoller.current
 
         refreshArtCache(now)
@@ -400,8 +406,8 @@ object SpotifyModule : Module("Spotify") {
         val shiftX = cos(angle) * (w * 0.42f)
 
         if (glassMode) {
-            NVGRenderer.rect(x, y, w, h, 0x72101824.toInt(), CORNER)
-            NVGRenderer.gradientRect(x, y, w, h * 0.56f, 0x34FFFFFF, 0x08000000, Gradient.TopToBottom, CORNER)
+            NVGRenderer.rect(x, y, w, h, ThemeSurface.panelGlass(), CORNER)
+            NVGRenderer.gradientRect(x, y, w, h * 0.56f, ThemeSurface.overlay(0x34), ThemeSurface.withAlpha(ThemeSurface.inset(), 0x08), Gradient.TopToBottom, CORNER)
             NVGRenderer.gradientRect(x, y + h * 0.46f, w, h * 0.54f, 0x04000000, 0x26000000, Gradient.TopToBottom, CORNER)
             NVGRenderer.hollowRect(x, y, w, h, 1f, 0x44FFFFFF, CORNER)
             NVGRenderer.hollowRect(x + 1f, y + 1f, w - 2f, h - 2f, 1f, 0x16FFFFFF, CORNER - 1f)
@@ -411,8 +417,8 @@ object SpotifyModule : Module("Spotify") {
                 Gradient.LeftToRight, CORNER, shiftX * 0.45f, 0f
             )
         } else {
-            NVGRenderer.rect(x, y, w, h, 0xFF0A0E1A.toInt(), CORNER)
-            NVGRenderer.gradientRect(x, y, w, h * 0.5f, 0x14FFFFFF, 0x00000000, Gradient.TopToBottom, CORNER)
+            NVGRenderer.rect(x, y, w, h, ThemeSurface.panelSolid(), CORNER)
+            NVGRenderer.gradientRect(x, y, w, h * 0.5f, ThemeSurface.overlay(), 0x00000000, Gradient.TopToBottom, CORNER)
             NVGRenderer.hollowGradientRectShifted(x, y, w, h, 1.5f, c1, c2, Gradient.LeftToRight, CORNER, shiftX, 0f)
         }
     }
@@ -461,7 +467,7 @@ object SpotifyModule : Module("Spotify") {
         val prog  = (track.currentProgressMs.toFloat() / track.durationMs).coerceIn(0f, 1f)
         val fillW = (barW * prog).coerceAtLeast(0f)
 
-        NVGRenderer.rect(barX, barY, barW, barH, if (isGlassMode) 0x4D1A2040 else 0xFF1A2040.toInt(), barR)
+        NVGRenderer.rect(barX, barY, barW, barH, if (isGlassMode) ThemeSurface.inset(0x4D) else ThemeSurface.track(), barR)
 
         if (fillW > barR * 2f) {
             val gradient = if (gradientDirectionSetting.value == 1) Gradient.TopToBottom else Gradient.LeftToRight
@@ -656,23 +662,27 @@ object SpotifyModule : Module("Spotify") {
 
     private fun refreshArtCache(now: Long) {
         val ver = SpotifyPoller.artVersion
-        if (ver == cachedArtVersion) return
-        cachedArtVersion = ver
+        val artChanged = ver != cachedArtVersion
 
-        val old = cachedArtImage
-        if (old != null) {
-            prevArtImage?.let { NVGRenderer.deleteImage(it) }
-            prevArtImage   = old
-            cachedArtImage = null
-            artFadeStartMs = now
+        if (artChanged) {
+            cachedArtVersion = ver
+
+            val old = cachedArtImage
+            if (old != null) {
+                prevArtImage?.let { NVGRenderer.deleteImage(it) }
+                prevArtImage   = old
+                cachedArtImage = null
+                artFadeStartMs = now
+            }
+
+            val path = SpotifyPoller.currentArtPath
+            if (path.isNotEmpty()) {
+                runCatching { cachedArtImage = NVGRenderer.createImage(path) }
+                if (artFadeStartMs == 0L) artFadeStartMs = now
+            }
         }
 
         val path = SpotifyPoller.currentArtPath
-        if (path.isNotEmpty()) {
-            runCatching { cachedArtImage = NVGRenderer.createImage(path) }
-            if (artFadeStartMs == 0L) artFadeStartMs = now
-        }
-
         if (autoColorSetting.value && path.isNotEmpty() && ver != dominantArtVersion) {
             dominantArtVersion = ver
             Thread({

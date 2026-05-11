@@ -346,6 +346,26 @@ object NVGRenderer {
   }
 
   @JvmStatic
+  fun gradientRectShifted(
+    x: Float,
+    y: Float,
+    w: Float,
+    h: Float,
+    color1: Int,
+    color2: Int,
+    gradient: Gradient,
+    radius: Float,
+    shiftX: Float,
+    shiftY: Float,
+  ) {
+    nvgBeginPath(vg)
+    nvgRoundedRect(vg, x, y, w, h, radius)
+    gradient(color1, color2, x + shiftX, y + shiftY, w, h, gradient)
+    nvgFillPaint(vg, nvgPaint)
+    nvgFill(vg)
+  }
+
+  @JvmStatic
   fun circle(x: Float, y: Float, radius: Float, color: Int) {
     nvgBeginPath(vg)
     nvgCircle(vg, x, y, radius)

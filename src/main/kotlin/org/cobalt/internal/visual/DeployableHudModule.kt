@@ -26,7 +26,9 @@ import org.cobalt.api.module.Module
 import org.cobalt.api.module.ModuleCategory
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.ModeSetting
+import org.cobalt.api.ui.theme.ThemeGradient
 import org.cobalt.api.ui.theme.ThemeManager
+import org.cobalt.api.ui.theme.ThemeSurface
 import org.cobalt.api.util.ui.NVGRenderer
 import org.cobalt.api.util.ui.helper.Gradient
 
@@ -462,14 +464,14 @@ object DeployableHudModule : Module("Deployable HUD") {
 
   private fun renderHudCard(active: ActiveDeployable) {
     val theme = ThemeManager.currentTheme
-    val accent = active.spec.accent
+    val accent = ThemeGradient.colors().first
     val width = baseWidthFor(active)
     val height = baseHeightFor(active)
 
     NVGRenderer.rect(4f, 5f, width, height, 0x24000000, CORNER + 2f)
     NVGRenderer.rect(2f, 2f, width, height, 0x12000000, CORNER + 1f)
 
-    NVGRenderer.rect(0f, 0f, width, height, 0xEA141924.toInt(), CORNER)
+    NVGRenderer.rect(0f, 0f, width, height, ThemeSurface.panel(0xEA), CORNER)
     NVGRenderer.gradientRect(0f, 0f, width, height * 0.55f, withAlpha(accent, 18), 0x00000000, Gradient.TopToBottom, CORNER)
     NVGRenderer.hollowRect(0f, 0f, width, height, 1f, withAlpha(accent, 105), CORNER)
 

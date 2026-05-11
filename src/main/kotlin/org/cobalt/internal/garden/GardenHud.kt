@@ -1,7 +1,9 @@
 package org.cobalt.internal.garden
 
 import kotlin.math.cos
+import org.cobalt.api.ui.theme.ThemeGradient
 import org.cobalt.api.ui.theme.ThemeManager
+import org.cobalt.api.ui.theme.ThemeSurface
 import org.cobalt.api.util.ui.NVGRenderer
 import org.cobalt.api.util.ui.helper.Gradient
 import org.cobalt.internal.garden.managers.DynamicRestManager
@@ -22,17 +24,18 @@ object GardenHud {
         val dimColor  = 0xBBAFCFFF.toInt()
         val now       = System.currentTimeMillis()
         val twoPi     = (Math.PI * 2).toFloat()
+        val (gradientStart, gradientEnd) = ThemeGradient.colors()
 
         // Spotify-style background
-        NVGRenderer.rect(x, y, w, h, 0xFF0A0E1A.toInt(), radius)
-        NVGRenderer.gradientRect(x, y, w, h * 0.5f, 0x14FFFFFF, 0x00000000, Gradient.TopToBottom, radius)
+        NVGRenderer.rect(x, y, w, h, ThemeSurface.panelSolid(), radius)
+        NVGRenderer.gradientRect(x, y, w, h * 0.5f, ThemeSurface.overlay(), 0x00000000, Gradient.TopToBottom, radius)
 
         // Animated gradient border
         val angle  = (now % 10000L).toFloat() / 10000f * twoPi
         val shiftX = cos(angle) * (w * 0.42f)
         NVGRenderer.hollowGradientRectShifted(
             x, y, w, h, 1.5f,
-            ThemeManager.currentTheme.accent, ThemeManager.currentTheme.accentSecondary,
+            gradientStart, gradientEnd,
             Gradient.LeftToRight, radius, shiftX, 0f
         )
 
@@ -74,9 +77,9 @@ object GardenHud {
             val totalMs = DynamicRestManager.targetWorkDurationMs.coerceAtLeast(1L)
             val elapsed = totalMs - restMs.coerceAtLeast(0L)
             val ratio = (elapsed.toFloat() / totalMs.toFloat()).coerceIn(0f, 1f)
-            NVGRenderer.rect(x + pad, cy, barW, barH, 0xFF1A2040.toInt(), 3f)
+            NVGRenderer.rect(x + pad, cy, barW, barH, ThemeSurface.track(), 3f)
             if (ratio > 0f) {
-                NVGRenderer.gradientRect(x + pad, cy, barW * ratio, barH, ThemeManager.currentTheme.accent, ThemeManager.currentTheme.accentSecondary, Gradient.LeftToRight, 3f)
+                NVGRenderer.gradientRect(x + pad, cy, barW * ratio, barH, gradientStart, gradientEnd, Gradient.LeftToRight, 3f)
             }
             cy += 12f
         }

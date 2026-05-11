@@ -403,7 +403,7 @@ object CombatMacroModule : Module("Combat Macro") {
 
   private val autoReaperScythe = CheckboxSetting(
     "Reaper Scythe",
-    "Use Reaper Scythe once when the Slayer boss is active. Auto-enables when the item is detected in hotbar.",
+    "Use Reaper Scythe during Enderman Slayer hit-shield phases. Auto-enables when detected for Enderman Slayer.",
     false
   )
 
@@ -830,6 +830,7 @@ object CombatMacroModule : Module("Combat Macro") {
   private var badHealthWasInHotbar = false
   private var emanHitPhaseBossWeaponPrimed = false
   private var emanHitPhaseSneakApplied = false
+  private var emanReaperScytheUsedThisHitPhase = false
   private var emanLaserPhaseActive = false
   private var emanLaserPhaseStartTick = -1L
   private var slayerRagnarokUsedForLaserPhase = false
@@ -1798,6 +1799,7 @@ object CombatMacroModule : Module("Combat Macro") {
     slayerLastReaperScytheUseTick = -1L
     slayerBossLastPos = null
     emanHitPhaseBossWeaponPrimed = false
+    emanReaperScytheUsedThisHitPhase = false
   }
 
   private fun tryUseSlayerSupportItems(player: Player, target: LivingEntity?, nowTick: Long) {
@@ -1829,6 +1831,23 @@ object CombatMacroModule : Module("Combat Macro") {
       }
     }
 
+    val bossTarget = target?.takeIf(::isSlayerBossEntity) ?: resolveNearestSlayerBoss()
+    val isEndermanHitPhase = bossTarget != null && shouldUseEndermanDynamicCombat() && isEndermanBossHitPhase(bossTarget)
+    if (!isEndermanHitPhase) {
+      emanReaperScytheUsedThisHitPhase = false
+    }
+
+    if (autoReaperScythe.value &&
+      isEndermanHitPhase &&
+      !emanReaperScytheUsedThisHitPhase &&
+      nowTick - slayerLastReaperScytheUseTick >= SLAYER_REAPER_SCYTHE_COOLDOWN_TICKS
+    ) {
+      if (tryUseReaperScytheOnBoss(player, bossTarget, nowTick)) {
+        emanReaperScytheUsedThisHitPhase = true
+        return
+      }
+    }
+
     if (autoRagnarok.value && !slayerRagnarokUsedThisBoss && nowTick - slayerLastRagnarokUseTick >= SLAYER_RAGNAROK_COOLDOWN_TICKS) {
       if (useHotbarUtilityItem(player, SLAYER_RAGNAROK_KEYWORDS)) {
         slayerRagnarokUsedThisBoss = true
@@ -1837,29 +1856,25 @@ object CombatMacroModule : Module("Combat Macro") {
       }
     }
 
-    if (autoReaperScythe.value && !slayerReaperScytheUsedThisBoss && nowTick - slayerLastReaperScytheUseTick >= SLAYER_REAPER_SCYTHE_COOLDOWN_TICKS) {
-      val bossTarget = target?.takeIf(::isSlayerBossEntity) ?: resolveNearestSlayerBoss()
-      if (bossTarget != null && player.hasLineOfSight(bossTarget)) {
-        val rotation = AngleUtils.getRotation(bossTarget)
-        RotationExecutor.rotateTo(rotation, rotationStrategy)
-        val yawError = abs(AngleUtils.getRotationDelta(player.yRot, rotation.yaw))
-        val pitchError = abs(rotation.pitch - player.xRot)
-        if (yawError <= REAPER_SCYTHE_USE_AIM_TOLERANCE &&
-          pitchError <= REAPER_SCYTHE_USE_AIM_TOLERANCE &&
-          useHotbarUtilityItem(player, SLAYER_REAPER_SCYTHE_KEYWORDS)
-        ) {
-          slayerReaperScytheUsedThisBoss = true
-          slayerLastReaperScytheUseTick = nowTick
-          return
-        }
-      }
-    }
-
     if (autoSwordOfBadHealth.value && nowTick - slayerLastBadHealthUseTick >= SLAYER_BAD_HEALTH_REUSE_TICKS) {
       if (useHotbarUtilityItem(player, SLAYER_BAD_HEALTH_KEYWORDS)) {
         slayerLastBadHealthUseTick = nowTick
       }
     }
+  }
+
+  private fun tryUseReaperScytheOnBoss(player: Player, bossTarget: LivingEntity?, nowTick: Long): Boolean {
+    if (bossTarget == null || !player.hasLineOfSight(bossTarget)) return false
+    val rotation = AngleUtils.getRotation(bossTarget)
+    RotationExecutor.rotateTo(rotation, rotationStrategy)
+    val yawError = abs(AngleUtils.getRotationDelta(player.yRot, rotation.yaw))
+    val pitchError = abs(rotation.pitch - player.xRot)
+    if (yawError > REAPER_SCYTHE_USE_AIM_TOLERANCE || pitchError > REAPER_SCYTHE_USE_AIM_TOLERANCE) {
+      return false
+    }
+    if (!useHotbarUtilityItem(player, SLAYER_REAPER_SCYTHE_KEYWORDS)) return false
+    slayerLastReaperScytheUseTick = nowTick
+    return true
   }
 
   private fun tryRestartSlayerQuest(player: Player, nowTick: Long): Boolean {
@@ -3099,7 +3114,7 @@ object CombatMacroModule : Module("Combat Macro") {
     ragnarokWasInHotbar = ragnarokInHotbar
 
     val reaperScytheInHotbar = findHotbarSlotByKeywords(player, SLAYER_REAPER_SCYTHE_KEYWORDS) in 0..8
-    if (reaperScytheInHotbar && !reaperScytheWasInHotbar && !autoReaperScythe.value) {
+    if (slayerType.value == 3 && reaperScytheInHotbar && !reaperScytheWasInHotbar && !autoReaperScythe.value) {
       autoReaperScythe.value = true
       changed = true
     }

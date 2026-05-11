@@ -8,6 +8,7 @@ import net.minecraft.world.level.Level
 import net.minecraft.world.level.block.SlabBlock
 import net.minecraft.world.level.block.StairBlock
 import net.minecraft.world.level.block.state.BlockState
+import net.minecraft.world.level.block.state.properties.Half
 import net.minecraft.world.phys.Vec3
 import org.cobalt.api.rotation.RotationExecutor
 import org.cobalt.api.util.helper.Rotation
@@ -167,7 +168,7 @@ data class PathCommand(
         for (offset in 2..3) {
             val pos = BlockPos(x, y + offset, z)
             val bs = cachedBlock(level, pos)
-            if (bs.block is StairBlock) continue
+            if (bs.block is StairBlock && bs.getValue(StairBlock.HALF) == Half.BOTTOM) continue
             if (!bs.getCollisionShape(level, pos).isEmpty) return true
         }
         return false
@@ -306,9 +307,10 @@ data class PathCommand(
             when {
                 name.contains("slab") -> canWalkInstead = true
                 name.contains("stair") -> {
-                    // Only walkable from the approach side (opposite to stair facing direction)
+                    // Only bottom stairs are walkable ramps; top-half stairs need a jump.
                     if (block is StairBlock) {
                         try {
+                            if (bs.getValue(StairBlock.HALF) != Half.BOTTOM) continue
                             val facing = bs.getValue(StairBlock.FACING)
                             val dx = n.x + 0.5 - player.x
                             val dz = n.z + 0.5 - player.z
@@ -319,7 +321,6 @@ data class PathCommand(
                             }
                             if (approach == facing.opposite) canWalkInstead = true
                         } catch (_: Exception) {
-                            canWalkInstead = true
                         }
                     } else {
                         canWalkInstead = true

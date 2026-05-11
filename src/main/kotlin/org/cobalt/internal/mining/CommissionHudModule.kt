@@ -6,7 +6,9 @@ import org.cobalt.api.hud.hudElement
 import org.cobalt.api.module.Module
 import org.cobalt.api.module.ModuleCategory
 import org.cobalt.api.module.setting.impl.CheckboxSetting
+import org.cobalt.api.ui.theme.ThemeGradient
 import org.cobalt.api.ui.theme.ThemeManager
+import org.cobalt.api.ui.theme.ThemeSurface
 import org.cobalt.api.util.ui.NVGRenderer
 import org.cobalt.api.util.ui.helper.Gradient
 
@@ -21,9 +23,6 @@ object CommissionHudModule : Module("Commission HUD") {
 
   private val labelColor  get() = (ThemeManager.currentTheme.text and 0x00FFFFFF) or 0x99000000.toInt()
   private val valueColor  get() = ThemeManager.currentTheme.accent
-  private val borderColor1 get() = ThemeManager.currentTheme.accent
-  private val borderColor2 get() = ThemeManager.currentTheme.accentSecondary
-
   private fun rows() = listOf(
     "Status"     to CommissionMacroModule.statusDisplay,
     "Mode"       to CommissionMacroModule.modeDisplay,
@@ -53,11 +52,12 @@ object CommissionHudModule : Module("Commission HUD") {
       val now    = System.currentTimeMillis()
       val twoPi  = (Math.PI * 2).toFloat()
 
-      NVGRenderer.rect(x, y, panelW, panelH, 0xFF0A0E1A.toInt(), corner)
-      NVGRenderer.gradientRect(x, y, panelW, panelH * 0.5f, 0x14FFFFFF, 0x00000000, Gradient.TopToBottom, corner)
+      NVGRenderer.rect(x, y, panelW, panelH, ThemeSurface.panelSolid(), corner)
+      NVGRenderer.gradientRect(x, y, panelW, panelH * 0.5f, ThemeSurface.overlay(), 0x00000000, Gradient.TopToBottom, corner)
 
       val angle  = (now % 10000L).toFloat() / 10000f * twoPi
       val shiftX = cos(angle) * (panelW * 0.42f)
+      val (borderColor1, borderColor2) = ThemeGradient.colors()
       NVGRenderer.hollowGradientRectShifted(x, y, panelW, panelH, 1.5f, borderColor1, borderColor2, Gradient.LeftToRight, corner, shiftX, 0f)
 
       r.forEachIndexed { i, (label, value) ->

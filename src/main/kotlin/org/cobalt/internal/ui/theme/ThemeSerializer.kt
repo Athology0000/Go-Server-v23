@@ -31,6 +31,7 @@ internal object ThemeSerializer {
     addProperty("rainbowSpeed", theme.rainbowSpeed)
     addProperty("rainbowSaturation", theme.rainbowSaturation)
     addProperty("rainbowBrightness", theme.rainbowBrightness)
+    addProperty("chatGradient", theme.chatGradient)
     addProperty("background", theme.background)
     addProperty("panel", theme.panel)
     addProperty("inset", theme.inset)
@@ -94,6 +95,7 @@ internal object ThemeSerializer {
       rainbowSpeed = json.get("rainbowSpeed")?.asFloat ?: defaults.rainbowSpeed,
       rainbowSaturation = json.get("rainbowSaturation")?.asFloat ?: defaults.rainbowSaturation,
       rainbowBrightness = json.get("rainbowBrightness")?.asFloat ?: defaults.rainbowBrightness,
+      chatGradient = json.get("chatGradient")?.asString ?: defaults.chatGradient,
       background = json.get("background")?.asInt ?: defaults.background,
       panel = json.get("panel")?.asInt ?: defaults.panel,
       inset = json.get("inset")?.asInt ?: defaults.inset,

@@ -1,3 +1,3 @@
 package org.cobalt.api.command.annotation
 
-annotation class SubCommand
+annotation class SubCommand(val value: String = "")

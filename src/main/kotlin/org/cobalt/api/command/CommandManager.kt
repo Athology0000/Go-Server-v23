@@ -48,9 +48,9 @@ object CommandManager {
           }
 
         command::class.declaredMemberFunctions.forEach { method ->
-          method.findAnnotation<SubCommand>()?.let {
+          method.findAnnotation<SubCommand>()?.let { annotation ->
             method.isAccessible = true
-            root = root.then(attachExecution(literal(method.name), method, command))
+            root = root.then(attachSubCommand(annotation.value.ifBlank { method.name }, method, command))
           }
         }
 
@@ -67,6 +67,26 @@ object CommandManager {
     val params = method.parameters.drop(1)
     if (params.isEmpty()) return builder.executes { method.call(command); 1 }
     return builder.then(buildArguments(params, 0, method, command))
+  }
+
+  private fun attachSubCommand(
+    path: String,
+    method: KFunction<*>,
+    command: Command,
+  ): LiteralArgumentBuilder<FabricClientCommandSource> {
+    val parts = path.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+    require(parts.isNotEmpty()) { "SubCommand path cannot be blank" }
+
+    fun build(index: Int): LiteralArgumentBuilder<FabricClientCommandSource> {
+      val builder = literal(parts[index])
+      return if (index == parts.lastIndex) {
+        attachExecution(builder, method, command)
+      } else {
+        builder.then(build(index + 1))
+      }
+    }
+
+    return build(0)
   }
 
   private fun buildArguments(

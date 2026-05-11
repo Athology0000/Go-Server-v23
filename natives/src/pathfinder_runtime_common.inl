@@ -168,6 +168,24 @@ inline bool Runtime::isStairsBottom(const int x, const int y, const int z) const
   return hasFlag(flagsAt(x, y, z), VF_STAIRS_BOTTOM);
 }
 
+inline bool Runtime::isStairAscentDirection(const int x, const int y, const int z, const int dx, const int dz) const {
+  const uint16_t flags = flagsAt(x, y, z);
+  if (!hasFlag(flags, VF_STAIRS_BOTTOM)) return false;
+
+  switch (flags & VF_STAIR_FACING_MASK) {
+    case VF_STAIR_FACING_NORTH:
+      return dx == 0 && dz == -1;
+    case VF_STAIR_FACING_SOUTH:
+      return dx == 0 && dz == 1;
+    case VF_STAIR_FACING_WEST:
+      return dx == -1 && dz == 0;
+    case VF_STAIR_FACING_EAST:
+      return dx == 1 && dz == 0;
+    default:
+      return false;
+  }
+}
+
 inline bool Runtime::isBlockingWall(const int x, const int y, const int z) const {
   return hasFlag(flagsAt(x, y, z), VF_BLOCKING_WALL);
 }
@@ -273,7 +291,7 @@ inline bool Runtime::isStepDirection(const int x, const int y, const int z, cons
   const int nz = z + dz;
 
   if (isStepSurface(nx, y, nz) && isSolid(nx, y, nz) && isPassable(nx, y + 1, nz) && isPassable(nx, y + 2, nz)) {
-    return true;
+    if (!isStairsBottom(nx, y, nz) || isStairAscentDirection(nx, y, nz, dx, dz)) return true;
   }
 
   if (isStepSurface(nx, y - 2, nz) && isSolid(nx, y - 2, nz) && isPassable(nx, y - 1, nz) && isPassable(nx, y, nz)) {

@@ -9,6 +9,7 @@ interface Theme {
   val rainbowSpeed: Float
   val rainbowSaturation: Float
   val rainbowBrightness: Float
+  val chatGradient: String
 
   val background: Int
   val panel: Int

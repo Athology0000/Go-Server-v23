@@ -6,6 +6,8 @@ import net.minecraft.core.Direction
 import net.minecraft.tags.BlockTags
 import net.minecraft.world.level.Level
 import net.minecraft.world.level.block.state.BlockState
+import org.cobalt.api.pathfinder.cache.CachedWorld
+import org.cobalt.api.pathfinder.jni.NativeVoxelFlags
 
 object MinecraftPathingRules {
 
@@ -39,26 +41,32 @@ object MinecraftPathingRules {
 
   fun walkableAt(level: Level, pos: BlockPos): BlockPos? {
     if (isWalkable(level, pos)) return pos
+    cachedWalkableAt(pos)?.let { return it }
     for (dy in 1..MAX_STEP_UP) {
       val up = pos.above(dy)
       if (isWalkable(level, up)) return up
+      if (isCachedWalkable(up)) return up
     }
     for (dy in 1..MAX_STEP_DOWN) {
       val down = pos.below(dy)
       if (isWalkable(level, down)) return down
+      if (isCachedWalkable(down)) return down
     }
     return null
   }
 
   fun resolveTarget(level: Level, raw: BlockPos): BlockPos? {
     if (isWalkable(level, raw)) return raw
+    if (isCachedWalkable(raw)) return raw
     for (dy in 1..MAX_CLIMB_SCAN) {
       val above = raw.above(dy)
       if (isWalkable(level, above)) return above
+      if (isCachedWalkable(above)) return above
     }
     for (dy in 1..MAX_STEP_DOWN) {
       val down = raw.below(dy)
       if (isWalkable(level, down)) return down
+      if (isCachedWalkable(down)) return down
     }
     return null
   }
@@ -134,6 +142,7 @@ object MinecraftPathingRules {
   }
 
   fun isChunkCached(level: Level, chunkX: Int, chunkZ: Int, ttlTicks: Long = CHUNK_CACHE_TTL_TICKS): Boolean {
+    if (CachedWorld.getChunk(chunkX, chunkZ) != null) return true
     val dimension = level.dimension().toString()
     val key = ChunkKey(dimension, chunkX, chunkZ)
     val now = level.gameTime
@@ -165,4 +174,37 @@ object MinecraftPathingRules {
       return state
     }
   }
+
+  private fun cachedWalkableAt(pos: BlockPos): BlockPos? {
+    if (isCachedWalkable(pos)) return pos
+    for (dy in 1..MAX_STEP_UP) {
+      val up = pos.above(dy)
+      if (isCachedWalkable(up)) return up
+    }
+    for (dy in 1..MAX_STEP_DOWN) {
+      val down = pos.below(dy)
+      if (isCachedWalkable(down)) return down
+    }
+    return null
+  }
+
+  private fun isCachedWalkable(pos: BlockPos): Boolean =
+    isCachedPassable(pos) &&
+      isCachedPassable(pos.above()) &&
+      isCachedStandable(pos.below())
+
+  private fun isCachedPassable(pos: BlockPos): Boolean {
+    val flags = cachedFlags(pos) ?: return false
+    return flags and NativeVoxelFlags.FLUID == 0 &&
+      flags and NativeVoxelFlags.PASSABLE != 0
+  }
+
+  private fun isCachedStandable(pos: BlockPos): Boolean {
+    val flags = cachedFlags(pos) ?: return false
+    return flags and NativeVoxelFlags.FLUID == 0 &&
+      flags and NativeVoxelFlags.SOLID != 0
+  }
+
+  private fun cachedFlags(pos: BlockPos): Int? =
+    CachedWorld.getBlockFlags(pos.x, pos.y, pos.z)?.toInt()?.and(0xFFFF)
 }

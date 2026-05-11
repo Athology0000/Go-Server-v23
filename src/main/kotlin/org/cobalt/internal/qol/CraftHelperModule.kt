@@ -18,7 +18,9 @@ import org.cobalt.api.module.setting.impl.InfoType
 import org.cobalt.api.module.setting.impl.SliderSetting
 import org.cobalt.api.module.setting.impl.TextSetting
 import org.cobalt.api.module.setting.inGroup
+import org.cobalt.api.ui.theme.ThemeGradient
 import org.cobalt.api.ui.theme.ThemeManager
+import org.cobalt.api.ui.theme.ThemeSurface
 import org.cobalt.api.util.ChatUtils
 import org.cobalt.api.util.getSkyblockId
 import org.cobalt.api.util.ui.NVGRenderer
@@ -537,12 +539,12 @@ object CraftHelperModule : Module("Craft Helper") {
     val width = panelWidth(state)
     val height = panelHeight(state)
     val theme = ThemeManager.currentTheme
-    val accent = state.titleColor
+    val accent = ThemeGradient.colors().first
 
     if (backgroundSetting.value) {
       NVGRenderer.rect(2f, 2f, width, height, 0x1A000000)
-      NVGRenderer.rect(0f, 0f, width, height, 0xE1141922.toInt(), PANEL_RADIUS)
-      NVGRenderer.gradientRect(0f, 0f, width, HEADER_HEIGHT + 10f, withAlpha(accent, 22), 0x00000000, org.cobalt.api.util.ui.helper.Gradient.TopToBottom, PANEL_RADIUS)
+      NVGRenderer.rect(0f, 0f, width, height, ThemeSurface.panel(0xE1), PANEL_RADIUS)
+      NVGRenderer.gradientRect(0f, 0f, width, HEADER_HEIGHT + 10f, ThemeGradient.withAlpha(accent, 22), 0x00000000, org.cobalt.api.util.ui.helper.Gradient.TopToBottom, PANEL_RADIUS)
       NVGRenderer.hollowRect(0f, 0f, width, height, 1f, withAlpha(accent, 96), PANEL_RADIUS)
       NVGRenderer.rect(PADDING_X, HEADER_HEIGHT, width - PADDING_X * 2f, 1f, withAlpha(accent, 48))
     }

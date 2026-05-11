@@ -19,7 +19,9 @@ import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.ColorSetting
 import org.cobalt.api.module.setting.impl.KeyBindSetting
 import org.cobalt.api.module.setting.impl.TextSetting
+import org.cobalt.api.ui.theme.ThemeGradient
 import org.cobalt.api.ui.theme.ThemeManager
+import org.cobalt.api.ui.theme.ThemeSurface
 import org.cobalt.api.util.ui.NVGRenderer
 import org.cobalt.api.util.ui.helper.Gradient
 import org.cobalt.render.HudGlassBlurRenderer
@@ -76,7 +78,6 @@ class WatermarkModule : Module("Watermark") {
     private const val WHITE_TEXT = 0xFFF2EFF6.toInt()
     private const val MUTED_TEXT = 0x998E8995.toInt()
     private const val GLASS_BLUR_STRENGTH = 1.35f
-    private val CARD_BG = 0x4C141118u.toInt()
     private const val SECTION_TINT = 0x1F1A1720
   }
 
@@ -272,9 +273,10 @@ class WatermarkModule : Module("Watermark") {
     val width = layout.width
     val totalHeight = layout.totalHeight.coerceAtLeast(MAIN_BAR_HEIGHT)
     val shiftX = cos((now % 10000L).toFloat() / 10000f * (Math.PI * 2).toFloat()) * (width * 0.32f)
+    val (gradientStart, gradientEnd) = ThemeGradient.colors()
 
     NVGRenderer.rect(x + 3f, y + 2f, width, totalHeight, 0x10000000, CARD_CORNER + 1f)
-    NVGRenderer.rect(x, y, width, totalHeight, CARD_BG, CARD_CORNER)
+    NVGRenderer.rect(x, y, width, totalHeight, ThemeSurface.panel(0x4C), CARD_CORNER)
     NVGRenderer.gradientRect(
       x,
       y,
@@ -301,8 +303,8 @@ class WatermarkModule : Module("Watermark") {
       width,
       totalHeight,
       1.2f,
-      withAlpha(accent, 96),
-      withAlpha(theme.accentSecondary, 82),
+      ThemeGradient.withAlpha(gradientStart, 96),
+      ThemeGradient.withAlpha(gradientEnd, 82),
       Gradient.LeftToRight,
       CARD_CORNER,
       shiftX,
@@ -453,7 +455,7 @@ class WatermarkModule : Module("Watermark") {
           rowY + 1f,
           width - PANEL_PAD_X * 2f,
           1f,
-          0x10FFFFFF,
+          ThemeSurface.overlay(0x10),
           0.5f,
         )
         rowY += PANEL_ROW_GAP

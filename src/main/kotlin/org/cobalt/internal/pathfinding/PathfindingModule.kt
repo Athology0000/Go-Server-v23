@@ -126,6 +126,12 @@ object PathfindingModule : Module("Pathfinding") {
     false
   )
 
+  private val debugChatLogging = CheckboxSetting(
+    "Debug Chat Logs",
+    "Show pathfinder diagnostics in chat without requiring file logging.",
+    false
+  )
+
   private val aotvSlot = ModeSetting(
     "AOTV Slot",
     "Hotbar slot (1-9) holding your AOTV item.",
@@ -309,6 +315,7 @@ object PathfindingModule : Module("Pathfinding") {
       cacheHudCellSize,
       cacheHudShowGrid,
       debugFileLogging,
+      debugChatLogging,
       aotvSlot,
       startAction,
       stopAction,
@@ -343,7 +350,8 @@ object PathfindingModule : Module("Pathfinding") {
   @SubscribeEvent
   fun onTick(@Suppress("UNUSED_PARAMETER") event: TickEvent.Start) {
     org.cobalt.internal.pathfinding.DebugLog.debugFileEnabled = debugFileLogging.value
-    org.cobalt.internal.pathfinding.DebugLog.debugChatEnabled = debugFileLogging.value || isDebugEnabled()
+    org.cobalt.internal.pathfinding.DebugLog.debugChatEnabled =
+      debugChatLogging.value || debugFileLogging.value || isDebugEnabled()
 
     // Update live info settings
     routeCountInfo.value = "${localRouteWaypoints.size} points"

@@ -1,8 +1,20 @@
 package org.cobalt.api.ui.theme
 
+import org.cobalt.api.ui.theme.impl.AuroraTheme
+import org.cobalt.api.ui.theme.impl.CircuitTheme
+import org.cobalt.api.ui.theme.impl.CrimsonTheme
 import org.cobalt.api.ui.theme.impl.DarkTheme
+import org.cobalt.api.ui.theme.impl.GlacierTheme
+import org.cobalt.api.ui.theme.impl.GroveTheme
 import org.cobalt.api.ui.theme.impl.LightTheme
+import org.cobalt.api.ui.theme.impl.NordFrostTheme
+import org.cobalt.api.ui.theme.impl.NordNightTheme
+import org.cobalt.api.ui.theme.impl.NordTheme
+import org.cobalt.api.ui.theme.impl.OnyxTheme
+import org.cobalt.api.ui.theme.impl.SakuraTheme
 import org.cobalt.api.ui.theme.impl.ShadowRealmTheme
+import org.cobalt.api.ui.theme.impl.SlateTheme
+import org.cobalt.api.ui.theme.impl.SolarTheme
 import java.awt.Color
 
 object ThemeManager {
@@ -17,6 +29,18 @@ object ThemeManager {
     registerTheme(currentTheme)
     registerTheme(DarkTheme())
     registerTheme(LightTheme())
+    registerTheme(OnyxTheme())
+    registerTheme(AuroraTheme())
+    registerTheme(CrimsonTheme())
+    registerTheme(GroveTheme())
+    registerTheme(GlacierTheme())
+    registerTheme(SolarTheme())
+    registerTheme(SakuraTheme())
+    registerTheme(CircuitTheme())
+    registerTheme(NordTheme())
+    registerTheme(NordFrostTheme())
+    registerTheme(NordNightTheme())
+    registerTheme(SlateTheme())
   }
 
   fun registerTheme(theme: Theme) {

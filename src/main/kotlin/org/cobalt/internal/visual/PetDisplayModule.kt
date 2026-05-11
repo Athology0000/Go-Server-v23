@@ -16,7 +16,9 @@ import org.cobalt.api.hud.HudModuleManager
 import org.cobalt.api.hud.hudElement
 import org.cobalt.api.module.Module
 import org.cobalt.api.module.setting.impl.CheckboxSetting
+import org.cobalt.api.ui.theme.ThemeGradient
 import org.cobalt.api.ui.theme.ThemeManager
+import org.cobalt.api.ui.theme.ThemeSurface
 import org.cobalt.api.util.ui.NVGRenderer
 import org.cobalt.api.util.ui.helper.Gradient
 import org.cobalt.api.util.ui.helper.Image
@@ -295,8 +297,7 @@ object PetDisplayModule : Module("Pet Display") {
 
             val now   = System.currentTimeMillis()
             val h     = hudHeight()
-            val c1    = ThemeManager.currentTheme.accent
-            val c2    = ThemeManager.currentTheme.accentSecondary
+            val (c1, c2) = ThemeGradient.colors()
             val data  = PetTabListParser.current
             val titleX = x + TEXT_X
             val titleMaxW = W - TEXT_X - PAD
@@ -318,8 +319,8 @@ object PetDisplayModule : Module("Pet Display") {
             }
 
             // -- Background ----------------------------------------------------
-            NVGRenderer.rect(x, y, W, h, 0xE61A2234.toInt(), CORNER)
-            NVGRenderer.gradientRect(x, y, W, h * 0.55f, 0x10FFFFFF, 0x00000000, Gradient.TopToBottom, CORNER)
+            NVGRenderer.rect(x, y, W, h, ThemeSurface.panel(0xE6), CORNER)
+            NVGRenderer.gradientRect(x, y, W, h * 0.55f, ThemeSurface.overlay(0x10), 0x00000000, Gradient.TopToBottom, CORNER)
             NVGRenderer.hollowRect(x, y, W, h, 1f, 0x1FFFFFFF, CORNER)
 
             // -- Icon box ------------------------------------------------------
@@ -490,7 +491,7 @@ object PetDisplayModule : Module("Pet Display") {
 
     private fun renderProgressBar(x: Float, y: Float, w: Float, ratio: Float, c1: Int, c2: Int, label: String) {
         val barR = BAR_H / 2f
-        NVGRenderer.rect(x, y, w, BAR_H, 0x70131A29, barR)
+        NVGRenderer.rect(x, y, w, BAR_H, ThemeSurface.inset(0x70), barR)
         val fillW = (w * ratio).coerceIn(0f, w)
         if (fillW > 0f) {
             NVGRenderer.pushScissor(x, y, fillW, BAR_H)

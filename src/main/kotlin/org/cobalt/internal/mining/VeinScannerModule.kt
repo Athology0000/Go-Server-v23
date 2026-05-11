@@ -3,10 +3,12 @@ package org.cobalt.internal.mining
 import com.google.gson.GsonBuilder
 import net.minecraft.client.Minecraft
 import net.minecraft.core.BlockPos
+import net.minecraft.world.level.ClipContext
 import net.minecraft.world.level.Level
 import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.HitResult
+import net.minecraft.world.phys.Vec3
 import org.cobalt.api.event.EventBus
 import org.cobalt.api.event.annotation.SubscribeEvent
 import org.cobalt.api.event.impl.client.TickEvent
@@ -26,6 +28,7 @@ import java.io.File
 import java.time.Instant
 import java.util.ArrayDeque
 import kotlin.math.roundToInt
+import kotlin.math.sqrt
 
 object VeinScannerModule : Module("Vein Scanner") {
   override val category = ModuleCategory.MINING
@@ -156,6 +159,10 @@ object VeinScannerModule : Module("Vein Scanner") {
     ChatUtils.sendMessage("Vein Scanner: enabled. Look at a vein to preview exported blocks.")
   }
 
+  fun exportLookedVein() {
+    captureCurrentVein(forceRescan = true)
+  }
+
   @SubscribeEvent
   fun onTick(@Suppress("UNUSED_PARAMETER") event: TickEvent.Start) {
     if (!enabled.value) {
@@ -209,8 +216,12 @@ object VeinScannerModule : Module("Vein Scanner") {
     }
   }
 
-  private fun captureCurrentVein() {
-    val vein = preview ?: lookedAtBlock()?.let(::scanFrom)
+  private fun captureCurrentVein(forceRescan: Boolean = false) {
+    val vein = if (forceRescan) {
+      lookedAtBlock()?.let(::scanFrom)
+    } else {
+      preview ?: lookedAtBlock()?.let(::scanFrom)
+    }
     if (vein == null) {
       ChatUtils.sendMessage("Vein Scanner: look at a supported ore vein first.")
       return
@@ -250,14 +261,16 @@ object VeinScannerModule : Module("Vein Scanner") {
     } else {
       null
     }
-    val blocks = if (ore == VeinOre.MITHRIL) {
+    val rawBlocks = if (ore == VeinOre.MITHRIL) {
       scanMithrilFromCenter(level, mithrilCenter ?: seed)
     } else {
       floodFill(level, seed, ore)
     }
+    val visibleBlocks = visibleBlocks(level, rawBlocks)
+    val blocks = visibleConnectedComponent(visibleBlocks, seed)
     if (blocks.isEmpty()) return null
 
-    val center = mithrilCenter ?: centerOf(blocks)
+    val center = mithrilCenter?.takeIf { candidate -> blocks.any { it == candidate } } ?: centerOf(blocks)
     val target = findPathTarget(level, blocks) ?: center
 
     return ScannedVein(
@@ -267,6 +280,61 @@ object VeinScannerModule : Module("Vein Scanner") {
       target = target,
       blocks = blocks.sortedWith(compareBy<BlockPos> { it.x }.thenBy { it.y }.thenBy { it.z }),
     )
+  }
+
+  private fun visibleBlocks(level: Level, blocks: List<BlockPos>): List<BlockPos> {
+    if (blocks.isEmpty()) return emptyList()
+    val player = mc.player ?: return blocks
+    val eye = player.eyePosition
+    return blocks.filter { block -> isBlockVisible(level, eye, block) }
+  }
+
+  private fun visibleConnectedComponent(blocks: List<BlockPos>, seed: BlockPos): List<BlockPos> {
+    if (blocks.isEmpty()) return emptyList()
+
+    val remaining = blocks.map { it.immutable() }.toHashSet()
+    val start = seed.immutable().takeIf { remaining.contains(it) }
+      ?: remaining.minWithOrNull(compareBy<BlockPos> { it.distManhattan(seed) }.thenBy { it.asLong() })
+      ?: return emptyList()
+
+    val out = mutableListOf<BlockPos>()
+    val queue: ArrayDeque<BlockPos> = ArrayDeque()
+    remaining.remove(start)
+    queue.add(start)
+
+    while (queue.isNotEmpty()) {
+      val pos = queue.removeFirst()
+      out += pos
+
+      for (offset in CONNECTED_OFFSETS) {
+        val next = pos.offset(offset).immutable()
+        if (remaining.remove(next)) {
+          queue.add(next)
+        }
+      }
+    }
+
+    return out
+  }
+
+  private fun isBlockVisible(level: Level, eye: Vec3, block: BlockPos): Boolean {
+    val player = mc.player ?: return true
+
+    for (offset in VISIBLE_SAMPLE_OFFSETS) {
+      val target = Vec3(block.x + offset.x, block.y + offset.y, block.z + offset.z)
+      val dx = target.x - eye.x
+      val dy = target.y - eye.y
+      val dz = target.z - eye.z
+      val distance = sqrt(dx * dx + dy * dy + dz * dz)
+      if (distance < 0.2) return true
+
+      val hit = level.clip(ClipContext(eye, target, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player))
+      if (hit.type == HitResult.Type.MISS || hit.blockPos == block || hit.location.distanceTo(eye) >= distance - 0.05) {
+        return true
+      }
+    }
+
+    return false
   }
 
   private fun selectedOre(level: Level, pos: BlockPos): VeinOre? {
@@ -524,6 +592,28 @@ object VeinScannerModule : Module("Vein Scanner") {
     BlockPos(-2, 0, 0),
     BlockPos(0, 0, 2),
     BlockPos(0, 0, -2),
+  )
+
+  private val CONNECTED_OFFSETS = buildList {
+    for (dx in -1..1) {
+      for (dy in -1..1) {
+        for (dz in -1..1) {
+          if (dx != 0 || dy != 0 || dz != 0) {
+            add(BlockPos(dx, dy, dz))
+          }
+        }
+      }
+    }
+  }
+
+  private val VISIBLE_SAMPLE_OFFSETS = listOf(
+    Vec3(0.5, 0.5, 0.5),
+    Vec3(0.5, 0.2, 0.5),
+    Vec3(0.5, 0.8, 0.5),
+    Vec3(0.2, 0.5, 0.5),
+    Vec3(0.8, 0.5, 0.5),
+    Vec3(0.5, 0.5, 0.2),
+    Vec3(0.5, 0.5, 0.8),
   )
 }
 

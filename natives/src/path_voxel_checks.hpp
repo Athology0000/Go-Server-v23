@@ -51,9 +51,14 @@ inline bool isFluidVoxel(const WorldSnapshot& world, const int x, const int y, c
   return hasVoxelFlag(flagsAt(world, x, y, z), VF_FLUID);
 }
 
+inline bool isLavaVoxel(const WorldSnapshot& world, const int x, const int y, const int z) {
+  return hasVoxelFlag(flagsAt(world, x, y, z), VF_LAVA);
+}
+
 inline bool isWalkPassableVoxel(const WorldSnapshot& world, const int x, const int y, const int z) {
   const uint16_t flags = flagsAt(world, x, y, z);
-  return hasVoxelFlag(flags, VF_PASSABLE) || hasVoxelFlag(flags, VF_CARPET_LIKE);
+  return !hasVoxelFlag(flags, VF_FLUID) &&
+    (hasVoxelFlag(flags, VF_PASSABLE) || hasVoxelFlag(flags, VF_CARPET_LIKE));
 }
 
 inline bool isFlyPassableVoxel(const WorldSnapshot& world, const int x, const int y, const int z) {

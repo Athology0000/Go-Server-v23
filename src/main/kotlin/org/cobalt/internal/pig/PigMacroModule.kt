@@ -26,7 +26,8 @@ import org.cobalt.api.module.setting.impl.InfoSetting
 import org.cobalt.api.module.setting.impl.InfoType
 import org.cobalt.api.module.setting.impl.SliderSetting
 import org.cobalt.api.module.setting.impl.TextSetting
-import org.cobalt.api.ui.theme.ThemeManager
+import org.cobalt.api.ui.theme.ThemeGradient
+import org.cobalt.api.ui.theme.ThemeSurface
 import org.cobalt.api.util.AngleUtils
 import org.cobalt.api.util.ChatUtils
 import org.cobalt.api.util.InventoryUtils
@@ -156,12 +157,11 @@ object PigMacroModule : Module("Pig Macro") {
         render { x, y, _ ->
             val now   = System.currentTimeMillis()
             val twoPi = (Math.PI * 2).toFloat()
-            val c1    = ThemeManager.currentTheme.accent
-            val c2    = ThemeManager.currentTheme.accentSecondary
+            val (c1, c2) = ThemeGradient.colors()
             val dim   = 0xBBAFCFFF.toInt()
 
-            NVGRenderer.rect(x, y, W, H, 0xFF0A0E1A.toInt(), CORNER)
-            NVGRenderer.gradientRect(x, y, W, H * 0.5f, 0x14FFFFFF, 0x00000000, Gradient.TopToBottom, CORNER)
+            NVGRenderer.rect(x, y, W, H, ThemeSurface.panelSolid(), CORNER)
+            NVGRenderer.gradientRect(x, y, W, H * 0.5f, ThemeSurface.overlay(), 0x00000000, Gradient.TopToBottom, CORNER)
             val shiftX = cos((now % 10000L).toFloat() / 10000f * twoPi) * (W * 0.42f)
             NVGRenderer.hollowGradientRectShifted(x, y, W, H, 1.5f, c1, c2, Gradient.LeftToRight, CORNER, shiftX, 0f)
 

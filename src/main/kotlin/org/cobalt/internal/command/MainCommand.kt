@@ -86,6 +86,11 @@ internal object MainCommand : Command(name = "dutt", aliases = arrayOf("cobalt",
     VeinScannerModule.enterScannerMode()
   }
 
+  @SubCommand("vein export")
+  fun veinExport() {
+    VeinScannerModule.exportLookedVein()
+  }
+
   @SubCommand
   fun unlock() {
     PathfindingModule.stopPath()

@@ -39,6 +39,12 @@ internal class UIThemeEditor(
 
   private val nameSetting = TextSetting("Name", "Theme name", theme.name)
   private val nameEditor = UITextSetting(nameSetting)
+  private val chatGradientDefaults = parseChatGradient(theme.chatGradient)
+  private val chatGradientSettings = listOf(
+    ColorSetting("Gradient Left", "Left side of the chat text gradient.", chatGradientDefaults[0]),
+    ColorSetting("Gradient Right", "Right side of the chat text gradient.", chatGradientDefaults[1]),
+  )
+  private val chatGradientEditors = chatGradientSettings.map { UIColorSetting(it) }
 
   private val palette = ThemePalette()
   private val paletteSettings = listOf(
@@ -155,6 +161,7 @@ internal class UIThemeEditor(
     components.add(backButton)
     components.add(topBar)
     components.add(nameEditor)
+    components.addAll(chatGradientEditors)
     components.add(UIInfoSetting(InfoSetting("Palette", "")))
     components.addAll(paletteEditors)
     components.add(generateButton)
@@ -179,6 +186,8 @@ internal class UIThemeEditor(
     val visibleHeight = height - (topBar.height + backButton.height + 20F)
 
     val list = listOf<UIComponent>(nameEditor) +
+      listOf(UIInfoSetting(InfoSetting("Text Chat Gradient", ""))) +
+      chatGradientEditors +
       listOf(UIInfoSetting(InfoSetting("Palette", ""))) +
       paletteEditors +
       listOf(generateButton) +
@@ -196,6 +205,7 @@ internal class UIThemeEditor(
     NVGRenderer.popScissor()
 
     paletteEditors.forEach { it.drawColorPicker() }
+    chatGradientEditors.forEach { it.drawColorPicker() }
     colorEditors.filterIsInstance<UIColorSetting>().forEach { it.drawColorPicker() }
 
     syncTheme()
@@ -281,12 +291,39 @@ internal class UIThemeEditor(
 
   private fun syncTheme() {
     theme.name = nameSetting.value
+    theme.chatGradient = chatGradientSettings.joinToString(",") { colorSetting ->
+      formatRgb(colorSetting.value)
+    }
     allColorFields.forEach { field ->
       field.apply(field.setting.value)
     }
 
     ThemeManager.setTheme(theme)
   }
+
+  private fun parseChatGradient(raw: String): List<Int> {
+    val parsed = Regex("#?([0-9a-fA-F]{8}|[0-9a-fA-F]{6})")
+      .findAll(raw)
+      .map { match ->
+        val hex = match.groupValues[1]
+        val rgbHex = if (hex.length == 8) hex.takeLast(6) else hex
+        0xFF000000.toInt() or rgbHex.toInt(16)
+      }
+      .take(2)
+      .toMutableList()
+
+    val fallback = listOf(theme.accent, theme.accentSecondary)
+    while (parsed.size < 2) {
+      parsed.add(fallback[parsed.size].withFullAlpha())
+    }
+    return parsed
+  }
+
+  private fun formatRgb(argb: Int): String =
+    "#%06X".format(argb and 0x00FFFFFF)
+
+  private fun Int.withFullAlpha(): Int =
+    0xFF000000.toInt() or (this and 0x00FFFFFF)
 
   private class UIGenerateButton(
     private val onClick: () -> Unit

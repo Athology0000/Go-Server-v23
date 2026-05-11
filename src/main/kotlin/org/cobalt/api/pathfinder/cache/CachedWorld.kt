@@ -9,6 +9,7 @@ import org.cobalt.api.event.impl.client.BlockChangeEvent
 import org.cobalt.api.event.impl.client.TickEvent
 import org.cobalt.api.pathfinder.jni.NativePathfinderBridge
 import org.cobalt.api.pathfinder.jni.NativeStateEncoder
+import org.cobalt.api.util.ChatUtils
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.ExecutorService
@@ -35,11 +36,15 @@ object CachedWorld {
     @Volatile private var worldKey: String = RUNTIME_WORLD_KEY
     @Volatile private var nativeWorldToken: String = ""
     @Volatile private var pendingNativeResync = true
+    @Volatile private var dirty = false
+    private var lastAutoSaveTick = 0L
 
     private var cacheKey: Long = Long.MIN_VALUE
     private var cacheChunk: CachedChunk? = null
 
     @Volatile private var unlimitedChunkCache = false
+
+    data class CachedChunkPos(val x: Int, val z: Int)
 
     private fun chunkKey(x: Int, z: Int): Long =
         (x.toLong() shl 32) or (z.toLong() and 0xFFFFFFFFL)
@@ -114,6 +119,7 @@ object CachedWorld {
             chunk.setFlags(pos.x and 15, pos.y, pos.z and 15, flags)
             queueNativeUpdate(pos.x, pos.y, pos.z, flags.toInt() and 0xFFFF)
             if (cacheKey == key) cacheChunk = chunk
+            dirty = true
         }
     }
 
@@ -158,6 +164,7 @@ object CachedWorld {
             if (!chunks.containsKey(key)) chunkInsertionOrder.addLast(key)
             chunks[key] = cached
             if (cacheKey == key) cacheChunk = cached
+            dirty = true
             syncChunkToNative(chunkX, chunkZ, cached)
         }
 
@@ -176,6 +183,7 @@ object CachedWorld {
         }
 
         flushPendingNativeUpdates()
+        autoSave(level.gameTime)
     }
 
     private fun resetState() {
@@ -185,6 +193,7 @@ object CachedWorld {
         pendingNativeUpdates.clear()
         cacheKey = Long.MIN_VALUE
         cacheChunk = null
+        dirty = false
         pendingNativeResync = true
         nativeWorldToken = ""
         NativePathfinderBridge.clearWorld()
@@ -192,10 +201,14 @@ object CachedWorld {
 
     fun saveAndClear(lobbyName: String) {
         val mapToSave = chunks
+        val count = mapToSave.values.count { it.ready }
         resetState()
         if (mapToSave.isNotEmpty()) {
             executor.submit {
-                try { WorldSerializer.save(lobbyName, mapToSave) } catch (e: Exception) { e.printStackTrace() }
+                try {
+                    WorldSerializer.save(lobbyName, mapToSave)
+                    sendCacheMessage("World cache saved $count chunks for $lobbyName.")
+                } catch (e: Exception) { e.printStackTrace() }
             }
         }
     }
@@ -208,6 +221,10 @@ object CachedWorld {
                 val loaded = WorldSerializer.load(lobbyName)
                 if (loaded != null && chunks === sessionMap) {
                     for ((key, chunk) in loaded) sessionMap.putIfAbsent(key, chunk)
+                    dirty = false
+                    sendCacheMessage("World cache loaded ${loaded.values.count { it.ready }} chunks for $lobbyName.")
+                } else if (loaded == null) {
+                    sendCacheMessage("World cache: no saved cache for $lobbyName yet.")
                 }
             } catch (e: Exception) { e.printStackTrace() }
         }
@@ -218,6 +235,11 @@ object CachedWorld {
     }
 
     val readyChunkCount: Int get() = chunks.values.count { it.ready }
+
+    fun readyChunkPositions(): List<CachedChunkPos> =
+        chunks.entries
+            .filter { it.value.ready }
+            .map { (key, _) -> CachedChunkPos((key shr 32).toInt(), key.toInt()) }
 
     fun getCacheStats(): String {
         val ready = chunks.values.count { it.ready }
@@ -231,10 +253,39 @@ object CachedWorld {
     fun setWorldKey(newWorldKey: String?) {
         val normalized = newWorldKey?.ifBlank { RUNTIME_WORLD_KEY } ?: RUNTIME_WORLD_KEY
         if (worldKey == normalized) return
+        val previous = worldKey
+        if (previous != RUNTIME_WORLD_KEY && dirty) {
+            save(previous)
+        }
         worldKey = normalized
         nativeWorldToken = ""
         pendingNativeResync = true
         NativePathfinderBridge.clearWorld()
+        sendCacheMessage("World cache key set to $worldKey.")
+    }
+
+    fun save(lobbyName: String = worldKey) {
+        if (lobbyName == RUNTIME_WORLD_KEY) return
+        val snapshot = ConcurrentHashMap(chunks)
+        val count = snapshot.values.count { it.ready }
+        if (count == 0) return
+        dirty = false
+        executor.submit {
+            try {
+                WorldSerializer.save(lobbyName, snapshot)
+                sendCacheMessage("World cache autosaved $count chunks for $lobbyName.")
+            } catch (e: Exception) {
+                dirty = true
+                e.printStackTrace()
+            }
+        }
+    }
+
+    private fun autoSave(gameTime: Long) {
+        if (!dirty || worldKey == RUNTIME_WORLD_KEY) return
+        if (gameTime - lastAutoSaveTick < AUTO_SAVE_INTERVAL_TICKS) return
+        lastAutoSaveTick = gameTime
+        save(worldKey)
     }
 
     private fun ensureNativeWorld(dimKey: String, minY: Int, maxY: Int) {
@@ -307,4 +358,12 @@ object CachedWorld {
     private fun queueNativeUpdate(x: Int, y: Int, z: Int, flags: Int) {
         pendingNativeUpdates[blockKey(x, y, z)] = flags
     }
+
+    private fun sendCacheMessage(message: String) {
+        Minecraft.getInstance().execute {
+            ChatUtils.sendMessage(message)
+        }
+    }
+
+    private const val AUTO_SAVE_INTERVAL_TICKS = 1200L
 }

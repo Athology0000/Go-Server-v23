@@ -1,9 +1,13 @@
 package org.cobalt.internal.skyblock
 
+import net.minecraft.ChatFormatting
+import net.minecraft.client.Minecraft
+import net.minecraft.network.chat.Component
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
 import net.hypixel.modapi.HypixelModAPI
 import net.hypixel.modapi.packet.impl.clientbound.event.ClientboundLocationPacket
 import org.cobalt.api.pathfinder.cache.CachedWorld
+import java.util.Locale
 
 object HypixelManager {
 
@@ -13,6 +17,19 @@ object HypixelManager {
         private set
     @Volatile var currentMode: String = "Unknown"
         private set
+
+    fun currentPlaceName(): String {
+        currentMap.takeIf(::isKnown)?.let { return it }
+
+        val detected = detectLivePlace()
+        if (detected != null) {
+            currentMap = detected
+            return detected
+        }
+
+        currentMode.takeIf(::isKnown)?.let { return it }
+        return "Unknown"
+    }
 
     fun init() {
         val api = HypixelModAPI.getInstance()
@@ -69,4 +86,73 @@ object HypixelManager {
         currentMap = "Unknown"
         currentMode = "Unknown"
     }
+
+    private fun detectLivePlace(): String? {
+        val mc = Minecraft.getInstance()
+        return detectFromLines(collectTabLines(mc))
+            ?: detectFromLines(collectScoreboardLines(mc))
+    }
+
+    private fun collectTabLines(mc: Minecraft): List<String> {
+        val connection = mc.connection ?: return emptyList()
+        return connection.onlinePlayers
+            .mapNotNull { info -> info.tabListDisplayName?.string ?: info.profile.name }
+            .flatMap(::splitCleanLines)
+    }
+
+    private fun collectScoreboardLines(mc: Minecraft): List<String> {
+        val level = mc.level ?: return emptyList()
+        val scoreboard = level.scoreboard
+        val objective = scoreboard.getDisplayObjective(net.minecraft.world.scores.DisplaySlot.SIDEBAR) ?: return emptyList()
+        return scoreboard.listPlayerScores(objective)
+            .map { score ->
+                score.display()?.string ?: run {
+                    val owner = score.owner()
+                    val team = scoreboard.getPlayersTeam(owner)
+                    if (team == null) score.ownerName().string else Component.empty()
+                        .append(team.playerPrefix.copy())
+                        .append(Component.literal(owner))
+                        .append(team.playerSuffix.copy())
+                        .string
+                }
+            }
+            .flatMap(::splitCleanLines)
+    }
+
+    private fun detectFromLines(lines: List<String>): String? {
+        for (line in lines) {
+            val labelMatch = LOCATION_LABEL.find(line)
+            if (labelMatch != null) {
+                return cleanPlace(labelMatch.groupValues[1])
+            }
+
+            val symbolIndex = line.indexOf('⏣')
+            if (symbolIndex >= 0 && symbolIndex + 1 < line.length) {
+                return cleanPlace(line.substring(symbolIndex + 1))
+            }
+        }
+        return null
+    }
+
+    private fun splitCleanLines(text: String): List<String> =
+        ChatFormatting.stripFormatting(text).orEmpty()
+            .replace("\r", "\n")
+            .split('\n')
+            .map { it.replace(Regex("""\s+"""), " ").trim() }
+            .filter { it.isNotEmpty() }
+
+    private fun cleanPlace(raw: String): String? {
+        val value = raw
+            .replace(Regex("""\s+"""), " ")
+            .trim(' ', ':', '-', '|')
+            .substringBefore("  ")
+            .ifBlank { return null }
+        if (!isKnown(value)) return null
+        return value
+    }
+
+    private fun isKnown(value: String): Boolean =
+        value.isNotBlank() && !value.equals("Unknown", ignoreCase = true)
+
+    private val LOCATION_LABEL = Regex("""(?i)\b(?:area|island|location|map)\s*:\s*(.+)$""")
 }

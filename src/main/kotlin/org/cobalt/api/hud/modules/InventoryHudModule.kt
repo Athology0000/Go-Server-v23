@@ -12,6 +12,8 @@ import org.cobalt.api.hud.HudModuleManager
 import org.cobalt.api.hud.hudElement
 import org.cobalt.api.module.Module
 import org.cobalt.api.module.setting.impl.CheckboxSetting
+import org.cobalt.api.ui.theme.ThemeGradient
+import org.cobalt.api.ui.theme.ThemeSurface
 import org.cobalt.api.util.ui.NVGRenderer
 import org.cobalt.api.util.ui.helper.Gradient
 
@@ -29,10 +31,6 @@ class InventoryHudModule : Module("Inventory HUD") {
   private val borderRadius    = 9f
   private val borderThickness = 1.5f
   private val itemOffset      = 2f
-
-  private val outlineStart = 0xFF2DE2FF.toInt()
-  private val outlineEnd   = 0xFFFF6ACD.toInt()
-  private val panelColor = 0x50101010.toInt()
 
   private lateinit var backgroundSetting: CheckboxSetting
 
@@ -76,12 +74,13 @@ class InventoryHudModule : Module("Inventory HUD") {
       val totalH = p * 2 + ROWS * ss + (ROWS - 1) * sg
 
       if (background.value) {
-        NVGRenderer.rect(0f, 0f, totalW, totalH, panelColor, br)
+        NVGRenderer.rect(0f, 0f, totalW, totalH, ThemeSurface.slotGlass(), br)
       }
 
       val angle  = (System.currentTimeMillis() % 12000L).toFloat() / 12000f * (Math.PI * 2.0).toFloat()
       val shiftX = cos(angle) * (totalW * 0.45f)
       val shiftY = sin(angle) * (totalH * 0.45f)
+      val (outlineStart, outlineEnd) = ThemeGradient.colors()
       NVGRenderer.hollowGradientRectShifted(
         0f, 0f, totalW, totalH,
         bt,

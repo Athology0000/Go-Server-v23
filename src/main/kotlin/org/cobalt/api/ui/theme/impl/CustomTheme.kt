@@ -9,6 +9,7 @@ data class CustomTheme(
   override var rainbowSpeed: Float = 1f,
   override var rainbowSaturation: Float = 1f,
   override var rainbowBrightness: Float = 1f,
+  override var chatGradient: String = "",
   override var background: Int = Color(18, 18, 18).rgb,
   override var panel: Int = Color(24, 24, 24).rgb,
   override var inset: Int = Color(30, 30, 30).rgb,

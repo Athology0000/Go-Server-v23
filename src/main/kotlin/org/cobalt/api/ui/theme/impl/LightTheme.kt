@@ -11,6 +11,7 @@ class LightTheme : Theme {
   override val rainbowSpeed = 1f
   override val rainbowSaturation = 1f
   override val rainbowBrightness = 1f
+  override val chatGradient = ""
 
   override val background = Color(240, 240, 240).rgb
   override val panel = Color(255, 255, 255).rgb

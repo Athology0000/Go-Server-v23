@@ -4,6 +4,7 @@ import net.minecraft.client.Minecraft
 import net.minecraft.core.BlockPos
 import net.minecraft.world.phys.Vec3
 import org.cobalt.api.module.ModuleDebug
+import org.cobalt.api.pathfinder.cache.CachedWorld
 import org.cobalt.api.rotation.RotationExecutor
 import org.cobalt.api.util.AngleUtils
 import org.cobalt.api.util.InventoryUtils
@@ -14,11 +15,15 @@ import org.cobalt.internal.pathfinding.DebugLog
 import org.cobalt.internal.pathfinding.PathRecoveryController
 import org.cobalt.internal.pathfinding.PathTeleportConfig
 import org.cobalt.internal.pathfinding.TeleportValidationController
+import org.cobalt.internal.skyblock.HypixelManager
+import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import kotlin.math.abs
 import kotlin.math.atan2
+import kotlin.math.max
+import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 object NativePathfinder {
@@ -101,6 +106,7 @@ object NativePathfinder {
 
     @Volatile private var searchResult: NativePathResult? = null
     @Volatile private var searchFailed: Boolean = false
+    @Volatile private var lastSearchSummary: String = ""
     private var searchFuture: Future<*>? = null
 
     private var prevJump: Boolean = false
@@ -124,6 +130,8 @@ object NativePathfinder {
     private var lastSearchGoalY: Int = Int.MIN_VALUE
     private var lastSearchGoalZ: Int = Int.MIN_VALUE
     private var sprintSuppressHysteresisTicks: Int = 0
+    private var originalGoalBeforeFrontier: SearchPoint? = null
+    private var walkingToCachedFrontier: Boolean = false
 
     // Debug fields
     var debugAvoidPoints: List<Pair<BlockPos, AvoidReason>> = emptyList()
@@ -164,6 +172,8 @@ object NativePathfinder {
     private const val CLEAN_EXEC_TICKS = 30
     private const val SPRINT_SUPPRESS_CURVATURE = 0.4
     private const val SPRINT_SUPPRESS_HYSTERESIS_TICKS = 6
+    private const val FRONTIER_MIN_DISTANCE_SQ = 64.0
+    private const val FRONTIER_Y_SCAN = 12
 
     fun init() {
         NativePathfinderJNI.initNative()
@@ -182,6 +192,8 @@ object NativePathfinder {
 
     fun setTargetWithRadius(x: Double, y: Double, z: Double, radius: Double) {
         routeWaypoints = emptyList()
+        originalGoalBeforeFrontier = null
+        walkingToCachedFrontier = false
         goalX = x.toInt(); goalY = y.toInt(); goalZ = z.toInt()
         arrivalRadius = radius
         startSearch()
@@ -199,6 +211,8 @@ object NativePathfinder {
             return false
         }
         routeWaypoints = emptyList()
+        originalGoalBeforeFrontier = null
+        walkingToCachedFrontier = false
         routeProfile = if (isFly) MovementProfile.FLY else MovementProfile.DEFAULT
         val finalGoal = goals.first()
         goalX = finalGoal.x; goalY = finalGoal.y; goalZ = finalGoal.z
@@ -212,6 +226,8 @@ object NativePathfinder {
 
     fun setFlyTarget(x: Double, y: Double, z: Double, radius: Double = 2.5) {
         routeWaypoints = emptyList()
+        originalGoalBeforeFrontier = null
+        walkingToCachedFrontier = false
         routeProfile = MovementProfile.FLY
         goalX = x.toInt(); goalY = y.toInt(); goalZ = z.toInt()
         arrivalRadius = radius
@@ -224,6 +240,8 @@ object NativePathfinder {
 
     fun setRouteWithRadius(waypoints: DoubleArray, loop: Boolean, profile: MovementProfile, arrivalRadius: Double) {
         routeLoop = loop
+        originalGoalBeforeFrontier = null
+        walkingToCachedFrontier = false
         routeProfile = profile
         routeArrivalRadius = arrivalRadius
         routeWpIndex = 0
@@ -282,6 +300,8 @@ object NativePathfinder {
         lastVerticalCheckPos = Vec3.ZERO
         stuckPositions.clear()
         transientAvoidPoints.clear()
+        originalGoalBeforeFrontier = null
+        walkingToCachedFrontier = false
         cleanExecTicks = 0
         PathExecutorState.reset()
         releaseGuidedControl()
@@ -300,6 +320,10 @@ object NativePathfinder {
             searchFailed = false
             searchFuture = null
             if (state == PathStatus.PLANNING) {
+                if (tryStartCachedFrontierFallback("findPath returned no result")) {
+                    lastTickStatus = state
+                    return null
+                }
                 state = PathStatus.FAILED
                 logFailure("findPath returned no result")
             } else {
@@ -541,6 +565,22 @@ object NativePathfinder {
     }
 
     private fun advanceRouteOrArrive(): Boolean {
+        if (walkingToCachedFrontier) {
+            val original = originalGoalBeforeFrontier
+            if (original != null) {
+                walkingToCachedFrontier = false
+                goalX = original.x
+                goalY = original.y
+                goalZ = original.z
+                DebugLog.status(
+                    Minecraft.getInstance(),
+                    "Pathfinding",
+                    "Pathfinder: reached cached frontier, retrying original goal ${formatPoint(original)}."
+                )
+                startSearch()
+                return true
+            }
+        }
         if (routeWaypoints.isNotEmpty()) {
             routeWpIndex++
             val totalWp = routeWaypoints.size
@@ -555,6 +595,8 @@ object NativePathfinder {
             }
         }
         state = PathStatus.ARRIVED
+        originalGoalBeforeFrontier = null
+        walkingToCachedFrontier = false
         cachedFullPathNodes = emptyList()
         cachedPathNodes = emptyList()
         pathNodeCursor = 0
@@ -631,6 +673,8 @@ object NativePathfinder {
         val moveOrderOffset = searchVariantSeed.coerceAtLeast(0)
         val flatStarts = starts.toFlatIntArray()
         val flatGoals = goals.toFlatIntArray()
+        lastSearchSummary = buildSearchSummary(starts, goals, isFly, avoidMeta.size / 5, moveOrderOffset)
+        DebugLog.status(Minecraft.getInstance(), "Pathfinding", "Pathfinder: planning $lastSearchSummary")
         searchFuture = searchExecutor.submit {
             try {
                 val result = NativePathfinderJNI.findPath(
@@ -757,7 +801,14 @@ object NativePathfinder {
         lastStuckCheckPos = playerPos
         lastCollisionCheckPos = playerPos
         ModuleDebug.log("Pathfinding", "Path built in ${result.timeMs}ms")
-        DebugLog.status(mc, "Pathfinding", "Pathfinder: path found: ${cachedPathNodes.size} key nodes, ${cachedFullPathNodes.size} nodes, goal ($goalX,$goalY,$goalZ), ${result.timeMs}ms, ${result.nodesExplored} explored")
+        DebugLog.status(
+            mc,
+            "Pathfinding",
+            "Pathfinder: path found: ${cachedPathNodes.size} key/${cachedFullPathNodes.size} dense nodes, " +
+                "length=${formatBlocks(pathLength(cachedFullPathNodes))}, goal=($goalX,$goalY,$goalZ), " +
+                "time=${result.timeMs}ms, explored=${result.nodesExplored}, selectedStart=${result.selectedStartIndex}, " +
+                "flags=${summarizeKeyFlags()}, ${cacheSummary()}, sig=${result.signature.take(10)}"
+        )
     }
 
     private fun cancelSearch() {
@@ -1011,10 +1062,177 @@ object NativePathfinder {
         }.coerceIn(0, lastIndex)
     }
 
+    private fun tryStartCachedFrontierFallback(reason: String): Boolean {
+        if (walkingToCachedFrontier || routeProfile == MovementProfile.FLY || routeWaypoints.isNotEmpty()) return false
+        if (CachedWorld.getChunk(goalX shr 4, goalZ shr 4) == null) return false
+
+        val player = Minecraft.getInstance().player ?: return false
+        val start = SearchPoint(player.blockX, player.blockY, player.blockZ)
+        val original = originalGoalBeforeFrontier ?: SearchPoint(goalX, goalY, goalZ).also {
+            originalGoalBeforeFrontier = it
+        }
+        val frontier = findCachedFrontierTarget(start, original) ?: return false
+        val dx = frontier.x + 0.5 - player.x
+        val dy = frontier.y.toDouble() - player.y
+        val dz = frontier.z + 0.5 - player.z
+        if (dx * dx + dy * dy + dz * dz < FRONTIER_MIN_DISTANCE_SQ) return false
+
+        walkingToCachedFrontier = true
+        goalX = frontier.x
+        goalY = frontier.y
+        goalZ = frontier.z
+        DebugLog.status(
+            Minecraft.getInstance(),
+            "Pathfinding",
+            "Pathfinder: full path unavailable ($reason). Walking to cached frontier ${formatPoint(frontier)} " +
+                "before retrying original goal ${formatPoint(original)}."
+        )
+        submitSearch(
+            starts = listOf(start),
+            goals = listOf(frontier),
+            isFly = false
+        )
+        return true
+    }
+
+    private fun findCachedFrontierTarget(start: SearchPoint, goal: SearchPoint): SearchPoint? {
+        val chunks = lineChunks(start.x shr 4, start.z shr 4, goal.x shr 4, goal.z shr 4)
+        if (chunks.size < 2) return null
+
+        var lastCached: Pair<Int, Int>? = null
+        for (chunk in chunks) {
+            if (CachedWorld.getChunk(chunk.first, chunk.second) == null) break
+            lastCached = chunk
+        }
+
+        val frontierChunk = lastCached ?: return null
+        if (frontierChunk.first == (start.x shr 4) && frontierChunk.second == (start.z shr 4)) return null
+        return findCachedWalkableInChunk(frontierChunk.first, frontierChunk.second, start.y, goal.x, goal.z)
+    }
+
+    private fun lineChunks(startX: Int, startZ: Int, goalX: Int, goalZ: Int): List<Pair<Int, Int>> {
+        val dx = goalX - startX
+        val dz = goalZ - startZ
+        val steps = max(abs(dx), abs(dz))
+        if (steps == 0) return listOf(startX to startZ)
+
+        val out = ArrayList<Pair<Int, Int>>(steps + 1)
+        var last: Pair<Int, Int>? = null
+        for (i in 0..steps) {
+            val x = (startX + dx * (i.toDouble() / steps.toDouble())).roundToInt()
+            val z = (startZ + dz * (i.toDouble() / steps.toDouble())).roundToInt()
+            val next = x to z
+            if (next != last) {
+                out += next
+                last = next
+            }
+        }
+        return out
+    }
+
+    private fun findCachedWalkableInChunk(
+        chunkX: Int,
+        chunkZ: Int,
+        aroundY: Int,
+        preferBlockX: Int,
+        preferBlockZ: Int
+    ): SearchPoint? {
+        val minX = chunkX shl 4
+        val minZ = chunkZ shl 4
+        val candidates = ArrayList<Pair<Int, Int>>(256)
+        for (lx in 0..15) {
+            for (lz in 0..15) {
+                val x = minX + lx
+                val z = minZ + lz
+                candidates += x to z
+            }
+        }
+        candidates.sortBy { (x, z) ->
+            val dx = x - preferBlockX
+            val dz = z - preferBlockZ
+            dx * dx + dz * dz
+        }
+
+        for (dy in 0..FRONTIER_Y_SCAN) {
+            val yCandidates = if (dy == 0) intArrayOf(aroundY) else intArrayOf(aroundY + dy, aroundY - dy)
+            for (y in yCandidates) {
+                for ((x, z) in candidates) {
+                    val point = SearchPoint(x, y, z)
+                    if (isCachedWalkable(point)) return point
+                }
+            }
+        }
+        return null
+    }
+
+    private fun isCachedWalkable(point: SearchPoint): Boolean =
+        isCachedPassable(point.x, point.y, point.z) &&
+            isCachedPassable(point.x, point.y + 1, point.z) &&
+            isCachedStandable(point.x, point.y - 1, point.z)
+
+    private fun isCachedPassable(x: Int, y: Int, z: Int): Boolean {
+        val flags = CachedWorld.getBlockFlags(x, y, z)?.toInt()?.and(0xFFFF) ?: return false
+        return flags and NativeVoxelFlags.FLUID == 0 &&
+            flags and NativeVoxelFlags.PASSABLE != 0
+    }
+
+    private fun isCachedStandable(x: Int, y: Int, z: Int): Boolean {
+        val flags = CachedWorld.getBlockFlags(x, y, z)?.toInt()?.and(0xFFFF) ?: return false
+        return flags and NativeVoxelFlags.FLUID == 0 &&
+            flags and NativeVoxelFlags.SOLID != 0
+    }
+
     private fun logFailure(reason: String) {
         val mc = Minecraft.getInstance()
-        DebugLog.status(mc, "Pathfinding", "Pathfinder: path failed: $reason")
+        val summary = lastSearchSummary.ifBlank { "goal=($goalX,$goalY,$goalZ)" }
+        DebugLog.status(mc, "Pathfinding", "Pathfinder: path failed: $reason | $summary | ${cacheSummary()}")
     }
+
+    private fun buildSearchSummary(
+        starts: List<SearchPoint>,
+        goals: List<SearchPoint>,
+        isFly: Boolean,
+        avoidCount: Int,
+        moveOrderOffset: Int
+    ): String {
+        val profile = if (isFly) "fly" else "walk"
+        val startText = starts.joinToString(prefix = "[", postfix = "]", limit = 3) { formatPoint(it) }
+        val goalText = goals.joinToString(prefix = "[", postfix = "]", limit = 3) { formatPoint(it) }
+        return "profile=$profile, starts=$startText, goals=$goalText, maxIter=$MAX_ITERATIONS, " +
+            "avoid=$avoidCount, variant=$moveOrderOffset, ${cacheSummary()}"
+    }
+
+    private fun cacheSummary(): String =
+        "${CachedWorld.getCacheStats()}, place=${HypixelManager.currentPlaceName()}"
+
+    private fun formatPoint(point: SearchPoint): String = "(${point.x},${point.y},${point.z})"
+
+    private fun pathLength(nodes: List<Vec3>): Double {
+        if (nodes.size < 2) return 0.0
+        var total = 0.0
+        var prev = nodes.first()
+        for (i in 1..nodes.lastIndex) {
+            val next = nodes[i]
+            total += prev.distanceTo(next)
+            prev = next
+        }
+        return total
+    }
+
+    private fun summarizeKeyFlags(): String {
+        var lowHeadroom = 0
+        var stepUp = 0
+        var tight = 0
+        for (flags in cachedKeyNodeFlags) {
+            if (flags and FLAG_LOW_HEADROOM != 0) lowHeadroom++
+            if (flags and FLAG_STEP_UP_NEXT != 0) stepUp++
+            if (flags and FLAG_TIGHT_CORRIDOR != 0) tight++
+        }
+        return "low=$lowHeadroom,step=$stepUp,tight=$tight"
+    }
+
+    private fun formatBlocks(value: Double): String =
+        String.format(Locale.US, "%.1fb", value)
 
     private fun releaseGuidedControl() {
         PathFlyMovementController.reset()

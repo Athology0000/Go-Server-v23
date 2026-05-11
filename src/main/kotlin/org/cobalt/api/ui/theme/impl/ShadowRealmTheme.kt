@@ -18,6 +18,7 @@ class ShadowRealmTheme : Theme {
   override val rainbowSpeed = 1f
   override val rainbowSaturation = 1f
   override val rainbowBrightness = 1f
+  override val chatGradient = ""
 
   // Base
   override val background = Color(0x05, 0x00, 0x08).rgb

@@ -109,6 +109,7 @@ class Runtime {
   [[nodiscard]] bool isTopSlab(int x, int y, int z) const;
   [[nodiscard]] bool isFenceLike(int x, int y, int z) const;
   [[nodiscard]] bool isStairsBottom(int x, int y, int z) const;
+  [[nodiscard]] bool isStairAscentDirection(int x, int y, int z, int dx, int dz) const;
   [[nodiscard]] bool isBlockingWall(int x, int y, int z) const;
   [[nodiscard]] bool isFluid(int x, int y, int z) const;
 

@@ -3,9 +3,11 @@ package org.cobalt.internal.ui.panel.panels
 import net.minecraft.client.Minecraft
 import org.cobalt.api.notification.NotificationManager
 import org.cobalt.api.ui.theme.Theme
+import org.cobalt.api.ui.theme.ThemeGradient
 import org.cobalt.api.ui.theme.ThemeManager
 import org.cobalt.api.ui.theme.impl.CustomTheme
 import org.cobalt.api.util.ui.NVGRenderer
+import org.cobalt.api.util.ui.helper.Gradient
 import org.cobalt.internal.ui.UIComponent
 import org.cobalt.internal.ui.animation.ColorAnimation
 import org.cobalt.internal.ui.components.UITopbar
@@ -302,15 +304,50 @@ internal class UIThemeSelector : UIPanel(
       NVGRenderer.rect(x + 20F + swatchSize + swatchGap, swatchY, swatchSize, swatchSize, theme.accent, 5F)
 
       NVGRenderer.rect(x + 20F + (swatchSize + swatchGap) * 2, swatchY, swatchSize, swatchSize, theme.text, 5F)
+
+      val (gradientStart, gradientEnd) = ThemeGradient.colors(theme)
+      val gradientX = gradientBarX()
+      val gradientY = gradientBarY()
+      val gradientW = gradientBarWidth()
+      val gradientH = gradientBarHeight()
+      val gradientHovering = isHoveringOver(gradientX, gradientY, gradientW, gradientH)
+      val shiftX = kotlin.math.cos(ThemeGradient.phase() * (Math.PI * 2.0).toFloat()) * gradientW * 0.45f
+
+      NVGRenderer.gradientRectShifted(
+        gradientX,
+        gradientY,
+        gradientW,
+        gradientH,
+        gradientStart,
+        gradientEnd,
+        Gradient.LeftToRight,
+        5F,
+        shiftX,
+        0F
+      )
+      NVGRenderer.hollowRect(
+        gradientX,
+        gradientY,
+        gradientW,
+        gradientH,
+        if (gradientHovering) 2F else 1F,
+        if (gradientHovering) theme.accent else ThemeManager.currentTheme.controlBorder,
+        5F
+      )
     }
 
     override fun mouseClicked(button: Int): Boolean {
       if (isHoveringOver(x, y, width, height)) {
+        if (button == 0 && isHoveringOver(gradientBarX(), gradientBarY(), gradientBarWidth(), gradientBarHeight())) {
+          openGradientEditor()
+          return true
+        }
+
         if (button == 0) {
           handleSelection()
           return true
-        }else if (button == 1 && theme is CustomTheme) {
-          UIConfig.swapBodyPanel(UIThemeEditor(theme))
+        } else if (button == 1) {
+          openGradientEditor()
           return true
         }
       }
@@ -319,6 +356,101 @@ internal class UIThemeSelector : UIPanel(
 
     open fun handleSelection() {
         ThemeManager.setTheme(theme)
+    }
+
+    private fun openGradientEditor() {
+      val editableTheme =
+        if (theme is CustomTheme) {
+          theme
+        } else {
+          createEditableCopy(theme)
+        }
+      UIConfig.swapBodyPanel(UIThemeEditor(editableTheme))
+    }
+
+    private fun gradientBarX(): Float = x + 145F
+
+    private fun gradientBarY(): Float = y + 58F
+
+    private fun gradientBarWidth(): Float = 105F
+
+    private fun gradientBarHeight(): Float = 18F
+
+    private fun createEditableCopy(source: Theme): CustomTheme {
+      val baseName = "${source.name} Custom"
+      var finalName = baseName
+      var counter = 2
+      while (ThemeManager.getThemes().any { it.name == finalName }) {
+        finalName = "$baseName ($counter)"
+        counter++
+      }
+
+      val copy = CustomTheme(
+        name = finalName,
+        rainbowEnabled = source.rainbowEnabled,
+        rainbowSpeed = source.rainbowSpeed,
+        rainbowSaturation = source.rainbowSaturation,
+        rainbowBrightness = source.rainbowBrightness,
+        chatGradient = source.chatGradient,
+        background = source.background,
+        panel = source.panel,
+        inset = source.inset,
+        overlay = source.overlay,
+        text = source.text,
+        textPrimary = source.textPrimary,
+        textSecondary = source.textSecondary,
+        textDisabled = source.textDisabled,
+        textPlaceholder = source.textPlaceholder,
+        textOnAccent = source.textOnAccent,
+        accent = source.accent,
+        accentPrimary = source.accentPrimary,
+        accentSecondary = source.accentSecondary,
+        selection = source.selection,
+        controlBg = source.controlBg,
+        controlBorder = source.controlBorder,
+        inputBg = source.inputBg,
+        inputBorder = source.inputBorder,
+        success = source.success,
+        warning = source.warning,
+        error = source.error,
+        info = source.info,
+        scrollbarThumb = source.scrollbarThumb,
+        scrollbarTrack = source.scrollbarTrack,
+        sliderTrack = source.sliderTrack,
+        sliderFill = source.sliderFill,
+        sliderThumb = source.sliderThumb,
+        tooltipBackground = source.tooltipBackground,
+        tooltipBorder = source.tooltipBorder,
+        tooltipText = source.tooltipText,
+        notificationBackground = source.notificationBackground,
+        notificationBorder = source.notificationBorder,
+        notificationText = source.notificationText,
+        notificationTextSecondary = source.notificationTextSecondary,
+        infoBackground = source.infoBackground,
+        infoBorder = source.infoBorder,
+        infoIcon = source.infoIcon,
+        warningBackground = source.warningBackground,
+        warningBorder = source.warningBorder,
+        warningIcon = source.warningIcon,
+        successBackground = source.successBackground,
+        successBorder = source.successBorder,
+        successIcon = source.successIcon,
+        errorBackground = source.errorBackground,
+        errorBorder = source.errorBorder,
+        errorIcon = source.errorIcon,
+        selectionText = source.selectionText,
+        searchPlaceholderText = source.searchPlaceholderText,
+        moduleDivider = source.moduleDivider,
+        selectedOverlay = source.selectedOverlay,
+        white = source.white,
+        black = source.black,
+        transparent = source.transparent,
+      )
+
+      ThemeManager.registerTheme(copy)
+      ThemeManager.setTheme(copy)
+      NotificationManager.queue("Theme Copy Created", "'$finalName' is ready to edit")
+      return copy
     }
 
   }

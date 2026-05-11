@@ -2,6 +2,7 @@ package org.cobalt.api.pathfinder.jni
 
 import net.minecraft.client.Minecraft
 import net.minecraft.core.BlockPos
+import net.minecraft.core.Direction
 import net.minecraft.world.level.block.AbstractSkullBlock
 import net.minecraft.world.level.block.BannerBlock
 import net.minecraft.world.level.block.BaseRailBlock
@@ -34,6 +35,7 @@ import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.level.block.state.properties.Half
 import net.minecraft.world.level.block.state.properties.SlabType
 import net.minecraft.world.phys.shapes.CollisionContext
+import net.minecraft.tags.FluidTags
 
 object NativeStateEncoder {
 
@@ -85,6 +87,9 @@ object NativeStateEncoder {
 
         if (!state.fluidState.isEmpty) {
             flags = flags or NativeVoxelFlags.FLUID
+            if (state.fluidState.`is`(FluidTags.LAVA)) {
+                flags = flags or NativeVoxelFlags.LAVA
+            }
         }
 
         if (block is CarpetBlock) {
@@ -157,7 +162,9 @@ object NativeStateEncoder {
             is StairBlock -> {
                 flags = flags or NativeVoxelFlags.SOLID
                 if (state.getValue(StairBlock.HALF) == Half.BOTTOM) {
-                    flags = flags or NativeVoxelFlags.STAIRS_BOTTOM
+                    flags = flags or NativeVoxelFlags.STAIRS_BOTTOM or stairFacingFlag(state.getValue(StairBlock.FACING))
+                } else {
+                    flags = flags or NativeVoxelFlags.BLOCKING_WALL
                 }
             }
 
@@ -199,4 +206,13 @@ object NativeStateEncoder {
 
         return flags
     }
+
+    private fun stairFacingFlag(facing: Direction): Int =
+        when (facing) {
+            Direction.NORTH -> NativeVoxelFlags.STAIR_FACING_NORTH
+            Direction.SOUTH -> NativeVoxelFlags.STAIR_FACING_SOUTH
+            Direction.WEST -> NativeVoxelFlags.STAIR_FACING_WEST
+            Direction.EAST -> NativeVoxelFlags.STAIR_FACING_EAST
+            else -> NativeVoxelFlags.STAIR_FACING_NORTH
+        }
 }

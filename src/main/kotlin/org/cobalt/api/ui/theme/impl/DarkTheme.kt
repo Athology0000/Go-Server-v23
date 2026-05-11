@@ -11,6 +11,7 @@ class DarkTheme : Theme {
   override val rainbowSpeed = 1f
   override val rainbowSaturation = 1f
   override val rainbowBrightness = 1f
+  override val chatGradient = ""
 
   override val background = Color(18, 18, 18).rgb
   override val panel = Color(24, 24, 24).rgb

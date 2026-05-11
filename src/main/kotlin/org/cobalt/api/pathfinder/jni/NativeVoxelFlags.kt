@@ -14,4 +14,10 @@ object NativeVoxelFlags {
     const val ETHER_PASSABLE = 1 shl 10
     const val ETHER_TELEPORT_CLEAR = 1 shl 11
     const val ETHER_FEET_BLOCKER = 1 shl 12
+    const val LAVA = 1 shl 13
+    const val STAIR_FACING_NORTH = 0 shl 14
+    const val STAIR_FACING_SOUTH = 1 shl 14
+    const val STAIR_FACING_WEST = 2 shl 14
+    const val STAIR_FACING_EAST = 3 shl 14
+    const val STAIR_FACING_MASK = 3 shl 14
 }

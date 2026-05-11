@@ -13,6 +13,8 @@ import org.cobalt.api.hud.hudElement
 import org.cobalt.api.module.Module
 import org.cobalt.api.module.ModuleCategory
 import org.cobalt.api.module.setting.impl.CheckboxSetting
+import org.cobalt.api.ui.theme.ThemeGradient
+import org.cobalt.api.ui.theme.ThemeSurface
 import org.cobalt.api.util.ui.NVGRenderer
 import org.cobalt.api.util.ui.helper.Gradient
 import org.cobalt.internal.qol.ItemLockingModule
@@ -61,11 +63,12 @@ object HotbarOverlayModule : Module("Liquid Hotbar") {
       val angle  = (System.currentTimeMillis() % 12000L).toFloat() / 12000f * (Math.PI * 2.0).toFloat()
       val shiftX = cos(angle) * (bw * 0.45f)
       val shiftY = sin(angle) * (bh * 0.45f)
+      val (gradientStart, gradientEnd) = ThemeGradient.colors()
       NVGRenderer.hollowGradientRectShifted(
         0f, 0f, bw, bh,
         sc * 1.5f,
-        0xFF2DE2FF.toInt(),
-        0xFFFF6ACD.toInt(),
+        gradientStart,
+        gradientEnd,
         Gradient.LeftToRight,
         rad, shiftX, shiftY
       )
@@ -79,8 +82,8 @@ object HotbarOverlayModule : Module("Liquid Hotbar") {
         NVGRenderer.hollowGradientRectShifted(
           ox, 0f, ow, bh,
           sc * 1.5f,
-          0xFF2DE2FF.toInt(),
-          0xFFFF6ACD.toInt(),
+          gradientStart,
+          gradientEnd,
           Gradient.LeftToRight,
           rad, oShiftX, oShiftY
         )
@@ -112,11 +115,11 @@ object HotbarOverlayModule : Module("Liquid Hotbar") {
     val gy = (sy / guiScale).toInt()
 
     // Dark grey glass fill - matches inventory HUD panelColor
-    event.graphics.fill(gx, gy, gx + 182, gy + 22, 0x50101010.toInt())
+    event.graphics.fill(gx, gy, gx + 182, gy + 22, ThemeSurface.slotGlass())
 
     val offhand = player.offhandItem
     if (!offhand.isEmpty) {
-      event.graphics.fill(gx - 29, gy, gx - 5, gy + 22, 0x50101010.toInt())
+      event.graphics.fill(gx - 29, gy, gx - 5, gy + 22, ThemeSurface.slotGlass())
     }
 
     // Items rendered after fills so they sit on top of the glass

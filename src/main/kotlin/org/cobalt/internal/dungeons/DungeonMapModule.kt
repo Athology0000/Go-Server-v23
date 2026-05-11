@@ -13,6 +13,8 @@ import org.cobalt.api.module.ModuleCategory
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.ColorSetting
 import org.cobalt.api.module.setting.impl.SliderSetting
+import org.cobalt.api.ui.theme.ThemeGradient
+import org.cobalt.api.ui.theme.ThemeSurface
 import org.cobalt.api.util.ui.NVGRenderer
 import org.cobalt.api.util.ui.helper.Gradient
 import org.cobalt.api.util.ui.helper.Image
@@ -217,10 +219,11 @@ object DungeonMapModule : Module("Dungeon Map") {
     val mapAreaSize = mapSize.value.toFloat()
     val mapX = PAD
     val mapY = HEADER_H
+    val (gradientStart, gradientEnd) = ThemeGradient.colors()
 
-    NVGRenderer.gradientRect(0f, 0f, width, height, 0xF015171A.toInt(), 0xF01A1D21.toInt(), Gradient.TopToBottom, 10f)
-    NVGRenderer.hollowGradientRect(0.5f, 0.5f, width - 1f, height - 1f, 1.8f, accentStart.value, accentEnd.value, Gradient.LeftToRight, 10f)
-    NVGRenderer.gradientRect(0f, 0f, width, HEADER_H, accentStart.value, accentEnd.value, Gradient.LeftToRight, 10f)
+    NVGRenderer.gradientRect(0f, 0f, width, height, ThemeSurface.panel(), ThemeSurface.inset(0xF0), Gradient.TopToBottom, 10f)
+    NVGRenderer.hollowGradientRect(0.5f, 0.5f, width - 1f, height - 1f, 1.8f, gradientStart, gradientEnd, Gradient.LeftToRight, 10f)
+    NVGRenderer.gradientRect(0f, 0f, width, HEADER_H, gradientStart, gradientEnd, Gradient.LeftToRight, 10f)
 
     val headerLabel =
       if (DungeonScanState.isInDungeon && DungeonScanState.floor != org.cobalt.internal.dungeons.map.DungeonFloor.NONE) {
