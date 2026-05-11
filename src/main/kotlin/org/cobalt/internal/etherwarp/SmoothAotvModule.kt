@@ -45,7 +45,7 @@ object SmoothAotvModule : Module("Smooth AOTV") {
   private val enabledSetting = CheckboxSetting(
     "Enabled",
     "Predict and smooth first-person AOTE/AOTV teleports.",
-    true
+    false
   )
 
   private val instantTransmission = CheckboxSetting(

@@ -21,7 +21,7 @@ object PriceTooltipModule : Module("Price Tooltip") {
   private val enabled = CheckboxSetting(
     "Enabled",
     "Show SkyBlock price lines on item tooltips.",
-    true,
+    false,
   ).inGroup("Tooltip")
 
   private val tooltipInfo = InfoSetting(

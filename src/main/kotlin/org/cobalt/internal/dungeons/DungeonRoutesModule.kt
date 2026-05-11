@@ -43,7 +43,7 @@ object DungeonRoutesModule : Module("Dungeon Routes") {
   private val enabled = CheckboxSetting(
     "Enabled",
     "Render Hunch-style routes for the current dungeon room.",
-    true,
+    false,
   )
   private val autoStart = CheckboxSetting(
     "Auto Start",

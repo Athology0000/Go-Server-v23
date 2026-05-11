@@ -194,6 +194,14 @@ inline bool Runtime::isFluid(const int x, const int y, const int z) const {
   return hasFlag(flagsAt(x, y, z), VF_FLUID);
 }
 
+inline bool Runtime::isLava(const int x, const int y, const int z) const {
+  return hasFlag(flagsAt(x, y, z), VF_LAVA);
+}
+
+inline bool Runtime::isHazardousForWalking(const int x, const int y, const int z) const {
+  return isLava(x, y, z) || isLava(x, y + 1, z) || isLava(x, y - 1, z);
+}
+
 inline bool Runtime::isSafe(const int x, const int y, const int z) {
   const uint64_t key = coordKey(x, y, z);
   const auto it = safeCache_.find(key);
@@ -202,7 +210,9 @@ inline bool Runtime::isSafe(const int x, const int y, const int z) {
   }
 
   bool safe = true;
-  if (!isSolid(x, y - 1, z)) {
+  if (isHazardousForWalking(x, y, z)) {
+    safe = false;
+  } else if (!isSolid(x, y - 1, z)) {
     safe = false;
   } else if (!isPassable(x, y, z)) {
     safe = false;
@@ -236,6 +246,9 @@ inline bool Runtime::isFlyColumnClear(const int x, const int y, const int z) {
 
 inline double Runtime::fluidPenalty(const int x, const int y, const int z) const {
   double penalty = 0.0;
+  if (isLava(x, y, z) || isLava(x, y + 1, z) || isLava(x, y - 1, z)) {
+    return ActionCosts::INF_COST;
+  }
   if (isFluid(x, y, z)) penalty += 20.0;
   if (isFluid(x, y + 1, z)) penalty += 20.0;
   return penalty;

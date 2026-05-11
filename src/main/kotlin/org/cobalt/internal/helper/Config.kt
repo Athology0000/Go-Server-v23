@@ -81,7 +81,7 @@ internal object Config {
           val hudId = hudObj.get("id")?.asString ?: return@forEach
           val hudElement = hudElementsMap[hudId] ?: return@forEach
 
-          hudElement.enabled = hudObj.get("enabled")?.asBoolean ?: true
+          hudElement.enabled = hudObj.get("enabled")?.asBoolean ?: hudElement.enabled
           hudElement.anchor = hudObj.get("anchor")?.asString?.let {
             runCatching { HudAnchor.valueOf(it) }.getOrNull()
           } ?: HudAnchor.TOP_LEFT

@@ -28,6 +28,7 @@ object PathExecutorState {
         private set
     var currentTargetPoint: Vec3? = null
         private set
+    private var smoothedTargetInitialized: Boolean = false
 
     // ── Dense look points (eye-level, curvature-offset, cached by signature) ──
     var lookPoints: List<Vec3> = emptyList()
@@ -74,9 +75,12 @@ object PathExecutorState {
     private const val PREDICTION_MAX_ADVANCE_AIR = 2.4
     private const val PREDICTION_MIN_SPEED_XZ = 0.05
     private const val PREDICTION_TICKS = 10
-    private const val YAW_DEADZONE = 1.2f
-    private const val PITCH_DEADZONE = 1.8f
-    private const val SMOOTH_FACTOR = 0.1
+    private const val YAW_DEADZONE = 0.45f
+    private const val PITCH_DEADZONE = 0.65f
+    private const val TARGET_SMOOTH_MIN = 0.10f
+    private const val TARGET_SMOOTH_MAX = 0.42f
+    private const val TARGET_SMOOTH_YAW_SCALE = 36.0
+    private const val TARGET_SMOOTH_PITCH_SCALE = 24.0
     private const val TELEPORT_RESYNC_TICKS = 14
     private const val TELEPORT_RESYNC_SEARCH_WINDOW = 72
     private const val UNSEEN_ROLLBACK_MS = 600L
@@ -104,6 +108,7 @@ object PathExecutorState {
         pathCurvature = 0.0
         currentPathPosition = 0.0
         currentTargetPoint = null
+        smoothedTargetInitialized = false
         jumpSuppressTicks = 0
         lookPoints = emptyList()
         lookPointsSignature = ""
@@ -178,7 +183,7 @@ object PathExecutorState {
     }
 
     fun initialTurnBoostFactor(yawError: Float): Float =
-        if (initialTurnBoostTicks > 0 && abs(yawError) >= maxOf(35f, YAW_DEADZONE * 4)) 2f else 1f
+        if (initialTurnBoostTicks > 0 && abs(yawError) >= maxOf(35f, YAW_DEADZONE * 4)) 1.35f else 1f
 
     /**
      * Rebuild look points from the dense path if the path signature has changed.
@@ -189,6 +194,7 @@ object PathExecutorState {
         lookPointsSignature = signature
         lookPoints = if (nodes.size >= 2) buildLookPoints(nodes) else emptyList()
         currentPathPosition = 0.0
+        smoothedTargetInitialized = false
         losCache.clear()
     }
 
@@ -289,7 +295,8 @@ object PathExecutorState {
         }
         if (minDistSq < effectiveThreshold * effectiveThreshold) {
             val maxJump = if (isTeleportResync) 14.0 else if (isFalling) 0.5 else 2.0
-            currentPathPosition = minOf(currentPathPosition + maxJump, bestT)
+            val advancedT = minOf(currentPathPosition + maxJump, bestT)
+            currentPathPosition = maxOf(currentPathPosition, advancedT)
         }
 
         if (!isTeleportResync) {
@@ -320,20 +327,14 @@ object PathExecutorState {
                 unseenSinceMs = now
                 unseenStartPathPosition = currentPathPosition
             }
-            if (now - unseenSinceMs >= UNSEEN_ROLLBACK_MS) {
-                val minRollback = maxOf(0.0, unseenStartPathPosition - 3.0)
-                var attempts = 0
-                while (currentPathPosition > minRollback && attempts < 3) {
-                    currentPathPosition = maxOf(minRollback, currentPathPosition - 1.0)
-                    val testT = minOf(pts.lastIndex.toDouble(), currentPathPosition + effectiveMin)
-                    if (level != null && isPointVisible(eye, getInterpolatedPoint(pts, testT), level)) {
-                        unseenSinceMs = 0L
-                        unseenStartPathPosition = currentPathPosition
-                        findResult = findVisibleLookahead(eye, pts, adaptiveLookahead, level)
-                        targetVisible = findResult.visible && isPointVisible(eye, findResult.point, level)
-                        break
-                    }
-                    attempts++
+            if (now - unseenSinceMs >= UNSEEN_ROLLBACK_MS && level != null) {
+                val testT = minOf(pts.lastIndex.toDouble(), currentPathPosition + effectiveMin)
+                val testPoint = getInterpolatedPoint(pts, testT)
+                if (isPointVisible(eye, testPoint, level)) {
+                    unseenSinceMs = 0L
+                    unseenStartPathPosition = currentPathPosition
+                    findResult = FindResult(testPoint, effectiveMin)
+                    targetVisible = true
                 }
             }
         } else {
@@ -391,18 +392,17 @@ object PathExecutorState {
         // the PD would sprint to each 10%-step then idle until the next tick (20 Hz micro-jitter).
         val lastIndex = pts.lastIndex
         val remainingPath = lastIndex - currentPathPosition
-        val finishFactor = if (remainingPath < 3.0) maxOf(0.1, remainingPath / 3.0) else 1.0
+        val finishFactor = if (remainingPath < 4.0) maxOf(0.25, remainingPath / 4.0) else 1.0
         val isStraight = pathCurvature < 0.15
         val dynamicYawDeadzone = (if (isStraight) YAW_DEADZONE * 1.5f else YAW_DEADZONE) * finishFactor.toFloat()
 
-        val yawDelta = AngleUtils.getRotationDelta(rawTargetYaw, targetYaw)
-        if (abs(yawDelta) > dynamicYawDeadzone) {
-            rawTargetYaw = targetYaw
-        }
-        val pitchDelta = targetPitch - rawTargetPitch
-        if (abs(pitchDelta) > PITCH_DEADZONE * finishFactor) {
-            rawTargetPitch = targetPitch
-        }
+        updateSmoothedRotationTarget(
+            targetYaw = targetYaw,
+            targetPitch = targetPitch,
+            yawDeadzone = dynamicYawDeadzone,
+            pitchDeadzone = (PITCH_DEADZONE * finishFactor).toFloat(),
+            finishFactor = finishFactor.toFloat()
+        )
 
         // ── Completion ──
         val lastPoint = pts[lastIndex]
@@ -438,6 +438,43 @@ object PathExecutorState {
         currentTargetPoint = targetPoint
         val r = rotationTo(eye, targetPoint)
         rawTargetYaw = r.yaw; rawTargetPitch = r.pitch
+    }
+
+    private fun updateSmoothedRotationTarget(
+        targetYaw: Float,
+        targetPitch: Float,
+        yawDeadzone: Float,
+        pitchDeadzone: Float,
+        finishFactor: Float
+    ) {
+        if (!smoothedTargetInitialized) {
+            rawTargetYaw = AngleUtils.normalizeAngle(targetYaw)
+            rawTargetPitch = targetPitch.coerceIn(-89.9f, 89.9f)
+            smoothedTargetInitialized = true
+            return
+        }
+
+        val finishDamping = (0.45f + 0.55f * finishFactor).coerceIn(0.25f, 1f)
+        val yawDelta = AngleUtils.getRotationDelta(rawTargetYaw, targetYaw)
+        val yawAbs = abs(yawDelta)
+        if (yawAbs > yawDeadzone) {
+            val alpha = nonlinearBlend(yawAbs.toDouble(), TARGET_SMOOTH_YAW_SCALE) * finishDamping
+            rawTargetYaw = AngleUtils.normalizeAngle(rawTargetYaw + yawDelta * alpha)
+        }
+
+        val pitchDelta = targetPitch - rawTargetPitch
+        val pitchAbs = abs(pitchDelta)
+        if (pitchAbs > pitchDeadzone) {
+            val alpha = nonlinearBlend(pitchAbs.toDouble(), TARGET_SMOOTH_PITCH_SCALE) * finishDamping
+            rawTargetPitch = (rawTargetPitch + pitchDelta * alpha).coerceIn(-89.9f, 89.9f)
+        }
+    }
+
+    private fun nonlinearBlend(delta: Double, scale: Double): Float {
+        val t = 1.0 - exp(-delta / scale)
+        return (TARGET_SMOOTH_MIN + (TARGET_SMOOTH_MAX - TARGET_SMOOTH_MIN) * t)
+            .toFloat()
+            .coerceIn(TARGET_SMOOTH_MIN, TARGET_SMOOTH_MAX)
     }
 
     // =========================================================================

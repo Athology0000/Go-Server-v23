@@ -35,7 +35,7 @@ object CommissionHudModule : Module("Commission HUD") {
     offsetX = 10f
     offsetY = 80f
 
-    val onlyWhenActive = setting(CheckboxSetting("Only When Active", "Hide when macro is off", false))
+    val onlyWhenActive = setting(CheckboxSetting("Only When Active", "Hide when macro is off", true))
 
     width {
       (rows().maxOfOrNull { (l, v) -> NVGRenderer.textWidth("$l: $v", textSize) } ?: 120f) + padding * 2

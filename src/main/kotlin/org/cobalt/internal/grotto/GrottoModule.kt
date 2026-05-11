@@ -8,7 +8,7 @@ object GrottoModule : Module("Fairy Grotto") {
   val enabled = CheckboxSetting(
     "Enabled",
     "Enable Fairy Grotto routes and commands.",
-    true
+    false
   )
 
   val renderRoutes = CheckboxSetting(

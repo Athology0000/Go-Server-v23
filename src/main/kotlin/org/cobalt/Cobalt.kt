@@ -91,6 +91,7 @@ import org.cobalt.internal.rotation.RotationsModule
 import org.cobalt.internal.seal.YearOfTheSealModule
 import org.cobalt.internal.skyblock.HypixelManager
 import org.cobalt.internal.skyblock.SkyblockEventManager
+import org.cobalt.internal.skyblock.SkyblockManaTracker
 import org.cobalt.internal.spotify.SpotifyModule
 import org.cobalt.internal.stats.MacroTimeTracker
 import org.cobalt.internal.visual.BlockOutlineModule
@@ -262,6 +263,7 @@ object Cobalt : ClientModInitializer {
       MacroTimeTracker,
       RouteEditMode,
       SkyblockEventManager,
+      SkyblockManaTracker,
     ).forEach { EventBus.register(it) }
   }
 

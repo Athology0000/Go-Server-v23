@@ -1,7 +1,9 @@
 package org.cobalt.api.pathfinder.jni
 
 import net.minecraft.client.Minecraft
+import net.minecraft.client.player.LocalPlayer
 import net.minecraft.core.BlockPos
+import net.minecraft.world.level.Level
 import net.minecraft.world.phys.Vec3
 import org.cobalt.api.module.ModuleDebug
 import org.cobalt.api.pathfinder.cache.CachedWorld
@@ -16,14 +18,17 @@ import org.cobalt.internal.pathfinding.PathRecoveryController
 import org.cobalt.internal.pathfinding.PathTeleportConfig
 import org.cobalt.internal.pathfinding.TeleportValidationController
 import org.cobalt.internal.skyblock.HypixelManager
+import org.cobalt.internal.skyblock.SkyblockManaTracker
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import kotlin.math.abs
 import kotlin.math.atan2
+import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.roundToInt
+import kotlin.math.sin
 import kotlin.math.sqrt
 
 object NativePathfinder {
@@ -154,9 +159,12 @@ object NativePathfinder {
     private const val NON_PRIMARY_START_PENALTY = 18.0
     private const val AOTV_NODE_DISTANCE_MIN = 6.0
     private const val AOTV_NODE_DISTANCE_MAX = 54.0
-    private const val AOTV_MIN_TOTAL_PATH_LENGTH = 40.0
+    private const val AOTV_MIN_TOTAL_PATH_LENGTH = 8.0
     private const val AOTV_FLUID_STRAIGHTNESS_BONUS = 10.0
     private const val AOTV_FLUID_MIN_GAIN_FACTOR = 0.7
+    private const val AOTV_NEEDED_MIN_GAIN = 4.0
+    private const val TELEPORT_FORWARD_DOT_MIN = 0.92
+    private const val TELEPORT_LOOK_DOT_MIN = 0.45
     private const val NODE_REACHED_RANGE = 0.75
 
     private const val FLAG_LOW_HEADROOM   = 1 shl 2
@@ -174,6 +182,14 @@ object NativePathfinder {
     private const val SPRINT_SUPPRESS_HYSTERESIS_TICKS = 6
     private const val FRONTIER_MIN_DISTANCE_SQ = 64.0
     private const val FRONTIER_Y_SCAN = 12
+    private const val HAZARD_LOOKAHEAD_NODES = 5
+    private const val HAZARD_MAX_JUMP_NODES = 3
+    private const val HAZARD_JUMP_MAX_DIST_SQ = 3.25 * 3.25
+    private const val HAZARD_AVOID_RADIUS = 3
+    private const val HAZARD_AVOID_PENALTY = 160.0
+    private const val HAZARD_AVOID_TTL_SEARCHES = 4
+    private const val TELEPORT_POST_LANDING_SAFE_NODES = 2
+    private const val TELEPORT_NEED_LOOKAHEAD_NODES = 7
 
     fun init() {
         NativePathfinderJNI.initNative()
@@ -312,6 +328,10 @@ object NativePathfinder {
     fun tick(): PathCommand? {
         val mc = Minecraft.getInstance()
         val player = mc.player ?: run {
+            releaseGuidedControl()
+            return null
+        }
+        val level = mc.level ?: run {
             releaseGuidedControl()
             return null
         }
@@ -461,6 +481,11 @@ object NativePathfinder {
         PathExecutorState.updateLookPoints(rotationNodes, lastPathSignature)
         PathExecutorState.update(player, rotationNodes)
         advanceKeyCursor(player, nodes)
+
+        if (state == PathStatus.EXECUTING && checkUpcomingHazard(level, playerPos, nodes)) {
+            lastTickStatus = state
+            return null
+        }
 
         if (state == PathStatus.EXECUTING &&
             PathExecutorState.trackNonChangeProgress(PathExecutorState.currentPathPosition)
@@ -907,6 +932,52 @@ object NativePathfinder {
     private fun centerNode(node: Vec3): Vec3 =
         Vec3(node.x + 0.5, node.y, node.z + 0.5)
 
+    private fun checkUpcomingHazard(level: Level, playerPos: Vec3, nodes: List<Vec3>): Boolean {
+        if (routeProfile == MovementProfile.FLY || nodes.isEmpty()) return false
+
+        val scanEnd = minOf(nodes.lastIndex, pathNodeCursor + HAZARD_LOOKAHEAD_NODES)
+        for (hazardIdx in (pathNodeCursor + 1)..scanEnd) {
+            val hazardPos = PathHazards.walkPosForNode(nodes[hazardIdx])
+            if (!PathHazards.isHarmfulStandPosition(level, hazardPos)) continue
+            if (canJumpAcrossHazard(level, nodes, hazardIdx)) return false
+            if (canTeleportAcrossHazard(nodes)) return false
+
+            addDebugAvoidPoint(
+                pos = hazardPos,
+                reason = AvoidReason.HAZARD,
+                radius = HAZARD_AVOID_RADIUS,
+                penalty = HAZARD_AVOID_PENALTY,
+                ttlSearches = HAZARD_AVOID_TTL_SEARCHES
+            )
+            startReplan(playerPos)
+            return true
+        }
+
+        return false
+    }
+
+    private fun canTeleportAcrossHazard(nodes: List<Vec3>): Boolean =
+        teleportCooldownTicks <= 0 &&
+            EtherwarpLogic.findEtherwarpHotbarSlot() >= 0 &&
+            selectV5TeleportCandidate(nodes, pathNodeCursor, forceNeeded = true) != null
+
+    private fun canJumpAcrossHazard(level: Level, nodes: List<Vec3>, hazardIdx: Int): Boolean {
+        val takeoffNode = nodes[(hazardIdx - 1).coerceAtLeast(pathNodeCursor)]
+        val landingEnd = minOf(nodes.lastIndex, hazardIdx + HAZARD_MAX_JUMP_NODES)
+
+        for (landingIdx in (hazardIdx + 1)..landingEnd) {
+            val landingPos = PathHazards.walkPosForNode(nodes[landingIdx])
+            if (!PathHazards.isReasonableLandingPosition(level, landingPos)) continue
+
+            val landingNode = nodes[landingIdx]
+            val dx = landingNode.x - takeoffNode.x
+            val dz = landingNode.z - takeoffNode.z
+            return dx * dx + dz * dz <= HAZARD_JUMP_MAX_DIST_SQ
+        }
+
+        return false
+    }
+
     private fun computeActiveAction(
         nodes: List<Vec3>,
         cursor: Int,
@@ -936,12 +1007,19 @@ object NativePathfinder {
         val action: ActionType
     )
 
-    private fun selectV5TeleportCandidate(nodes: List<Vec3>, cursor: Int): TeleportCandidate? {
-        val player = Minecraft.getInstance().player ?: return null
+    private fun selectV5TeleportCandidate(
+        nodes: List<Vec3>,
+        cursor: Int,
+        forceNeeded: Boolean = false
+    ): TeleportCandidate? {
+        val mc = Minecraft.getInstance()
+        val player = mc.player ?: return null
+        val level = mc.level ?: return null
         if (nodes.isEmpty()) return null
 
-        val distanceToFinal = player.position().distanceTo(centerNode(nodes.last()))
-        if (distanceToFinal <= PathTeleportConfig.finalNoTeleportRadius) return null
+        val teleportNeeded = forceNeeded || player.horizontalCollision || hasTeleportNeedAhead(level, nodes, cursor)
+        if (!teleportNeeded) return null
+        if (!SkyblockManaTracker.canUseInstantTransmission()) return null
 
         val remainingLength = estimatePathGain(nodes, cursor, nodes.lastIndex)
         if (remainingLength < AOTV_MIN_TOTAL_PATH_LENGTH) return null
@@ -951,10 +1029,11 @@ object NativePathfinder {
             PathTeleportConfig.teleportStraightnessTolerance + AOTV_FLUID_STRAIGHTNESS_BONUS
         else
             PathTeleportConfig.teleportStraightnessTolerance
-        val effectiveMinGain = if (inFluid)
-            PathTeleportConfig.minTeleportGain * AOTV_FLUID_MIN_GAIN_FACTOR
-        else
-            PathTeleportConfig.minTeleportGain
+        val effectiveMinGain = when {
+            teleportNeeded -> AOTV_NEEDED_MIN_GAIN
+            inFluid -> PathTeleportConfig.minTeleportGain * AOTV_FLUID_MIN_GAIN_FACTOR
+            else -> PathTeleportConfig.minTeleportGain
+        }
 
         val maxRange = EtherwarpLogic.getEtherwarpRange().toDouble().coerceAtLeast(AOTV_NODE_DISTANCE_MAX)
         val maxIndex = minOf(nodes.lastIndex, cursor + PathTeleportConfig.maxLookAheadNodes.coerceAtLeast(1))
@@ -971,6 +1050,9 @@ object NativePathfinder {
             val aimPoint = Vec3(aimBlock.x + 0.5, aimBlock.y + 0.92, aimBlock.z + 0.5)
             val gain = estimatePathGain(nodes, cursor, i)
             if (gain < effectiveMinGain) continue
+            if (!isForwardTeleportCandidate(player, nodes, cursor, i)) continue
+            if (!isTeleportSegmentStraightEnough(nodes, cursor, i, effectiveStraightnessTolerance)) continue
+            if (!isTeleportLandingCandidateSafe(level, nodes, i, aimBlock)) continue
 
             val dx = aimPoint.x - player.eyePosition.x
             val dy = aimPoint.y - player.eyePosition.y
@@ -990,14 +1072,93 @@ object NativePathfinder {
             }
 
             if (PathTeleportConfig.v5AotvEnabled && gain >= AOTV_NODE_DISTANCE_MIN && gain <= AOTV_NODE_DISTANCE_MAX) {
-                if (isTeleportSegmentStraightEnough(nodes, cursor, i, effectiveStraightnessTolerance)) {
-                    best = TeleportCandidate(i, yaw, 0f, ActionType.AOTV)
-                    break
-                }
+                best = TeleportCandidate(i, yaw, 0f, ActionType.AOTV)
+                break
             }
         }
 
         return best
+    }
+
+    private fun isForwardTeleportCandidate(
+        player: LocalPlayer,
+        nodes: List<Vec3>,
+        cursor: Int,
+        candidateIndex: Int
+    ): Boolean {
+        if (candidateIndex <= cursor || cursor >= nodes.lastIndex) return false
+
+        val from = centerNode(nodes[cursor.coerceIn(0, nodes.lastIndex)])
+        val next = centerNode(nodes[(cursor + 1).coerceAtMost(nodes.lastIndex)])
+        val target = centerNode(nodes[candidateIndex])
+
+        val pathDx = next.x - from.x
+        val pathDz = next.z - from.z
+        val targetDx = target.x - from.x
+        val targetDz = target.z - from.z
+
+        val pathLen = sqrt(pathDx * pathDx + pathDz * pathDz)
+        val targetLen = sqrt(targetDx * targetDx + targetDz * targetDz)
+        if (pathLen < 0.001 || targetLen < 0.001) return false
+
+        val pathDot = (pathDx * targetDx + pathDz * targetDz) / (pathLen * targetLen)
+        if (pathDot < TELEPORT_FORWARD_DOT_MIN) return false
+
+        val yawRad = Math.toRadians(player.yRot.toDouble())
+        val lookX = -sin(yawRad)
+        val lookZ = cos(yawRad)
+        val playerDx = target.x - player.x
+        val playerDz = target.z - player.z
+        val playerLen = sqrt(playerDx * playerDx + playerDz * playerDz)
+        if (playerLen < 0.001) return false
+
+        val lookDot = (lookX * playerDx + lookZ * playerDz) / playerLen
+        return lookDot >= TELEPORT_LOOK_DOT_MIN
+    }
+
+    private fun isTeleportLandingCandidateSafe(
+        level: Level,
+        nodes: List<Vec3>,
+        candidateIndex: Int,
+        supportPos: BlockPos
+    ): Boolean {
+        if (!PathHazards.isSafeTeleportSupport(level, supportPos)) return false
+
+        val predictedFeet = PathHazards.teleportFeetPos(level, supportPos)
+        if (PathHazards.isHarmfulStandPosition(level, predictedFeet)) return false
+
+        val nodeFeet = PathHazards.walkPosForNode(nodes[candidateIndex])
+        if (PathHazards.isHarmfulStandPosition(level, nodeFeet)) return false
+
+        val postEnd = minOf(nodes.lastIndex, candidateIndex + TELEPORT_POST_LANDING_SAFE_NODES)
+        for (i in candidateIndex..postEnd) {
+            if (PathHazards.isHarmfulStandPosition(level, PathHazards.walkPosForNode(nodes[i]))) {
+                return false
+            }
+        }
+
+        return true
+    }
+
+    private fun hasTeleportNeedAhead(level: Level, nodes: List<Vec3>, cursor: Int): Boolean {
+        val scanEnd = minOf(nodes.lastIndex, cursor + TELEPORT_NEED_LOOKAHEAD_NODES)
+        for (i in cursor..scanEnd) {
+            val flags = cachedKeyNodeFlags.getOrElse(i) { 0 }
+            if (flags and FLAG_LOW_HEADROOM != 0 || flags and FLAG_TIGHT_CORRIDOR != 0) return true
+            if (flags and FLAG_STEP_UP_NEXT != 0 && i > cursor) return true
+            if (PathHazards.isHarmfulStandPosition(level, PathHazards.walkPosForNode(nodes[i]))) return true
+        }
+        return false
+    }
+
+    private fun isTeleportSegmentOpen(level: Level, nodes: List<Vec3>, start: Int, end: Int): Boolean {
+        if (end <= start) return false
+        for (i in start..end) {
+            val flags = cachedKeyNodeFlags.getOrElse(i) { 0 }
+            if (flags and FLAG_LOW_HEADROOM != 0 || flags and FLAG_TIGHT_CORRIDOR != 0) return false
+            if (PathHazards.isHarmfulStandPosition(level, PathHazards.walkPosForNode(nodes[i]))) return false
+        }
+        return true
     }
 
     private fun estimatePathGain(nodes: List<Vec3>, start: Int, end: Int): Double {

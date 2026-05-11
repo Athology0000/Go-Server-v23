@@ -45,7 +45,7 @@ object BloodCampHelperModule : Module("Blood Camp Helper") {
   private val enabled = CheckboxSetting(
     "Enabled",
     "Predict where Blood Room mobs spawned by The Watcher will land.",
-    true
+    false
   )
 
   private val currentMarker = CheckboxSetting(
