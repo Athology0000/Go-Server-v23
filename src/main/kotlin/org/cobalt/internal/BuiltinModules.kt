@@ -34,13 +34,12 @@ import org.cobalt.internal.garden.GardenAnalyzerModule
 import org.cobalt.internal.garden.GardenHudModule
 import org.cobalt.internal.garden.GardenMacroModule
 import org.cobalt.internal.garden.PestWarningModule
-import org.cobalt.internal.grotto.GrottoModule
+import org.cobalt.internal.grotto.FairyGrottoModule
 import org.cobalt.internal.mining.AutoForgeModule
 import org.cobalt.internal.mining.AutoLanternModule
 import org.cobalt.internal.mining.BlockMinerModule
 import org.cobalt.internal.mining.CommissionHudModule
 import org.cobalt.internal.mining.CommissionMacroModule
-import org.cobalt.internal.mining.FairyModule
 import org.cobalt.internal.mining.GemstoneMinerModule
 import org.cobalt.internal.mining.MiningCoinPopupModule
 import org.cobalt.internal.mining.MiningMacroModule
@@ -148,7 +147,7 @@ internal object BuiltinModules {
     CommissionHudModule,
     AutoForgeModule,
     AutoLanternModule,
-    FairyModule,
+    FairyGrottoModule,
     VeinDirectionModule,
     NoFrillsMiningModule,
     MiningFailsafeHudModule,
@@ -179,7 +178,6 @@ internal object BuiltinModules {
     DungeonRoutesModule,
     BloodCampHelperModule,
     DungeonMobEspModule,
-    GrottoModule,
 
     // Etherwarp / movement helpers
     EtherwarpHelperModule,

@@ -2,7 +2,9 @@ package org.cobalt.api.pathfinder.jni
 
 import net.minecraft.client.Minecraft
 import net.minecraft.client.player.LocalPlayer
+import net.minecraft.core.BlockPos
 import net.minecraft.world.level.ClipContext
+import net.minecraft.world.level.Level
 import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.Vec3
 import org.cobalt.api.util.AngleUtils
@@ -40,6 +42,8 @@ object PathExecutorState {
     var executionDebugLine: String = "spline idle"
         private set
     var requiresPrecisionMovement: Boolean = false
+        private set
+    var shouldUsePrecisionSneak: Boolean = false
         private set
     private var smoothedTargetInitialized: Boolean = false
 
@@ -80,6 +84,19 @@ object PathExecutorState {
     private const val PRECISION_CURVATURE = 0.34
     private const val DROP_SCAN_DISTANCE = 3.5
     private const val DROP_HEIGHT_THRESHOLD = 0.45
+    private const val EDGE_SCAN_DISTANCE = 4.25
+    private const val EDGE_SCAN_STEP = 0.7
+    private const val FOOTPRINT_RADIUS = 0.38
+    private const val FOOTPRINT_DROP_DEPTH = 1.25
+    private const val CORRIDOR_SCAN_DISTANCE = 2.8
+    private const val CORRIDOR_SCAN_STEP = 0.45
+    private const val EDGE_BIAS_STRENGTH = 0.42
+    private const val EDGE_DRIFT_DISTANCE = 0.85
+    private const val ARRIVAL_BRAKE_DISTANCE = 3.25
+    private const val TURN_BRAKE_CURVATURE = 0.26
+    private const val STRAIGHT_STABILIZE_CURVATURE = 0.08
+    private const val STRAIGHT_TANGENT_LOOKAHEAD = 4.2
+    private const val STRAIGHT_TARGET_BLEND = 0.78
     private const val RECOVERY_MIN_LOOKAHEAD = 0.1
     private const val LOOKAHEAD_STEP = 0.4
     private const val RECOVERY_LOOKAHEAD_STEP = 0.15
@@ -137,6 +154,7 @@ object PathExecutorState {
         currentLookaheadDistance = 0.0
         executionDebugLine = "spline idle"
         requiresPrecisionMovement = false
+        shouldUsePrecisionSneak = false
         smoothedTargetInitialized = false
         jumpSuppressTicks = 0
         lookPoints = emptyList()
@@ -332,9 +350,21 @@ object PathExecutorState {
 
         val adaptiveLookahead = getAdaptiveLookaheadDistance(eye, spline, dropAhead)
         currentLookaheadDistance = adaptiveLookahead
-        requiresPrecisionMovement = dropAhead || pathCurvature >= PRECISION_CURVATURE || projection.distSq > 2.25
+        val safety = if (level != null) assessSplineSafety(level, player, spline, projection) else SafetyAssessment.NONE
+        requiresPrecisionMovement =
+            dropAhead ||
+                safety.requiresPrecision ||
+                pathCurvature >= PRECISION_CURVATURE ||
+                projection.distSq > 2.25 ||
+                spline.totalLength - currentSplineDistance <= ARRIVAL_BRAKE_DISTANCE
+        shouldUsePrecisionSneak = safety.shouldSneak || spline.totalLength - currentSplineDistance <= ARRIVAL_BRAKE_DISTANCE * 0.65
         val remainingPathForLookahead = spline.totalLength - currentSplineDistance
-        val effectiveLookahead = minOf(adaptiveLookahead, remainingPathForLookahead.coerceAtLeast(0.1))
+        val safetyLookaheadCap = when {
+            dropAhead || safety.ledgeRisk || safety.corridorUnsafe -> PRECISION_LOOKAHEAD
+            pathCurvature >= TURN_BRAKE_CURVATURE -> minOf(adaptiveLookahead, 2.0)
+            else -> adaptiveLookahead
+        }
+        val effectiveLookahead = minOf(safetyLookaheadCap, remainingPathForLookahead.coerceAtLeast(0.1))
         var findResult = if (level != null) {
             findVisibleSplineLookahead(eye, spline, effectiveLookahead, level)
         } else {
@@ -368,7 +398,8 @@ object PathExecutorState {
             currentTargetPoint = null
             currentLookaheadSplinePoint = null
             requiresPrecisionMovement = true
-            executionDebugLine = formatDebugLine(spline, projection.distSq, false)
+            shouldUsePrecisionSneak = true
+            executionDebugLine = formatDebugLine(spline, projection.distSq, false, safety)
             return
         }
 
@@ -389,6 +420,12 @@ object PathExecutorState {
             if (level == null || isPointVisible(eye, fallTarget, level)) {
                 targetPoint = fallTarget
             }
+        }
+        if (level != null && safety.edgeDrift) {
+            targetPoint = biasTargetTowardSafeFootprint(level, player, targetPoint)
+        }
+        if (!requiresPrecisionMovement && pathCurvature <= STRAIGHT_STABILIZE_CURVATURE) {
+            targetPoint = stabilizeStraightTarget(eye, spline, targetPoint)
         }
 
         targetPoint = clampLookDistance(eye, targetPoint)
@@ -414,7 +451,7 @@ object PathExecutorState {
             currentSplineDistance = spline.totalLength
             currentPathPosition = currentSplineDistance
         }
-        executionDebugLine = formatDebugLine(spline, projection.distSq, targetVisible)
+        executionDebugLine = formatDebugLine(spline, projection.distSq, targetVisible, safety)
     }
 
     private fun updateFull(player: LocalPlayer, pts: List<Vec3>) {
@@ -595,6 +632,7 @@ object PathExecutorState {
             rawTargetYaw = player.yRot; rawTargetPitch = player.xRot
             pathCurvature = 0.0; currentPathPosition = 0.0; currentTargetPoint = null; currentLookaheadSplinePoint = null
             requiresPrecisionMovement = false
+            shouldUsePrecisionSneak = false
             return
         }
         val eye = player.eyePosition
@@ -1155,17 +1193,171 @@ object PathExecutorState {
         return false
     }
 
-    private fun formatDebugLine(spline: SplinePath, projectionDistSq: Double, targetVisible: Boolean): String =
+    private data class SafetyAssessment(
+        val ledgeRisk: Boolean,
+        val corridorUnsafe: Boolean,
+        val edgeDrift: Boolean,
+        val arrival: Boolean,
+    ) {
+        val requiresPrecision: Boolean get() = ledgeRisk || corridorUnsafe || edgeDrift || arrival
+        val shouldSneak: Boolean get() = ledgeRisk || corridorUnsafe || edgeDrift || arrival
+
+        companion object {
+            val NONE = SafetyAssessment(false, false, false, false)
+        }
+    }
+
+    private fun assessSplineSafety(
+        level: Level,
+        player: LocalPlayer,
+        spline: SplinePath,
+        projection: SplineProjection
+    ): SafetyAssessment {
+        val remaining = spline.totalLength - currentSplineDistance
+        val arrival = remaining <= ARRIVAL_BRAKE_DISTANCE
+        val edgeDrift = projection.distSq >= EDGE_DRIFT_DISTANCE * EDGE_DRIFT_DISTANCE &&
+            !isFootprintSafe(level, player.x, player.y, player.z)
+
+        var ledgeRisk = false
+        var distance = 0.0
+        while (distance <= EDGE_SCAN_DISTANCE && currentSplineDistance + distance <= spline.totalLength) {
+            val sample = spline.sample(currentSplineDistance + distance)
+            if (!isSplineFootprintSafe(level, sample)) {
+                ledgeRisk = true
+                break
+            }
+            distance += EDGE_SCAN_STEP
+        }
+
+        var corridorUnsafe = false
+        distance = CORRIDOR_SCAN_STEP
+        while (distance <= CORRIDOR_SCAN_DISTANCE && currentSplineDistance + distance <= spline.totalLength) {
+            val sample = spline.sample(currentSplineDistance + distance)
+            if (!isSplineFootprintSafe(level, sample)) {
+                corridorUnsafe = true
+                break
+            }
+            distance += CORRIDOR_SCAN_STEP
+        }
+
+        return SafetyAssessment(
+            ledgeRisk = ledgeRisk,
+            corridorUnsafe = corridorUnsafe,
+            edgeDrift = edgeDrift,
+            arrival = arrival
+        )
+    }
+
+    private fun isSplineFootprintSafe(level: Level, point: Vec3): Boolean =
+        isFootprintSafe(level, point.x, point.y - PLAYER_LOOK_HEIGHT, point.z)
+
+    private fun isFootprintSafe(level: Level, x: Double, feetY: Double, z: Double): Boolean {
+        val samples = doubleArrayOf(
+            0.0, 0.0,
+            FOOTPRINT_RADIUS, FOOTPRINT_RADIUS,
+            FOOTPRINT_RADIUS, -FOOTPRINT_RADIUS,
+            -FOOTPRINT_RADIUS, FOOTPRINT_RADIUS,
+            -FOOTPRINT_RADIUS, -FOOTPRINT_RADIUS,
+            FOOTPRINT_RADIUS, 0.0,
+            -FOOTPRINT_RADIUS, 0.0,
+            0.0, FOOTPRINT_RADIUS,
+            0.0, -FOOTPRINT_RADIUS
+        )
+        var i = 0
+        while (i < samples.size) {
+            if (!hasNearbySupport(level, x + samples[i], feetY, z + samples[i + 1])) return false
+            i += 2
+        }
+        return true
+    }
+
+    private fun hasNearbySupport(level: Level, x: Double, feetY: Double, z: Double): Boolean {
+        val blockX = floor(x).toInt()
+        val blockZ = floor(z).toInt()
+        val feetBlockY = floor(feetY + 0.05).toInt()
+        val minTop = feetY - FOOTPRINT_DROP_DEPTH
+
+        for (y in feetBlockY - 1 downTo feetBlockY - 3) {
+            val pos = BlockPos(blockX, y, blockZ)
+            val top = collisionTop(level, pos) ?: continue
+            if (top >= minTop) return true
+        }
+        return false
+    }
+
+    private fun collisionTop(level: Level, pos: BlockPos): Double? {
+        val state = level.getBlockState(pos)
+        if (state.isAir) return null
+        val shape = state.getCollisionShape(level, pos)
+        if (shape.isEmpty) return null
+        return pos.y + shape.bounds().maxY
+    }
+
+    private fun biasTargetTowardSafeFootprint(level: Level, player: LocalPlayer, target: Vec3): Vec3 {
+        val candidates = arrayOf(
+            Vec3(EDGE_BIAS_STRENGTH, 0.0, 0.0),
+            Vec3(-EDGE_BIAS_STRENGTH, 0.0, 0.0),
+            Vec3(0.0, 0.0, EDGE_BIAS_STRENGTH),
+            Vec3(0.0, 0.0, -EDGE_BIAS_STRENGTH),
+            Vec3(EDGE_BIAS_STRENGTH, 0.0, EDGE_BIAS_STRENGTH),
+            Vec3(EDGE_BIAS_STRENGTH, 0.0, -EDGE_BIAS_STRENGTH),
+            Vec3(-EDGE_BIAS_STRENGTH, 0.0, EDGE_BIAS_STRENGTH),
+            Vec3(-EDGE_BIAS_STRENGTH, 0.0, -EDGE_BIAS_STRENGTH)
+        )
+
+        var best = target
+        var bestScore = Double.POSITIVE_INFINITY
+        for (offset in candidates) {
+            val candidate = Vec3(player.x + offset.x, target.y, player.z + offset.z)
+            if (!isFootprintSafe(level, candidate.x, player.y, candidate.z)) continue
+            val score = candidate.distanceToSqr(target)
+            if (score < bestScore) {
+                bestScore = score
+                best = Vec3((target.x + candidate.x) * 0.5, target.y, (target.z + candidate.z) * 0.5)
+            }
+        }
+        return best
+    }
+
+    private fun stabilizeStraightTarget(eye: Vec3, spline: SplinePath, target: Vec3): Vec3 {
+        val from = spline.sample(currentSplineDistance)
+        val to = spline.sample(minOf(spline.totalLength, currentSplineDistance + STRAIGHT_TANGENT_LOOKAHEAD))
+        val dx = to.x - from.x
+        val dz = to.z - from.z
+        val mag = sqrt(dx * dx + dz * dz)
+        if (mag < 0.05) return target
+
+        val tangentTarget = Vec3(
+            eye.x + (dx / mag) * MAX_LOOK_DISTANCE,
+            target.y,
+            eye.z + (dz / mag) * MAX_LOOK_DISTANCE
+        )
+        return Vec3(
+            target.x + (tangentTarget.x - target.x) * STRAIGHT_TARGET_BLEND,
+            target.y,
+            target.z + (tangentTarget.z - target.z) * STRAIGHT_TARGET_BLEND
+        )
+    }
+
+    private fun formatDebugLine(
+        spline: SplinePath,
+        projectionDistSq: Double,
+        targetVisible: Boolean,
+        safety: SafetyAssessment = SafetyAssessment.NONE
+    ): String =
         String.format(
             Locale.US,
-            "spline %.1f/%.1fm | look %.2fm | curve %.2f | proj %.2fm | %s%s",
+            "spline %.1f/%.1fm | look %.2fm | curve %.2f | proj %.2fm | %s%s%s%s%s",
             currentSplineDistance,
             spline.totalLength,
             currentLookaheadDistance,
             pathCurvature,
             sqrt(projectionDistSq.coerceAtLeast(0.0)),
             if (targetVisible) "visible" else "blocked",
-            if (requiresPrecisionMovement) " | precision" else ""
+            if (requiresPrecisionMovement) " | precision" else "",
+            if (safety.ledgeRisk) " | edge" else "",
+            if (safety.corridorUnsafe) " | corridor" else "",
+            if (safety.arrival) " | brake" else ""
         )
 
     private fun updateCurvatureFromLookPoints(pts: List<Vec3>, nearIdx: Int) {

@@ -42,6 +42,7 @@ import org.cobalt.internal.garden.GardenAnalyzerModule
 import org.cobalt.internal.garden.GardenHudModule
 import org.cobalt.internal.garden.GardenMacroModule
 import org.cobalt.internal.garden.PestWarningModule
+import org.cobalt.internal.grotto.FairyGrottoModule
 import org.cobalt.internal.helper.Config
 import org.cobalt.internal.loader.AddonLoader
 import org.cobalt.internal.mining.*
@@ -106,7 +107,7 @@ object Cobalt : ClientModInitializer {
         GemstoneMinerModule,
         MiningHudModule,
         MiningCoinPopupModule,
-        FairyModule,
+        FairyGrottoModule,
         RoutesModule,
         MiningMacroModule,
         CommissionMacroModule,

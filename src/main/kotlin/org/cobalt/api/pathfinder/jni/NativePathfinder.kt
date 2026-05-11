@@ -532,7 +532,7 @@ object NativePathfinder {
             forward = true,
             back = false,
             jump = false,
-            sneak = false,
+            sneak = PathExecutorState.shouldUsePrecisionSneak,
             sprint = !lowHeadroom &&
                 !tightCorridor &&
                 !highCurvature &&

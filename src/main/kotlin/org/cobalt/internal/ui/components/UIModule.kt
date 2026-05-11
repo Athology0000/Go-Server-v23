@@ -51,7 +51,7 @@ internal class UIModule(
         colorMask = ThemeManager.currentTheme.textDisabled)
     }
 
-    if (entitled && module.name.equals("Fairy", ignoreCase = true)) {
+    if (entitled && module.name.equals("Fairy Grotto", ignoreCase = true)) {
       NVGRenderer.textGradient(
         module.name,
         x + 20F + xOffset,

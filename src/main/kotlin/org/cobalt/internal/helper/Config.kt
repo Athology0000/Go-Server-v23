@@ -63,7 +63,10 @@ internal object Config {
       val addonId = addonObj.get("addon").asString
       val modules = grouped[addonId] ?: return@forEach
 
-      val modulesMap = modules.associateBy { it.name }
+      val modulesMap = modules.associateBy { it.name }.toMutableMap()
+      modules.firstOrNull { it.name == "Fairy Grotto" }?.let { fairyGrotto ->
+        modulesMap.putIfAbsent("Fairy", fairyGrotto)
+      }
 
       addonObj.getAsJsonArray("modules")?.forEach { moduleElement ->
         val moduleObj = moduleElement.asJsonObject

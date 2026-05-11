@@ -12,7 +12,6 @@ import net.minecraft.ChatFormatting
 import net.minecraft.client.Minecraft
 import net.minecraft.core.BlockPos
 import net.minecraft.network.chat.Component
-import org.cobalt.internal.mining.FairyModule
 
 object GrottoCommands {
 
@@ -191,7 +190,7 @@ object GrottoCommands {
     preset: String,
     mode: String?
   ): Int {
-    if (!FairyModule.enabled.value) {
+    if (!FairyGrottoModule.enabled.value) {
       GrottoChat.send(Component.literal("Fairy Grotto module is disabled.").withStyle(ChatFormatting.RED))
       return 0
     }

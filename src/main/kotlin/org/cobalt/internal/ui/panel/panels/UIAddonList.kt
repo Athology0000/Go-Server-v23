@@ -13,11 +13,11 @@ import org.cobalt.api.hud.modules.MiningHudModule
 import org.cobalt.internal.combat.CombatMacroModule
 import org.cobalt.internal.garden.GardenAnalyzerModule
 import org.cobalt.internal.garden.GardenMacroModule
+import org.cobalt.internal.grotto.FairyGrottoModule
 import org.cobalt.internal.loader.AddonLoader
 import org.cobalt.internal.mining.AutoLanternModule
 import org.cobalt.internal.mining.BlockMinerModule
 import org.cobalt.internal.mining.CommissionHudModule
-import org.cobalt.internal.mining.FairyModule
 import org.cobalt.internal.mining.GemstoneMinerModule
 import org.cobalt.internal.mining.MiningMacroModule
 import org.cobalt.internal.mining.MiningModule
@@ -141,7 +141,8 @@ internal class UIAddonList : UIPanel(
         module.name.contains("Commission", ignoreCase = true) ||
         module.name.contains("Ore", ignoreCase = true) ||
         module.name.contains("Forge", ignoreCase = true) ||
-        module.name.contains("Lantern", ignoreCase = true)
+        module.name.contains("Lantern", ignoreCase = true) ||
+        module.name.contains("Grotto", ignoreCase = true)
     }
 
     val combatModules = builtinModules.filter {
@@ -253,9 +254,13 @@ internal class UIAddonList : UIPanel(
       val name = moduleName(module)
       name.contains("Tunnel", ignoreCase = true) ||
         name.equals("Auto Lantern", ignoreCase = true) ||
-        name.equals("Fairy", ignoreCase = true) ||
         name.equals("Vein Direction Setter", ignoreCase = true) ||
         name.equals("Routes", ignoreCase = true)
+    }
+
+    val fairyGrottoModules = miningModules.filter { module ->
+      module == FairyGrottoModule ||
+        moduleName(module).equals("Fairy Grotto", ignoreCase = true)
     }
 
     val blockMinerModules = exactModules("Block Miner", "Mining")
@@ -265,9 +270,9 @@ internal class UIAddonList : UIPanel(
     val scathaModules = matchingModules("scatha")
     val excavatorModules = matchingModules("excavator")
     val pinglessModules = matchingModules("pingless")
-    val utilityModules = matchingModules("forge", "lantern", "fairy", "nofrills", "lobby hopper", "strict mining")
+    val utilityModules = matchingModules("forge", "lantern", "nofrills", "lobby hopper", "strict mining")
 
-    val covered = (coreMining + blockMinerModules + gemstoneModules + tunnelModules + miningBotModules +
+    val covered = (coreMining + blockMinerModules + gemstoneModules + tunnelModules + fairyGrottoModules + miningBotModules +
       commissionModules + oreModules + powderModules + scathaModules + excavatorModules +
       pinglessModules + utilityModules).toSet()
     val otherMiningModules = miningModules.filter { it !in covered }
@@ -296,6 +301,12 @@ internal class UIAddonList : UIPanel(
         "Tunnel Miner",
         version,
         tunnelModules
+      ),
+      createBuiltinEntry(
+        "cobalt-mining-fairy-grotto",
+        "Fairy Grotto",
+        version,
+        fairyGrottoModules
       ),
       createBuiltinEntry(
         "cobalt-mining-bot",
