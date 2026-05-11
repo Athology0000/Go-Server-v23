@@ -95,6 +95,10 @@ object PathManager {
     private var currentTask: Future<*>? = null
     private val searchId = AtomicInteger(0)
 
+    // =========================================================================
+    // Public path-finding entry points (findPath / findEtherwarpPath / variants)
+    // =========================================================================
+
     private fun resolveEtherwarpThreadCount(threadCount: Int): Int {
         val maxThreads = max(1, Runtime.getRuntime().availableProcessors())
         return if (threadCount == ETHERWARP_AUTO_THREAD_COUNT) maxThreads
@@ -300,6 +304,10 @@ object PathManager {
         }
     }
 
+    // =========================================================================
+    // Native call argument encoding / result decoding
+    // =========================================================================
+
     private fun flattenPoints(points: Array<IntArray>): IntArray {
         val out = IntArray(points.size * 3)
         var idx = 0
@@ -359,6 +367,10 @@ object PathManager {
         }
         return result
     }
+
+    // =========================================================================
+    // Etherwarp landing validation + landing candidate enumeration
+    // =========================================================================
 
     private fun validateEtherwarpLanding(label: String, x: Int, y: Int, z: Int): String? {
         val level = Minecraft.getInstance().level ?: return "World is not loaded"
@@ -469,6 +481,10 @@ object PathManager {
         return EtherwarpLandingCandidatesResult(goals, centers)
     }
 
+    // =========================================================================
+    // Hypixel area + per-area etherwarp eye/sneak offsets
+    // =========================================================================
+
     @JvmStatic
     fun getCurrentEtherwarpEyeHeight(): Double = ETHERWARP_STANDING_EYE_HEIGHT - getCurrentEtherwarpSneakOffset()
 
@@ -489,6 +505,10 @@ object PathManager {
     }
 
     private fun isModernEtherwarpArea(area: String?): Boolean = area != null && area in MODERN_ETHERWARP_AREAS
+
+    // =========================================================================
+    // Transient avoid zones + accessors used by JNI / Kotlin callers
+    // =========================================================================
 
     private fun consumeTransientAvoidZones(): Array<NativeAvoidZone> {
         synchronized(avoidLock) {
