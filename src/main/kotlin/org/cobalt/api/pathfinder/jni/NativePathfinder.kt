@@ -113,7 +113,6 @@ object NativePathfinder {
     @Volatile private var lastSearchSummary: String = ""
     private var searchFuture: Future<*>? = null
 
-    private var prevJump: Boolean = false
     private var teleportFiredNodeKey: Long = -1L
     private var teleportRestoreSlot: Int = -1
     private var teleportCooldownTicks: Int = 0
@@ -300,7 +299,6 @@ object NativePathfinder {
         selectedStartIndex = -1
         lastPathSignature = ""
         pathNodeCursor = 0
-        prevJump = false
         teleportFiredNodeKey = -1L
         teleportCooldownTicks = 0
         resetSelectedTeleport()
@@ -360,7 +358,6 @@ object NativePathfinder {
         when (state) {
             PathStatus.IDLE, PathStatus.FAILED, PathStatus.ARRIVED -> {
                 if (state != lastTickStatus) {
-                    prevJump = false
                     cachedFullPathNodes = emptyList()
                     cachedPathNodes = emptyList()
                     pathNodeCursor = 0
@@ -523,16 +520,8 @@ object NativePathfinder {
             0f
         }
 
-        val jumpNode = nodes.getOrNull(minOf(pathNodeCursor, nodes.lastIndex)) ?: nodes.last()
-        val jdx = jumpNode.x + 0.5 - player.x
-        val jdz = jumpNode.z + 0.5 - player.z
-        val ndyRaw = jumpNode.y - player.y
-        val jumpRaw = player.onGround() && ndyRaw > 0.5 && sqrt(jdx * jdx + jdz * jdz) < 2.5
-        if (jumpRaw && player.onGround()) prevJump = false
-        val jumpPulse = jumpRaw && !prevJump
-        prevJump = jumpRaw
-
-        val highCurvature = PathExecutorState.pathCurvature >= SPRINT_SUPPRESS_CURVATURE
+        val precisionMovement = PathExecutorState.requiresPrecisionMovement
+        val highCurvature = PathExecutorState.pathCurvature >= SPRINT_SUPPRESS_CURVATURE || precisionMovement
         if (highCurvature) {
             sprintSuppressHysteresisTicks = SPRINT_SUPPRESS_HYSTERESIS_TICKS
         } else if (sprintSuppressHysteresisTicks > 0) {
@@ -542,7 +531,7 @@ object NativePathfinder {
         val cmd = PathCommand(
             forward = true,
             back = false,
-            jump = jumpPulse,
+            jump = false,
             sneak = false,
             sprint = !lowHeadroom &&
                 !tightCorridor &&
@@ -868,6 +857,7 @@ object NativePathfinder {
     private fun fireTeleport(isEtherwarp: Boolean, aotvSlot: Int) {
         val mc = Minecraft.getInstance()
         val player = mc.player ?: return
+        if (!EtherwarpLogic.tryConsumeTeleportUseThisTick()) return
 
         PathExecutorState.onTeleportTriggered(selectedTeleportIndex.toDouble())
 

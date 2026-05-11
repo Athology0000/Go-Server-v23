@@ -170,7 +170,7 @@ object FishingMacroModule : Module("Fishing Macro") {
     "Catch Golden Fish",
     "Enable golden fish helper controls for trophy fishing.",
     false,
-  )
+  ).inGroup(TROPHY_GROUP)
 
   private val goldenFishPredictionDistanceSetting = SliderSetting(
     "Golden Fish Prediction Distance",
@@ -179,7 +179,7 @@ object FishingMacroModule : Module("Fishing Macro") {
     0.1,
     3.0,
     0.1,
-  )
+  ).inGroup(TROPHY_GROUP)
 
   private val minimumTrophyWaitTimeSetting = SliderSetting(
     "Minimum Wait Time",
