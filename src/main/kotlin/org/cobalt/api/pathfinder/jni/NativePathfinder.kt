@@ -189,6 +189,10 @@ object NativePathfinder {
     private const val TELEPORT_POST_LANDING_SAFE_NODES = 2
     private const val TELEPORT_NEED_LOOKAHEAD_NODES = 7
 
+    // =========================================================================
+    // Lifecycle & public path/route entry points
+    // =========================================================================
+
     fun init() {
         NativePathfinderJNI.initNative()
         searchExecutor.submit {}
@@ -321,6 +325,10 @@ object NativePathfinder {
     }
 
     val status: PathStatus get() = state
+
+    // =========================================================================
+    // Tick: status machine + movement command production
+    // =========================================================================
 
     fun tick(): PathCommand? {
         val mc = Minecraft.getInstance()
@@ -617,6 +625,10 @@ object NativePathfinder {
         return true
     }
 
+    // =========================================================================
+    // Avoid points + debug
+    // =========================================================================
+
     fun addTransientAvoidPoint(
         x: Int,
         y: Int,
@@ -680,6 +692,10 @@ object NativePathfinder {
 
         return meta to penalties
     }
+
+    // =========================================================================
+    // Search submission + result handling
+    // =========================================================================
 
     private fun submitSearch(starts: List<SearchPoint>, goals: List<SearchPoint>, isFly: Boolean) {
         val (avoidMeta, avoidPenalty) = buildAvoidInputs()
@@ -854,6 +870,10 @@ object NativePathfinder {
         return out
     }
 
+    // =========================================================================
+    // Teleport firing + selection (AOTV / Etherwarp)
+    // =========================================================================
+
     private fun fireTeleport(isEtherwarp: Boolean, aotvSlot: Int) {
         val mc = Minecraft.getInstance()
         val player = mc.player ?: return
@@ -920,6 +940,10 @@ object NativePathfinder {
 
     private fun centerNode(node: Vec3): Vec3 =
         Vec3(node.x + 0.5, node.y, node.z + 0.5)
+
+    // =========================================================================
+    // Hazard checks
+    // =========================================================================
 
     private fun checkUpcomingHazard(level: Level, playerPos: Vec3, nodes: List<Vec3>): Boolean {
         if (routeProfile == MovementProfile.FLY || nodes.isEmpty()) return false
@@ -1210,6 +1234,10 @@ object NativePathfinder {
         }.coerceIn(0, lastIndex)
     }
 
+    // =========================================================================
+    // Cached-world frontier fallback (used when no path found)
+    // =========================================================================
+
     private fun tryStartCachedFrontierFallback(reason: String): Boolean {
         if (walkingToCachedFrontier || routeProfile == MovementProfile.FLY || routeWaypoints.isNotEmpty()) return false
         if (CachedWorld.getChunk(goalX shr 4, goalZ shr 4) == null) return false
@@ -1329,6 +1357,10 @@ object NativePathfinder {
         return flags and NativeVoxelFlags.FLUID == 0 &&
             flags and NativeVoxelFlags.SOLID != 0
     }
+
+    // =========================================================================
+    // Logging + summary helpers
+    // =========================================================================
 
     private fun logFailure(reason: String) {
         val mc = Minecraft.getInstance()
