@@ -1,50 +1,49 @@
 package org.cobalt.render;
 
-import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.opengl.GlDevice;
 import com.mojang.blaze3d.opengl.GlTexture;
+import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL12;
 import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
 
-public class HudGlassBlurRenderer {
+public class HudGlowRenderer {
 
   private static final Minecraft MC = Minecraft.getInstance();
 
-  private static HudGlassBlurShader blurShader;
+  private static HudGlowShader glowShader;
   private static boolean initialized = false;
 
   private static int quadVao;
   private static int quadVbo;
 
-  private static int captureTexture;
-  private static int captureWidth;
-  private static int captureHeight;
-
-  public static void renderBlurRect(float x, float y, float width, float height, float cornerRadius, float blurStrength) {
-    if (width <= 1f || height <= 1f) {
+  public static void renderGlowRect(
+    float x,
+    float y,
+    float width,
+    float height,
+    float cornerRadius,
+    float glowSize,
+    int colorA,
+    int colorB,
+    float alpha
+  ) {
+    if (width <= 1f || height <= 1f || alpha <= 0f) {
       return;
     }
 
     if (!initialized) {
       init();
     }
-    if (!initialized || blurShader == null || !blurShader.isValid()) {
+    if (!initialized || glowShader == null || !glowShader.isValid()) {
       return;
     }
 
     RenderTarget framebuffer = MC.getMainRenderTarget();
-    if (framebuffer == null) {
-      return;
-    }
-
-    int fbWidth = framebuffer.width;
-    int fbHeight = framebuffer.height;
-    if (fbWidth <= 0 || fbHeight <= 0) {
+    if (framebuffer == null || framebuffer.width <= 0 || framebuffer.height <= 0) {
       return;
     }
 
@@ -54,19 +53,18 @@ public class HudGlassBlurRenderer {
       return;
     }
 
-    float scaleX = fbWidth / (float) screenWidth;
-    float scaleY = fbHeight / (float) screenHeight;
+    float scaleX = framebuffer.width / (float) screenWidth;
+    float scaleY = framebuffer.height / (float) screenHeight;
     float framebufferX = x * scaleX;
     float framebufferY = y * scaleY;
     float framebufferWidth = width * scaleX;
     float framebufferHeight = height * scaleY;
     float framebufferRadius = cornerRadius * Math.max(scaleX, scaleY);
+    float framebufferGlow = glowSize * Math.max(scaleX, scaleY);
     int mainFramebuffer = ((GlTexture) framebuffer.getColorTexture()).getFbo(
       ((GlDevice) RenderSystem.getDevice()).directStateAccess(),
       null
     );
-
-    ensureCaptureTexture(fbWidth, fbHeight);
 
     int prevFramebuffer = 0;
     int prevProgram = 0;
@@ -108,11 +106,7 @@ public class HudGlassBlurRenderer {
       stateCaptured = true;
 
       GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, mainFramebuffer);
-      GL11.glViewport(0, 0, fbWidth, fbHeight);
-
-      GL13.glActiveTexture(GL13.GL_TEXTURE0);
-      GL11.glBindTexture(GL11.GL_TEXTURE_2D, captureTexture);
-      GL11.glCopyTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, 0, 0, 0, fbWidth, fbHeight);
+      GL11.glViewport(0, 0, framebuffer.width, framebuffer.height);
 
       if (scissorEnabled) {
         GL11.glDisable(GL11.GL_SCISSOR_TEST);
@@ -121,25 +115,28 @@ public class HudGlassBlurRenderer {
       GL11.glDepthMask(false);
       GL11.glDisable(GL11.GL_CULL_FACE);
       GL11.glEnable(GL11.GL_BLEND);
-      GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+      GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE);
       GL20.glBlendEquationSeparate(GL20.GL_FUNC_ADD, GL20.GL_FUNC_ADD);
 
-      if (!blurShader.use()) {
+      if (!glowShader.use()) {
         initialized = false;
         return;
       }
 
-      blurShader.setTexture(0);
-      blurShader.setScreenSize(fbWidth, fbHeight);
-      blurShader.setRect(framebufferX, framebufferY, framebufferWidth, framebufferHeight);
-      blurShader.setCornerRadius(Math.max(0f, Math.min(framebufferRadius, Math.min(framebufferWidth, framebufferHeight) * 0.5f)));
-      blurShader.setBlurStrength(Math.max(1.0f, blurStrength * Math.max(scaleX, scaleY)));
+      glowShader.setScreenSize(framebuffer.width, framebuffer.height);
+      glowShader.setRect(framebufferX, framebufferY, framebufferWidth, framebufferHeight);
+      glowShader.setCornerRadius(Math.max(0f, Math.min(framebufferRadius, Math.min(framebufferWidth, framebufferHeight) * 0.5f)));
+      glowShader.setGlowSize(Math.max(4f, framebufferGlow));
+      glowShader.setAlpha(Math.max(0f, Math.min(alpha, 1f)));
+      glowShader.setTime((System.currentTimeMillis() % 1_000_000L) / 1000f);
+      glowShader.setColorA(colorA);
+      glowShader.setColorB(colorB);
 
       GL30.glBindVertexArray(quadVao);
       GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 6);
       GL30.glBindVertexArray(0);
     } catch (Exception e) {
-      System.err.println("[HudGlassBlurRenderer] Error during blur rendering: " + e.getMessage());
+      System.err.println("[HudGlowRenderer] Error during glow rendering: " + e.getMessage());
       e.printStackTrace();
     } finally {
       if (!stateCaptured) {
@@ -164,32 +161,28 @@ public class HudGlassBlurRenderer {
   }
 
   public static void cleanup() {
-    if (blurShader != null) {
-      blurShader.cleanup();
-      blurShader = null;
+    if (glowShader != null) {
+      glowShader.cleanup();
+      glowShader = null;
     }
     if (quadVao != 0) GL30.glDeleteVertexArrays(quadVao);
     if (quadVbo != 0) GL20.glDeleteBuffers(quadVbo);
-    if (captureTexture != 0) GL11.glDeleteTextures(captureTexture);
     quadVao = 0;
     quadVbo = 0;
-    captureTexture = 0;
-    captureWidth = 0;
-    captureHeight = 0;
     initialized = false;
   }
 
   private static void init() {
     try {
-      blurShader = new HudGlassBlurShader();
-      if (blurShader == null || !blurShader.isValid()) {
-        blurShader = null;
+      glowShader = new HudGlowShader();
+      if (glowShader == null || !glowShader.isValid()) {
+        glowShader = null;
         return;
       }
       createFullscreenQuad();
       initialized = true;
     } catch (Exception e) {
-      System.err.println("[HudGlassBlurRenderer] Failed to initialize: " + e.getMessage());
+      System.err.println("[HudGlowRenderer] Failed to initialize: " + e.getMessage());
       e.printStackTrace();
     }
   }
@@ -218,26 +211,5 @@ public class HudGlassBlurRenderer {
     GL20.glVertexAttribPointer(1, 2, GL11.GL_FLOAT, false, 4 * Float.BYTES, 2L * Float.BYTES);
 
     GL30.glBindVertexArray(0);
-  }
-
-  private static void ensureCaptureTexture(int width, int height) {
-    if (captureTexture == 0) {
-      captureTexture = GL11.glGenTextures();
-    }
-
-    if (captureWidth == width && captureHeight == height) {
-      return;
-    }
-
-    GL11.glBindTexture(GL11.GL_TEXTURE_2D, captureTexture);
-    GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA, width, height, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, 0);
-    GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
-    GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
-    GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL12.GL_CLAMP_TO_EDGE);
-    GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
-    GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
-
-    captureWidth = width;
-    captureHeight = height;
   }
 }

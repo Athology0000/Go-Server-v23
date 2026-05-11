@@ -77,8 +77,7 @@ class WatermarkModule : Module("Watermark") {
     private const val KEY_PILL_TEXT_SIZE = 9.4f
     private const val WHITE_TEXT = 0xFFF2EFF6.toInt()
     private const val MUTED_TEXT = 0x998E8995.toInt()
-    private const val GLASS_BLUR_STRENGTH = 1.35f
-    private const val SECTION_TINT = 0x1F1A1720
+    private const val GLASS_BLUR_STRENGTH = 14.0f
   }
 
   private val mc = Minecraft.getInstance()
@@ -275,15 +274,15 @@ class WatermarkModule : Module("Watermark") {
     val shiftX = cos((now % 10000L).toFloat() / 10000f * (Math.PI * 2).toFloat()) * (width * 0.32f)
     val (gradientStart, gradientEnd) = ThemeGradient.colors()
 
-    NVGRenderer.rect(x + 3f, y + 2f, width, totalHeight, 0x10000000, CARD_CORNER + 1f)
-    NVGRenderer.rect(x, y, width, totalHeight, ThemeSurface.panel(0x4C), CARD_CORNER)
+    NVGRenderer.rect(x + 3f, y + 2f, width, totalHeight, 0x0A000000, CARD_CORNER + 1f)
+    NVGRenderer.rect(x, y, width, totalHeight, ThemeSurface.panel(0x34), CARD_CORNER)
     NVGRenderer.gradientRect(
       x,
       y,
       width,
       totalHeight,
-      0x18FFFFFF,
-      SECTION_TINT,
+      ThemeSurface.overlay(0x18),
+      ThemeSurface.inset(0x12),
       Gradient.TopToBottom,
       CARD_CORNER,
     )
@@ -292,7 +291,7 @@ class WatermarkModule : Module("Watermark") {
       y,
       width,
       MAIN_BAR_HEIGHT + layout.macroVisibleHeight * 0.55f,
-      0x2EFFFFFF,
+      ThemeSurface.overlay(0x1E),
       0x00000000,
       Gradient.TopToBottom,
       CARD_CORNER,

@@ -16,6 +16,7 @@ import org.cobalt.api.ui.theme.ThemeGradient
 import org.cobalt.api.ui.theme.ThemeSurface
 import org.cobalt.api.util.ui.NVGRenderer
 import org.cobalt.api.util.ui.helper.Gradient
+import org.cobalt.render.HudGlassBlurRenderer
 
 class InventoryHudModule : Module("Inventory HUD") {
 
@@ -31,6 +32,7 @@ class InventoryHudModule : Module("Inventory HUD") {
   private val borderRadius    = 9f
   private val borderThickness = 1.5f
   private val itemOffset      = 2f
+  private val blurStrength    = 16.0f
 
   private lateinit var backgroundSetting: CheckboxSetting
 
@@ -60,6 +62,26 @@ class InventoryHudModule : Module("Inventory HUD") {
       p * 2 + ROWS * ss + (ROWS - 1) * sg
     }
 
+    preRender { screenX, screenY, scale ->
+      if (!background.value) return@preRender
+
+      val ss = slotSize     * baseScale
+      val sg = slotGap      * baseScale
+      val p  = padding      * baseScale
+      val br = borderRadius * baseScale
+      val totalW = p * 2 + COLS * ss + (COLS - 1) * sg
+      val totalH = p * 2 + ROWS * ss + (ROWS - 1) * sg
+
+      HudGlassBlurRenderer.renderBlurRect(
+        screenX,
+        screenY,
+        totalW * scale,
+        totalH * scale,
+        br * scale,
+        blurStrength,
+      )
+    }
+
     // -- NVG render - smooth rounded fills + gradient border -------------------
     // Items are drawn BEFORE this (in onGuiRender) and show through the
     // semi-transparent fills, giving a glass-inside-slot look.
@@ -74,7 +96,8 @@ class InventoryHudModule : Module("Inventory HUD") {
       val totalH = p * 2 + ROWS * ss + (ROWS - 1) * sg
 
       if (background.value) {
-        NVGRenderer.rect(0f, 0f, totalW, totalH, ThemeSurface.slotGlass(), br)
+        NVGRenderer.rect(0f, 0f, totalW, totalH, ThemeSurface.panel(0x3A), br)
+        NVGRenderer.gradientRect(0f, 0f, totalW, totalH * 0.45f, ThemeSurface.overlay(0x18), 0x00000000, Gradient.TopToBottom, br)
       }
 
       val angle  = (System.currentTimeMillis() % 12000L).toFloat() / 12000f * (Math.PI * 2.0).toFloat()

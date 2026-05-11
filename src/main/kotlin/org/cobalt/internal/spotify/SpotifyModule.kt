@@ -17,6 +17,8 @@ import org.cobalt.api.ui.theme.ThemeSurface
 import org.cobalt.api.util.ui.NVGRenderer
 import org.cobalt.api.util.ui.helper.Gradient
 import org.cobalt.api.util.ui.helper.Image
+import org.cobalt.render.HudGlassBlurRenderer
+import org.cobalt.render.HudGlowRenderer
 
 object SpotifyModule : Module("Spotify") {
 
@@ -125,6 +127,8 @@ object SpotifyModule : Module("Spotify") {
     private const val COMPACT_ART    = 46f
     private const val ART_FRAME      = ART      // ART_PAD = 0
     private const val CORNER         = 10f
+    private const val GLASS_BLUR_STRENGTH = 14.0f
+    private const val SHADER_GLOW_SIZE = 22f
     private const val PAD            = 8f
     private const val TEXT_X         = PAD + ART_FRAME + 8f  // 76f
     private const val BTN_W          = 32f
@@ -161,6 +165,10 @@ object SpotifyModule : Module("Spotify") {
         setting(showTimeSetting)
         setting(waveformSetting)
 
+        preRender { screenX, screenY, scale ->
+            renderHudBackdrop(screenX, screenY, scale)
+        }
+
         render { x, y, scale ->
             // HudModuleManager only calls this when mc.screen == null, so controls are hidden.
             // No mouse-to-screen conversion is needed on this path.
@@ -181,6 +189,8 @@ object SpotifyModule : Module("Spotify") {
         val sh      = window.screenHeight.toFloat()
         val (sx, sy) = spotifyHud.getScreenPosition(sw, sh)
         val s       = spotifyHud.scale
+
+        renderHudBackdrop(sx, sy, s)
 
         NVGRenderer.beginFrame(sw, sh)
         NVGRenderer.push()
@@ -242,6 +252,32 @@ object SpotifyModule : Module("Spotify") {
     }
 
     // -- Core HUD render -------------------------------------------------------
+
+    private fun renderHudBackdrop(screenX: Float, screenY: Float, scale: Float) {
+        if (isGlassMode) {
+            HudGlassBlurRenderer.renderBlurRect(
+                screenX,
+                screenY,
+                currentHudWidth * scale,
+                currentHudHeight * scale,
+                CORNER * scale,
+                GLASS_BLUR_STRENGTH,
+            )
+        }
+        if (glowSetting.value) {
+            HudGlowRenderer.renderGlowRect(
+                screenX,
+                screenY,
+                currentHudWidth * scale,
+                currentHudHeight * scale,
+                CORNER * scale,
+                SHADER_GLOW_SIZE * scale,
+                color1,
+                color2,
+                if (isGlassMode) 0.62f else 0.42f,
+            )
+        }
+    }
 
     private fun renderHudContent(
         x: Float, y: Float,
@@ -390,27 +426,15 @@ object SpotifyModule : Module("Spotify") {
         val twoPi = (Math.PI * 2).toFloat()
         val glassMode = isGlassMode
 
-        if (glowSetting.value) {
-            val pulse = 0.4f + 0.6f * cos((now % 4000L).toFloat() / 4000f * twoPi)
-            val outerMax = if (glassMode) 0x1A else 0x28
-            val innerMax = if (glassMode) 0x24 else 0x40
-            val a2 = (outerMax * pulse).toInt().coerceIn(0, outerMax)
-            val a1 = (innerMax * pulse).toInt().coerceIn(0, innerMax)
-            NVGRenderer.hollowRect(x - 3f, y - 3f, w + 6f, h + 6f, 2.5f,
-                (a2 shl 24) or (c1 and 0x00FFFFFF), CORNER + 3f)
-            NVGRenderer.hollowRect(x - 1.5f, y - 1.5f, w + 3f, h + 3f, 1.5f,
-                (a1 shl 24) or (c1 and 0x00FFFFFF), CORNER + 1.5f)
-        }
-
         val angle  = (now % 10000L).toFloat() / 10000f * twoPi
         val shiftX = cos(angle) * (w * 0.42f)
 
         if (glassMode) {
-            NVGRenderer.rect(x, y, w, h, ThemeSurface.panelGlass(), CORNER)
-            NVGRenderer.gradientRect(x, y, w, h * 0.56f, ThemeSurface.overlay(0x34), ThemeSurface.withAlpha(ThemeSurface.inset(), 0x08), Gradient.TopToBottom, CORNER)
-            NVGRenderer.gradientRect(x, y + h * 0.46f, w, h * 0.54f, 0x04000000, 0x26000000, Gradient.TopToBottom, CORNER)
-            NVGRenderer.hollowRect(x, y, w, h, 1f, 0x44FFFFFF, CORNER)
-            NVGRenderer.hollowRect(x + 1f, y + 1f, w - 2f, h - 2f, 1f, 0x16FFFFFF, CORNER - 1f)
+            NVGRenderer.rect(x, y, w, h, ThemeSurface.panel(0x34), CORNER)
+            NVGRenderer.gradientRect(x, y, w, h * 0.56f, ThemeSurface.overlay(0x18), 0x00000000, Gradient.TopToBottom, CORNER)
+            NVGRenderer.gradientRect(x, y + h * 0.52f, w, h * 0.48f, 0x00000000, ThemeSurface.inset(0x16), Gradient.TopToBottom, CORNER)
+            NVGRenderer.hollowRect(x, y, w, h, 1f, ThemeSurface.overlay(0x42), CORNER)
+            NVGRenderer.hollowRect(x + 1f, y + 1f, w - 2f, h - 2f, 1f, ThemeSurface.overlay(0x16), CORNER - 1f)
             NVGRenderer.hollowGradientRectShifted(
                 x, y, w, h, 1.2f,
                 withAlpha(c1, 0x54), withAlpha(c2, 0x34),
