@@ -27,6 +27,7 @@ type Config struct {
 	PublicCORSAllowOrigins string
 	AdminCORSAllowOrigins  string
 	BodyLimit             int
+	SessionTTLHours       int
 }
 
 func Load() (*Config, error) {
@@ -63,6 +64,7 @@ func Load() (*Config, error) {
 		AppEnv:                strings.ToLower(getEnvOr("APP_ENV", "development")),
 		PublicCORSAllowOrigins: publicOrigins,
 		AdminCORSAllowOrigins:  adminOrigins,
+		SessionTTLHours:       getEnvIntOr("SESSION_TTL_HOURS", 1),
 		BodyLimit:             getEnvIntOr("BODY_LIMIT_BYTES", 10*1024*1024),
 	}
 

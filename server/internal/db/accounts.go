@@ -14,6 +14,7 @@ type Account struct {
 	Status       string    `json:"status"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
+	
 }
 
 func GetAccountByID(ctx context.Context, pool *pgxpool.Pool, id string) (*Account, error) {

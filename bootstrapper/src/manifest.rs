@@ -118,23 +118,44 @@ pub fn fetch_and_verify(
     }
 
     let mut manifest = parse_manifest_body(&body)?;
+    let expected_sig = expected_sig.trim();
+    let payload_sig = manifest.signature.trim();
 
-    let sig_to_verify = if !expected_sig.trim().is_empty() {
-        expected_sig.trim()
+    if !expected_sig.is_empty() && !payload_sig.is_empty() && expected_sig != payload_sig {
+        return Err("Manifest signature mismatch between auth response and manifest payload".to_string());
+    }
+
+    let sig_to_verify = if !expected_sig.is_empty() {
+        expected_sig
     } else {
-        manifest.signature.trim()
+        payload_sig
     };
 
     if sig_to_verify.is_empty() {
-        eprintln!(
-            "WARNING: manifest has no signature. This is okay for local dev only. Do not use unsigned manifests in production."
-        );
+        if allow_unsigned_manifests() {
+            eprintln!(
+                "WARNING: unsigned manifest accepted because COBALT_ALLOW_UNSIGNED_MANIFESTS=1 is set."
+            );
+        } else {
+            return Err(
+                "Unsigned manifests are prohibited in production. Set COBALT_ALLOW_UNSIGNED_MANIFESTS=1 only for local development.".to_string(),
+            );
+        }
     } else {
         verify_signature(&manifest, sig_to_verify)?;
         manifest.signature = sig_to_verify.to_string();
     }
 
     Ok(manifest)
+}
+
+fn allow_unsigned_manifests() -> bool {
+    std::env::var("COBALT_ALLOW_UNSIGNED_MANIFESTS")
+        .map(|val| {
+            let normalized = val.trim().to_lowercase();
+            normalized == "1" || normalized == "true" || normalized == "yes"
+        })
+        .unwrap_or(false)
 }
 
 fn parse_manifest_body(body: &str) -> Result<ContentManifest, String> {

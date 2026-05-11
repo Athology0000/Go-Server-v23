@@ -3,6 +3,7 @@ mod client;
 mod config;
 mod credentials;
 mod enrollment;
+mod heartbeat;
 mod hwid;
 mod jar;
 mod launch;
@@ -164,6 +165,13 @@ fn main() {
 
     ok(&format!("Session file written: {}", session_path.display()));
     warn("Session file will NOT be deleted while debugging.");
+
+    println!();
+    step(5, "Starting heartbeat monitor");
+
+    heartbeat::start_heartbeat(&http, &cfg.server_url, &auth_result.session_token, &cfg.game_dir);
+
+    ok("Heartbeat monitor started");
 
     println!();
     divider();

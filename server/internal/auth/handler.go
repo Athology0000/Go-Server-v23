@@ -40,13 +40,20 @@ type verifySessionRequest struct {
 	MinecraftUsername string `json:"minecraft_username"`
 }
 
+type heartbeatRequest struct {
+	SessionToken string   `json:"session_token"`
+	Activity     []string `json:"activity"`
+}
+
 func RegisterRoutes(app *fiber.App, svc *Service, pool *pgxpool.Pool, rdb *redis.Client, auditSvc *audit.Service) {
 	authLimit := middleware.RateLimit(rdb, 10, time.Minute, middleware.IPAndUsernameKey("auth"))
+	heartbeatLimit := middleware.RateLimit(rdb, 60, time.Minute, middleware.IPAndUsernameKey("heartbeat"))
 
 	app.Post("/auth/start", authLimit, handleStart(svc))
 	app.Post("/auth/finish", authLimit, handleFinish(svc))
 	app.Post("/auth/verify-minecraft", authLimit, handleVerifyMinecraft(svc))
 	app.Post("/auth/verify-session", authLimit, handleVerifySession(svc))
+	app.Post("/auth/heartbeat", heartbeatLimit, handleHeartbeat(svc))
 
 	panelLimit := middleware.RateLimit(rdb, 20, time.Minute, middleware.IPKey("panel-auth"))
 	app.Post("/auth/login", panelLimit, handlePanelLogin(pool, auditSvc))
@@ -518,4 +525,27 @@ func nullableString(value string) any {
 	}
 
 	return value
+}
+
+func handleHeartbeat(svc *Service) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var req heartbeatRequest
+
+		if err := c.BodyParser(&req); err != nil || req.SessionToken == "" {
+			return c.Status(400).JSON(fiber.Map{"error": "invalid_request"})
+		}
+
+		ip := middleware.GetRealIP(c)
+
+		err := svc.Heartbeat(c.Context(), req.SessionToken, ip, req.Activity)
+		if errors.Is(err, ErrSessionInvalid) {
+			return c.Status(401).JSON(fiber.Map{"error": "session_invalid"})
+		}
+
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
+		}
+
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
 }

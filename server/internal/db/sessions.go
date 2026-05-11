@@ -47,6 +47,9 @@ func GetSessionByTokenHash(ctx context.Context, pool *pgxpool.Pool, tokenHash st
 		&s.EnabledModules, &s.EnabledFeatures, &s.EntitlementExpiresAt,
 		&s.ExpiresAt, &s.Revoked, &s.LastSeenIP, &s.CreatedAt)
 	return s, err
+func UpdateSessionExpiresAt(ctx context.Context, pool *pgxpool.Pool, sessionID string, expiresAt time.Time) error {
+	_, err := pool.Exec(ctx, `UPDATE sessions SET expires_at = $1 WHERE id = $2`, expiresAt, sessionID)
+	return err
 }
 
 func RevokeSession(ctx context.Context, pool *pgxpool.Pool, sessionID string) error {

@@ -59,6 +59,7 @@ type Service struct {
 	masterKey []byte
 	pepper    []byte
 	baseURL   string
+	cfg       *config.Config
 }
 
 func New(
@@ -68,7 +69,7 @@ func New(
 	auditSvc *audit.Service,
 	masterKey []byte,
 	pepper []byte,
-	baseURL string,
+	cfg *config.Config,
 ) *Service {
 	return &Service{
 		pool:      pool,
@@ -77,6 +78,8 @@ func New(
 		auditSvc:  auditSvc,
 		masterKey: masterKey,
 		pepper:    pepper,
+		baseURL:   strings.TrimRight(baseURL, "/"),
+		cfg:       cfg
 		baseURL:   strings.TrimRight(baseURL, "/"),
 	}
 }
@@ -125,8 +128,8 @@ func (s *Service) Start(ctx context.Context, username, rawHWID, minecraftUsernam
 			"reason": "device_not_enrolled",
 		})
 		return nil, ErrNotFound
-	}
-
+	}fully_bound" && s.cfg.StrictSessionIP {
+		if device.LastSeenIP == nil || *device.LastSeen
 	if device.BindingStatus == "hwid_pending" {
 		if device.EnrollmentIP == nil || *device.EnrollmentIP != sourceIP {
 			s.auditSvc.Log("auth.start.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
@@ -260,7 +263,7 @@ func (s *Service) Finish(ctx context.Context, username, proofHex, sourceIP, mine
 			AccountID:      account.ID,
 			Username:       account.Username,
 			Reason:         ent.Reason,
-		}, nil
+		}, nilDuration(s.cfg.SessionTTLHours) * time.
 	}
 
 	expiresAt := time.Now().Add(time.Hour)
@@ -304,6 +307,14 @@ func (s *Service) Finish(ctx context.Context, username, proofHex, sourceIP, mine
 	manifestURL := s.baseURL + "/content/manifest/stable"
 	manifestSig := ""
 
+	if manifest, err := db.GetLatestManifest(ctx, s.pool, ent.ContentChannel); err == nil {
+		 else {
+		log.Printf("[auth.finish] no manifest found for channel %s: %v", ent.ContentChannel, err)
+		return nil, errors.New("no manifest available for your plan")
+	}manifestURL = s.baseURL + "/content/manifest/" + manifest.ID
+		manifestSig = manifest.Signature
+	}
+
 	s.auditSvc.Log("auth.finish.success", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
 		"plan_tier": planTier,
 	})
@@ -333,6 +344,35 @@ func (s *Service) Finish(ctx context.Context, username, proofHex, sourceIP, mine
 		ManifestSignature:    manifestSig,
 		EntitlementExpiresAt: ent.EntitlementExpiresAt,
 	}, nil
+}
+
+func (s *Service) Heartbeat(ctx context.Context, sessionToken, sourceIP string) error {
+	tokenHash := crypto.HashToken(sessionToken)
+
+	session, err := db.GetSessionByTokenHash(ctx, s.pool, tokenHash)
+	if err != nil {
+		return ErrSessionInvalid
+	}
+
+	if session.Revoked {
+		return ErrSessionInvalid
+	}
+
+	if session.ExpiresAt.Before(time.Now()) {
+		return ErrSessionInvalid
+	}
+
+	// Extend session expiration
+	newExpiresAt := time.Now().Add(time.Hour)
+	if err := db.UpdateSessionExpiresAt(ctx, s.pool, session.ID, newExpiresAt); err != nil {
+		return err
+	}
+
+	s.auditSvc.Log("auth.heartbeat", &session.AccountID, &session.DeviceID, nil, &sourceIP, map[string]any{
+		"session_id": session.ID,
+	})
+
+	return nil
 }
 
 type VerifyMinecraftResult struct {

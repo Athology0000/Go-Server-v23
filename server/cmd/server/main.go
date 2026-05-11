@@ -49,7 +49,7 @@ func main() {
 
 	entSvc := entitlement.New(pool)
 	auditSvc := audit.New(pool)
-	authSvc := auth.New(pool, rdb, entSvc, auditSvc, cfg.MasterKey, cfg.ServerPepper, cfg.BaseURL)
+	authSvc := auth.New(pool, rdb, entSvc, auditSvc, cfg.MasterKey, cfg.ServerPepper, cfg.BaseURL, cfg)
 	enrollSvc := enrollment.New(pool, auditSvc, cfg.MasterKey, cfg.ServerPepper)
 	contentSvc := content.New(pool, entSvc, cfg.ContentDir)
 

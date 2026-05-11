@@ -1,7 +1,9 @@
 package middleware
 
 import (
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
