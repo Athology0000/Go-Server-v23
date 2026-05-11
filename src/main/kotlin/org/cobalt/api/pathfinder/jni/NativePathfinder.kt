@@ -18,7 +18,6 @@ import org.cobalt.internal.pathfinding.PathRecoveryController
 import org.cobalt.internal.pathfinding.PathTeleportConfig
 import org.cobalt.internal.pathfinding.TeleportValidationController
 import org.cobalt.internal.skyblock.HypixelManager
-import org.cobalt.internal.skyblock.SkyblockManaTracker
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -1019,8 +1018,6 @@ object NativePathfinder {
 
         val teleportNeeded = forceNeeded || player.horizontalCollision || hasTeleportNeedAhead(level, nodes, cursor)
         if (!teleportNeeded) return null
-        if (!SkyblockManaTracker.canUseInstantTransmission()) return null
-
         val remainingLength = estimatePathGain(nodes, cursor, nodes.lastIndex)
         if (remainingLength < AOTV_MIN_TOTAL_PATH_LENGTH) return null
 
