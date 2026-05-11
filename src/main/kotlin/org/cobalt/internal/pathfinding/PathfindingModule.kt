@@ -71,6 +71,13 @@ object PathfindingModule : Module("Pathfinding") {
   private val COLOR_LOOKAHEAD_SPLINE = OverlayRenderEngine.Color(210, 55, 255, 230)
   private val COLOR_LOOKAHEAD_POINT = OverlayRenderEngine.Color(0, 240, 255, 235)
 
+  // Movement execution debug render colors
+  private val COLOR_MOVE_NODE_FAR  = OverlayRenderEngine.Color(180, 180, 200, 90)   // faint gray-blue: upcoming path nodes
+  private val COLOR_MOVE_NODE_NEAR = OverlayRenderEngine.Color(120, 220, 120, 200)  // green: nodes the player is about to traverse
+  private val COLOR_MOVE_NEXT      = OverlayRenderEngine.Color(0, 220, 255, 255)    // cyan: the immediate next node (chosen next step)
+  private val COLOR_MOVE_CURSOR    = OverlayRenderEngine.Color(255, 120, 0, 230)    // orange: current cursor node
+  private val COLOR_MOVE_TARGET    = OverlayRenderEngine.Color(255, 240, 0, 255)    // yellow: steering target (lookahead point)
+
   val enabled = CheckboxSetting(
     "Enabled",
     "Enable pathfinding target selection and commands.",
@@ -132,6 +139,48 @@ object PathfindingModule : Module("Pathfinding") {
     "Debug Chat Logs",
     "Show pathfinder diagnostics in chat without requiring file logging.",
     false
+  )
+
+  private val lookaheadDistance = SliderSetting(
+    "Lookahead Distance",
+    "How far ahead on the path the steering target sits. Higher = smoother rotations, wider cornering.",
+    4.8, 1.5, 8.0
+  )
+
+  private val lookaheadShrink = SliderSetting(
+    "Lookahead Shrink",
+    "How aggressively the lookahead shortens on turns and when off-path. 0.0 = always stay far (smoothest rotations, may cut corners). 1.0 = original behavior.",
+    0.3, 0.0, 1.0
+  )
+
+  private val movementDebugRender = CheckboxSetting(
+    "Movement Debug Render",
+    "Draw all upcoming path blocks (faint), the current cursor and next step (orange/cyan), and the steering target block (yellow) in-world. Useful for tuning lookahead and seeing what the executor picked each tick.",
+    false
+  )
+
+  private val movementDebugRange = SliderSetting(
+    "Debug Render Range",
+    "How many upcoming path nodes to draw when Movement Debug Render is on.",
+    24.0, 4.0, 64.0
+  )
+
+  private val rotationCatchupMin = SliderSetting(
+    "Rotation Catch-up Min",
+    "Per-frame fraction of remaining yaw/pitch delta closed when aim is near the target. Higher = quicker return when close.",
+    0.30, 0.05, 0.60
+  )
+
+  private val rotationCatchupMax = SliderSetting(
+    "Rotation Catch-up Max",
+    "Per-frame closure ceiling when the aim is far from the target. Higher = quicker recovery on big deviations, but more snap.",
+    0.70, 0.30, 0.95
+  )
+
+  private val rotationRampScale = SliderSetting(
+    "Rotation Ramp Scale",
+    "How quickly the catch-up ramps from Min toward Max as the angle delta grows. Smaller = ramps faster (snappier). Larger = stays smooth on big deltas.",
+    16.0, 5.0, 60.0
   )
 
   private val aotvSlot = ModeSetting(
@@ -354,6 +403,11 @@ object PathfindingModule : Module("Pathfinding") {
     org.cobalt.internal.pathfinding.DebugLog.debugFileEnabled = debugFileLogging.value
     org.cobalt.internal.pathfinding.DebugLog.debugChatEnabled =
       debugChatLogging.value || debugFileLogging.value || isDebugEnabled()
+    PathExecutorState.lookaheadDistanceFar = lookaheadDistance.value
+    PathExecutorState.lookaheadShrinkStrength = lookaheadShrink.value
+    PathExecutorState.rotationCatchupMin = rotationCatchupMin.value
+    PathExecutorState.rotationCatchupMax = rotationCatchupMax.value
+    PathExecutorState.rotationRampScale = rotationRampScale.value
 
     // Update live info settings
     routeCountInfo.value = "${localRouteWaypoints.size} points"
@@ -417,6 +471,10 @@ object PathfindingModule : Module("Pathfinding") {
         }
         OverlayRenderEngine.clearTag("jump-guide")
         renderJumpGuides(level, player.position(), NativePathfinder.cachedPathNodes)
+        OverlayRenderEngine.clearTag("movement-debug")
+        if (movementDebugRender.value) {
+          renderMovementDebug(level, NativePathfinder.cachedPathNodes, NativePathfinder.pathNodeCursor)
+        }
       }
     }
 
@@ -531,6 +589,84 @@ object PathfindingModule : Module("Pathfinding") {
       tag = "lookahead-ray",
       forceRender = true
     )
+  }
+
+  private fun supportBlockOf(node: Vec3): BlockPos =
+    BlockPos(
+      Math.floor(node.x).toInt(),
+      Math.round(node.y).toInt() - 1,
+      Math.floor(node.z).toInt()
+    )
+
+  /**
+   * In-world overlay of what the movement executor is currently working with:
+   *  - all upcoming path nodes (faint = far, green = near)
+   *  - cursor node (orange) and next node (cyan)
+   *  - steering target / lookahead block (yellow)
+   */
+  private fun renderMovementDebug(
+    level: net.minecraft.world.level.Level,
+    nodes: List<Vec3>,
+    cursor: Int
+  ) {
+    if (nodes.isEmpty()) return
+    val range = movementDebugRange.value.toInt().coerceAtLeast(1)
+    val startIdx = cursor.coerceIn(0, nodes.lastIndex)
+    val endIdx = minOf(nodes.lastIndex, startIdx + range)
+
+    // All upcoming path-support blocks (deduped — many nodes can share the same standing block).
+    val seen = HashSet<Long>(range * 2)
+    for (i in startIdx..endIdx) {
+      val pos = supportBlockOf(nodes[i])
+      if (!seen.add(pos.asLong())) continue
+      val near = (i - startIdx) <= 4
+      OverlayRenderEngine.outlineBlockColor(
+        level, pos,
+        if (near) COLOR_MOVE_NODE_NEAR else COLOR_MOVE_NODE_FAR,
+        durationTicks = 2,
+        tag = "movement-debug",
+        lineWidth = if (near) 1.6f else 1.0f
+      )
+    }
+
+    // Cursor node — orange
+    OverlayRenderEngine.outlineBlockColor(
+      level, supportBlockOf(nodes[startIdx]),
+      COLOR_MOVE_CURSOR,
+      durationTicks = 2,
+      tag = "movement-debug",
+      lineWidth = 2.4f
+    )
+
+    // Next node (the immediate chosen next step) — cyan
+    if (startIdx + 1 <= nodes.lastIndex) {
+      OverlayRenderEngine.outlineBlockColor(
+        level, supportBlockOf(nodes[startIdx + 1]),
+        COLOR_MOVE_NEXT,
+        durationTicks = 2,
+        tag = "movement-debug",
+        lineWidth = 2.6f
+      )
+    }
+
+    // Steering target block — yellow. Prefer the raw lookahead spline point (world-space,
+    // not eye-clamped) so it reflects the path-space decision the executor made.
+    val targetPoint = PathExecutorState.currentLookaheadSplinePoint
+      ?: PathExecutorState.currentTargetPoint
+    if (targetPoint != null) {
+      val targetBlock = BlockPos(
+        Math.floor(targetPoint.x).toInt(),
+        Math.floor(targetPoint.y).toInt(),
+        Math.floor(targetPoint.z).toInt()
+      )
+      OverlayRenderEngine.outlineBlockColor(
+        level, targetBlock,
+        COLOR_MOVE_TARGET,
+        durationTicks = 2,
+        tag = "movement-debug",
+        lineWidth = 3.0f
+      )
+    }
   }
 
   private fun renderJumpGuides(level: net.minecraft.world.level.Level, playerPos: Vec3, nodes: List<Vec3>) {

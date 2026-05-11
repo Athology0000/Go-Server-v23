@@ -74,6 +74,21 @@ object PathExecutorState {
     // ── Per-update LOS cache ──
     private val losCache = HashMap<Long, Boolean>(64)
 
+    // ── Adjustable lookahead (set from PathfindingModule settings) ──
+    // Base "far" distance the lookahead point sits ahead of the player on the spline.
+    @JvmField var lookaheadDistanceFar: Double = 4.8
+    // 0.0 = lookahead never shrinks on turns/deviation (always stays far → smoother rotations,
+    //       wider cornering). 1.0 = original aggressive shrink behavior.
+    @JvmField var lookaheadShrinkStrength: Double = 0.3
+
+    // ── Adjustable rotation catch-up (how fast the aim returns to the lookahead) ──
+    // Min/Max are alpha bounds: per-frame fraction of remaining yaw/pitch delta closed.
+    // Higher = quicker return. The nonlinear curve between them preserves smoothness on big deltas.
+    @JvmField var rotationCatchupMin: Double = 0.30
+    @JvmField var rotationCatchupMax: Double = 0.70
+    // Yaw "ramp scale": smaller = alpha rises toward Max faster as delta grows.
+    @JvmField var rotationRampScale: Double = 16.0
+
     // =========================================================================
     // Constants
     // =========================================================================
@@ -361,7 +376,12 @@ object PathExecutorState {
         val remainingPathForLookahead = spline.totalLength - currentSplineDistance
         val safetyLookaheadCap = when {
             dropAhead || safety.ledgeRisk || safety.corridorUnsafe -> PRECISION_LOOKAHEAD
-            pathCurvature >= TURN_BRAKE_CURVATURE -> minOf(adaptiveLookahead, 2.0)
+            pathCurvature >= TURN_BRAKE_CURVATURE -> {
+                // Blend turn-brake cap with shrink setting. At strength=0 the cap is disabled
+                // (keep adaptiveLookahead so the aim stays far through turns).
+                val turnCap = adaptiveLookahead - (adaptiveLookahead - 2.0).coerceAtLeast(0.0) * lookaheadShrinkStrength
+                minOf(adaptiveLookahead, turnCap)
+            }
             else -> adaptiveLookahead
         }
         val effectiveLookahead = minOf(safetyLookaheadCap, remainingPathForLookahead.coerceAtLeast(0.1))
@@ -673,23 +693,26 @@ object PathExecutorState {
         val yawDelta = AngleUtils.getRotationDelta(rawTargetYaw, targetYaw)
         val yawAbs = abs(yawDelta)
         if (yawAbs > yawDeadzone) {
-            val alpha = nonlinearBlend(yawAbs.toDouble(), TARGET_SMOOTH_YAW_SCALE) * finishDamping
+            val alpha = nonlinearBlend(yawAbs.toDouble(), rotationRampScale) * finishDamping
             rawTargetYaw = AngleUtils.normalizeAngle(rawTargetYaw + yawDelta * alpha)
         }
 
         val pitchDelta = targetPitch - rawTargetPitch
         val pitchAbs = abs(pitchDelta)
         if (pitchAbs > pitchDeadzone) {
-            val alpha = nonlinearBlend(pitchAbs.toDouble(), TARGET_SMOOTH_PITCH_SCALE) * finishDamping
+            // Pitch responds slightly quicker than yaw (preserves the original 18/24 = 0.75 ratio).
+            val alpha = nonlinearBlend(pitchAbs.toDouble(), rotationRampScale * 0.75) * finishDamping
             rawTargetPitch = (rawTargetPitch + pitchDelta * alpha).coerceIn(-89.9f, 89.9f)
         }
     }
 
     private fun nonlinearBlend(delta: Double, scale: Double): Float {
-        val t = 1.0 - exp(-delta / scale)
-        return (TARGET_SMOOTH_MIN + (TARGET_SMOOTH_MAX - TARGET_SMOOTH_MIN) * t)
+        val mn = rotationCatchupMin.toFloat()
+        val mx = rotationCatchupMax.coerceAtLeast(rotationCatchupMin).toFloat()
+        val t = 1.0 - exp(-delta / scale.coerceAtLeast(0.5))
+        return (mn + (mx - mn) * t)
             .toFloat()
-            .coerceIn(TARGET_SMOOTH_MIN, TARGET_SMOOTH_MAX)
+            .coerceIn(mn, mx)
     }
 
     // =========================================================================
@@ -903,8 +926,10 @@ object PathExecutorState {
         val isFalling = Minecraft.getInstance().player?.deltaMovement?.y?.let { it < -0.1 } ?: false
         val effectiveAngle = if (isFalling) maxAngle * 0.5 else maxAngle
         val curveFactor = ((effectiveAngle - 0.61) / 0.7).coerceIn(0.0, 1.0)
-        val adjustFactor = maxOf(deviationFactor, curveFactor)
-        val target = MAX_LOOKAHEAD - (MAX_LOOKAHEAD - MIN_LOOKAHEAD) * adjustFactor
+        // Setting-controlled shrink: 0.0 → never shrink (always stay far), 1.0 → original.
+        val adjustFactor = maxOf(deviationFactor, curveFactor) * lookaheadShrinkStrength
+        val maxL = lookaheadDistanceFar
+        val target = maxL - (maxL - MIN_LOOKAHEAD) * adjustFactor
         val lerpFactor = if (target > smoothedLookahead) 0.1 else 0.05
         smoothedLookahead += (target - smoothedLookahead) * lerpFactor
         return smoothedLookahead
@@ -955,11 +980,16 @@ object PathExecutorState {
         val effectiveAngle = if (isFalling) maxAngle * 0.5 else maxAngle
         val curveFactor = ((effectiveAngle - 0.52) / 0.75).coerceIn(0.0, 1.0)
         val safetyFactor = if (dropAhead) 1.0 else 0.0
-        val adjustFactor = maxOf(deviationFactor, curveFactor, safetyFactor)
+        // dropAhead still forces precision (safety); curve/deviation shrink is gated by setting.
+        val adjustFactor = maxOf(
+            maxOf(deviationFactor, curveFactor) * lookaheadShrinkStrength,
+            safetyFactor
+        )
+        val maxL = lookaheadDistanceFar
         val target = if (dropAhead) {
             PRECISION_LOOKAHEAD
         } else {
-            MAX_LOOKAHEAD - (MAX_LOOKAHEAD - MIN_LOOKAHEAD) * adjustFactor
+            maxL - (maxL - MIN_LOOKAHEAD) * adjustFactor
         }
         val lerpFactor = if (dropAhead) 0.45 else if (target > smoothedLookahead) 0.14 else 0.08
         smoothedLookahead += (target - smoothedLookahead) * lerpFactor
