@@ -776,6 +776,12 @@ object CommissionMacroModule : Module("Commission Macro") {
     val found = linkedMapOf<String, TabCommission>()
     for (line in lines) {
       val normalized = normalize(line)
+      val parsed = parseCommissionFromTabLine(normalized)
+      if (parsed != null) {
+        val commission = parsed
+        found[commission.name] = commission
+        continue
+      }
       for (task in CommissionData.commissionData) {
         for (name in task.names) {
           if (!normalized.contains(normalize(name))) continue
@@ -785,6 +791,42 @@ object CommissionMacroModule : Module("Commission Macro") {
       }
     }
     return found.values.toList()
+  }
+
+  private fun parseCommissionFromTabLine(line: String): TabCommission? {
+    if (!looksLikeTabCommissionLine(line)) return null
+    val label = buildCommissionLabelFromTabLine(line) ?: return null
+    val task = CommissionData.resolveTask(label) ?: return null
+    return TabCommission(
+      name = task.names.firstOrNull { it.equals(label, ignoreCase = true) } ?: task.primaryName,
+      progress = parseProgress(line),
+    )
+  }
+
+  private fun looksLikeTabCommissionLine(line: String): Boolean {
+    if (line.isBlank() || line.contains("commission complete", ignoreCase = true)) return false
+    val hasProgress =
+      Regex("([0-9]{1,3}(?:\\.[0-9]+)?)\\s*%").containsMatchIn(line) ||
+        Regex("([0-9,]+)\\s*/\\s*([0-9,]+)").containsMatchIn(line) ||
+        line.contains("done", ignoreCase = true) ||
+        line.contains("complete", ignoreCase = true)
+    if (!hasProgress) return false
+    return commissionObjectivePrefixes.any { prefix -> line.startsWith(prefix) || line.contains(" $prefix") } ||
+      miningAreaAliases.keys.any { area -> line.contains(area) } ||
+      CommissionData.commissionData.any { task -> task.names.any { name -> line.contains(normalize(name)) } }
+  }
+
+  private fun buildCommissionLabelFromTabLine(line: String): String? {
+    canonicalizeKnownCommissionLabel(line)?.let { return it }
+    val lines = listOf(line)
+
+    val miningKeyword = extractMiningKeyword(lines)
+    if (miningKeyword != null) return buildMiningCommissionLabel(lines, miningKeyword)
+
+    val combatTarget = extractCombatCommissionTarget(lines)
+    if (combatTarget != null) return buildCombatCommissionLabel(lines, combatTarget)
+
+    return null
   }
 
   private fun updateCommissionsIfChanged(newCommissions: List<TabCommission>) {

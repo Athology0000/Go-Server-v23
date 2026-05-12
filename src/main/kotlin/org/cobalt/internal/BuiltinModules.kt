@@ -11,7 +11,9 @@ import org.cobalt.internal.combat.CombatHudModule
 import org.cobalt.internal.combat.CombatMacroModule
 import org.cobalt.internal.combat.CombatPatrolModule
 import org.cobalt.internal.combat.slayer.BlazeSlayerMacroModule
+import org.cobalt.internal.combat.slayer.CocoonAlertModule
 import org.cobalt.internal.combat.slayer.EndermanSlayerMacroModule
+import org.cobalt.internal.combat.slayer.MinibossAlertModule
 import org.cobalt.internal.combat.slayer.SpiderSlayerMacroModule
 import org.cobalt.internal.combat.slayer.VampireSlayerMacroModule
 import org.cobalt.internal.combat.slayer.WolfSlayerMacroModule
@@ -59,8 +61,11 @@ import org.cobalt.internal.pathfinding.PathfindingModule
 import org.cobalt.internal.pathfinding.debug.PathPreviewRenderModule
 import org.cobalt.internal.pig.PigMacroModule
 import org.cobalt.internal.qol.AutoStashModule
+import org.cobalt.internal.qol.ColoredEnchantsModule
 import org.cobalt.internal.qol.CraftHelperModule
 import org.cobalt.internal.qol.ItemLockingModule
+import org.cobalt.internal.qol.LagDetectorModule
+import org.cobalt.internal.qol.MissingEnchantsModule
 import org.cobalt.internal.qol.PriceTooltipModule
 import org.cobalt.internal.qol.QolModule
 import org.cobalt.internal.qol.RsaAutoGfsModule
@@ -69,6 +74,7 @@ import org.cobalt.internal.seal.YearOfTheSealModule
 import org.cobalt.internal.spotify.SpotifyModule
 import org.cobalt.internal.visual.BlockOutlineModule
 import org.cobalt.internal.visual.BlockOverlayModule
+import org.cobalt.internal.visual.ArrowHitboxesModule
 import org.cobalt.internal.visual.CustomScoreboardModule
 import org.cobalt.internal.visual.DeadEntityCleanerModule
 import org.cobalt.internal.visual.DeployableHudModule
@@ -129,6 +135,8 @@ internal object BuiltinModules {
     EndermanSlayerMacroModule,
     BlazeSlayerMacroModule,
     VampireSlayerMacroModule,
+    CocoonAlertModule,
+    MinibossAlertModule,
 
     // Combat
     CombatHudModule,
@@ -190,6 +198,9 @@ internal object BuiltinModules {
     CraftHelperModule,
     ItemLockingModule,
     PriceTooltipModule,
+    ColoredEnchantsModule,
+    MissingEnchantsModule,
+    LagDetectorModule,
     RsaAutoGfsModule,
     WardrobeModule,
     SpotifyModule,
@@ -200,6 +211,7 @@ internal object BuiltinModules {
     OrbitFreecamModule,
     BlockOverlayModule,
     BlockOutlineModule,
+    ArrowHitboxesModule,
     CustomScoreboardModule,
     HotbarOverlayModule,
     PetDisplayModule,
