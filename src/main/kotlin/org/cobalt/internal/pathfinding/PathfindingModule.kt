@@ -29,6 +29,7 @@ import org.cobalt.api.module.setting.impl.ModeSetting
 import org.cobalt.api.module.setting.impl.TextSetting
 import org.cobalt.api.pathfinder.jni.ActionType
 import org.cobalt.api.pathfinder.jni.NativePathfinder
+import org.cobalt.api.pathfinder.jni.PathHazards
 import org.cobalt.api.pathfinder.jni.PathExecutorState
 import org.cobalt.api.pathfinder.jni.PathStatus
 import org.cobalt.api.pathfinder.minecraft.MinecraftPathingRules
@@ -71,15 +72,13 @@ object PathfindingModule : Module("Pathfinding") {
   private val COLOR_LOOKAHEAD_SPLINE = OverlayRenderEngine.Color(210, 55, 255, 230)
   private val COLOR_LOOKAHEAD_POINT = OverlayRenderEngine.Color(0, 240, 255, 235)
 
-  // Movement execution debug render colors. Two distinct visual tiers so
-  // "possible path blocks" vs "blocks the player will actually walk on" reads
-  // at a glance: FAR = thin, very faint white (the whole path); NEAR = thick,
-  // bright green (the next ~6 steps the executor is committed to).
-  private val COLOR_MOVE_NODE_FAR  = OverlayRenderEngine.Color(220, 220, 230, 45)   // ghost white: all upcoming path support blocks
-  private val COLOR_MOVE_NODE_NEAR = OverlayRenderEngine.Color(80, 255, 80, 240)    // bright green: blocks the player will walk on next
-  private val COLOR_MOVE_NEXT      = OverlayRenderEngine.Color(0, 255, 255, 255)    // cyan: the immediate next step
-  private val COLOR_MOVE_CURSOR    = OverlayRenderEngine.Color(255, 140, 0, 255)    // orange: current cursor block under the player
-  private val COLOR_MOVE_TARGET    = OverlayRenderEngine.Color(255, 240, 0, 255)    // yellow: steering target (lookahead point)
+  // Movement execution block-selection debug colors.
+  private val COLOR_BLOCK_SELECTED = OverlayRenderEngine.Color(60, 255, 90, 210)     // green: selected / optimal path
+  private val COLOR_BLOCK_POTENTIAL = OverlayRenderEngine.Color(255, 45, 55, 135)    // red: possible, not chosen
+  private val COLOR_BLOCK_TOO_FAR = OverlayRenderEngine.Color(160, 55, 255, 115)     // purple: outside the executor corridor
+  private val COLOR_BLOCK_HAZARD = OverlayRenderEngine.Color(255, 150, 0, 170)       // orange: harmful stand/support block
+  private val COLOR_MOVE_CURSOR = OverlayRenderEngine.Color(255, 255, 255, 255)      // white: current cursor
+  private val COLOR_MOVE_TARGET = OverlayRenderEngine.Color(255, 240, 0, 255)        // yellow: steering target
 
   // Weight-map quartiles: green = best alternatives, red = rejected/blocked.
   private val COLOR_WEIGHT_Q1 = OverlayRenderEngine.Color(  0, 220,  60, 120) // top quartile — viable, close to chosen
@@ -164,14 +163,20 @@ object PathfindingModule : Module("Pathfinding") {
 
   private val movementDebugRender = CheckboxSetting(
     "Movement Debug Render",
-    "Draw all upcoming path blocks (faint), the current cursor and next step (orange/cyan), and the steering target block (yellow) in-world. Useful for tuning lookahead and seeing what the executor picked each tick.",
+    "Draw block-selection debug for any active path owner. Green = chosen path, red = possible but not chosen, purple = too far outside the corridor, orange = hazard.",
     false
   )
 
   private val movementDebugRange = SliderSetting(
     "Debug Render Range",
-    "How many upcoming path nodes to draw when Movement Debug Render is on.",
+    "How many upcoming path nodes and nearby candidate blocks to draw when Movement Debug Render is on.",
     24.0, 4.0, 64.0
+  )
+
+  private val movementDebugCandidateRadius = SliderSetting(
+    "Debug Candidate Radius",
+    "Horizontal radius around the player scanned for possible/hazard/too-far support blocks.",
+    7.0, 3.0, 14.0
   )
 
   private val weightMapEnabled = CheckboxSetting(
@@ -452,6 +457,11 @@ object PathfindingModule : Module("Pathfinding") {
       cacheHudRadius,
       cacheHudCellSize,
       cacheHudShowGrid,
+      movementDebugRender,
+      movementDebugRange,
+      movementDebugCandidateRadius,
+      weightMapEnabled,
+      weightMapForward,
       debugFileLogging,
       debugChatLogging,
       aotvSlot,
@@ -784,10 +794,11 @@ object PathfindingModule : Module("Pathfinding") {
   }
 
   /**
-   * In-world overlay of what the movement executor is currently working with:
-   *  - all upcoming path nodes (faint = far, green = near)
-   *  - cursor node (orange) and next node (cyan)
-   *  - steering target / lookahead block (yellow)
+   * In-world overlay of the executor's block selection:
+   *  - green: upcoming blocks the active path will walk on
+   *  - red: valid nearby support blocks that were not selected
+   *  - purple: valid support blocks outside the selected-path corridor
+   *  - orange: harmful stand/support blocks
    */
   private fun renderMovementDebug(
     level: net.minecraft.world.level.Level,
@@ -795,56 +806,31 @@ object PathfindingModule : Module("Pathfinding") {
     cursor: Int
   ) {
     if (nodes.isEmpty()) return
-    val rangeFar = movementDebugRange.value.toInt().coerceAtLeast(1) // ghost-white window
-    val nearCount = 6 // first N support blocks the player will actually walk on next
+    val rangeFar = movementDebugRange.value.toInt().coerceAtLeast(1)
     val startIdx = cursor.coerceIn(0, nodes.lastIndex)
     val endIdxFar = minOf(nodes.lastIndex, startIdx + rangeFar)
-    val endIdxNear = minOf(nodes.lastIndex, startIdx + nearCount)
 
-    // Pass 0 (renders behind everything else): weight map of candidate lookahead
-    // support blocks, color-binned by quartile of distance from the chosen
-    // steering target. Green = best alternatives, red = far / rejected.
     val mPlayer = mc.player
     if (weightMapEnabled.value && mPlayer != null) {
       renderLookaheadWeightMap(level, mPlayer.position())
     }
 
-    // Pass 1: render every upcoming path-support block within the FAR window in
-    // ghost-white. These are the "possible" blocks the path passes through —
-    // shown faintly so the whole path shape reads at a glance. Deduped by
-    // support BlockPos (many nodes share the same standing block).
-    val seen = HashSet<Long>(rangeFar * 2)
+    val selectedBlocks = HashSet<Long>(rangeFar * 2)
+    val selectedPositions = ArrayList<BlockPos>(rangeFar)
     for (i in startIdx..endIdxFar) {
       val pos = supportBlockOf(nodes[i])
-      if (!seen.add(pos.asLong())) continue
-      OverlayRenderEngine.outlineBlockColor(
-        level, pos,
-        COLOR_MOVE_NODE_FAR,
-        durationTicks = 4,
-        tag = "movement-debug",
-        lineWidth = 1.0f,
-        forceRender = true,
-      )
+      if (selectedBlocks.add(pos.asLong())) selectedPositions.add(pos)
     }
 
-    // Pass 2: re-render the first NEAR support blocks in bright green over top.
-    // These are the blocks the executor is committed to in the next handful of
-    // ticks — the "blocks it's gonna walk on" view the user asked for.
-    val seenNear = HashSet<Long>(nearCount * 2)
-    for (i in startIdx..endIdxNear) {
-      val pos = supportBlockOf(nodes[i])
-      if (!seenNear.add(pos.asLong())) continue
-      OverlayRenderEngine.outlineBlockColor(
-        level, pos,
-        COLOR_MOVE_NODE_NEAR,
-        durationTicks = 4,
-        tag = "movement-debug",
-        lineWidth = 2.0f,
-        forceRender = true,
-      )
+    if (mPlayer != null) {
+      renderMovementCandidateBlocks(level, mPlayer.blockPosition(), selectedBlocks, selectedPositions)
     }
 
-    // Cursor node — orange
+    for (pos in selectedPositions) {
+      renderDebugBlock(level, pos, COLOR_BLOCK_SELECTED, lineWidth = 2.0f)
+    }
+
+    // Cursor node.
     OverlayRenderEngine.outlineBlockColor(
       level, supportBlockOf(nodes[startIdx]),
       COLOR_MOVE_CURSOR,
@@ -854,20 +840,8 @@ object PathfindingModule : Module("Pathfinding") {
       forceRender = true,
     )
 
-    // Next node (the immediate chosen next step) — cyan
-    if (startIdx + 1 <= nodes.lastIndex) {
-      OverlayRenderEngine.outlineBlockColor(
-        level, supportBlockOf(nodes[startIdx + 1]),
-        COLOR_MOVE_NEXT,
-        durationTicks = 4,
-        tag = "movement-debug",
-        lineWidth = 2.6f,
-        forceRender = true,
-      )
-    }
-
-    // Steering target block — yellow. Prefer the raw lookahead spline point (world-space,
-    // not eye-clamped) so it reflects the path-space decision the executor made.
+    // Steering target block. Prefer the raw lookahead spline point so it
+    // reflects the path-space decision the executor made.
     val targetPoint = PathExecutorState.currentLookaheadSplinePoint
       ?: PathExecutorState.currentTargetPoint
     if (targetPoint != null) {
@@ -885,6 +859,110 @@ object PathfindingModule : Module("Pathfinding") {
         forceRender = true,
       )
     }
+  }
+
+  private fun renderMovementCandidateBlocks(
+    level: net.minecraft.world.level.Level,
+    center: BlockPos,
+    selectedBlocks: Set<Long>,
+    selectedPositions: List<BlockPos>
+  ) {
+    if (selectedPositions.isEmpty()) return
+
+    val radius = movementDebugCandidateRadius.value.toInt().coerceIn(3, 14)
+    val corridorDistanceSq = 2.25 * 2.25
+    val minY = center.y - 3
+    val maxY = center.y + 2
+
+    for (x in center.x - radius..center.x + radius) {
+      for (z in center.z - radius..center.z + radius) {
+        val dx = x - center.x
+        val dz = z - center.z
+        if (dx * dx + dz * dz > radius * radius) continue
+
+        val candidate = bestSupportCandidate(level, x, z, minY, maxY) ?: continue
+        val key = candidate.asLong()
+        if (key in selectedBlocks) continue
+
+        val color = if (isMovementHazard(level, candidate)) {
+          COLOR_BLOCK_HAZARD
+        } else if (distanceSqToSelected(candidate, selectedPositions) > corridorDistanceSq) {
+          COLOR_BLOCK_TOO_FAR
+        } else {
+          COLOR_BLOCK_POTENTIAL
+        }
+
+        renderDebugBlock(level, candidate, color, lineWidth = 1.2f)
+      }
+    }
+  }
+
+  private fun bestSupportCandidate(
+    level: net.minecraft.world.level.Level,
+    x: Int,
+    z: Int,
+    minY: Int,
+    maxY: Int
+  ): BlockPos? {
+    for (y in maxY downTo minY) {
+      val support = BlockPos(x, y, z)
+      val feet = support.above()
+      if (isPassable(level, feet) && isPassable(level, feet.above()) && isStandable(level, support)) {
+        return support
+      }
+      if (PathHazards.isHarmfulStandPosition(level, feet)) {
+        return support
+      }
+    }
+    return null
+  }
+
+  private fun isMovementHazard(level: net.minecraft.world.level.Level, support: BlockPos): Boolean =
+    PathHazards.isHarmfulStandPosition(level, support.above())
+
+  private fun isPassable(level: net.minecraft.world.level.Level, pos: BlockPos): Boolean {
+    val state = level.getBlockState(pos)
+    return state.fluidState.isEmpty && state.getCollisionShape(level, pos).isEmpty
+  }
+
+  private fun isStandable(level: net.minecraft.world.level.Level, pos: BlockPos): Boolean {
+    val state = level.getBlockState(pos)
+    return state.fluidState.isEmpty && !state.getCollisionShape(level, pos).isEmpty
+  }
+
+  private fun distanceSqToSelected(pos: BlockPos, selectedPositions: List<BlockPos>): Double {
+    var best = Double.MAX_VALUE
+    for (selected in selectedPositions) {
+      val dx = (pos.x - selected.x).toDouble()
+      val dz = (pos.z - selected.z).toDouble()
+      val distSq = dx * dx + dz * dz
+      if (distSq < best) best = distSq
+    }
+    return best
+  }
+
+  private fun renderDebugBlock(
+    level: net.minecraft.world.level.Level,
+    pos: BlockPos,
+    color: OverlayRenderEngine.Color,
+    lineWidth: Float
+  ) {
+    val pad = 0.002
+    OverlayRenderEngine.addBox(
+      level,
+      pos.x - pad,
+      pos.y - pad,
+      pos.z - pad,
+      pos.x + 1.0 + pad,
+      pos.y + 1.0 + pad,
+      pos.z + 1.0 + pad,
+      color.withAlpha((color.a * 0.28).toInt().coerceIn(25, 90)),
+      color,
+      lineWidth = lineWidth,
+      durationTicks = 4,
+      tag = "movement-debug",
+      forceRender = true,
+    )
   }
 
   private fun renderJumpGuides(level: net.minecraft.world.level.Level, playerPos: Vec3, nodes: List<Vec3>) {
