@@ -152,13 +152,13 @@ object PathfindingModule : Module("Pathfinding") {
   private val lookaheadDistance = SliderSetting(
     "Lookahead Distance",
     "How far ahead on the path the steering target sits. Higher = smoother rotations, wider cornering.",
-    4.8, 1.5, 8.0
+    5.8, 1.5, 8.0
   )
 
   private val lookaheadShrink = SliderSetting(
     "Lookahead Shrink",
     "How aggressively the lookahead shortens on turns and when off-path. 0.0 = always stay far (smoothest rotations, may cut corners). 1.0 = original behavior.",
-    0.3, 0.0, 1.0
+    0.12, 0.0, 1.0
   )
 
   private val movementDebugRender = CheckboxSetting(
@@ -212,7 +212,7 @@ object PathfindingModule : Module("Pathfinding") {
   private val precisionAggressiveness = SliderSetting(
     "Precision Aggressiveness",
     "How eagerly precision mode (slower walk + sneak near goal) engages on soft triggers: curvature, off-path deviation, arrival brake. 0 = soft triggers off (only physical hazards engage precision). 1 = original aggressive behavior.",
-    0.3, 0.0, 1.0
+    0.12, 0.0, 1.0
   )
 
   private val precisionUsesSprint = CheckboxSetting(
@@ -224,19 +224,19 @@ object PathfindingModule : Module("Pathfinding") {
   private val jumpMinRise = SliderSetting(
     "Jump Min Rise",
     "Minimum path rise (blocks) before a geometry-fallback jump triggers. Raise above 0.9 if the bot is randomly jumping at slabs / small inclines.",
-    1.0, 0.85, 1.4
+    1.12, 0.85, 1.4
   )
 
   private val lookaheadVelocityBoost = SliderSetting(
     "Lookahead Velocity Boost",
     "Extra lookahead distance (blocks) per block/sec of player speed. Sprinting (~5.6 b/s) at 0.15 adds ~0.84 blocks. 0 = original speed-agnostic behavior.",
-    0.15, 0.0, 0.4
+    0.22, 0.0, 0.4
   )
 
   private val sprintBrakeCurvature = SliderSetting(
     "Sprint Brake Curvature",
     "Drop sprint pre-emptively when upcoming path curvature meets this threshold so the player slows before the turn. Lower = brakes earlier. Set above 2.0 to disable.",
-    0.20, 0.10, 2.5
+    2.5, 0.10, 2.5
   )
 
   private val sprintEngageTicks = SliderSetting(
@@ -248,7 +248,7 @@ object PathfindingModule : Module("Pathfinding") {
   private val sneakEngageTicks = SliderSetting(
     "Sneak Engage Ticks",
     "Sneak engagement requires this many ticks of sustained signal — kills brief edge-flicker sneaking on thin bridges. Quick release so the player still drops when the path needs it.",
-    2.0, 0.0, 10.0
+    5.0, 0.0, 10.0
   )
 
   private val forwardYawTolerance = SliderSetting(
@@ -260,19 +260,19 @@ object PathfindingModule : Module("Pathfinding") {
   private val jumpCooldownFloor = SliderSetting(
     "Jump Cooldown Floor",
     "Minimum ticks between consecutive jumps. Stops double-jumps from one trigger resetting while another fires.",
-    5.0, 1.0, 15.0
+    8.0, 1.0, 15.0
   )
 
   private val edgeScanDistance = SliderSetting(
     "Edge Scan Distance",
     "How far ahead on the spline ledge-risk safety is checked. Original was 4.25 (engages sneak on thin bridges way too early). Intentional drops are now excluded automatically. Lower = less eager sneaking.",
-    1.5, 0.5, 6.0
+    0.9, 0.5, 6.0
   )
 
   private val jumpRangeMultiplier = SliderSetting(
     "Jump Range Multiplier",
     "Scales all jump trigger distances (preemptive / hill / obstacle / gap / hazard). 1.0 = original. Lower = jumps only fire when the player is closer to the obstacle — kills early/random jumps.",
-    0.7, 0.4, 1.0
+    0.55, 0.4, 1.0
   )
 
   private val aotvSlot = ModeSetting(
@@ -623,8 +623,15 @@ object PathfindingModule : Module("Pathfinding") {
 
   @SubscribeEvent
   fun onRender(event: WorldRenderEvent.Last) {
-    if (!enabled.value) return
     val level = mc.level ?: return
+
+    if (movementDebugRender.value) {
+      OverlayRenderEngine.clearTag("path-spline")
+      renderLookaheadSpline(level)
+      return
+    }
+
+    if (!enabled.value) return
 
     // Spline path rendering - rebuild only when path nodes change.
     // When nodes drops to < 2 (planning/arrived) keep the old spline visible so the

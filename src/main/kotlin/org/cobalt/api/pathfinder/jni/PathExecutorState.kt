@@ -80,10 +80,10 @@ object PathExecutorState {
 
     // ── Adjustable lookahead (set from PathfindingModule settings) ──
     // Base "far" distance the lookahead point sits ahead of the player on the spline.
-    @JvmField var lookaheadDistanceFar: Double = 4.8
+    @JvmField var lookaheadDistanceFar: Double = 5.8
     // 0.0 = lookahead never shrinks on turns/deviation (always stays far → smoother rotations,
     //       wider cornering). 1.0 = original aggressive shrink behavior.
-    @JvmField var lookaheadShrinkStrength: Double = 0.3
+    @JvmField var lookaheadShrinkStrength: Double = 0.12
 
     // ── Adjustable rotation catch-up (how fast the aim returns to the lookahead) ──
     // Min/Max are alpha bounds: per-frame fraction of remaining yaw/pitch delta closed.
@@ -98,19 +98,19 @@ object PathExecutorState {
     // brake distance, arrival sneak distance) engage precision movement / sneak.
     // 1.0 = original behavior. 0.0 = soft triggers effectively disabled — only
     // hard safety (dropAhead, safety.requiresPrecision) can engage precision.
-    @JvmField var precisionAggressiveness: Double = 0.3
+    @JvmField var precisionAggressiveness: Double = 0.12
 
     // ── Adjustable velocity-scaled lookahead ──
     // Additional lookahead distance (blocks) per block/sec of player speed.
     // Sprinting is ~5.6 b/s, so at 0.15 sprint adds ~0.84 blocks of lookahead.
     // At 0.0 the lookahead doesn't react to speed (original behavior).
-    @JvmField var lookaheadVelocityBoost: Double = 0.15
+    @JvmField var lookaheadVelocityBoost: Double = 0.22
 
     // ── Adjustable pre-emptive sprint brake ──
     // When upcoming pathCurvature >= this threshold, sprint is dropped even
     // if the native command requested it. Lower = brakes earlier before turns.
     // Set very high (e.g. > 2.0) to disable.
-    @JvmField var sprintBrakeCurvature: Double = 0.20
+    @JvmField var sprintBrakeCurvature: Double = 2.5
 
     // ── Hysteresis: require sustained signal before engaging sprint / sneak.
     // Sprint releases instantly the moment conditions break, but only re-engages
@@ -120,7 +120,7 @@ object PathExecutorState {
     // Sneak engagement also requires sustained signal so brief safety flickers
     // (e.g. crossing a 1-block edge on a thin bridge) don't tap sneak on. Quick
     // release so we don't stay sneaked when the path actually demands a drop.
-    @JvmField var sneakEngageTicks: Int = 2
+    @JvmField var sneakEngageTicks: Int = 5
 
     // Internal hysteresis counters (advanced each applyToPlayer call).
     var sprintReadyTicks: Int = 0
@@ -135,7 +135,7 @@ object PathExecutorState {
     // ── Global minimum gap between consecutive jumps. ──
     // Each jumpTrue(N) sets jumpSuppressTicks to max(N, jumpCooldownFloor).
     // Stops the rare double-jump where one detector resets while another fires.
-    @JvmField var jumpCooldownFloor: Int = 5
+    @JvmField var jumpCooldownFloor: Int = 8
 
     // ── Adjustable ledge / safety scan distance ──
     // How far ahead on the spline assessSplineSafety probes for unsafe
@@ -143,7 +143,7 @@ object PathExecutorState {
     // way too far back. Tunable; intentional drops (where the spline itself
     // descends) are also excluded so we don't sneak the player into a wall
     // when the path needs to fall.
-    @JvmField var edgeScanDistance: Double = 1.5
+    @JvmField var edgeScanDistance: Double = 0.9
 
     // ── Precision mode movement profile ──
     // When true, the precision-sneak state holds BOTH sprint and sneak ("ninja
@@ -157,7 +157,7 @@ object PathExecutorState {
     // =========================================================================
 
     private const val MIN_LOOKAHEAD = 2.35
-    private const val MAX_LOOKAHEAD = 4.8
+    private const val MAX_LOOKAHEAD = 6.4
     private const val PRECISION_LOOKAHEAD = 1.25
     private const val PRECISION_CURVATURE = 0.34
     private const val DROP_SCAN_DISTANCE = 3.5
@@ -453,14 +453,13 @@ object PathExecutorState {
         val curvatureTrigger = PRECISION_CURVATURE / aggro.coerceAtLeast(0.05)
         val deviationTriggerSq = 2.25 / aggro.coerceAtLeast(0.05)
         val arrivalBrake = ARRIVAL_BRAKE_DISTANCE * aggro
-        val arrivalSneak = ARRIVAL_BRAKE_DISTANCE * 0.65 * aggro
         requiresPrecisionMovement =
             dropAhead ||
                 safety.requiresPrecision ||
                 pathCurvature >= curvatureTrigger ||
                 projection.distSq > deviationTriggerSq ||
                 spline.totalLength - currentSplineDistance <= arrivalBrake
-        shouldUsePrecisionSneak = safety.shouldSneak || spline.totalLength - currentSplineDistance <= arrivalSneak
+        shouldUsePrecisionSneak = safety.shouldSneak
         val remainingPathForLookahead = spline.totalLength - currentSplineDistance
         val safetyLookaheadCap = when {
             dropAhead || safety.ledgeRisk || safety.corridorUnsafe -> PRECISION_LOOKAHEAD
@@ -506,7 +505,7 @@ object PathExecutorState {
             currentTargetPoint = null
             currentLookaheadSplinePoint = null
             requiresPrecisionMovement = true
-            shouldUsePrecisionSneak = true
+            shouldUsePrecisionSneak = safety.shouldSneak
             executionDebugLine = formatDebugLine(spline, projection.distSq, false, safety)
             return
         }
@@ -1161,12 +1160,13 @@ object PathExecutorState {
         val corridorUnsafe: Boolean,
         val edgeDrift: Boolean,
         val arrival: Boolean,
+        val progressBlockingDrop: Boolean,
     ) {
-        val requiresPrecision: Boolean get() = ledgeRisk || corridorUnsafe || edgeDrift || arrival
-        val shouldSneak: Boolean get() = ledgeRisk || corridorUnsafe || edgeDrift || arrival
+        val requiresPrecision: Boolean get() = ledgeRisk || corridorUnsafe || edgeDrift
+        val shouldSneak: Boolean get() = progressBlockingDrop
 
         companion object {
-            val NONE = SafetyAssessment(false, false, false, false)
+            val NONE = SafetyAssessment(false, false, false, false, false)
         }
     }
 
@@ -1217,7 +1217,8 @@ object PathExecutorState {
             ledgeRisk = ledgeRisk,
             corridorUnsafe = corridorUnsafe,
             edgeDrift = edgeDrift,
-            arrival = arrival
+            arrival = arrival,
+            progressBlockingDrop = ledgeRisk || corridorUnsafe || edgeDrift
         )
     }
 
@@ -1330,6 +1331,7 @@ object PathExecutorState {
             if (requiresPrecisionMovement) " | precision" else "",
             if (safety.ledgeRisk) " | edge" else "",
             if (safety.corridorUnsafe) " | corridor" else "",
+            if (safety.progressBlockingDrop && shouldUsePrecisionSneak) " | sneak-drop" else "",
             if (safety.arrival) " | brake" else ""
         )
 

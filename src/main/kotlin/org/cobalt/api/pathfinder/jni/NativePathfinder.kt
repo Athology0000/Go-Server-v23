@@ -176,8 +176,8 @@ object NativePathfinder {
     private const val AVOID_RADIUS_SQ = 4
     private const val AVOID_MAX_Y_DIFF = 2
     private const val CLEAN_EXEC_TICKS = 30
-    private const val SPRINT_SUPPRESS_CURVATURE = 0.4
-    private const val SPRINT_SUPPRESS_HYSTERESIS_TICKS = 6
+    private const val SPRINT_SUPPRESS_CURVATURE = 1.35
+    private const val SPRINT_SUPPRESS_HYSTERESIS_TICKS = 2
     private const val FRONTIER_MIN_DISTANCE_SQ = 64.0
     private const val FRONTIER_Y_SCAN = 12
     private const val HAZARD_LOOKAHEAD_NODES = 5
@@ -528,8 +528,7 @@ object NativePathfinder {
             0f
         }
 
-        val precisionMovement = PathExecutorState.requiresPrecisionMovement
-        val highCurvature = PathExecutorState.pathCurvature >= SPRINT_SUPPRESS_CURVATURE || precisionMovement
+        val highCurvature = PathExecutorState.pathCurvature >= SPRINT_SUPPRESS_CURVATURE
         if (highCurvature) {
             sprintSuppressHysteresisTicks = SPRINT_SUPPRESS_HYSTERESIS_TICKS
         } else if (sprintSuppressHysteresisTicks > 0) {

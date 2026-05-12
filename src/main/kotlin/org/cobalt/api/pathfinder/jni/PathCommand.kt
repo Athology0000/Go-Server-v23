@@ -103,7 +103,8 @@ data class PathCommand(
         //
         // Pre-emptive sprint brake: drop sprint when an upcoming turn (pathCurvature
         // computed from nodes ahead) exceeds the configured threshold.
-        val curvatureBrake = PathExecutorState.pathCurvature >= PathExecutorState.sprintBrakeCurvature
+        val effectiveSprintBrakeCurvature = PathExecutorState.sprintBrakeCurvature.coerceAtLeast(1.2)
+        val curvatureBrake = PathExecutorState.pathCurvature >= effectiveSprintBrakeCurvature
 
         // Yaw-alignment gate on forward: if the player's current facing is way
         // off from the desired travel direction (rotation still catching up after
