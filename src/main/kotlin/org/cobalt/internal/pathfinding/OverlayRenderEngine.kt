@@ -182,7 +182,8 @@ object OverlayRenderEngine {
     color: Color,
     durationTicks: Int = 40,
     tag: String? = null,
-    lineWidth: Float = 2.2f
+    lineWidth: Float = 2.2f,
+    forceRender: Boolean = false
   ) {
     val pad = 0.002
     addBox(
@@ -197,7 +198,8 @@ object OverlayRenderEngine {
       color,
       lineWidth,
       durationTicks,
-      tag
+      tag,
+      forceRender
     )
   }
 

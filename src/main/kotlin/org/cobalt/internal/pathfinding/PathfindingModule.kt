@@ -71,12 +71,21 @@ object PathfindingModule : Module("Pathfinding") {
   private val COLOR_LOOKAHEAD_SPLINE = OverlayRenderEngine.Color(210, 55, 255, 230)
   private val COLOR_LOOKAHEAD_POINT = OverlayRenderEngine.Color(0, 240, 255, 235)
 
-  // Movement execution debug render colors
-  private val COLOR_MOVE_NODE_FAR  = OverlayRenderEngine.Color(180, 180, 200, 90)   // faint gray-blue: upcoming path nodes
-  private val COLOR_MOVE_NODE_NEAR = OverlayRenderEngine.Color(120, 220, 120, 200)  // green: nodes the player is about to traverse
-  private val COLOR_MOVE_NEXT      = OverlayRenderEngine.Color(0, 220, 255, 255)    // cyan: the immediate next node (chosen next step)
-  private val COLOR_MOVE_CURSOR    = OverlayRenderEngine.Color(255, 120, 0, 230)    // orange: current cursor node
+  // Movement execution debug render colors. Two distinct visual tiers so
+  // "possible path blocks" vs "blocks the player will actually walk on" reads
+  // at a glance: FAR = thin, very faint white (the whole path); NEAR = thick,
+  // bright green (the next ~6 steps the executor is committed to).
+  private val COLOR_MOVE_NODE_FAR  = OverlayRenderEngine.Color(220, 220, 230, 45)   // ghost white: all upcoming path support blocks
+  private val COLOR_MOVE_NODE_NEAR = OverlayRenderEngine.Color(80, 255, 80, 240)    // bright green: blocks the player will walk on next
+  private val COLOR_MOVE_NEXT      = OverlayRenderEngine.Color(0, 255, 255, 255)    // cyan: the immediate next step
+  private val COLOR_MOVE_CURSOR    = OverlayRenderEngine.Color(255, 140, 0, 255)    // orange: current cursor block under the player
   private val COLOR_MOVE_TARGET    = OverlayRenderEngine.Color(255, 240, 0, 255)    // yellow: steering target (lookahead point)
+
+  // Weight-map quartiles: green = best alternatives, red = rejected/blocked.
+  private val COLOR_WEIGHT_Q1 = OverlayRenderEngine.Color(  0, 220,  60, 120) // top quartile — viable, close to chosen
+  private val COLOR_WEIGHT_Q2 = OverlayRenderEngine.Color(220, 220,   0, 110) // viable but slightly off
+  private val COLOR_WEIGHT_Q3 = OverlayRenderEngine.Color(255, 140,   0, 110) // penalized (off-path / partial-visibility)
+  private val COLOR_WEIGHT_Q4 = OverlayRenderEngine.Color(220,  40,  40,  95) // rejected (blocked / very off-path)
 
   val enabled = CheckboxSetting(
     "Enabled",
@@ -165,6 +174,18 @@ object PathfindingModule : Module("Pathfinding") {
     24.0, 4.0, 64.0
   )
 
+  private val weightMapEnabled = CheckboxSetting(
+    "Lookahead Weight Map",
+    "Show all candidate support blocks the lookahead logic considered along the spline, color-binned by quartile of distance-from-chosen-target. Green = best alternatives, red = rejected / blocked / far from chosen.",
+    false
+  )
+
+  private val weightMapForward = SliderSetting(
+    "Weight Map Forward",
+    "How far ahead along the spline (in spline-sample steps) to scan for candidate lookahead positions when the weight map is on.",
+    16.0, 4.0, 48.0
+  )
+
   private val rotationCatchupMin = SliderSetting(
     "Rotation Catch-up Min",
     "Per-frame fraction of remaining yaw/pitch delta closed when aim is near the target. Higher = quicker return when close.",
@@ -181,6 +202,72 @@ object PathfindingModule : Module("Pathfinding") {
     "Rotation Ramp Scale",
     "How quickly the catch-up ramps from Min toward Max as the angle delta grows. Smaller = ramps faster (snappier). Larger = stays smooth on big deltas.",
     16.0, 5.0, 60.0
+  )
+
+  private val precisionAggressiveness = SliderSetting(
+    "Precision Aggressiveness",
+    "How eagerly precision mode (slower walk + sneak near goal) engages on soft triggers: curvature, off-path deviation, arrival brake. 0 = soft triggers off (only physical hazards engage precision). 1 = original aggressive behavior.",
+    0.3, 0.0, 1.0
+  )
+
+  private val precisionUsesSprint = CheckboxSetting(
+    "Precision Uses Sprint",
+    "When precision mode engages sneak (the 'slow mode'), also hold sprint so the player ninja-sneaks: sneak speed + sprint state (FOV, sprint-attack flag) at once. Off = sneak-only (slowest, original behavior).",
+    true
+  )
+
+  private val jumpMinRise = SliderSetting(
+    "Jump Min Rise",
+    "Minimum path rise (blocks) before a geometry-fallback jump triggers. Raise above 0.9 if the bot is randomly jumping at slabs / small inclines.",
+    1.0, 0.85, 1.4
+  )
+
+  private val lookaheadVelocityBoost = SliderSetting(
+    "Lookahead Velocity Boost",
+    "Extra lookahead distance (blocks) per block/sec of player speed. Sprinting (~5.6 b/s) at 0.15 adds ~0.84 blocks. 0 = original speed-agnostic behavior.",
+    0.15, 0.0, 0.4
+  )
+
+  private val sprintBrakeCurvature = SliderSetting(
+    "Sprint Brake Curvature",
+    "Drop sprint pre-emptively when upcoming path curvature meets this threshold so the player slows before the turn. Lower = brakes earlier. Set above 2.0 to disable.",
+    0.20, 0.10, 2.5
+  )
+
+  private val sprintEngageTicks = SliderSetting(
+    "Sprint Engage Ticks",
+    "Sprint releases instantly when conditions break, but re-engaging requires this many ticks of stable conditions. Stops tick-to-tick sprint flicker.",
+    3.0, 0.0, 10.0
+  )
+
+  private val sneakEngageTicks = SliderSetting(
+    "Sneak Engage Ticks",
+    "Sneak engagement requires this many ticks of sustained signal — kills brief edge-flicker sneaking on thin bridges. Quick release so the player still drops when the path needs it.",
+    2.0, 0.0, 10.0
+  )
+
+  private val forwardYawTolerance = SliderSetting(
+    "Forward Yaw Tolerance",
+    "Only press forward when the player's yaw is within this many degrees of the target travel direction. Stops walking sideways into walls while the rotation catches up.",
+    60.0, 15.0, 180.0
+  )
+
+  private val jumpCooldownFloor = SliderSetting(
+    "Jump Cooldown Floor",
+    "Minimum ticks between consecutive jumps. Stops double-jumps from one trigger resetting while another fires.",
+    5.0, 1.0, 15.0
+  )
+
+  private val edgeScanDistance = SliderSetting(
+    "Edge Scan Distance",
+    "How far ahead on the spline ledge-risk safety is checked. Original was 4.25 (engages sneak on thin bridges way too early). Intentional drops are now excluded automatically. Lower = less eager sneaking.",
+    1.5, 0.5, 6.0
+  )
+
+  private val jumpRangeMultiplier = SliderSetting(
+    "Jump Range Multiplier",
+    "Scales all jump trigger distances (preemptive / hill / obstacle / gap / hazard). 1.0 = original. Lower = jumps only fire when the player is closer to the obstacle — kills early/random jumps.",
+    0.7, 0.4, 1.0
   )
 
   private val aotvSlot = ModeSetting(
@@ -408,6 +495,17 @@ object PathfindingModule : Module("Pathfinding") {
     PathExecutorState.rotationCatchupMin = rotationCatchupMin.value
     PathExecutorState.rotationCatchupMax = rotationCatchupMax.value
     PathExecutorState.rotationRampScale = rotationRampScale.value
+    PathExecutorState.precisionAggressiveness = precisionAggressiveness.value
+    PathExecutorState.precisionUsesSprint = precisionUsesSprint.value
+    PathExecutorState.lookaheadVelocityBoost = lookaheadVelocityBoost.value
+    PathExecutorState.sprintBrakeCurvature = sprintBrakeCurvature.value
+    PathExecutorState.sprintEngageTicks = sprintEngageTicks.value.toInt()
+    PathExecutorState.sneakEngageTicks = sneakEngageTicks.value.toInt()
+    PathExecutorState.forwardYawTolerance = forwardYawTolerance.value
+    PathExecutorState.jumpCooldownFloor = jumpCooldownFloor.value.toInt()
+    PathExecutorState.edgeScanDistance = edgeScanDistance.value
+    org.cobalt.api.pathfinder.jni.executor.JumpDetector.jumpRiseMin = jumpMinRise.value
+    org.cobalt.api.pathfinder.jni.executor.JumpDetector.jumpRangeMultiplier = jumpRangeMultiplier.value
 
     // Update live info settings
     routeCountInfo.value = "${localRouteWaypoints.size} points"
@@ -471,10 +569,17 @@ object PathfindingModule : Module("Pathfinding") {
         }
         OverlayRenderEngine.clearTag("jump-guide")
         renderJumpGuides(level, player.position(), NativePathfinder.cachedPathNodes)
-        OverlayRenderEngine.clearTag("movement-debug")
-        if (movementDebugRender.value) {
-          renderMovementDebug(level, NativePathfinder.cachedPathNodes, NativePathfinder.pathNodeCursor)
-        }
+      }
+    }
+
+    // Movement debug render works for ANY path owner (mining, combat, etc.),
+    // not just when this module owns the path — purely diagnostic.
+    val mPlayer = mc.player
+    val mLevel = mc.level
+    if (mPlayer != null && mLevel != null) {
+      OverlayRenderEngine.clearTag("movement-debug")
+      if (movementDebugRender.value && NativePathfinder.cachedPathNodes.isNotEmpty()) {
+        renderMovementDebug(mLevel, NativePathfinder.cachedPathNodes, NativePathfinder.pathNodeCursor)
       }
     }
 
@@ -599,6 +704,86 @@ object PathfindingModule : Module("Pathfinding") {
     )
 
   /**
+   * Walks the dense spline-sample list forward from the sample closest to the
+   * player and collects support-block candidates. Each candidate is scored by
+   * 3D distance from the executor's currently-chosen lookahead point (the
+   * yellow target block). Best candidates per BlockPos win when multiple
+   * samples map to the same block. Quartile-binned and rendered behind the
+   * main path tiers so the user can see which alternatives were close to
+   * being chosen vs which were too far / rejected.
+   */
+  private fun renderLookaheadWeightMap(level: net.minecraft.world.level.Level, playerPos: Vec3) {
+    val samples = PathExecutorState.lookaheadSplinePoints
+    if (samples.size < 4) return
+    val chosen = PathExecutorState.currentLookaheadSplinePoint
+      ?: PathExecutorState.currentTargetPoint
+      ?: return
+
+    // Find the spline sample closest (horizontally) to the player — that's
+    // where we start the forward scan.
+    var nearest = 0
+    var nearestDistSq = Double.MAX_VALUE
+    for (i in samples.indices) {
+      val s = samples[i]
+      val dx = s.x - playerPos.x
+      val dz = s.z - playerPos.z
+      val ds = dx * dx + dz * dz
+      if (ds < nearestDistSq) {
+        nearestDistSq = ds
+        nearest = i
+      }
+    }
+
+    val forward = weightMapForward.value.toInt().coerceAtLeast(2)
+    val end = minOf(samples.lastIndex, nearest + forward)
+    if (end - nearest < 2) return
+
+    // Map BlockPos.asLong() -> (BlockPos, best score for this block).
+    val scoreByBlock = HashMap<Long, Pair<BlockPos, Double>>(forward * 2)
+    for (i in nearest..end) {
+      val sample = samples[i]
+      val pos = BlockPos(
+        Math.floor(sample.x).toInt(),
+        Math.round(sample.y).toInt() - 1,
+        Math.floor(sample.z).toInt(),
+      )
+      val dx = sample.x - chosen.x
+      val dy = sample.y - chosen.y
+      val dz = sample.z - chosen.z
+      val score = kotlin.math.sqrt(dx * dx + dy * dy + dz * dz)
+      val key = pos.asLong()
+      val existing = scoreByBlock[key]
+      if (existing == null || score < existing.second) {
+        scoreByBlock[key] = pos to score
+      }
+    }
+
+    if (scoreByBlock.size < 4) return
+
+    // Quartile bin.
+    val sorted = scoreByBlock.values.sortedBy { it.second }
+    val q1End = sorted.size / 4
+    val q2End = sorted.size / 2
+    val q3End = sorted.size * 3 / 4
+
+    for ((idx, entry) in sorted.withIndex()) {
+      val color = when {
+        idx < q1End -> COLOR_WEIGHT_Q1
+        idx < q2End -> COLOR_WEIGHT_Q2
+        idx < q3End -> COLOR_WEIGHT_Q3
+        else -> COLOR_WEIGHT_Q4
+      }
+      OverlayRenderEngine.outlineBlockColor(
+        level, entry.first, color,
+        durationTicks = 4,
+        tag = "movement-debug",
+        lineWidth = 0.8f,
+        forceRender = true,
+      )
+    }
+  }
+
+  /**
    * In-world overlay of what the movement executor is currently working with:
    *  - all upcoming path nodes (faint = far, green = near)
    *  - cursor node (orange) and next node (cyan)
@@ -610,22 +795,52 @@ object PathfindingModule : Module("Pathfinding") {
     cursor: Int
   ) {
     if (nodes.isEmpty()) return
-    val range = movementDebugRange.value.toInt().coerceAtLeast(1)
+    val rangeFar = movementDebugRange.value.toInt().coerceAtLeast(1) // ghost-white window
+    val nearCount = 6 // first N support blocks the player will actually walk on next
     val startIdx = cursor.coerceIn(0, nodes.lastIndex)
-    val endIdx = minOf(nodes.lastIndex, startIdx + range)
+    val endIdxFar = minOf(nodes.lastIndex, startIdx + rangeFar)
+    val endIdxNear = minOf(nodes.lastIndex, startIdx + nearCount)
 
-    // All upcoming path-support blocks (deduped — many nodes can share the same standing block).
-    val seen = HashSet<Long>(range * 2)
-    for (i in startIdx..endIdx) {
+    // Pass 0 (renders behind everything else): weight map of candidate lookahead
+    // support blocks, color-binned by quartile of distance from the chosen
+    // steering target. Green = best alternatives, red = far / rejected.
+    val mPlayer = mc.player
+    if (weightMapEnabled.value && mPlayer != null) {
+      renderLookaheadWeightMap(level, mPlayer.position())
+    }
+
+    // Pass 1: render every upcoming path-support block within the FAR window in
+    // ghost-white. These are the "possible" blocks the path passes through —
+    // shown faintly so the whole path shape reads at a glance. Deduped by
+    // support BlockPos (many nodes share the same standing block).
+    val seen = HashSet<Long>(rangeFar * 2)
+    for (i in startIdx..endIdxFar) {
       val pos = supportBlockOf(nodes[i])
       if (!seen.add(pos.asLong())) continue
-      val near = (i - startIdx) <= 4
       OverlayRenderEngine.outlineBlockColor(
         level, pos,
-        if (near) COLOR_MOVE_NODE_NEAR else COLOR_MOVE_NODE_FAR,
-        durationTicks = 2,
+        COLOR_MOVE_NODE_FAR,
+        durationTicks = 4,
         tag = "movement-debug",
-        lineWidth = if (near) 1.6f else 1.0f
+        lineWidth = 1.0f,
+        forceRender = true,
+      )
+    }
+
+    // Pass 2: re-render the first NEAR support blocks in bright green over top.
+    // These are the blocks the executor is committed to in the next handful of
+    // ticks — the "blocks it's gonna walk on" view the user asked for.
+    val seenNear = HashSet<Long>(nearCount * 2)
+    for (i in startIdx..endIdxNear) {
+      val pos = supportBlockOf(nodes[i])
+      if (!seenNear.add(pos.asLong())) continue
+      OverlayRenderEngine.outlineBlockColor(
+        level, pos,
+        COLOR_MOVE_NODE_NEAR,
+        durationTicks = 4,
+        tag = "movement-debug",
+        lineWidth = 2.0f,
+        forceRender = true,
       )
     }
 
@@ -633,9 +848,10 @@ object PathfindingModule : Module("Pathfinding") {
     OverlayRenderEngine.outlineBlockColor(
       level, supportBlockOf(nodes[startIdx]),
       COLOR_MOVE_CURSOR,
-      durationTicks = 2,
+      durationTicks = 4,
       tag = "movement-debug",
-      lineWidth = 2.4f
+      lineWidth = 2.4f,
+      forceRender = true,
     )
 
     // Next node (the immediate chosen next step) — cyan
@@ -643,9 +859,10 @@ object PathfindingModule : Module("Pathfinding") {
       OverlayRenderEngine.outlineBlockColor(
         level, supportBlockOf(nodes[startIdx + 1]),
         COLOR_MOVE_NEXT,
-        durationTicks = 2,
+        durationTicks = 4,
         tag = "movement-debug",
-        lineWidth = 2.6f
+        lineWidth = 2.6f,
+        forceRender = true,
       )
     }
 
@@ -662,9 +879,10 @@ object PathfindingModule : Module("Pathfinding") {
       OverlayRenderEngine.outlineBlockColor(
         level, targetBlock,
         COLOR_MOVE_TARGET,
-        durationTicks = 2,
+        durationTicks = 4,
         tag = "movement-debug",
-        lineWidth = 3.0f
+        lineWidth = 3.0f,
+        forceRender = true,
       )
     }
   }

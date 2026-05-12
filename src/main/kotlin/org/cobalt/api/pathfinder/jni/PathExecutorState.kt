@@ -93,6 +93,65 @@ object PathExecutorState {
     // Yaw "ramp scale": smaller = alpha rises toward Max faster as delta grows.
     @JvmField var rotationRampScale: Double = 16.0
 
+    // ── Adjustable precision-mode aggressiveness ──
+    // Scales how eagerly soft triggers (curvature, off-path deviation, arrival
+    // brake distance, arrival sneak distance) engage precision movement / sneak.
+    // 1.0 = original behavior. 0.0 = soft triggers effectively disabled — only
+    // hard safety (dropAhead, safety.requiresPrecision) can engage precision.
+    @JvmField var precisionAggressiveness: Double = 0.3
+
+    // ── Adjustable velocity-scaled lookahead ──
+    // Additional lookahead distance (blocks) per block/sec of player speed.
+    // Sprinting is ~5.6 b/s, so at 0.15 sprint adds ~0.84 blocks of lookahead.
+    // At 0.0 the lookahead doesn't react to speed (original behavior).
+    @JvmField var lookaheadVelocityBoost: Double = 0.15
+
+    // ── Adjustable pre-emptive sprint brake ──
+    // When upcoming pathCurvature >= this threshold, sprint is dropped even
+    // if the native command requested it. Lower = brakes earlier before turns.
+    // Set very high (e.g. > 2.0) to disable.
+    @JvmField var sprintBrakeCurvature: Double = 0.20
+
+    // ── Hysteresis: require sustained signal before engaging sprint / sneak.
+    // Sprint releases instantly the moment conditions break, but only re-engages
+    // after this many ticks of stable "want to sprint" conditions — kills the
+    // tick-to-tick flicker as horizontalCollision / curvature toggles.
+    @JvmField var sprintEngageTicks: Int = 3
+    // Sneak engagement also requires sustained signal so brief safety flickers
+    // (e.g. crossing a 1-block edge on a thin bridge) don't tap sneak on. Quick
+    // release so we don't stay sneaked when the path actually demands a drop.
+    @JvmField var sneakEngageTicks: Int = 2
+
+    // Internal hysteresis counters (advanced each applyToPlayer call).
+    var sprintReadyTicks: Int = 0
+    var sneakRequestTicks: Int = 0
+
+    // ── Yaw-alignment gate on forward input ──
+    // Only press W when player's current yaw is within this many degrees of
+    // the desired travel direction. Stops "walking sideways into walls" while
+    // the rotation catches up after a sharp replan or teleport.
+    @JvmField var forwardYawTolerance: Double = 60.0
+
+    // ── Global minimum gap between consecutive jumps. ──
+    // Each jumpTrue(N) sets jumpSuppressTicks to max(N, jumpCooldownFloor).
+    // Stops the rare double-jump where one detector resets while another fires.
+    @JvmField var jumpCooldownFloor: Int = 5
+
+    // ── Adjustable ledge / safety scan distance ──
+    // How far ahead on the spline assessSplineSafety probes for unsafe
+    // footprints. Was a fixed 4.25 — on thin bridges that engages sneak from
+    // way too far back. Tunable; intentional drops (where the spline itself
+    // descends) are also excluded so we don't sneak the player into a wall
+    // when the path needs to fall.
+    @JvmField var edgeScanDistance: Double = 1.5
+
+    // ── Precision mode movement profile ──
+    // When true, the precision-sneak state holds BOTH sprint and sneak ("ninja
+    // sneak"): sneak keeps the player's hitbox safe near edges and the speed
+    // damped, while the sprint key stays pressed for sprint-related state
+    // (FOV bonus, jump-boost on landing, sprint-attack flag for combat).
+    @JvmField var precisionUsesSprint: Boolean = true
+
     // =========================================================================
     // Constants
     // =========================================================================
@@ -251,12 +310,38 @@ object PathExecutorState {
      */
     fun updateLookPoints(nodes: List<Vec3>, signature: String) {
         if (signature == lookPointsSignature && lookPoints.isNotEmpty()) return
+
+        // Snapshot the world-space position of the cursor on the OLD spline
+        // before swapping. If we just reset currentSplineDistance to 0, every
+        // replan causes a visible steering stutter as the executor scans from
+        // the front of the new path. Carrying the anchor through preserves
+        // continuity across replans when the new path overlaps the old.
+        val previousAnchor: Vec3? = splinePath?.let { old ->
+            if (old.totalLength > 0.0 && currentSplineDistance > 0.0 && old.samples.size >= 2) {
+                old.sample(currentSplineDistance)
+            } else null
+        }
+
         lookPointsSignature = signature
         lookPoints = if (nodes.size >= 2) buildLookPoints(nodes) else emptyList()
         splinePath = lookPoints.takeIf { it.size >= 2 }?.let(::buildSplinePath)
         lookaheadSplinePoints = splinePath?.samples ?: emptyList()
-        currentPathPosition = 0.0
-        currentSplineDistance = 0.0
+
+        val newSpline = splinePath
+        val seedDistance = if (newSpline != null && previousAnchor != null && newSpline.totalLength > 0.0) {
+            newSpline.project(
+                point = previousAnchor,
+                hintDistance = currentSplineDistance.coerceIn(0.0, newSpline.totalLength),
+                searchBack = 6.0,
+                searchForward = newSpline.totalLength,
+                horizontalOnly = true,
+            ).distance.coerceIn(0.0, newSpline.totalLength)
+        } else {
+            0.0
+        }
+
+        currentPathPosition = seedDistance
+        currentSplineDistance = seedDistance
         currentLookaheadDistance = 0.0
         smoothedTargetInitialized = false
         losCache.clear()
@@ -361,13 +446,21 @@ object PathExecutorState {
         val adaptiveLookahead = getAdaptiveLookaheadDistance(eye, spline, dropAhead)
         currentLookaheadDistance = adaptiveLookahead
         val safety = if (level != null) assessSplineSafety(level, player, spline, projection) else SafetyAssessment.NONE
+        // Soft-trigger thresholds scale with precisionAggressiveness. At 0 they are
+        // effectively disabled and only hard safety (dropAhead / safety.requiresPrecision)
+        // can engage precision. At 1 the original thresholds apply.
+        val aggro = precisionAggressiveness.coerceIn(0.0, 1.0)
+        val curvatureTrigger = PRECISION_CURVATURE / aggro.coerceAtLeast(0.05)
+        val deviationTriggerSq = 2.25 / aggro.coerceAtLeast(0.05)
+        val arrivalBrake = ARRIVAL_BRAKE_DISTANCE * aggro
+        val arrivalSneak = ARRIVAL_BRAKE_DISTANCE * 0.65 * aggro
         requiresPrecisionMovement =
             dropAhead ||
                 safety.requiresPrecision ||
-                pathCurvature >= PRECISION_CURVATURE ||
-                projection.distSq > 2.25 ||
-                spline.totalLength - currentSplineDistance <= ARRIVAL_BRAKE_DISTANCE
-        shouldUsePrecisionSneak = safety.shouldSneak || spline.totalLength - currentSplineDistance <= ARRIVAL_BRAKE_DISTANCE * 0.65
+                pathCurvature >= curvatureTrigger ||
+                projection.distSq > deviationTriggerSq ||
+                spline.totalLength - currentSplineDistance <= arrivalBrake
+        shouldUsePrecisionSneak = safety.shouldSneak || spline.totalLength - currentSplineDistance <= arrivalSneak
         val remainingPathForLookahead = spline.totalLength - currentSplineDistance
         val safetyLookaheadCap = when {
             dropAhead || safety.ledgeRisk || safety.corridorUnsafe -> PRECISION_LOOKAHEAD
@@ -755,10 +848,24 @@ object PathExecutorState {
         // Setting-controlled shrink: 0.0 → never shrink (always stay far), 1.0 → original.
         val adjustFactor = maxOf(deviationFactor, curveFactor) * lookaheadShrinkStrength
         val maxL = lookaheadDistanceFar
-        val target = maxL - (maxL - MIN_LOOKAHEAD) * adjustFactor
+        val target = maxL - (maxL - MIN_LOOKAHEAD) * adjustFactor + velocityLookaheadBoost()
         val lerpFactor = if (target > smoothedLookahead) 0.1 else 0.05
         smoothedLookahead += (target - smoothedLookahead) * lerpFactor
         return smoothedLookahead
+    }
+
+    /**
+     * Extra lookahead distance proportional to the player's horizontal speed.
+     * Capped at half of the configured "far" distance so it can't dominate the
+     * adaptive behavior. Returns 0 when boost is disabled or speed is tiny.
+     */
+    private fun velocityLookaheadBoost(): Double {
+        if (lookaheadVelocityBoost <= 0.0) return 0.0
+        val motion = Minecraft.getInstance().player?.deltaMovement ?: return 0.0
+        val speedXZ = sqrt(motion.x * motion.x + motion.z * motion.z) * 20.0 // blocks/sec
+        if (speedXZ < 0.5) return 0.0
+        val boost = speedXZ * lookaheadVelocityBoost
+        return boost.coerceAtMost(lookaheadDistanceFar * 0.5)
     }
 
     private fun getAdaptiveLookaheadDistance(eye: Vec3, spline: SplinePath, dropAhead: Boolean): Double {
@@ -815,7 +922,7 @@ object PathExecutorState {
         val target = if (dropAhead) {
             PRECISION_LOOKAHEAD
         } else {
-            maxL - (maxL - MIN_LOOKAHEAD) * adjustFactor
+            maxL - (maxL - MIN_LOOKAHEAD) * adjustFactor + velocityLookaheadBoost()
         }
         val lerpFactor = if (dropAhead) 0.45 else if (target > smoothedLookahead) 0.14 else 0.08
         smoothedLookahead += (target - smoothedLookahead) * lerpFactor
@@ -1074,10 +1181,19 @@ object PathExecutorState {
         val edgeDrift = projection.distSq >= EDGE_DRIFT_DISTANCE * EDGE_DRIFT_DISTANCE &&
             !isFootprintSafe(level, player.x, player.y, player.z)
 
+        // Both ledge and corridor scans now bail when the spline itself drops
+        // below the start sample by more than FOOTPRINT_DROP_DEPTH — that means
+        // the "unsafe footprint" we'd otherwise hit IS the intentional descent
+        // we're meant to fall down, not a side ledge. Without this the executor
+        // sneaks up to the edge of the drop and refuses to step off.
+        val scanStartY = spline.sample(currentSplineDistance).y
+
         var ledgeRisk = false
         var distance = 0.0
-        while (distance <= EDGE_SCAN_DISTANCE && currentSplineDistance + distance <= spline.totalLength) {
+        val effectiveEdgeScan = edgeScanDistance.coerceAtLeast(0.5)
+        while (distance <= effectiveEdgeScan && currentSplineDistance + distance <= spline.totalLength) {
             val sample = spline.sample(currentSplineDistance + distance)
+            if (scanStartY - sample.y > FOOTPRINT_DROP_DEPTH) break // intentional drop ahead
             if (!isSplineFootprintSafe(level, sample)) {
                 ledgeRisk = true
                 break
@@ -1089,6 +1205,7 @@ object PathExecutorState {
         distance = CORRIDOR_SCAN_STEP
         while (distance <= CORRIDOR_SCAN_DISTANCE && currentSplineDistance + distance <= spline.totalLength) {
             val sample = spline.sample(currentSplineDistance + distance)
+            if (scanStartY - sample.y > FOOTPRINT_DROP_DEPTH) break // intentional drop ahead
             if (!isSplineFootprintSafe(level, sample)) {
                 corridorUnsafe = true
                 break

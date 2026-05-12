@@ -28,6 +28,22 @@ import kotlin.math.abs
  */
 internal object JumpDetector {
 
+    /**
+     * Minimum path-rise (next.y - prev.y) before geometry-fallback jumps trigger.
+     * Raising this above 0.9 prevents spurious jumps at slabs / half-blocks /
+     * small inclines where the rounded riseFromPlayer alone would say "1 block".
+     * Settable from PathfindingModule.
+     */
+    @JvmField var jumpRiseMin: Double = 1.0
+
+    /**
+     * Multiplier on the squared trigger distances for hill / preemptive /
+     * obstacle / gap / hazard jumps. 1.0 = original behavior. < 1.0 = jumps
+     * only fire when the player is closer to the obstacle (more conservative,
+     * fewer "random" early jumps).
+     */
+    @JvmField var jumpRangeMultiplier: Double = 0.7
+
     fun detectJump(player: LocalPlayer): Boolean {
         val state = PathExecutorState
         blockCache.clear()
@@ -111,12 +127,12 @@ internal object JumpDetector {
         val level = Minecraft.getInstance().level ?: return false
         if (nearIdx + 1 > nodes.lastIndex) return false
         val curr = nodes[nearIdx]; val next = nodes[nearIdx + 1]
-        if (next.y - curr.y < JUMP_RISE_MIN) return false
+        if (next.y - curr.y < jumpRiseMin) return false
         val rise = Math.round(next.y).toInt() - playerFloorY
         if (rise !in 1..2) return false
         if (isWalkablePartialStairStep(level, player, next, playerFloorY)) return false
         val tdx = next.x + 0.5 - player.x; val tdz = next.z + 0.5 - player.z
-        if (tdx * tdx + tdz * tdz > PREEMPTIVE_JUMP_DIST_SQ) return false
+        if (tdx * tdx + tdz * tdz > PREEMPTIVE_JUMP_DIST_SQ * jumpRangeMultiplier) return false
         return jumpTrue(JUMP_SUPPRESS_TICKS)
     }
 
@@ -134,7 +150,7 @@ internal object JumpDetector {
             val next = nodes[i]
             val pathRise = next.y - previous.y
             val riseFromPlayer = Math.round(next.y).toInt() - playerFloorY
-            if (pathRise < JUMP_RISE_MIN) continue
+            if (pathRise < jumpRiseMin) continue
             if (riseFromPlayer !in 1..2) continue
             if (isWalkablePartialStairStep(level, player, next, playerFloorY)) continue
 
@@ -164,7 +180,7 @@ internal object JumpDetector {
                 distanceToSegmentHorizontalSq(player.x, player.z, takeoff, landing),
                 horizontalDistanceSq(player.x, player.z, takeoff.x, takeoff.z),
             )
-            if (triggerDistSq > HILL_JUMP_TRIGGER_DIST_SQ) continue
+            if (triggerDistSq > HILL_JUMP_TRIGGER_DIST_SQ * jumpRangeMultiplier) continue
             return jumpTrue(JUMP_SUPPRESS_TICKS)
         }
 
@@ -193,7 +209,7 @@ internal object JumpDetector {
             val takeoff = Vec3(takeoffNode.x + 0.5, takeoffNode.y, takeoffNode.z + 0.5)
             val landing = Vec3(landingNode.x + 0.5, landingNode.y, landingNode.z + 0.5)
             if (!isAheadOnSegment(player.position(), takeoff, landing)) return false
-            if (distanceToSegmentHorizontalSq(player.x, player.z, takeoff, landing) > HAZARD_JUMP_TRIGGER_DIST_SQ) return false
+            if (distanceToSegmentHorizontalSq(player.x, player.z, takeoff, landing) > HAZARD_JUMP_TRIGGER_DIST_SQ * jumpRangeMultiplier) return false
 
             return jumpTrue(HAZARD_JUMP_SUPPRESS_TICKS)
         }
@@ -240,7 +256,7 @@ internal object JumpDetector {
         val edge = Vec3(edgeNode.x + 0.5, edgeNode.y, edgeNode.z + 0.5)
         val landing = Vec3(recovNode.x + 0.5, recovNode.y, recovNode.z + 0.5)
         if (!isAheadOnSegment(player.position(), edge, landing)) return false
-        if (distanceToSegmentHorizontalSq(player.x, player.z, edge, landing) > GAP_TRIGGER_DIST_SQ) return false
+        if (distanceToSegmentHorizontalSq(player.x, player.z, edge, landing) > GAP_TRIGGER_DIST_SQ * jumpRangeMultiplier) return false
         return jumpTrue(GAP_JUMP_SUPPRESS_TICKS)
     }
 
@@ -308,7 +324,7 @@ internal object JumpDetector {
 
             val dx = n.x + 0.5 - player.x
             val dz = n.z + 0.5 - player.z
-            if (dx * dx + dz * dz > OBSTACLE_TRIGGER_DIST_SQ) continue
+            if (dx * dx + dz * dz > OBSTACLE_TRIGGER_DIST_SQ * jumpRangeMultiplier) continue
             if (name.contains("snow")) continue
             if (bs.getCollisionShape(level, floorPos).isEmpty) continue
             if (floorY - playerFloorY <= stepLimit) continue
@@ -340,7 +356,10 @@ internal object JumpDetector {
     }
 
     private fun jumpTrue(suppressTicks: Int): Boolean {
-        PathExecutorState.jumpSuppressTicks = suppressTicks
+        // Enforce a global minimum gap between jumps so brief detector resets
+        // (one trigger clearing and another firing the same tick / next tick)
+        // can't cause double-jumps.
+        PathExecutorState.jumpSuppressTicks = maxOf(suppressTicks, PathExecutorState.jumpCooldownFloor)
         return true
     }
 
@@ -425,7 +444,6 @@ internal object JumpDetector {
     private const val STEP_HEIGHT = 0.6
     private const val LOOKAHEAD_NODES = 5
     private const val STEP_LOOKAHEAD_NODES = 4
-    private const val JUMP_RISE_MIN = 0.9
     private const val PARTIAL_STAIR_STEP_HEIGHT = 0.6
     private const val HILL_JUMP_TRIGGER_DISTANCE = 1.55
     private const val HILL_JUMP_TRIGGER_DIST_SQ = HILL_JUMP_TRIGGER_DISTANCE * HILL_JUMP_TRIGGER_DISTANCE

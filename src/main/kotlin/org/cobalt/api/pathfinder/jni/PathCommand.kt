@@ -4,8 +4,10 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.player.LocalPlayer
 import org.cobalt.api.pathfinder.jni.executor.JumpDetector
 import org.cobalt.api.rotation.RotationExecutor
+import org.cobalt.api.util.AngleUtils
 import org.cobalt.api.util.helper.Rotation
 import org.cobalt.api.util.player.MovementManager
+import kotlin.math.abs
 
 data class PathCommand(
     val forward: Boolean,
@@ -35,6 +37,25 @@ data class PathCommand(
 
         // Old DUSk/V5 execution core: take the movement lock and write raw forced inputs.
         // Do not let the newer owner layer reject PATHFINDER while mining/combat wrappers are active.
+        // Sneak engage hysteresis: require N ticks of sustained "want sneak"
+        // before actually engaging. Releases instantly when the signal stops,
+        // so the player doesn't stay sneaked when the path demands a drop.
+        val wantSneak = sneak || PathExecutorState.shouldUsePrecisionSneak
+        if (wantSneak) {
+            PathExecutorState.sneakRequestTicks = (PathExecutorState.sneakRequestTicks + 1).coerceAtMost(100)
+        } else {
+            PathExecutorState.sneakRequestTicks = 0
+        }
+        val effectiveSneak = wantSneak && PathExecutorState.sneakRequestTicks >= PathExecutorState.sneakEngageTicks
+
+        // Precision profile: when sneak is engaged for safety, optionally also
+        // hold sprint ("ninja sneak"). Sneak still dominates the actual move
+        // speed in MC, but the sprint key being pressed maintains sprint state
+        // (FOV bonus, sprint-attack flag, jump-boost on transitions). This is
+        // the "slow mode = sprint-crouching" the user requested.
+        val precisionSprintBoost = effectiveSneak && PathExecutorState.precisionUsesSprint && usesGroundMovement()
+        val finalSprintKey = movement.sprint || precisionSprintBoost
+
         MovementManager.setMovementLock(true)
         MovementManager.setForcedMovement(
             movement.forward,
@@ -42,10 +63,10 @@ data class PathCommand(
             left = movement.left,
             right = movement.right,
             jump = shouldJump,
-            shift = sneak,
-            sprint = movement.sprint,
+            shift = effectiveSneak,
+            sprint = finalSprintKey,
         )
-        player?.setSprinting(movement.sprint)
+        player?.setSprinting(finalSprintKey)
         if (applyRotation) {
             MovementManager.setLookLock(true)
             RotationExecutor.rotateTo(targetRotation, PathfinderRotationStrategy)
@@ -79,12 +100,36 @@ data class PathCommand(
         // V5 PathMovement does not solve strafe vectors while walking; it holds W
         // and lets PathRotations steer. The old mixed solver could orbit when its
         // sparse guide node disagreed with the rotation look point.
+        //
+        // Pre-emptive sprint brake: drop sprint when an upcoming turn (pathCurvature
+        // computed from nodes ahead) exceeds the configured threshold.
+        val curvatureBrake = PathExecutorState.pathCurvature >= PathExecutorState.sprintBrakeCurvature
+
+        // Yaw-alignment gate on forward: if the player's current facing is way
+        // off from the desired travel direction (rotation still catching up after
+        // teleport / sharp replan), don't press W — let the rotation align first
+        // so we don't walk sideways into a wall.
+        val yawError = AngleUtils.getRotationDelta(player.yRot, PathExecutorState.rawTargetYaw)
+        val alignedForward = abs(yawError).toDouble() <= PathExecutorState.forwardYawTolerance
+        val finalForward = forward && alignedForward
+
+        // Sprint engage hysteresis: instant release, but require N stable ticks
+        // before re-engaging. Eliminates tick-to-tick flicker from horizontal
+        // collision / curvature crossing the brake threshold.
+        val rawWantSprint = sprint && finalForward && !back && !player.horizontalCollision && !curvatureBrake
+        if (rawWantSprint) {
+            PathExecutorState.sprintReadyTicks = (PathExecutorState.sprintReadyTicks + 1).coerceAtMost(100)
+        } else {
+            PathExecutorState.sprintReadyTicks = 0
+        }
+        val finalSprint = rawWantSprint && PathExecutorState.sprintReadyTicks >= PathExecutorState.sprintEngageTicks
+
         return MovementInputs(
-            forward = forward,
+            forward = finalForward,
             backward = back,
             left = false,
             right = false,
-            sprint = sprint && forward && !back && !player.horizontalCollision,
+            sprint = finalSprint,
         )
     }
 

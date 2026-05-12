@@ -42,10 +42,18 @@ internal class SplinePath(
         var bestPoint = sample(bestDistance)
         var bestDistSq = Double.POSITIVE_INFINITY
 
-        for (i in 0 until samples.lastIndex) {
+        // Binary-search the first segment whose end >= startDistance, then iterate
+        // forward only until segStart exceeds endDistance. Was O(N) over every
+        // spline sample per project() call — at typical paths (300+ samples,
+        // multiple project() calls per tick) the linear skip-loop dominated the
+        // tick cost. cumulative[] is sorted by construction so this is O(log N + window).
+        val rawIdx = cumulative.binarySearch(startDistance)
+        val firstSeg = ((if (rawIdx >= 0) rawIdx else -rawIdx - 1) - 1).coerceAtLeast(0)
+
+        for (i in firstSeg until samples.lastIndex) {
             val segStart = cumulative[i]
+            if (segStart > endDistance) break
             val segEnd = cumulative[i + 1]
-            if (segEnd < startDistance || segStart > endDistance) continue
 
             val a = samples[i]
             val b = samples[i + 1]
