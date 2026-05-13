@@ -109,6 +109,17 @@ object MiningBlockRegistry {
   private val BLACKLISTED_BLOCK_IDS = setOf(
     "minecraft:stone",
     "minecraft:light_gray_wool",  // hardstone background in tunnels/mineshaft — not titanium
+    "minecraft:bedrock",          // never mineable; also flagged below as an LOS occluder
+  )
+
+  /**
+   * Block IDs that the mining macro must treat as permanent occluders: if one
+   * sits between the player and a candidate target the target should be
+   * rejected outright rather than waited on. Pathfinder can't dig through
+   * these so chasing them is wasted ticks.
+   */
+  val PERMANENT_LOS_OCCLUDERS: Set<String> = setOf(
+    "minecraft:bedrock",
   )
 
   fun normalizeType(type: String): String = LEGACY_TYPE_ALIASES[type] ?: type

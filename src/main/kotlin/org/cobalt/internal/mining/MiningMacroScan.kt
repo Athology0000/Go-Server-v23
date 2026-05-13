@@ -102,10 +102,83 @@ internal fun MiningMacroModule.immediateStartScan(
     lastLanternRefreshTick = -1L
     scanActive = false
     scanPriorityIndex = 0
+    rememberVeinAnchor(pos)
     ChatUtils.sendMessage("Mining macro: found ${vein.typeLabel} vein with ${vein.blocks.size} blocks.")
     return true
   }
   return false
+}
+
+/**
+ * Walk the learned vein anchor list, prefer the closest one, return true if a
+ * vein got seeded. Each anchor is checked at its exact position and at a tiny
+ * 1-block radius around it to absorb minor server respawn variance.
+ */
+internal fun MiningMacroModule.tryStartFromLearnedAnchors(
+  level: net.minecraft.world.level.Level,
+  player: Player,
+  selections: List<ScanTypeSelection>
+): Boolean {
+  val merged = mergeSelections(selections)
+  val playerPos = player.blockPosition()
+
+  data class AnchorCandidate(val pos: BlockPos, val distSq: Double)
+  val candidates = ArrayList<AnchorCandidate>(learnedVeinAnchors.size)
+  for (key in learnedVeinAnchors) {
+    val pos = BlockPos.of(key)
+    if (skippedSeeds.contains(key)) continue
+    candidates.add(AnchorCandidate(pos, distanceToBlockSq(player, pos)))
+  }
+  candidates.sortBy { it.distSq }
+
+  for (cand in candidates) {
+    val seed = findMineableNear(level, player, cand.pos, merged.ids) ?: continue
+    val vein = buildVein(level, player, seed, merged, maxVeinBlocks.value.toInt())
+    if (SKIP_OCCUPIED_VEINS && isVeinOccupied(level, vein, player)) {
+      skippedSeeds.add(seed.asLong())
+      continue
+    }
+    currentVein = vein
+    veinStartAnchor = playerPos.immutable()
+    currentTargetNoLosTicks = 0
+    currentDirectionalFlow = null
+    lanternPlacedForVein = false
+    lastLanternRefreshTick = -1L
+    scanActive = false
+    scanPriorityIndex = 0
+    rememberVeinAnchor(seed)
+    ChatUtils.sendMessage(
+      "Mining macro: resumed ${vein.typeLabel} vein from learned anchor (${vein.blocks.size} blocks)."
+    )
+    return true
+  }
+  return false
+}
+
+/** Search the 3×3×3 cube around [anchor] for a mineable seed. */
+private fun MiningMacroModule.findMineableNear(
+  level: net.minecraft.world.level.Level,
+  player: Player,
+  anchor: BlockPos,
+  allowedIds: Set<String>
+): BlockPos? {
+  if (isMineableTarget(level, player, anchor, allowedIds)) return anchor
+  for (dy in -1..1) for (dx in -1..1) for (dz in -1..1) {
+    if (dx == 0 && dy == 0 && dz == 0) continue
+    val p = anchor.offset(dx, dy, dz)
+    if (isMineableTarget(level, player, p, allowedIds)) return p
+  }
+  return null
+}
+
+/**
+ * Persist the vein seed to the correct per-area file. Area is determined by
+ * the seed's Y coordinate (Y<189 = Dwarven, Y>=189 = Glacite) so anchors
+ * always end up in the right file no matter where the player stands.
+ */
+internal fun MiningMacroModule.rememberVeinAnchor(pos: BlockPos) {
+  if (!rememberVeinSpots.value) return
+  MiningAnchorStore.add(pos, MiningMacroModule.LEARNED_ANCHOR_CAP)
 }
 
 internal fun MiningMacroModule.startOrContinueScan(
@@ -113,6 +186,15 @@ internal fun MiningMacroModule.startOrContinueScan(
   player: Player,
   selections: List<ScanTypeSelection>
 ) {
+  // Fixed-spot maps (Dwarven, Glacite camp): the same vein anchors respawn at
+  // the same coordinates. Walking through the learned list is O(N) cheap, so
+  // do it before the radius scan and we usually pick the right spot first try.
+  if (rememberVeinSpots.value && learnedVeinAnchors.isNotEmpty()) {
+    if (tryStartFromLearnedAnchors(level, player, selections)) {
+      return
+    }
+  }
+
   val desiredOrigin = automationScanAnchor ?: player.blockPosition()
   if (!scanActive || desiredOrigin.distSqr(scanOrigin) > 0.0) {
     scanOrigin = desiredOrigin
@@ -155,6 +237,7 @@ internal fun MiningMacroModule.startOrContinueScan(
     lastLanternRefreshTick = -1L
     scanActive = false
     scanPriorityIndex = 0
+    rememberVeinAnchor(pos)
     ChatUtils.sendMessage("Mining macro: found ${vein.typeLabel} vein with ${vein.blocks.size} blocks.")
     return
   }

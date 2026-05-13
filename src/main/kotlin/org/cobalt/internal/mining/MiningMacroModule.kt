@@ -46,6 +46,9 @@ import org.cobalt.api.pathfinder.jni.PathStatus
 import org.cobalt.api.util.player.MovementManager
 import org.cobalt.internal.combat.CombatMacroModule
 import org.cobalt.internal.pathfinding.PathfindingModule
+import org.cobalt.internal.rotation.BlockRotationRequest
+import org.cobalt.internal.rotation.CobaltRotation
+import org.cobalt.internal.rotation.RotationEasingType
 import org.cobalt.internal.rotation.RotationsModule
 import org.cobalt.internal.routes.RoutePickerSetting
 import org.cobalt.internal.routes.RouteType
@@ -147,6 +150,41 @@ object MiningMacroModule : Module("Mining Macro") {
     2048.0,
     1.0
   )
+
+  internal val rememberVeinSpots = CheckboxSetting(
+    "Remember Vein Spots",
+    "Cache vein seed positions and check them first before scanning. Dwarven/Glacite veins respawn in fixed locations.",
+    true
+  )
+
+  internal val clearLearnedSpots = ActionSetting(
+    "Clear Learned Spots",
+    "Forget cached vein anchors for the current area (dwarven_data.json / glacite_data.json).",
+    "Clear",
+  ) {
+    MiningAnchorStore.clearAll()
+    ChatUtils.sendMessage("Mining macro: cleared dwarven_data.json + glacite_data.json.")
+  }
+
+  internal val returnToStartAfterVein = CheckboxSetting(
+    "Return To Start After Vein",
+    "After fully mining a vein, walk back to where the macro was started before scanning for the next one.",
+    true,
+  )
+
+  /** Per-area anchor cap. */
+  internal const val LEARNED_ANCHOR_CAP = 256
+
+  /**
+   * Anchors of the area the player is currently in. Backed by [MiningAnchorStore]
+   * which writes to dwarven_data.json or glacite_data.json based on the player's
+   * Y coordinate (Y<189 = Dwarven, Y>=189 = Glacite).
+   */
+  internal val learnedVeinAnchors: LinkedHashSet<Long>
+    get() {
+      val y = mc.player?.blockY ?: return MiningAnchorStore.get(MiningArea.DWARVEN)
+      return MiningAnchorStore.get(MiningAnchorStore.areaForY(y))
+    }
 
   private val highlightPossibleBlocks = CheckboxSetting(
     "Highlight Possible Blocks",
@@ -319,6 +357,9 @@ object MiningMacroModule : Module("Mining Macro") {
       usePathfinding,
       useVeinDirection,
       occupiedRadius,
+      rememberVeinSpots,
+      clearLearnedSpots,
+      returnToStartAfterVein,
     )
 
     val generalGroup = "General"
@@ -430,6 +471,13 @@ object MiningMacroModule : Module("Mining Macro") {
   internal var approachStartTick = 0L
   internal var approachStartDistance = 0.0
   private var wasEnabled = false
+
+  /** Position the player was standing in when the macro was last enabled. */
+  internal var macroStartAnchor: BlockPos? = null
+
+  /** True while pathing back to [macroStartAnchor] after a vein completes. */
+  internal var returningToStart: Boolean = false
+
   internal var lanternPlacedForVein = false
   internal var lastLanternPlaceTick = 0L
   internal var lastLanternRefreshTick = -1L
@@ -496,6 +544,9 @@ object MiningMacroModule : Module("Mining Macro") {
   fun isUsingPrecisionPoint(): Boolean =
     enabled.value && miningOnTarget != null && miningUsesPrecisionPoint
 
+  fun shouldRenderRotationDebug(): Boolean =
+    enabled.value && highlightAimPoint.value
+
   internal val skippedSeeds = HashSet<Long>()
   internal const val FLOW_MATCH_MAX_DIST_SQ = 24.0 * 24.0
   internal const val DIRECTIONAL_STEP_MAX_DIST_SQ = 64.0
@@ -560,6 +611,8 @@ object MiningMacroModule : Module("Mining Macro") {
     // First tick after enable - try to seed the vein immediately from the player's position.
     if (!wasEnabled) {
       wasEnabled = true
+      macroStartAnchor = player.blockPosition().immutable()
+      returningToStart = false
       MiningProfitTracker.resetSession()
       val selections = resolveTypeSelections()
       if (selections.isEmpty()) {
@@ -618,6 +671,25 @@ object MiningMacroModule : Module("Mining Macro") {
       return
     }
 
+    // Return-to-start: drive the path back to macroStartAnchor before scanning
+    // for the next vein. Cleared once we're within arrival distance.
+    if (returningToStart) {
+      val anchor = macroStartAnchor
+      if (anchor == null) {
+        returningToStart = false
+      } else {
+        val arrival = RETURN_TO_ANCHOR_ARRIVAL_DIST * RETURN_TO_ANCHOR_ARRIVAL_DIST
+        if (player.blockPosition().distSqr(anchor) <= arrival) {
+          returningToStart = false
+          stopApproachMovement()
+          MovementManager.clearForcedMovement()
+        } else {
+          returnToMacroStart(level, player)
+          return
+        }
+      }
+    }
+
     if (goldenGoblinReturnPending) {
       handleGoldenGoblinReturn(level, player)
       return
@@ -666,6 +738,13 @@ object MiningMacroModule : Module("Mining Macro") {
       resetScanState()
       lanternPlacedForVein = false
       lastLanternRefreshTick = -1L
+      // Begin return-to-start; the path is driven by the block at the top of
+      // onTick once `returningToStart` is true.
+      if (returnToStartAfterVein.value && macroStartAnchor != null) {
+        returningToStart = true
+        stopMiningKeys()
+        CobaltRotation.blockController.cancel()
+      }
       return
     }
 
@@ -798,22 +877,41 @@ object MiningMacroModule : Module("Mining Macro") {
         val precisionRotScale =
           if (aim.usesPrecisionPoint) (precisionPointRotationSpeed.value / 100.0).coerceAtLeast(0.1)
           else 1.0
-        frameRotSnapThreshold = RotationsModule.bezierSnapThreshold.value.toFloat()
-        frameRotSpeedScale = (RotationsModule.sample(RotationsModule.miningSpeedScale.value) * precisionRotScale).toFloat()
-        frameRotAccelScale = (RotationsModule.sample(RotationsModule.miningAccelScale.value) * precisionRotScale).toFloat()
-        frameRotPitchStep  = (RotationsModule.sample(RotationsModule.miningPitchStep.value) * precisionRotScale).toFloat()
-        frameRotMaxSpeed   = (RotationsModule.sample(RotationsModule.miningMaxSpeed.value) * precisionRotScale).toFloat()
-        frameRotMaxAccel   = (RotationsModule.sample(RotationsModule.miningMaxAccel.value) * precisionRotScale).toFloat()
-        // Capture initial angular distance once per new block so onFrame can hold constant speed.
+        // Drive the block-to-block controller on every new target. Duration is scaled
+        // by angular distance: short hops finish in ~5 ticks, long hops up to ~16.
         if (target != frameRotPrevBlock) {
           val initRot = AngleUtils.getRotation(aim.point)
-          val initYaw = abs(AngleUtils.getRotationDelta(player.yRot, initRot.yaw).toFloat())
+          val initYaw = abs(AngleUtils.getRotationDelta(player.yRot, initRot.yaw))
           val initPitch = abs(initRot.pitch - player.xRot)
-          frameRotInitialDist = maxOf(initYaw, initPitch).coerceAtLeast(1f)
+          val initialDist = maxOf(initYaw, initPitch).coerceAtLeast(1f)
+          frameRotInitialDist = initialDist
+          // Longer base duration + sine in/out gives the camera a clear
+          // acceleration in, sweep, and decel out — the "deliberate, not
+          // robotic" feel the spec asks for.
+          val baseDuration = (initialDist / 30f * 3f).toInt().coerceIn(3, 12)
+          val scaledDuration = (baseDuration / precisionRotScale.coerceAtLeast(0.1))
+            .toInt().coerceIn(3, 18)
+          val fromBlock = frameRotPrevBlock ?: target
+          CobaltRotation.blockController.rotate(
+            BlockRotationRequest(
+              fromBlock = fromBlock,
+              toBlock = target,
+              durationTicks = scaledDuration,
+              useFromBlockAsStartRotation = false,
+              maxDegreesPerTick = 12f,
+              easing = RotationEasingType.EASE_IN_OUT_SINE,
+            )
+          )
           frameRotPrevBlock = target
           frameRotLastNs = 0L
         }
-        frameRotTarget     = aim.point
+        if (aim.usesPrecisionPoint) {
+          CobaltRotation.blockController.setPrecisionPoint(aim.point)
+        } else {
+          CobaltRotation.blockController.setPrecisionPoint(null)
+        }
+        frameRotTarget = aim.point
+        setAimRenderTarget(target, aim.point)
       }
     } else {
       stopMiningKeys()
@@ -898,6 +996,13 @@ object MiningMacroModule : Module("Mining Macro") {
       if (currentTarget == event.pos) {
         currentTarget = null
         currentTargetNoLosTicks = 0
+        // Block broke while we were rotating toward it; surface the next-closest
+        // remaining vein block to the debug renderer so it can draw the recovery line.
+        val playerPos = mc.player?.blockPosition()
+        val fallback = if (playerPos != null && vein.blocks.isNotEmpty()) {
+          vein.blocks.minByOrNull { it.distSqr(playerPos) }
+        } else null
+        CobaltRotation.blockController.setFallbackBlock(fallback)
       }
       if (approachTarget == event.pos || lastPathTarget == event.pos) {
         stopApproachMovement()
@@ -911,51 +1016,15 @@ object MiningMacroModule : Module("Mining Macro") {
     }
   }
 
+  // Rotation is now driven by CobaltRotation.blockController on TickEvent.End.
+  // This handler just clears the frame-rotation bookkeeping when there is no
+  // target, so frameRotPrevBlock resets correctly between veins.
   @SubscribeEvent
   fun onFrame(@Suppress("UNUSED_PARAMETER") event: WorldRenderEvent.Last) {
-    val target = frameRotTarget
-    val player = mc.player ?: return
-
-    if (target == null) {
+    if (frameRotTarget == null) {
       frameRotLastNs = 0L
       frameRotPrevBlock = null
-      return
     }
-
-    val targetRot = AngleUtils.getRotation(target)
-    val yawDelta  = AngleUtils.getRotationDelta(player.yRot, targetRot.yaw)
-    val pitchDelta = targetRot.pitch - player.xRot
-    val absYaw   = abs(yawDelta)
-    val absPitch = abs(pitchDelta)
-
-    val snapThresh = frameRotSnapThreshold.coerceAtLeast(0.5f)
-    if (absYaw <= snapThresh && absPitch <= snapThresh) {
-      player.yRot    = AngleUtils.normalizeAngle(targetRot.yaw)
-      player.yHeadRot = player.yRot
-      player.yBodyRot = player.yRot
-      player.xRot    = targetRot.pitch.coerceIn(-89.9f, 89.9f)
-      frameRotLastNs = 0L
-      return
-    }
-
-    val nowNs = System.nanoTime()
-    val dt = if (frameRotLastNs == 0L) 1f / 60f
-             else ((nowNs - frameRotLastNs) / 1_000_000_000f).coerceIn(1f / 240f, 1f / 10f)
-    frameRotLastNs = nowNs
-
-    // Constant speed proportional to initial angular distance to this block.
-    // frameRotMaxSpeed (deg/s) is the reference speed at 30° — far blocks rotate faster,
-    // close blocks rotate slower, but each rotation holds one speed end-to-end.
-    val degsPerSec = (frameRotInitialDist / 30f) * frameRotMaxSpeed * frameRotSpeedScale
-    val step = degsPerSec * dt
-
-    val yawStep = if (absYaw <= step) yawDelta else step * (if (yawDelta >= 0f) 1f else -1f)
-    player.yRot    = AngleUtils.normalizeAngle(player.yRot + yawStep)
-    player.yHeadRot = player.yRot
-    player.yBodyRot = player.yRot
-
-    val pitchStep = if (absPitch <= step) pitchDelta else step * (if (pitchDelta >= 0f) 1f else -1f)
-    player.xRot = (player.xRot + pitchStep).coerceIn(-89.9f, 89.9f)
   }
 
   @SubscribeEvent
@@ -983,11 +1052,8 @@ object MiningMacroModule : Module("Mining Macro") {
     val returnPos = goldenGoblinReturnPos
     val connectedBlocks = collectConnectedHighlightBlocks(level, player, active, preview)
     val vein = currentVein
-    val aimPoint = aimRenderPoint?.takeIf { highlightAimPoint.value && aimRenderBlock != null }
-    val aimBlock = aimRenderBlock
-
     OverlayRenderEngine.clearTag(OVERLAY_TAG)
-    if (active == null && preview == null && returnPos == null && connectedBlocks.isEmpty() && vein == null && aimPoint == null) {
+    if (active == null && preview == null && returnPos == null && connectedBlocks.isEmpty() && vein == null) {
       return
     }
 
@@ -996,9 +1062,6 @@ object MiningMacroModule : Module("Mining Macro") {
     val previewOutline = OverlayRenderEngine.Color(0xFF, 0xD8, 0x4C, 0xFF)
     val possibleOutline = OverlayRenderEngine.Color(0x2D, 0xE2, 0xFF, 0xA0)
     val returnOutline = OverlayRenderEngine.Color(0x6E, 0xEA, 0x92, 0xFF)
-    val aimFill = OverlayRenderEngine.Color(0xFF, 0x5A, 0xD6, 0x99)
-    val aimOutline = OverlayRenderEngine.Color(0xFF, 0x5A, 0xD6, 0xFF)
-
     renderSingleVeinOutline(level, vein, connectedBlocks, possibleOutline)
 
     if (active != null) {
@@ -1021,9 +1084,6 @@ object MiningMacroModule : Module("Mining Macro") {
     if (preview != null && preview != active) {
       OverlayRenderEngine.outlineBlockColor(level, preview, previewOutline, 2, OVERLAY_TAG, 2.0f)
     }
-    if (aimPoint != null && aimBlock != null) {
-      renderAimPointMarker(level, player, aimBlock, aimPoint, aimFill, aimOutline)
-    }
     if (returnPos != null) {
       renderReturnSpotMarker(level, returnPos, returnOutline)
     }
@@ -1033,39 +1093,6 @@ object MiningMacroModule : Module("Mining Macro") {
   internal fun setAimRenderTarget(block: BlockPos?, point: Vec3?) {
     aimRenderBlock = block
     aimRenderPoint = point
-  }
-
-  private fun renderAimPointMarker(
-    level: net.minecraft.world.level.Level,
-    player: Player,
-    block: BlockPos,
-    point: Vec3,
-    fill: OverlayRenderEngine.Color,
-    outline: OverlayRenderEngine.Color,
-  ) {
-    val size = 0.075
-    OverlayRenderEngine.addBox(
-      level,
-      point.x - size, point.y - size, point.z - size,
-      point.x + size, point.y + size, point.z + size,
-      fill,
-      outline,
-      2.0f,
-      2,
-      OVERLAY_TAG,
-      true,
-    )
-    val eye = player.eyePosition
-    OverlayRenderEngine.addLine(
-      level,
-      eye.x, eye.y, eye.z,
-      point.x, point.y, point.z,
-      outline.withAlpha(0xB8),
-      1.25f,
-      2,
-      OVERLAY_TAG,
-      true,
-    )
   }
 
   private fun renderSingleVeinOutline(
@@ -1286,6 +1313,11 @@ object MiningMacroModule : Module("Mining Macro") {
     lastPathStartTick = 0L
     stopMiningKeys()
     RotationExecutor.stopRotating()
+    CobaltRotation.blockController.cancel()
+    frameRotPrevBlock = null
+    frameRotTarget = null
+    macroStartAnchor = null
+    returningToStart = false
     restoreEtherwarpSlot()
     resetWarp()
     currentVein = null

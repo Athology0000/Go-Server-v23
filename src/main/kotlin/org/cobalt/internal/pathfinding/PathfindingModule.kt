@@ -152,19 +152,31 @@ object PathfindingModule : Module("Pathfinding") {
   private val lookaheadDistance = SliderSetting(
     "Lookahead Distance",
     "How far ahead on the path the steering target sits. Higher = smoother rotations, wider cornering.",
-    5.8, 1.5, 8.0
+    9.0, 1.5, 10.0
   )
 
   private val lookaheadShrink = SliderSetting(
     "Lookahead Shrink",
     "How aggressively the lookahead shortens on turns and when off-path. 0.0 = always stay far (smoothest rotations, may cut corners). 1.0 = original behavior.",
-    0.12, 0.0, 1.0
+    0.05, 0.0, 1.0
   )
 
   private val movementDebugRender = CheckboxSetting(
     "Movement Debug Render",
     "Draw block-selection debug for any active path owner. Green = chosen path, red = possible but not chosen, purple = too far outside the corridor, orange = hazard.",
     false
+  )
+
+  private val weightMapRender = CheckboxSetting(
+    "Weight Map",
+    "Heatmap nearby non-walkable blocks around the active path. Bright red = adjacent obstacle, deep red = farther blocked cell. The path itself stays green.",
+    false
+  )
+
+  private val weightMapRadius = SliderSetting(
+    "Weight Map Radius",
+    "Horizontal sample radius around each path node when rendering the weight heatmap.",
+    3.0, 1.0, 6.0
   )
 
   private val movementDebugRange = SliderSetting(
@@ -212,7 +224,7 @@ object PathfindingModule : Module("Pathfinding") {
   private val precisionAggressiveness = SliderSetting(
     "Precision Aggressiveness",
     "How eagerly precision mode (slower walk + sneak near goal) engages on soft triggers: curvature, off-path deviation, arrival brake. 0 = soft triggers off (only physical hazards engage precision). 1 = original aggressive behavior.",
-    0.12, 0.0, 1.0
+    0.05, 0.0, 1.0
   )
 
   private val precisionUsesSprint = CheckboxSetting(
@@ -230,19 +242,19 @@ object PathfindingModule : Module("Pathfinding") {
   private val lookaheadVelocityBoost = SliderSetting(
     "Lookahead Velocity Boost",
     "Extra lookahead distance (blocks) per block/sec of player speed. Sprinting (~5.6 b/s) at 0.15 adds ~0.84 blocks. 0 = original speed-agnostic behavior.",
-    0.22, 0.0, 0.4
+    0.32, 0.0, 0.5
   )
 
   private val sprintBrakeCurvature = SliderSetting(
     "Sprint Brake Curvature",
-    "Drop sprint pre-emptively when upcoming path curvature meets this threshold so the player slows before the turn. Lower = brakes earlier. Set above 2.0 to disable.",
-    2.5, 0.10, 2.5
+    "Drop sprint pre-emptively when upcoming path curvature meets this threshold so the player slows before the turn. Lower = brakes earlier. Set near max to effectively disable.",
+    4.0, 0.10, 4.0
   )
 
   private val sprintEngageTicks = SliderSetting(
     "Sprint Engage Ticks",
     "Sprint releases instantly when conditions break, but re-engaging requires this many ticks of stable conditions. Stops tick-to-tick sprint flicker.",
-    3.0, 0.0, 10.0
+    1.0, 0.0, 10.0
   )
 
   private val sneakEngageTicks = SliderSetting(
@@ -254,7 +266,7 @@ object PathfindingModule : Module("Pathfinding") {
   private val forwardYawTolerance = SliderSetting(
     "Forward Yaw Tolerance",
     "Only press forward when the player's yaw is within this many degrees of the target travel direction. Stops walking sideways into walls while the rotation catches up.",
-    60.0, 15.0, 180.0
+    90.0, 15.0, 180.0
   )
 
   private val jumpCooldownFloor = SliderSetting(
@@ -458,6 +470,8 @@ object PathfindingModule : Module("Pathfinding") {
       cacheHudCellSize,
       cacheHudShowGrid,
       movementDebugRender,
+      weightMapRender,
+      weightMapRadius,
       movementDebugRange,
       movementDebugCandidateRadius,
       weightMapEnabled,
@@ -633,34 +647,93 @@ object PathfindingModule : Module("Pathfinding") {
 
     if (!enabled.value) return
 
-    // Spline path rendering - rebuild only when path nodes change.
-    // When nodes drops to < 2 (planning/arrived) keep the old spline visible so the
-    // path doesn't flash out during every replan; it's replaced when a fresh path arrives.
+    // Block-by-block highlight render. Each cached path node gets an outlined
+    // box; if the weight map is enabled, surrounding non-walkable blocks get
+    // a red heat overlay.
+    OverlayRenderEngine.clearTag("path-spline")
+    OverlayRenderEngine.clearTag("path-blocks")
+    OverlayRenderEngine.clearTag("path-weights")
+
     val nodes = NativePathfinder.cachedPathNodes
-    if (nodes !== lastNodesRef) {
-      lastNodesRef = nodes
-      if (nodes.size >= 2) {
-        cachedSpline = PathSplineRenderer.buildSpline(nodes)
-        val spline = cachedSpline!!
-        val pts  = spline.points
-        val isAv = spline.isAotv
-        OverlayRenderEngine.clearTag("path-spline")
-        for (i in 0 until pts.size - 1) {
-          val a = pts[i]; val b = pts[i + 1]
-          val color = if (isAv[i]) COLOR_PATH_AOTV else COLOR_PATH_NORMAL
-          OverlayRenderEngine.addLine(
-            level,
-            a.x, a.y + 0.05, a.z,
-            b.x, b.y + 0.05, b.z,
-            color, 2.0f, durationTicks = 60, tag = "path-spline", forceRender = true
-          )
-        }
-      } else {
-        OverlayRenderEngine.clearTag("path-spline")
+    if (nodes.size >= 2) {
+      val pad = 0.02
+      val fill = OverlayRenderEngine.Color(60, 235, 110, 70)
+      val outline = OverlayRenderEngine.Color(60, 235, 110, 220)
+      val aotvFill = OverlayRenderEngine.Color(255, 170, 30, 70)
+      val aotvOutline = OverlayRenderEngine.Color(255, 170, 30, 220)
+      val flags = NativePathfinder.cachedPathFlags
+      for (i in nodes.indices) {
+        val v = nodes[i]
+        val bx = kotlin.math.floor(v.x)
+        val by = kotlin.math.floor(v.y)
+        val bz = kotlin.math.floor(v.z)
+        val isAotv = i < flags.size && (flags[i] and 0x1) != 0
+        OverlayRenderEngine.addBox(
+          level,
+          bx - pad, by - pad, bz - pad,
+          bx + 1.0 + pad, by + 1.0 + pad, bz + 1.0 + pad,
+          if (isAotv) aotvFill else fill,
+          if (isAotv) aotvOutline else outline,
+          1.6f,
+          durationTicks = 4,
+          tag = "path-blocks",
+          forceRender = true,
+        )
       }
     }
 
+    if (weightMapRender.value) {
+      renderWeightMap(level, nodes)
+    }
+
     renderLookaheadSpline(level)
+  }
+
+  private fun renderWeightMap(level: net.minecraft.world.level.Level, nodes: List<net.minecraft.world.phys.Vec3>) {
+    if (nodes.isEmpty()) return
+    val r = weightMapRadius.value.toInt().coerceIn(1, 6)
+    val pathSet = HashSet<Long>(nodes.size)
+    for (v in nodes) {
+      pathSet.add(net.minecraft.core.BlockPos.asLong(
+        kotlin.math.floor(v.x).toInt(),
+        kotlin.math.floor(v.y).toInt(),
+        kotlin.math.floor(v.z).toInt(),
+      ))
+    }
+    val visited = HashSet<Long>(nodes.size * (2 * r + 1) * (2 * r + 1))
+    val mp = net.minecraft.core.BlockPos.MutableBlockPos()
+
+    for (v in nodes) {
+      val cx = kotlin.math.floor(v.x).toInt()
+      val cy = kotlin.math.floor(v.y).toInt()
+      val cz = kotlin.math.floor(v.z).toInt()
+      for (dy in -1..1) for (dx in -r..r) for (dz in -r..r) {
+        mp.set(cx + dx, cy + dy, cz + dz)
+        val key = mp.asLong()
+        if (!visited.add(key)) continue
+        if (pathSet.contains(key)) continue
+        // Cost approximation: blocks adjacent to the path are "low cost" (light red),
+        // farther non-walkable blocks are "high cost" (deep red). Walkable cells aren't
+        // drawn so the path itself stays the focal point.
+        if (MinecraftPathingRules.isWalkable(level, mp)) continue
+        val dist = kotlin.math.sqrt((dx * dx + dy * dy + dz * dz).toDouble())
+        val t = (dist / r.toDouble()).coerceIn(0.0, 1.0)
+        val alpha = (60 + (1.0 - t) * 90).toInt().coerceIn(40, 160)
+        val color = OverlayRenderEngine.Color(255, 60, 50, alpha)
+        val outlineCol = OverlayRenderEngine.Color(255, 90, 80, (alpha + 40).coerceAtMost(220))
+        OverlayRenderEngine.addBox(
+          level,
+          mp.x + 0.04, mp.y + 0.04, mp.z + 0.04,
+          mp.x + 0.96, mp.y + 0.96, mp.z + 0.96,
+          color,
+          outlineCol,
+          0.9f,
+          durationTicks = 4,
+          tag = "path-weights",
+          forceRender = false,
+        )
+      }
+    }
   }
 
   private fun renderLookaheadSpline(level: net.minecraft.world.level.Level) {

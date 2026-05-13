@@ -30,6 +30,12 @@ object PathExecutorState {
     var initialTurnBoostTicks: Int = 0
     var jumpSuppressTicks: Int = 0
 
+    // ── Block-to-block rotation handoff ──
+    // Tracks whether pathfinding currently owns CobaltRotation.blockController so we
+    // only cancel it when path-rotation actually started it (not when a macro is driving).
+    var blockRotationOwned: Boolean = false
+    var blockRotationLastTarget: BlockPos? = null
+
     // ── Path position (indexed into lookPoints) ──
     var currentPathPosition: Double = 0.0
         private set
@@ -80,10 +86,10 @@ object PathExecutorState {
 
     // ── Adjustable lookahead (set from PathfindingModule settings) ──
     // Base "far" distance the lookahead point sits ahead of the player on the spline.
-    @JvmField var lookaheadDistanceFar: Double = 5.8
+    @JvmField var lookaheadDistanceFar: Double = 9.0
     // 0.0 = lookahead never shrinks on turns/deviation (always stays far → smoother rotations,
     //       wider cornering). 1.0 = original aggressive shrink behavior.
-    @JvmField var lookaheadShrinkStrength: Double = 0.12
+    @JvmField var lookaheadShrinkStrength: Double = 0.05
 
     // ── Adjustable rotation catch-up (how fast the aim returns to the lookahead) ──
     // Min/Max are alpha bounds: per-frame fraction of remaining yaw/pitch delta closed.
@@ -98,25 +104,25 @@ object PathExecutorState {
     // brake distance, arrival sneak distance) engage precision movement / sneak.
     // 1.0 = original behavior. 0.0 = soft triggers effectively disabled — only
     // hard safety (dropAhead, safety.requiresPrecision) can engage precision.
-    @JvmField var precisionAggressiveness: Double = 0.12
+    @JvmField var precisionAggressiveness: Double = 0.05
 
     // ── Adjustable velocity-scaled lookahead ──
     // Additional lookahead distance (blocks) per block/sec of player speed.
     // Sprinting is ~5.6 b/s, so at 0.15 sprint adds ~0.84 blocks of lookahead.
     // At 0.0 the lookahead doesn't react to speed (original behavior).
-    @JvmField var lookaheadVelocityBoost: Double = 0.22
+    @JvmField var lookaheadVelocityBoost: Double = 0.32
 
     // ── Adjustable pre-emptive sprint brake ──
     // When upcoming pathCurvature >= this threshold, sprint is dropped even
     // if the native command requested it. Lower = brakes earlier before turns.
     // Set very high (e.g. > 2.0) to disable.
-    @JvmField var sprintBrakeCurvature: Double = 2.5
+    @JvmField var sprintBrakeCurvature: Double = 4.0
 
     // ── Hysteresis: require sustained signal before engaging sprint / sneak.
     // Sprint releases instantly the moment conditions break, but only re-engages
     // after this many ticks of stable "want to sprint" conditions — kills the
     // tick-to-tick flicker as horizontalCollision / curvature toggles.
-    @JvmField var sprintEngageTicks: Int = 3
+    @JvmField var sprintEngageTicks: Int = 1
     // Sneak engagement also requires sustained signal so brief safety flickers
     // (e.g. crossing a 1-block edge on a thin bridge) don't tap sneak on. Quick
     // release so we don't stay sneaked when the path actually demands a drop.
@@ -130,7 +136,7 @@ object PathExecutorState {
     // Only press W when player's current yaw is within this many degrees of
     // the desired travel direction. Stops "walking sideways into walls" while
     // the rotation catches up after a sharp replan or teleport.
-    @JvmField var forwardYawTolerance: Double = 60.0
+    @JvmField var forwardYawTolerance: Double = 90.0
 
     // ── Global minimum gap between consecutive jumps. ──
     // Each jumpTrue(N) sets jumpSuppressTicks to max(N, jumpCooldownFloor).
@@ -157,7 +163,7 @@ object PathExecutorState {
     // =========================================================================
 
     private const val MIN_LOOKAHEAD = 2.35
-    private const val MAX_LOOKAHEAD = 6.4
+    private const val MAX_LOOKAHEAD = 10.0
     private const val PRECISION_LOOKAHEAD = 1.25
     private const val PRECISION_CURVATURE = 0.34
     private const val DROP_SCAN_DISTANCE = 3.5
@@ -538,7 +544,20 @@ object PathExecutorState {
         targetPoint = clampLookDistance(eye, targetPoint)
         currentTargetPoint = targetPoint
 
-        val r = rotationTo(eye, targetPoint)
+        // Blended forward-window aim: average of direction vectors to N samples
+        // along [lookahead, lookahead + window]. Falls back to single-point aim
+        // when safety/precision is active or when the blend has no visible
+        // samples — keeps the existing safe behavior in tight spots.
+        val safeForBlend = !requiresPrecisionMovement && !dropAhead && targetVisible
+        val blended = if (safeForBlend) blendedAimRotation(
+            eye = eye,
+            sample = { d -> spline.sample(minOf(spline.totalLength, d)) },
+            basePos = currentSplineDistance,
+            baseLookahead = findResult.lookahead,
+            maxPos = spline.totalLength,
+            level = level,
+        ) else null
+        val r = blended ?: rotationTo(eye, targetPoint)
         val remainingPath = spline.totalLength - currentSplineDistance
         val finishFactor = if (remainingPath < 4.0) maxOf(0.25, remainingPath / 4.0) else 1.0
         val isStraight = pathCurvature < 0.15
@@ -697,12 +716,30 @@ object PathExecutorState {
         currentTargetPoint = targetPoint
 
         // ── Compute rotation target ──
-        val tdx = targetPoint.x - eye.x
-        val tdy = targetPoint.y - eye.y
-        val tdz = targetPoint.z - eye.z
-        val tHorz = sqrt(tdx * tdx + tdz * tdz)
-        val targetYaw = Math.toDegrees(atan2(-tdx, tdz)).toFloat()
-        val targetPitch = -Math.toDegrees(atan2(tdy, tHorz)).toFloat()
+        // Try the blended forward-window aim first (averages direction across the
+        // next few blocks instead of locking onto a single sample). Falls back to
+        // the single-point aim when the blend can't get a clean read.
+        val blended = blendedAimRotation(
+            eye = eye,
+            sample = { d -> getInterpolatedPoint(pts, minOf(pts.lastIndex.toDouble(), d)) },
+            basePos = currentPathPosition,
+            baseLookahead = findResult.lookahead,
+            maxPos = pts.lastIndex.toDouble(),
+            level = level,
+        )
+        val targetYaw: Float
+        val targetPitch: Float
+        if (blended != null) {
+            targetYaw = blended.yaw
+            targetPitch = blended.pitch
+        } else {
+            val tdx = targetPoint.x - eye.x
+            val tdy = targetPoint.y - eye.y
+            val tdz = targetPoint.z - eye.z
+            val tHorz = sqrt(tdx * tdx + tdz * tdz)
+            targetYaw = Math.toDegrees(atan2(-tdx, tdz)).toFloat()
+            targetPitch = -Math.toDegrees(atan2(tdy, tHorz)).toFloat()
+        }
 
         // ── Feed look-target directly to the PD controller ──
         // The PD controller in PathfinderRotationStrategy provides all frame-level smoothing via
@@ -1437,6 +1474,65 @@ object PathExecutorState {
         val dx = to.x - from.x; val dy = to.y - from.y; val dz = to.z - from.z
         val h = sqrt(dx * dx + dz * dz)
         return Rotation(Math.toDegrees(atan2(-dx, dz)).toFloat(), -Math.toDegrees(atan2(dy, h)).toFloat())
+    }
+
+    /**
+     * Builds a rotation by averaging unit direction vectors from the eye to a
+     * window of forward sample points along the spline/path. This produces a
+     * "look toward where I'm going over the next few blocks" aim rather than
+     * locking onto one lookahead sample. Samples that aren't visible (LOS
+     * blocked) are dropped so the average doesn't phantom-aim through walls.
+     * Near samples carry slightly more weight than the farthest so the camera
+     * tracks the corridor instead of overshooting into the next turn.
+     */
+    private fun blendedAimRotation(
+        eye: Vec3,
+        sample: (Double) -> Vec3,
+        basePos: Double,
+        baseLookahead: Double,
+        maxPos: Double,
+        level: net.minecraft.world.level.Level?,
+        window: Double = 8.0,
+        samples: Int = 7,
+        horizonBoost: Double = 2.5,
+    ): Rotation? {
+        // Sample a window that extends well past the immediate lookahead point.
+        // The far end of the window gets the heaviest weight so the rotation is
+        // anchored to a "horizon" point — where the path will be several blocks
+        // from now — instead of the closer-in lookahead sample. The near samples
+        // are still in the average to keep the camera honest if the horizon is
+        // occluded by a wall; in that case LOS drops them and the visible near
+        // samples take over so the bot doesn't aim through geometry.
+        var sx = 0.0; var sy = 0.0; var sz = 0.0; var wsum = 0.0
+        var horizonVisible = false
+        for (i in 0 until samples) {
+            val t = if (samples == 1) 0.0 else i.toDouble() / (samples - 1).toDouble()
+            val d = baseLookahead + window * t
+            val pos = (basePos + d).coerceIn(0.0, maxPos)
+            val p = sample(pos)
+            val dx = p.x - eye.x; val dy = p.y - eye.y; val dz = p.z - eye.z
+            val mag = sqrt(dx * dx + dy * dy + dz * dz)
+            if (mag < 1e-3) continue
+            if (level != null && !isPointVisible(eye, p, level)) continue
+            // Front-biased ramp: w grows from 0.4 at t=0 to (1.0 + horizonBoost) at t=1.
+            // The horizon sample dominates when visible; near samples backstop it.
+            val w = 0.4 + (0.6 + horizonBoost) * t
+            val inv = w / mag
+            sx += dx * inv; sy += dy * inv; sz += dz * inv; wsum += w
+            if (t >= 0.999) horizonVisible = true
+        }
+        if (wsum <= 0.0) return null
+        // If the horizon was occluded, also pull a small additional weight from
+        // the deepest visible sample so the aim still leans forward instead of
+        // collapsing onto the near point.
+        @Suppress("UNUSED_VARIABLE") val _hv = horizonVisible
+        val nx = sx / wsum; val ny = sy / wsum; val nz = sz / wsum
+        val h = sqrt(nx * nx + nz * nz)
+        if (h < 1e-4 && abs(ny) < 1e-4) return null
+        return Rotation(
+            Math.toDegrees(atan2(-nx, nz)).toFloat(),
+            -Math.toDegrees(atan2(ny, h)).toFloat()
+        )
     }
 
 }

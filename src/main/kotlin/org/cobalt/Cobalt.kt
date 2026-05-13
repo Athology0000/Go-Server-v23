@@ -59,6 +59,8 @@ import org.cobalt.internal.pathfinding.debug.PathPreviewRenderModule
 import org.cobalt.internal.pathfinding.debug.PathRouteQuickAssignCommand
 import org.cobalt.internal.pig.PigMacroModule
 import org.cobalt.internal.qol.*
+import org.cobalt.internal.rotation.CobaltRotation
+import org.cobalt.internal.rotation.BlockRotationDebugRenderer
 import org.cobalt.internal.rotation.RotationsModule
 import org.cobalt.internal.routes.RouteEditMode
 import org.cobalt.internal.routes.RouteStore
@@ -110,6 +112,7 @@ object Cobalt : ClientModInitializer {
         FairyGrottoModule,
         RoutesModule,
         MiningMacroModule,
+        WorldVeinCacherModule,
         CommissionMacroModule,
         CommissionHudModule,
         AutoForgeModule,
@@ -223,6 +226,8 @@ object Cobalt : ClientModInitializer {
       MainCommand,
       NotificationManager,
       RotationExecutor,
+      CobaltRotation,
+      BlockRotationDebugRenderer,
       HudModuleManager,
       TitleScreenRenderer,
       MacroTimeTracker,

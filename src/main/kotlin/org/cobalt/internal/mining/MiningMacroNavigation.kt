@@ -7,6 +7,7 @@ import kotlin.math.sqrt
 import net.minecraft.ChatFormatting
 import net.minecraft.client.Minecraft
 import net.minecraft.core.BlockPos
+import net.minecraft.core.Direction
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.phys.AABB
@@ -227,6 +228,38 @@ internal fun MiningMacroModule.hasDriftedFromVeinStart(player: Player): Boolean 
   val anchor = veinStartAnchor ?: return false
   val r = anchorRadius.value
   return player.blockPosition().distSqr(anchor) > r * r
+}
+
+/**
+ * Path back to the spot where the macro was originally enabled, so once a
+ * vein finishes the macro returns to its starting position before scanning
+ * for the next one. Mirrors [returnToVeinAnchor] but reads [MiningMacroModule.macroStartAnchor].
+ */
+internal fun MiningMacroModule.returnToMacroStart(
+  level: net.minecraft.world.level.Level,
+  player: Player,
+) {
+  val anchor = macroStartAnchor ?: return
+
+  val destination =
+    if (MinecraftPathingRules.isWalkable(level, anchor)) {
+      anchor
+    } else {
+      findNearestWalkableAround(level, anchor, RETURN_TO_ANCHOR_SCAN_RADIUS, RETURN_TO_ANCHOR_SCAN_VERTICAL)
+    } ?: run {
+      MovementManager.clearForcedMovement()
+      return
+    }
+
+  if (!nativeActive() || lastPathTarget == null || lastPathTarget?.distSqr(destination) ?: 0.0 > 1.0) {
+    if (level.gameTime - lastPathStartTick < 8L) {
+      return
+    }
+    lastPathStartTick = level.gameTime
+    NativePathfinder.setTarget(destination.x + 0.5, destination.y.toDouble(), destination.z + 0.5)
+    startedPath = true
+    lastPathTarget = destination
+  }
 }
 
 internal fun MiningMacroModule.returnToVeinAnchor(
@@ -834,6 +867,48 @@ internal fun MiningMacroModule.buildAimSamplePoints(eye: Vec3, target: BlockPos)
   )
 }
 
+/**
+ * Build candidate aim points only on faces of [target] whose adjacent block is
+ * air. The macro should never aim at a buried face — pathing/breaking can't
+ * succeed there and it wastes approach budget. Faces are sorted closest-to-eye
+ * first so the natural face gets tried before farther-side air faces.
+ */
+internal fun MiningMacroModule.buildAirFacingAimPoints(
+  level: net.minecraft.world.level.Level,
+  eye: Vec3,
+  target: BlockPos,
+): List<Vec3> {
+  val cx = target.x + 0.5
+  val cy = target.y + 0.5
+  val cz = target.z + 0.5
+  val inset = 0.001
+  // Per face: (aim point on the outer side, outward normal direction)
+  val faces = listOf(
+    Triple(Vec3(target.x - inset, cy, cz), Direction.WEST, Vec3(-1.0, 0.0, 0.0)),
+    Triple(Vec3(target.x + 1.0 + inset, cy, cz), Direction.EAST, Vec3(1.0, 0.0, 0.0)),
+    Triple(Vec3(cx, target.y - inset, cz), Direction.DOWN, Vec3(0.0, -1.0, 0.0)),
+    Triple(Vec3(cx, target.y + 1.0 + inset, cz), Direction.UP, Vec3(0.0, 1.0, 0.0)),
+    Triple(Vec3(cx, cy, target.z - inset), Direction.NORTH, Vec3(0.0, 0.0, -1.0)),
+    Triple(Vec3(cx, cy, target.z + 1.0 + inset), Direction.SOUTH, Vec3(0.0, 0.0, 1.0)),
+  )
+  val mp = BlockPos.MutableBlockPos()
+  val center = Vec3(cx, cy, cz)
+  val eyeRelative = eye.subtract(center)
+
+  val usable = faces.filter { (_, dir, normal) ->
+    // 1. The face must be physically exposed (adjacent cell is air).
+    mp.set(target.x + dir.stepX, target.y + dir.stepY, target.z + dir.stepZ)
+    if (!level.getBlockState(mp).isAir) return@filter false
+    // 2. The face must be on the eye's side of the block. Otherwise the LOS
+    //    ray enters the target through a different face first and the
+    //    crosshair lands on a face we can't actually hit. Use a small bias
+    //    (0.05) so glancing faces don't sneak through.
+    val dot = normal.x * eyeRelative.x + normal.y * eyeRelative.y + normal.z * eyeRelative.z
+    dot > 0.05
+  }
+  return usable.sortedBy { it.first.distanceToSqr(eye) }.map { it.first }
+}
+
 internal fun MiningMacroModule.findVisibleAimPoint(
   level: net.minecraft.world.level.Level,
   entity: net.minecraft.world.entity.Entity,
@@ -841,12 +916,53 @@ internal fun MiningMacroModule.findVisibleAimPoint(
   target: BlockPos,
   ignorePlayerObstructions: Boolean = false,
 ): Vec3? {
+  // Only try air-facing samples. A buried face can't be hit even if the LOS
+  // ray geometrically lines up — the renderer/server will reject it.
+  for (point in buildAirFacingAimPoints(level, eye, target)) {
+    if (canSeeAimPoint(level, entity, eye, point, target, ignorePlayerObstructions)) {
+      return point
+    }
+  }
+  // Fallback to legacy sampling ONLY for the corner case where no face has
+  // air adjacent (rare; would mean a fully buried block, which we shouldn't
+  // mine anyway — but the original code took inset samples that could still
+  // resolve. Keep it as a last resort for ceiling-style edge blocks.)
   for (point in buildAimSamplePoints(eye, target)) {
     if (canSeeAimPoint(level, entity, eye, point, target, ignorePlayerObstructions)) {
       return point
     }
   }
   return null
+}
+
+/**
+ * Probe the LOS ray from [eye] toward [target] and return true if a permanent
+ * occluder (bedrock, etc. — see [MiningBlockRegistry.PERMANENT_LOS_OCCLUDERS])
+ * sits between the eye and the target block. Pathfinder can't remove these,
+ * so candidate target blocks that fail this probe should be skipped instead
+ * of having an approach scheduled.
+ */
+internal fun MiningMacroModule.isBlockedByPermanentOccluder(
+  level: net.minecraft.world.level.Level,
+  entity: net.minecraft.world.entity.Entity,
+  eye: Vec3,
+  target: BlockPos,
+): Boolean {
+  val center = Vec3(target.x + 0.5, target.y + 0.5, target.z + 0.5)
+  val hit = level.clip(
+    net.minecraft.world.level.ClipContext(
+      eye,
+      center,
+      net.minecraft.world.level.ClipContext.Block.COLLIDER,
+      net.minecraft.world.level.ClipContext.Fluid.NONE,
+      entity,
+    )
+  )
+  if (hit.type != net.minecraft.world.phys.HitResult.Type.BLOCK) return false
+  if (hit.blockPos == target) return false
+  val id = net.minecraft.core.registries.BuiltInRegistries.BLOCK
+    .getKey(level.getBlockState(hit.blockPos).block).toString()
+  return id in MiningBlockRegistry.PERMANENT_LOS_OCCLUDERS
 }
 
 internal fun MiningMacroModule.canSeeAimPoint(
@@ -868,6 +984,21 @@ internal fun MiningMacroModule.canSeeAimPoint(
   )
   if (hit.type != net.minecraft.world.phys.HitResult.Type.BLOCK || hit.blockPos != target) {
     return false
+  }
+  // Reject if the ray landed on a face whose neighbor is NOT air — that face
+  // isn't physically reachable. Without this guard, the LOS check passes
+  // because the ray hit the target block, but the macro then aims at a buried
+  // face the server won't actually accept.
+  val hitDir = (hit as? net.minecraft.world.phys.BlockHitResult)?.direction
+  if (hitDir != null) {
+    val neighbor = BlockPos.MutableBlockPos().set(
+      target.x + hitDir.stepX,
+      target.y + hitDir.stepY,
+      target.z + hitDir.stepZ,
+    )
+    if (!level.getBlockState(neighbor).isAir) {
+      return false
+    }
   }
   if (!ignorePlayerObstructions && entity is Player && findBlockingPlayer(level, entity, eye, point) != null) {
     return false

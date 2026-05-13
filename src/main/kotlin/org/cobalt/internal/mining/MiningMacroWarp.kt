@@ -7,6 +7,7 @@ import kotlin.math.cos
 import kotlin.random.Random
 import net.minecraft.client.Minecraft
 import net.minecraft.core.BlockPos
+import net.minecraft.core.Direction
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.phys.AABB
@@ -313,9 +314,26 @@ internal fun MiningMacroModule.isMineableTarget(
   val state = level.getBlockState(pos)
   if (state.isAir) return false
   val id = BuiltInRegistries.BLOCK.getKey(state.block).toString()
+  // Hard-reject bedrock and other permanent occluders, even if they somehow
+  // appear in `allowedIds` (e.g. Custom mode misconfig). These are never
+  // mineable and chasing them stalls the macro.
+  if (id in MiningBlockRegistry.PERMANENT_LOS_OCCLUDERS) return false
   if (allowedIds != null && !allowedIds.contains(id)) return false
   if (MiningBlockRegistry.isBlacklisted(id)) return false
+  if (!hasAirAdjacentFace(level, pos)) return false
   return state.getDestroyProgress(player, level, pos) > 0f
+}
+
+internal fun MiningMacroModule.hasAirAdjacentFace(
+  level: net.minecraft.world.level.Level,
+  pos: BlockPos,
+): Boolean {
+  for (direction in Direction.values()) {
+    if (level.getBlockState(pos.relative(direction)).isAir) {
+      return true
+    }
+  }
+  return false
 }
 
 internal fun MiningMacroModule.isCrosshairOnTarget(target: BlockPos): Boolean {

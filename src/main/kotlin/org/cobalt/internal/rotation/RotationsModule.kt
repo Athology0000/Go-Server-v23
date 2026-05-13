@@ -2,6 +2,7 @@ package org.cobalt.internal.rotation
 
 import kotlin.random.Random
 import org.cobalt.api.module.Module
+import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.InfoSetting
 import org.cobalt.api.module.setting.impl.InfoType
 import org.cobalt.api.module.setting.impl.ModeSetting
@@ -10,6 +11,14 @@ import org.cobalt.api.module.setting.impl.SliderSetting
 import org.cobalt.internal.pathfinding.HeadRotationModule
 
 object RotationsModule : Module("Rotations") {
+
+  // --- Block-to-Block Rotation (mining, pathfinding) ---
+
+  val blockRotationDebug = CheckboxSetting(
+    "Block Rotation Debug",
+    "Render currently-looked block, line to next aim, precision point, and fallback block.",
+    false
+  )
 
   // --- Bezier Tracking (Combat Macro & Routes) ---
 
@@ -122,6 +131,7 @@ object RotationsModule : Module("Rotations") {
 
   init {
     addSetting(
+      blockRotationDebug,
       headerBezier,
       bezierCurveIn, bezierCurveOut, bezierMinScale, bezierSnapThreshold,
       headerCombat,
