@@ -6,11 +6,11 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/cobalt/server/internal/admin"
 	"github.com/cobalt/server/internal/audit"
 	"github.com/cobalt/server/internal/auth"
@@ -21,8 +21,10 @@ import (
 	"github.com/cobalt/server/internal/enrollment"
 	"github.com/cobalt/server/internal/entitlement"
 	"github.com/cobalt/server/internal/logbuf"
-	"github.com/cobalt/server/internal/panel"
 	"github.com/cobalt/server/internal/middleware"
+	"github.com/cobalt/server/internal/panel"
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 )
 
 func main() {
@@ -64,6 +66,8 @@ func main() {
 	enrollment.RegisterRoutes(pub, enrollSvc, rdb)
 	panel.RegisterRoutes(pub, pool, rdb, auditSvc, cfg.MasterKey)
 	content.RegisterRoutes(pub, contentSvc, pool, rdb, cfg.StrictSessionIP)
+	admin.RegisterRoutes(pub, pool, cfg.ManifestSigningKey, auditSvc, cfg.AdminAPISecret)
+	registerAdminUI(pub)
 
 	// Admin server
 	adm := fiber.New(fiber.Config{DisableStartupMessage: true, BodyLimit: cfg.BodyLimit})
@@ -72,6 +76,7 @@ func main() {
 	adm.Use(middleware.RateLimit(rdb, 60, time.Minute, middleware.IPKey("admin-global")))
 	adm.Use(middleware.SecurityHeaders())
 	admin.RegisterRoutes(adm, pool, cfg.ManifestSigningKey, auditSvc, cfg.AdminAPISecret)
+	registerAdminUI(adm)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
@@ -93,4 +98,42 @@ func main() {
 	log.Println("shutting down")
 	pub.ShutdownWithTimeout(10 * time.Second)
 	adm.ShutdownWithTimeout(10 * time.Second)
+}
+
+func registerAdminUI(app *fiber.App) {
+	dist := firstExistingDir("dist", filepath.Join("admin", "dist"), filepath.Join("admin", "admin", "dist"))
+	if dist == "" {
+		log.Printf("admin UI dist not found; skipping static admin UI")
+		return
+	}
+
+	app.Static("/assets", filepath.Join(dist, "assets"))
+	app.Get("/", func(c *fiber.Ctx) error {
+		return sendAdminUI(c, dist)
+	})
+	app.Get("/admin", func(c *fiber.Ctx) error {
+		return sendAdminUI(c, dist)
+	})
+	app.Get("/admin/*", func(c *fiber.Ctx) error {
+		return sendAdminUI(c, dist)
+	})
+	app.Get("/*", func(c *fiber.Ctx) error {
+		if !strings.Contains(c.Get("Accept"), "text/html") {
+			return fiber.ErrNotFound
+		}
+		return sendAdminUI(c, dist)
+	})
+}
+
+func sendAdminUI(c *fiber.Ctx, dist string) error {
+	return c.SendFile(filepath.Join(dist, "index.html"))
+}
+
+func firstExistingDir(paths ...string) string {
+	for _, path := range paths {
+		if info, err := os.Stat(path); err == nil && info.IsDir() {
+			return path
+		}
+	}
+	return ""
 }

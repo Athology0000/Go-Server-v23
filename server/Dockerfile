@@ -9,5 +9,8 @@ FROM alpine:3.20
 RUN apk add --no-cache ca-certificates
 WORKDIR /app
 COPY --from=builder /app/cobalt-server .
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/admin/dist ./admin/dist
+COPY --from=builder /app/admin/admin/dist ./admin/admin/dist
 EXPOSE 8080 8081
 CMD ["./cobalt-server"]
