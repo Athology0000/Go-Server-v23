@@ -494,9 +494,7 @@ object PathManager {
         else ETHERWARP_LEGACY_SNEAK_OFFSET
 
     private fun getCurrentHypixelArea(): String? {
-        val connection = Minecraft.getInstance().player?.connection ?: return null
-        for (player in connection.onlinePlayers) {
-            val name = player.tabListDisplayName?.string ?: continue
+        for (name in org.cobalt.api.util.TabListUtils.rawDisplayNames()) {
             if (!name.contains("Area:")) continue
             val value = name.substringAfter("Area:", "").trim()
             if (value.isNotEmpty()) return value

@@ -841,14 +841,12 @@ object CustomScoreboardModule : Module("Custom Scoreboard") {
   }
 
   private fun collectTabLines(): List<String> {
-    val connection = mc.connection ?: return emptyList()
+    if (mc.connection == null) return emptyList()
     val lines = mutableListOf<String>()
     val overlay = mc.gui.tabList as? TabOverlayAccessor
     overlay?.header?.string?.let { lines.addAll(splitTabText(it)) }
     overlay?.footer?.string?.let { lines.addAll(splitTabText(it)) }
-    lines += connection.onlinePlayers
-      .mapNotNull { info -> info.tabListDisplayName?.string ?: info.profile.name }
-      .flatMap(::splitTabText)
+    lines += org.cobalt.api.util.TabListUtils.rawDisplayNames().flatMap(::splitTabText)
     return lines.distinctBy { it.lowercase(Locale.US) }
   }
 

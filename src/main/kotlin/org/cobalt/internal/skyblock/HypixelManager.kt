@@ -93,31 +93,15 @@ object HypixelManager {
             ?: detectFromLines(collectScoreboardLines(mc))
     }
 
-    private fun collectTabLines(mc: Minecraft): List<String> {
-        val connection = mc.connection ?: return emptyList()
-        return connection.onlinePlayers
-            .mapNotNull { info -> info.tabListDisplayName?.string ?: info.profile.name }
-            .flatMap(::splitCleanLines)
-    }
+    @Suppress("UNUSED_PARAMETER")
+    private fun collectTabLines(mc: Minecraft): List<String> =
+        org.cobalt.api.util.TabListUtils.rawDisplayNames().flatMap(::splitCleanLines)
 
-    private fun collectScoreboardLines(mc: Minecraft): List<String> {
-        val level = mc.level ?: return emptyList()
-        val scoreboard = level.scoreboard
-        val objective = scoreboard.getDisplayObjective(net.minecraft.world.scores.DisplaySlot.SIDEBAR) ?: return emptyList()
-        return scoreboard.listPlayerScores(objective)
-            .map { score ->
-                score.display()?.string ?: run {
-                    val owner = score.owner()
-                    val team = scoreboard.getPlayersTeam(owner)
-                    if (team == null) score.ownerName().string else Component.empty()
-                        .append(team.playerPrefix.copy())
-                        .append(Component.literal(owner))
-                        .append(team.playerSuffix.copy())
-                        .string
-                }
-            }
+    @Suppress("UNUSED_PARAMETER")
+    private fun collectScoreboardLines(mc: Minecraft): List<String> =
+        org.cobalt.api.util.ScoreboardUtils.sidebarComponents()
+            .map { it.string }
             .flatMap(::splitCleanLines)
-    }
 
     private fun detectFromLines(lines: List<String>): String? {
         for (line in lines) {

@@ -18,6 +18,7 @@ import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.SliderSetting
 import org.cobalt.api.module.setting.inGroup
 import org.cobalt.api.notification.NotificationManager
+import org.cobalt.api.ui.theme.ThemeGradient
 import org.cobalt.api.ui.theme.ThemeManager
 import org.cobalt.api.util.ui.NVGRenderer
 
@@ -109,10 +110,10 @@ object RngDropDisplayModule : Module("RNG Drop Display") {
       val height = computeHeight()
       val rowWidth = width - PADDING * 2f
 
-      NVGRenderer.rect(0f, 0f, width, height, withAlpha(theme.panel, 212), 10f)
-      NVGRenderer.hollowRect(0f, 0f, width, height, 1.1f, withAlpha(theme.accent, 88), 10f)
+      NVGRenderer.rect(0f, 0f, width, height, ThemeGradient.withAlpha(theme.panel, 212), 10f)
+      NVGRenderer.hollowRect(0f, 0f, width, height, 1.1f, ThemeGradient.withAlpha(theme.accent, 88), 10f)
       NVGRenderer.text("RNG Drops", PADDING, PADDING - 1f, HEADER_SIZE, theme.textPrimary)
-      NVGRenderer.rect(PADDING, HEADER_Y + 14f, rowWidth, 1f, withAlpha(theme.accentSecondary, 72))
+      NVGRenderer.rect(PADDING, HEADER_Y + 14f, rowWidth, 1f, ThemeGradient.withAlpha(theme.accentSecondary, 72))
 
       var y = HEADER_Y + 22f
       lines.forEach { entry ->
@@ -266,10 +267,6 @@ object RngDropDisplayModule : Module("RNG Drop Display") {
       if (NVGRenderer.textWidth(candidate, size) <= maxWidth) return candidate
     }
     return "..."
-  }
-
-  private fun withAlpha(color: Int, alpha: Int): Int {
-    return (alpha.coerceIn(0, 255) shl 24) or (color and 0x00FFFFFF)
   }
 
   private const val PADDING = 10f

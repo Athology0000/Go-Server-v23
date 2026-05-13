@@ -2313,17 +2313,11 @@ object CombatMacroModule : Module("Combat Macro") {
     return true
   }
 
+  @Suppress("UNUSED_PARAMETER")
   private fun readScoreboardSidebarLines(level: ClientLevel?): List<String> {
-    val liveLevel = level ?: return emptyList()
-    val scoreboard = liveLevel.scoreboard
-    val objective = scoreboard.getDisplayObjective(DisplaySlot.SIDEBAR) ?: return emptyList()
-    return scoreboard.listPlayerScores(objective)
-      .mapNotNull { score ->
-        val ownerName = score.owner()
-        val team = scoreboard.getPlayersTeam(ownerName)
-        val raw = if (team != null) team.playerPrefix.string + ownerName + team.playerSuffix.string else ownerName
-        ChatFormatting.stripFormatting(raw)?.lowercase(Locale.ROOT)?.trim()
-      }
+    if (level == null) return emptyList()
+    return org.cobalt.api.util.ScoreboardUtils.sidebarLines()
+      .map { it.lowercase(Locale.ROOT).trim() }
       .filter { it.isNotBlank() }
   }
 

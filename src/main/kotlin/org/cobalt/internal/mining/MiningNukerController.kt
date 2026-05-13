@@ -369,17 +369,9 @@ internal object MiningNukerController {
     return cachedPowderArea
   }
 
-  private fun readScoreboardLines(level: net.minecraft.world.level.Level): List<String> {
-    val scoreboard = level.scoreboard
-    val objective = scoreboard.getDisplayObjective(DisplaySlot.SIDEBAR) ?: return emptyList()
-
-    return scoreboard.listPlayerScores(objective).mapNotNull { score ->
-      val ownerName = score.owner()
-      val team = scoreboard.getPlayersTeam(ownerName)
-      val raw = if (team != null) team.playerPrefix.string + ownerName + team.playerSuffix.string else ownerName
-      stripFormatting(raw).takeIf { it.isNotBlank() }
-    }
-  }
+  @Suppress("UNUSED_PARAMETER")
+  private fun readScoreboardLines(level: net.minecraft.world.level.Level): List<String> =
+    org.cobalt.api.util.ScoreboardUtils.sidebarLines().filter { it.isNotBlank() }
 
   private fun isNearPlayer(pos: BlockPos, maxDistanceSq: Double): Boolean {
     return distanceToBlockSq(pos) <= maxDistanceSq

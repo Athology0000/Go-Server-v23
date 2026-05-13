@@ -11,8 +11,10 @@ import org.cobalt.api.hud.hudElement
 import org.cobalt.api.module.Module
 import org.cobalt.api.module.ModuleCategory
 import org.cobalt.api.module.setting.impl.CheckboxSetting
+import org.cobalt.api.module.setting.impl.ModeSetting
 import org.cobalt.api.module.setting.impl.SliderSetting
 import org.cobalt.api.ui.theme.ThemeManager
+import org.cobalt.api.ui.theme.ThemeSurface
 import org.cobalt.api.util.ui.NVGRenderer
 
 object LagDetectorModule : Module("Lag Detector") {
@@ -36,12 +38,30 @@ object LagDetectorModule : Module("Lag Detector") {
     50.0,
   )
 
+  private val displayUnit = ModeSetting(
+    "Display Unit",
+    "Choose whether the lag timer is shown in milliseconds or seconds.",
+    0,
+    arrayOf("Milliseconds", "Seconds"),
+  )
+
+  private val useTheme = CheckboxSetting(
+    "Use Theme",
+    "Use the active Cobalt theme for the lag detector HUD colors.",
+    true,
+  )
+
   private var lastServerTickMs = 0L
 
   val lagHud = hudElement("lag-detector", "Lag Detector", "Shows server tick delay.") {
     anchor = HudAnchor.TOP_CENTER
     offsetY = 72f
     scale = 1f
+
+    setting(enabled)
+    setting(thresholdMs)
+    setting(displayUnit)
+    setting(useTheme)
 
     width { currentText()?.let { NVGRenderer.textWidth(it, 15f) + 22f } ?: 76f }
     height { 27f }
@@ -50,14 +70,21 @@ object LagDetectorModule : Module("Lag Detector") {
       val text = currentText() ?: return@render
       val w = NVGRenderer.textWidth(text, 15f) + 22f
       val theme = ThemeManager.currentTheme
-      NVGRenderer.rect(x, y, w, 27f, theme.overlay, 5f)
-      NVGRenderer.rect(x, y, 3f, 27f, 0xFFFF5555.toInt(), 2f)
-      NVGRenderer.text(text, x + 11f, y + 6f, 15f, 0xFFFF7777.toInt())
+      val backgroundColor = if (useTheme.value) ThemeSurface.withAlpha(theme.panel, 0xE6) else 0xCC000000.toInt()
+      val accentColor = if (useTheme.value) theme.errorIcon else 0xFFFF5555.toInt()
+      val textColor = if (useTheme.value) theme.errorIcon else 0xFFFF7777.toInt()
+
+      NVGRenderer.rect(x, y, w, 27f, backgroundColor, 5f)
+      if (useTheme.value) {
+        NVGRenderer.hollowRect(x, y, w, 27f, 1f, theme.errorBorder, 5f)
+      }
+      NVGRenderer.rect(x, y, 3f, 27f, accentColor, 2f)
+      NVGRenderer.text(text, x + 11f, y + 6f, 15f, textColor)
     }
   }
 
   init {
-    addSetting(enabled, thresholdMs)
+    addSetting(enabled, thresholdMs, displayUnit, useTheme)
     EventBus.register(this)
   }
 
@@ -72,6 +99,10 @@ object LagDetectorModule : Module("Lag Detector") {
     if (!enabled.value || mc.player == null || mc.level == null || lastServerTickMs == 0L) return null
     val elapsed = System.currentTimeMillis() - lastServerTickMs
     if (elapsed <= thresholdMs.value.toLong()) return null
-    return String.format(Locale.US, "%dms", elapsed)
+    return if (displayUnit.value == 1) {
+      String.format(Locale.US, "%.2fs", elapsed / 1000.0)
+    } else {
+      String.format(Locale.US, "%dms", elapsed)
+    }
   }
 }

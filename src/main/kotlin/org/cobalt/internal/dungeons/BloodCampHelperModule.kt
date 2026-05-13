@@ -437,9 +437,9 @@ object BloodCampHelperModule : Module("Blood Camp Helper") {
     return ChatFormatting.stripFormatting(text) ?: text
   }
 
+  @Suppress("UNUSED_PARAMETER")
   private fun isInDungeon(level: ClientLevel): Boolean {
-    val scoreboard = level.scoreboard
-    val objective = scoreboard.getDisplayObjective(DisplaySlot.SIDEBAR) ?: return false
+    val objective = org.cobalt.api.util.ScoreboardUtils.sidebarObjective() ?: return false
 
     val allText = StringBuilder()
     val display = objective.displayName.string
@@ -448,17 +448,8 @@ object BloodCampHelperModule : Module("Blood Camp Helper") {
     }
 
     try {
-      val scores = scoreboard.listPlayerScores(objective)
-      for (score in scores) {
-        val ownerName = score.owner()
-        val team = scoreboard.getPlayersTeam(ownerName)
-        val lineText =
-          if (team != null) {
-            team.playerPrefix.string + ownerName + team.playerSuffix.string
-          } else {
-            ownerName
-          }
-        allText.append(lineText).append(' ')
+      for (line in org.cobalt.api.util.ScoreboardUtils.sidebarLines()) {
+        allText.append(line).append(' ')
       }
     } catch (_: Exception) {
     }

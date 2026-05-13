@@ -852,53 +852,10 @@ object CommissionMacroModule : Module("Commission Macro") {
     return 0.0
   }
 
-  private fun readTabLines(): List<String> {
-    val connection = mc.connection ?: return emptyList()
-    return try {
-      resolveTabEntries(connection)
-        .mapNotNull { resolveEntryDisplayName(it) }
-        .map { ChatFormatting.stripFormatting(it)?.trim() ?: it.trim() }
-        .filter { it.isNotBlank() }
-    } catch (_: Exception) {
-      emptyList()
-    }
-  }
-
-  private fun resolveTabEntries(connection: Any): List<Any> {
-    for (name in listOf("listPlayerEntries", "getListedOnlinePlayers", "getOnlinePlayers")) {
-      val method = connection.javaClass.methods.firstOrNull { it.name == name && it.parameterCount == 0 } ?: continue
-      val result = runCatching { method.invoke(connection) }.getOrNull() ?: continue
-      when (result) {
-        is Collection<*> -> return result.filterNotNull()
-        is Iterable<*> -> return result.filterNotNull()
-      }
-    }
-    return emptyList()
-  }
-
-  private fun resolveEntryDisplayName(entry: Any): String? {
-    for (name in listOf("getTabListDisplayName", "tabListDisplayName", "getDisplayName", "displayName")) {
-      val method = entry.javaClass.methods.firstOrNull { it.name == name && it.parameterCount == 0 } ?: continue
-      val text = coerceText(runCatching { method.invoke(entry) }.getOrNull())
-      if (!text.isNullOrBlank()) return text
-    }
-    for (name in listOf("getProfile", "getGameProfile", "profile")) {
-      val method = entry.javaClass.methods.firstOrNull { it.name == name && it.parameterCount == 0 } ?: continue
-      val profile = runCatching { method.invoke(entry) }.getOrNull() ?: continue
-      val nm = profile.javaClass.methods.firstOrNull { it.name == "getName" && it.parameterCount == 0 } ?: continue
-      val value = runCatching { nm.invoke(profile) as? String }.getOrNull()
-      if (!value.isNullOrBlank()) return value
-    }
-    return null
-  }
-
-  private fun coerceText(value: Any?): String? {
-    if (value == null) return null
-    if (value is String) return value
-    val method = value.javaClass.methods.firstOrNull { it.name == "getString" && it.parameterCount == 0 }
-    val raw = method?.let { runCatching { it.invoke(value) }.getOrNull() }
-    return if (raw is String) raw else value.toString()
-  }
+  private fun readTabLines(): List<String> =
+    org.cobalt.api.util.TabListUtils.displayNames()
+      .map { it.trim() }
+      .filter { it.isNotBlank() }
 
   private fun detectAreaFromTabList(): String? {
     val areaNames = listOf("Dwarven Mines", "Crystal Hollows", "Glacite Tunnels", "Forge")

@@ -302,7 +302,7 @@ class WatermarkModule : Module("Watermark") {
         y + MAIN_BAR_HEIGHT - 0.5f,
         width - 28f,
         1f,
-        withAlpha(accent, (28f + 42f * macroExpand).toInt()),
+        ThemeGradient.withAlpha(accent, (28f + 42f * macroExpand).toInt()),
         0.5f,
       )
     }
@@ -339,14 +339,14 @@ class WatermarkModule : Module("Watermark") {
         x + width - 34f,
         y + totalHeight - 18f,
         9f,
-        withAlpha(theme.accentSecondary, (8f + 12f * macroExpand).toInt()),
+        ThemeGradient.withAlpha(theme.accentSecondary, (8f + 12f * macroExpand).toInt()),
       )
     }
   }
 
   private fun renderBadge(cx: Float, cy: Float, size: Float, accent: Int, brand: String) {
     val radius = size / 2f
-    val ringColor = withAlpha(accent, 90)
+    val ringColor = ThemeGradient.withAlpha(accent, 90)
     val innerColor = 0xA6221D26u.toInt()
     val initial = brand.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "C"
 
@@ -398,11 +398,11 @@ class WatermarkModule : Module("Watermark") {
     val glowAlpha = (22f + pulse * 22f).toInt()
     val shimmerAlpha = (12f + pulse * 14f).toInt()
 
-    NVGRenderer.text(text, x - 0.7f, y, size, withAlpha(glowColor, glowAlpha))
-    NVGRenderer.text(text, x + 0.7f, y, size, withAlpha(glowColor, glowAlpha))
-    NVGRenderer.text(text, x, y - 0.7f, size, withAlpha(glowColor, glowAlpha))
-    NVGRenderer.text(text, x, y + 0.7f, size, withAlpha(glowColor, glowAlpha))
-    NVGRenderer.text(text, x, y - 0.1f, size, withAlpha(WHITE_TEXT, shimmerAlpha))
+    NVGRenderer.text(text, x - 0.7f, y, size, ThemeGradient.withAlpha(glowColor, glowAlpha))
+    NVGRenderer.text(text, x + 0.7f, y, size, ThemeGradient.withAlpha(glowColor, glowAlpha))
+    NVGRenderer.text(text, x, y - 0.7f, size, ThemeGradient.withAlpha(glowColor, glowAlpha))
+    NVGRenderer.text(text, x, y + 0.7f, size, ThemeGradient.withAlpha(glowColor, glowAlpha))
+    NVGRenderer.text(text, x, y - 0.1f, size, ThemeGradient.withAlpha(WHITE_TEXT, shimmerAlpha))
     NVGRenderer.text(text, x, y, size, color)
   }
 
@@ -421,7 +421,7 @@ class WatermarkModule : Module("Watermark") {
     NVGRenderer.globalAlpha(contentAlpha)
 
     val headerY = y + PANEL_PAD_Y
-    NVGRenderer.circle(x + PANEL_PAD_X + 3f, headerY + 5.5f, 2.5f, withAlpha(accent, 176))
+    NVGRenderer.circle(x + PANEL_PAD_X + 3f, headerY + 5.5f, 2.5f, ThemeGradient.withAlpha(accent, 176))
     NVGRenderer.text("ACTIVE MACROS", x + PANEL_PAD_X + 11f, headerY, HEADER_TITLE_SIZE, MUTED_TEXT)
     renderHeaderPill(
       rightX = x + width - PANEL_PAD_X,
@@ -459,8 +459,8 @@ class WatermarkModule : Module("Watermark") {
 
     NVGRenderer.text(label, x, y + 1f, ROW_LABEL_SIZE, WHITE_TEXT)
 
-    NVGRenderer.rect(pillX, y - 2f, pillWidth, 15f, withAlpha(accent, 18), 7f)
-    NVGRenderer.hollowRect(pillX, y - 2f, pillWidth, 15f, 1f, withAlpha(accent, 78), 7f)
+    NVGRenderer.rect(pillX, y - 2f, pillWidth, 15f, ThemeGradient.withAlpha(accent, 18), 7f)
+    NVGRenderer.hollowRect(pillX, y - 2f, pillWidth, 15f, 1f, ThemeGradient.withAlpha(accent, 78), 7f)
     NVGRenderer.text(
       row.keybind,
       pillX + (pillWidth - NVGRenderer.textWidth(row.keybind, KEY_PILL_TEXT_SIZE)) / 2f,
@@ -473,8 +473,8 @@ class WatermarkModule : Module("Watermark") {
   private fun renderHeaderPill(rightX: Float, y: Float, text: String, accent: Int) {
     val pillWidth = NVGRenderer.textWidth(text, KEY_PILL_TEXT_SIZE) + 14f
     val pillX = rightX - pillWidth
-    NVGRenderer.rect(pillX, y, pillWidth, 15f, withAlpha(accent, 16), 7f)
-    NVGRenderer.hollowRect(pillX, y, pillWidth, 15f, 1f, withAlpha(accent, 72), 7f)
+    NVGRenderer.rect(pillX, y, pillWidth, 15f, ThemeGradient.withAlpha(accent, 16), 7f)
+    NVGRenderer.hollowRect(pillX, y, pillWidth, 15f, 1f, ThemeGradient.withAlpha(accent, 72), 7f)
     NVGRenderer.text(
       text,
       pillX + (pillWidth - NVGRenderer.textWidth(text, KEY_PILL_TEXT_SIZE)) / 2f,
@@ -644,10 +644,6 @@ class WatermarkModule : Module("Watermark") {
       if (NVGRenderer.textWidth(candidate, size) <= maxWidth) return candidate
     }
     return "..."
-  }
-
-  private fun withAlpha(color: Int, alpha: Int): Int {
-    return ((alpha.coerceIn(0, 255) shl 24) or (color and 0x00FFFFFF))
   }
 
   private fun sampleFrameRate() {

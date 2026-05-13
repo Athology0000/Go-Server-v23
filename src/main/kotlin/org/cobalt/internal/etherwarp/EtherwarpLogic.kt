@@ -176,18 +176,8 @@ object EtherwarpLogic {
     return Pair(result.angles[0], result.angles[1])
   }
 
-  fun findEtherwarpHotbarSlot(): Int {
-    val player = mc.player ?: return -1
-    val inventory = player.inventory
-    for (i in 0..8) {
-      val stack = inventory.getItem(i)
-      if (stack.isEmpty) continue
-      if (isEtherwarpStack(stack)) {
-        return i
-      }
-    }
-    return -1
-  }
+  fun findEtherwarpHotbarSlot(): Int =
+    org.cobalt.api.util.InventoryUtils.findHotbarSlotMatching { isEtherwarpStack(it) }
 
   fun getEtherwarpRange(): Int {
     val player = mc.player ?: return 57
