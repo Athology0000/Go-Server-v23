@@ -48,15 +48,14 @@ internal fun MiningMacroModule.selectMineTarget(
     // When out of range, fall through and re-select the nearest block every tick so the
     // macro always approaches the closest available block first.
     if (inAttackRange) {
-      val hasLos = !REQUIRE_MINE_LOS || hasLineOfSight(level, player, sticky)
-      if (hasLos) {
+      // Use the same aim-point LOS standard the rotation actually needs — a
+      // center-to-center hasLineOfSight can pass while every usable face is
+      // occluded, leaving the macro to stare through a block. If no visible
+      // aim point exists from the current eye position, abandon sticky so the
+      // selector either picks a different block or triggers movement.
+      val visible = !REQUIRE_MINE_LOS || findVisibleAimPoint(level, player, player.eyePosition, sticky) != null
+      if (visible) {
         currentTargetNoLosTicks = 0
-        return sticky
-      }
-
-      val stickyRange = mineRange.value + TARGET_STICKY_RANGE_EXTRA
-      if (distSq <= stickyRange * stickyRange && currentTargetNoLosTicks < TARGET_LOS_GRACE_TICKS) {
-        currentTargetNoLosTicks++
         return sticky
       }
     }
@@ -92,7 +91,14 @@ internal fun MiningMacroModule.selectMineTarget(
     val eyeDistSq = dx * dx + dy * dy + dz * dz
     val ang = angularDistanceTo(player, aimPoint).toDouble()
     val anglePenalty = (ang / 90.0) * (ang / 90.0) * 1.5
-    val score = eyeDistSq + anglePenalty
+    // Pitch penalty: blocks that require steep up/down look produce
+    // unstable raycasts (face edges align poorly) and are slower for the
+    // smoother to settle on. Penalty grows past ~45° pitch.
+    val pitchAbs = kotlin.math.abs(
+      Math.toDegrees(kotlin.math.atan2(dy, kotlin.math.sqrt(dx * dx + dz * dz)))
+    )
+    val pitchPenalty = if (pitchAbs > 45.0) ((pitchAbs - 45.0) / 45.0).let { it * it * 1.2 } else 0.0
+    val score = eyeDistSq + anglePenalty + pitchPenalty
     if (score < bestScore) {
       bestScore = score
       bestInRange = pos

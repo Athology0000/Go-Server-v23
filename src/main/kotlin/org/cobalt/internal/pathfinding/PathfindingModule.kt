@@ -173,6 +173,12 @@ object PathfindingModule : Module("Pathfinding") {
     false
   )
 
+  private val rollingFootPath = CheckboxSetting(
+    "Rolling Foot Path",
+    "Render a transparent tile on the floor of every block the path walks on. Behind the cursor = blocks already walked, ahead = blocks the path will attempt. Alpha tapers with distance from the cursor for a rolling effect.",
+    false
+  )
+
   private val weightMapRadius = SliderSetting(
     "Weight Map Radius",
     "Horizontal sample radius around each path node when rendering the weight heatmap.",
@@ -471,6 +477,7 @@ object PathfindingModule : Module("Pathfinding") {
       cacheHudShowGrid,
       movementDebugRender,
       weightMapRender,
+      rollingFootPath,
       weightMapRadius,
       movementDebugRange,
       movementDebugCandidateRadius,
@@ -686,6 +693,11 @@ object PathfindingModule : Module("Pathfinding") {
       renderWeightMap(level, nodes)
     }
 
+    OverlayRenderEngine.clearTag("path-foot")
+    if (rollingFootPath.value && nodes.isNotEmpty()) {
+      renderRollingFootPath(level, nodes, NativePathfinder.pathNodeCursor)
+    }
+
     renderLookaheadSpline(level)
   }
 
@@ -730,9 +742,69 @@ object PathfindingModule : Module("Pathfinding") {
           0.9f,
           durationTicks = 4,
           tag = "path-weights",
-          forceRender = false,
+          forceRender = true,
         )
       }
+    }
+  }
+
+  /**
+   * Rolling foot-path overlay. For each node along the path, paint a flat
+   * fill tile on top of the floor (block below the node) with no outline.
+   * Nodes behind the cursor render with a "walked" color; nodes at and ahead
+   * of the cursor render with an "attempting" color. Alpha tapers with
+   * distance from the cursor so the trail fades in/out as the player moves.
+   */
+  private fun renderRollingFootPath(
+    level: net.minecraft.world.level.Level,
+    nodes: List<net.minecraft.world.phys.Vec3>,
+    cursor: Int,
+  ) {
+    if (nodes.isEmpty()) return
+    val clampedCursor = cursor.coerceIn(0, nodes.size - 1)
+    val falloff = 12.0  // nodes; how quickly the trail fades from cursor
+    val tileHeight = 0.02
+    val inset = 0.03
+
+    val seen = HashSet<Long>(nodes.size)
+    for (i in nodes.indices) {
+      val v = nodes[i]
+      val bx = kotlin.math.floor(v.x).toInt()
+      val by = kotlin.math.floor(v.y).toInt()
+      val bz = kotlin.math.floor(v.z).toInt()
+      // Coalesce repeated nodes onto the same floor block — common when the
+      // path lingers at the same cell across a few cached samples.
+      val key = net.minecraft.core.BlockPos.asLong(bx, by, bz)
+      if (!seen.add(key)) continue
+
+      val offset = i - clampedCursor
+      val falloffT = (kotlin.math.abs(offset).toDouble() / falloff).coerceIn(0.0, 1.0)
+      val alphaScale = (1.0 - falloffT * 0.75)
+      val baseAlpha = (160.0 * alphaScale).toInt().coerceIn(28, 200)
+
+      val color = if (offset < 0) {
+        // Walked — soft green.
+        OverlayRenderEngine.Color(110, 235, 140, baseAlpha)
+      } else if (offset == 0) {
+        // Current cursor — bright white for emphasis.
+        OverlayRenderEngine.Color(255, 255, 255, (baseAlpha + 30).coerceAtMost(220))
+      } else {
+        // Attempting — soft cyan.
+        OverlayRenderEngine.Color(80, 200, 255, baseAlpha)
+      }
+
+      val floorY = by.toDouble()
+      OverlayRenderEngine.addBox(
+        level,
+        bx + inset, floorY, bz + inset,
+        bx + 1.0 - inset, floorY + tileHeight, bz + 1.0 - inset,
+        color,
+        null,
+        0f,
+        durationTicks = 3,
+        tag = "path-foot",
+        forceRender = true,
+      )
     }
   }
 

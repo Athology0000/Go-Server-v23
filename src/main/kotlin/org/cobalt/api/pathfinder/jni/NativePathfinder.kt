@@ -17,6 +17,7 @@ import org.cobalt.internal.pathfinding.DebugLog
 import org.cobalt.internal.pathfinding.PathRecoveryController
 import org.cobalt.internal.pathfinding.PathTeleportConfig
 import org.cobalt.internal.pathfinding.TeleportValidationController
+import org.cobalt.internal.rotation.CobaltRotation
 import org.cobalt.internal.skyblock.HypixelManager
 import java.util.Locale
 import java.util.concurrent.ExecutorService
@@ -1435,5 +1436,13 @@ object NativePathfinder {
         PathFlyMovementController.reset()
         MovementManager.setLookLock(false)
         RotationExecutor.stopIfUsing(PathfinderRotationStrategy)
+        // Soft-release the block rotation controller too. Without this, the
+        // direct-target writes PathCommand.drivePathRotation() made each tick
+        // leave the camera locked on the last path aim after the path ends.
+        if (PathExecutorState.blockRotationOwned) {
+            CobaltRotation.blockController.releaseWhenSettled(maxFrames = 20)
+            PathExecutorState.blockRotationOwned = false
+            PathExecutorState.blockRotationLastTarget = null
+        }
     }
 }

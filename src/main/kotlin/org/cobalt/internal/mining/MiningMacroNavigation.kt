@@ -895,18 +895,32 @@ internal fun MiningMacroModule.buildAirFacingAimPoints(
   val center = Vec3(cx, cy, cz)
   val eyeRelative = eye.subtract(center)
 
-  val usable = faces.filter { (_, dir, normal) ->
-    // 1. The face must be physically exposed (adjacent cell is air).
+  val eyeLen = kotlin.math.sqrt(
+    eyeRelative.x * eyeRelative.x +
+      eyeRelative.y * eyeRelative.y +
+      eyeRelative.z * eyeRelative.z
+  ).coerceAtLeast(1.0e-4)
+
+  // Score each candidate face by both squareness (cos of angle between face
+  // normal and eye-to-block) AND distance. Squareness dominates so we don't
+  // pick a face the camera is nearly grazing — those produce sub-pixel aim
+  // points that often miss when rotation smoothing settles slightly off.
+  val usable = faces.mapNotNull { (point, dir, normal) ->
     mp.set(target.x + dir.stepX, target.y + dir.stepY, target.z + dir.stepZ)
-    if (!level.getBlockState(mp).isAir) return@filter false
-    // 2. The face must be on the eye's side of the block. Otherwise the LOS
-    //    ray enters the target through a different face first and the
-    //    crosshair lands on a face we can't actually hit. Use a small bias
-    //    (0.05) so glancing faces don't sneak through.
-    val dot = normal.x * eyeRelative.x + normal.y * eyeRelative.y + normal.z * eyeRelative.z
-    dot > 0.05
+    if (!level.getBlockState(mp).isAir) return@mapNotNull null
+    val rawDot = normal.x * eyeRelative.x + normal.y * eyeRelative.y + normal.z * eyeRelative.z
+    val cos = rawDot / eyeLen
+    // Require at least ~17° away from grazing (cos > 0.30). Tighter than the
+    // previous 0.05 epsilon — a face that's only 3° off the silhouette is
+    // technically visible but lands on a 1-pixel sliver.
+    if (cos < 0.30) return@mapNotNull null
+    Triple(point, cos, point.distanceToSqr(eye))
   }
-  return usable.sortedBy { it.first.distanceToSqr(eye) }.map { it.first }
+
+  // Sort: squareness first (descending), distance second (ascending) as tiebreak.
+  return usable
+    .sortedWith(compareByDescending<Triple<Vec3, Double, Double>> { it.second }.thenBy { it.third })
+    .map { it.first }
 }
 
 internal fun MiningMacroModule.findVisibleAimPoint(

@@ -84,6 +84,17 @@ object PathExecutorState {
     // ── Per-update LOS cache ──
     private val losCache = HashMap<Long, Boolean>(64)
 
+    // ── Keynode override state ──
+    // Current keynode (rotation pin) — null when the override is disengaged.
+    var currentKeynodePoint: Vec3? = null
+        private set
+    private var keynodeBlockedTicks: Int = 0
+    private var keynodeClearTicks: Int = 0
+    // Tracks the spline distance the keynode currently sits at, so the same
+    // keynode can be re-selected next tick without rescanning when conditions
+    // haven't materially changed.
+    private var keynodeSplineDistance: Double = 0.0
+
     // ── Adjustable lookahead (set from PathfindingModule settings) ──
     // Base "far" distance the lookahead point sits ahead of the player on the spline.
     @JvmField var lookaheadDistanceFar: Double = 9.0
@@ -210,6 +221,26 @@ object PathExecutorState {
     private const val NON_CHANGE_PATH_DELTA = 0.45
     private const val NON_CHANGE_TICKS_THRESHOLD = 35
 
+    // ── Walkable keynode override ──
+    // After the spline lookahead picks an aim point, we verify a clear walk-line
+    // from the player's foot position to it at two probe heights (above 1-block
+    // step-up so single-step terrain isn't rejected). If the walk-line is
+    // blocked the aim point is treated as "past a wall" and backed off along
+    // the spline until the line clears — the resulting point is the keynode.
+    // Intermediate spline nodes between the player and the keynode are treated
+    // as movement suggestions; the rotation pins to the keynode. Spacing falls
+    // out of the scan: the keynode is the farthest walkable spline point.
+    private const val KEYNODE_PROBE_LOW = 1.15
+    private const val KEYNODE_PROBE_HIGH = 1.55
+    private const val KEYNODE_BACKOFF_STEP = 0.45
+    private const val KEYNODE_MIN_SPACING = 1.2
+    // Sticky hysteresis. The keynode override is only allowed to *engage*
+    // (back off the aim) after N consecutive ticks of blocked walk-line, and
+    // only allowed to *disengage* after N consecutive ticks of clear walk-line.
+    // This kills tick-to-tick flicker that the rotation smoother can't absorb.
+    private const val KEYNODE_ENGAGE_HYSTERESIS = 2
+    private const val KEYNODE_DISENGAGE_HYSTERESIS = 4
+
     // =========================================================================
     // Public API
     // =========================================================================
@@ -245,6 +276,10 @@ object PathExecutorState {
         nonChangeBestPathPosition = null
         nonChangeTicks = 0
         losCache.clear()
+        currentKeynodePoint = null
+        keynodeBlockedTicks = 0
+        keynodeClearTicks = 0
+        keynodeSplineDistance = 0.0
     }
 
     fun onTeleportTriggered(targetPathPosition: Double? = null) {
@@ -557,7 +592,24 @@ object PathExecutorState {
             maxPos = spline.totalLength,
             level = level,
         ) else null
-        val r = blended ?: rotationTo(eye, targetPoint)
+        val rawRotation = blended ?: rotationTo(eye, targetPoint)
+
+        // Keynode override. If the walk-line from the player's foot to the
+        // spline aim point is blocked at body height, the rotation is aiming
+        // through (or past) a wall — the "walking into a wall while looking
+        // sideways" symptom. Back off the aim along the spline until the
+        // walk-line clears; that closer point becomes the keynode and the
+        // rotation re-pins to it. When the walk-line is already clear (the
+        // common case in open corridors) the override is a no-op.
+        val r = if (level != null) {
+            val keynode = selectKeynode(player, level, spline, targetPoint)
+            if (keynode !== targetPoint && keynode !== currentTargetPoint) {
+                currentTargetPoint = keynode
+                rotationTo(eye, keynode)
+            } else {
+                rawRotation
+            }
+        } else rawRotation
         val remainingPath = spline.totalLength - currentSplineDistance
         val finishFactor = if (remainingPath < 4.0) maxOf(0.25, remainingPath / 4.0) else 1.0
         val isStraight = pathCurvature < 0.15
@@ -1068,6 +1120,107 @@ object PathExecutorState {
         val close = maxOf(RECOVERY_MIN_LOOKAHEAD, MIN_LOOKAHEAD - 0.2)
         val point = spline.sample(minOf(spline.totalLength, currentSplineDistance + close))
         return FindResult(point, close, isPointVisible(eye, point, level))
+    }
+
+    /**
+     * Checks whether a horizontal straight line from [fromFoot] to [toFoot] is
+     * walkable — i.e. not crossed by any solid block at torso/head height.
+     * Probe heights are above 1-block step-up so single-step terrain doesn't
+     * trigger a false block. The vertical (foot Y) of the probes follows the
+     * player's foot height, not the candidate's — we're testing what stops the
+     * *body* moving in that direction, not what blocks an arbitrary aim ray.
+     */
+    private fun isWalkLineClear(
+        level: Level,
+        player: LocalPlayer,
+        fromFoot: Vec3,
+        toFoot: Vec3,
+    ): Boolean {
+        val dx = toFoot.x - fromFoot.x
+        val dz = toFoot.z - fromFoot.z
+        if (dx * dx + dz * dz < 0.04) return true
+        val probeOffsets = doubleArrayOf(KEYNODE_PROBE_LOW, KEYNODE_PROBE_HIGH)
+        for (off in probeOffsets) {
+            val from = Vec3(fromFoot.x, fromFoot.y + off, fromFoot.z)
+            val to = Vec3(toFoot.x, fromFoot.y + off, toFoot.z)
+            val clip = try {
+                level.clip(ClipContext(from, to, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player))
+            } catch (_: Exception) { return true }
+            if (clip.type == HitResult.Type.BLOCK) return false
+        }
+        return true
+    }
+
+    /**
+     * Walkable keynode selector. If the walk-line from the player's foot to
+     * [proposedAim] is clear at torso/head height, returns [proposedAim] (no
+     * override needed — the existing spline lookahead is already valid). If
+     * blocked, backs off along the spline toward the player until the walk-line
+     * clears, and returns that point as the keynode. Engage/disengage
+     * hysteresis prevents the override from flickering tick-to-tick.
+     *
+     * Spacing: the backoff scan uses [KEYNODE_BACKOFF_STEP] granularity and
+     * stops [KEYNODE_MIN_SPACING] blocks ahead of the player at minimum, so
+     * the keynode is never placed *behind* or *on top of* the player.
+     */
+    private fun selectKeynode(
+        player: LocalPlayer,
+        level: Level,
+        spline: SplinePath,
+        proposedAim: Vec3,
+    ): Vec3 {
+        val playerFoot = Vec3(player.x, player.y, player.z)
+        val proposedFoot = Vec3(proposedAim.x, player.y, proposedAim.z)
+
+        // Cheap-pass: if the proposed aim is already walkable, just take it.
+        // The keynode override only engages after KEYNODE_ENGAGE_HYSTERESIS
+        // ticks of sustained blockage — short flashes from a single-tile lip
+        // or a moving entity shouldn't pull the rotation around.
+        val proposedClear = isWalkLineClear(level, player, playerFoot, proposedFoot)
+        if (proposedClear) {
+            keynodeBlockedTicks = 0
+            if (currentKeynodePoint != null) {
+                keynodeClearTicks++
+                if (keynodeClearTicks >= KEYNODE_DISENGAGE_HYSTERESIS) {
+                    currentKeynodePoint = null
+                    keynodeSplineDistance = 0.0
+                }
+            }
+            return currentKeynodePoint ?: proposedAim
+        }
+        keynodeClearTicks = 0
+        keynodeBlockedTicks++
+        if (keynodeBlockedTicks < KEYNODE_ENGAGE_HYSTERESIS) {
+            return currentKeynodePoint ?: proposedAim
+        }
+
+        // Engaged — back off along the spline until the walk-line clears.
+        val minDist = currentSplineDistance + KEYNODE_MIN_SPACING
+        val proposedDist = run {
+            val proj = spline.project(
+                point = proposedAim,
+                hintDistance = currentSplineDistance,
+                searchBack = 0.0,
+                searchForward = spline.totalLength,
+                horizontalOnly = true,
+            )
+            proj.distance.coerceIn(minDist, spline.totalLength)
+        }
+        var probe = proposedDist
+        while (probe >= minDist) {
+            val candidate = spline.sample(probe)
+            val candidateFoot = Vec3(candidate.x, player.y, candidate.z)
+            if (isWalkLineClear(level, player, playerFoot, candidateFoot)) {
+                currentKeynodePoint = candidate
+                keynodeSplineDistance = probe
+                return candidate
+            }
+            probe -= KEYNODE_BACKOFF_STEP
+        }
+        // Nothing along the spline is walkable from here. Hold the previous
+        // keynode if we had one (rotation freezes rather than flailing); the
+        // movement layer's stuck-detector handles the actual recovery.
+        return currentKeynodePoint ?: proposedAim
     }
 
     private fun isPointVisible(from: Vec3, to: Vec3, level: net.minecraft.world.level.Level): Boolean {

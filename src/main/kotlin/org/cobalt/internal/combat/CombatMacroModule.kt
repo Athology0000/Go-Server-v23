@@ -17,6 +17,7 @@ import net.minecraft.core.BlockPos
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.decoration.ArmorStand
 import net.minecraft.world.entity.player.Player
+import net.minecraft.world.phys.Vec3
 import org.cobalt.api.event.EventBus
 import org.cobalt.api.event.annotation.SubscribeEvent
 import org.cobalt.api.event.impl.client.ChatEvent
@@ -742,6 +743,15 @@ object CombatMacroModule : Module("Combat Macro") {
   private var automationBypassWhitelist = false
   private var closeChaseActive = false
   private var closeChaseTargetId: UUID? = null
+  private var combatAimTargetId: UUID? = null
+  private var combatAimMode = -1
+  private var combatAimXFraction = 0.5
+  private var combatAimYFraction = 0.68
+  private var combatAimZFraction = 0.5
+  private var oneTapFocusTargetId: UUID? = null
+  private var oneTapFocusStartTick = -1L
+  private var oneTapAlignedSinceTick = -1L
+  private val oneTapSkipUntilTickById = HashMap<UUID, Long>()
   private var lastPathStartTick = 0L
   private var killCandidateId: UUID? = null
   private var killCandidateName: String? = null
@@ -1359,7 +1369,7 @@ object CombatMacroModule : Module("Combat Macro") {
       applyEmanHitPhaseSneak(target, inAttackRange || inKeepDistanceZone)
     }
 
-    val aimRotation = if (activeCombatMode != 0) rangedAimRotation(player, target, activeCombatMode) else AngleUtils.getRotation(target)
+    val aimRotation = combatAimRotation(player, target, activeCombatMode)
     val spiderHatchlingPhaseTarget =
       shouldUseSpiderPhaseBowCombat() &&
         isSpiderBossHatchlingsPhaseActive(level.gameTime) &&
@@ -1400,7 +1410,14 @@ object CombatMacroModule : Module("Combat Macro") {
       stuckRepathCount = 0
       if (inAttackRange) {
         val keepRangedMomentum = activeCombatMode != 0 && oneTapMode.value && pathActiveNow
-        if (!keepRangedMomentum && !phaseMovementActive) {
+        if (oneTapMode.value && !phaseMovementActive) {
+          RotationExecutor.rotateTo(aimRotation, rotationStrategy)
+          holdStillNoStrafe()
+          if (!prepareOneTapHit(player, target, aimRotation, level.gameTime)) {
+            updateStuck(player, true, level)
+            return
+          }
+        } else if (!keepRangedMomentum && !phaseMovementActive) {
           MovementManager.clearForcedMovement()
         }
         if (!suppressAttack && !delayedByEmanPreSwap && !phaseMovementActive) {
@@ -2486,7 +2503,7 @@ object CombatMacroModule : Module("Combat Macro") {
         if (activeCombatMode != 0) {
           rangedAimRotation(player, target, activeCombatMode)
         } else {
-          AngleUtils.getRotation(target)
+          combatAimRotation(player, target, activeCombatMode)
         }
       RotationExecutor.rotateTo(rotation, rotationStrategy)
       return
@@ -2688,6 +2705,11 @@ object CombatMacroModule : Module("Combat Macro") {
     if (living == player) return false
     if (!living.isAlive) return false
     if (living is Player && mc.connection?.getPlayerInfo(living.uuid) != null) return false
+    val nowTick = mc.level?.gameTime ?: 0L
+    oneTapSkipUntilTickById[living.uuid]?.let { skipUntil ->
+      if (oneTapMode.value && nowTick < skipUntil) return false
+      oneTapSkipUntilTickById.remove(living.uuid)
+    }
     val displayName = normalizedTargetDisplayName(living)
     if (blacklisted.contains(displayName)) return false
     if (nameFilter.isNotEmpty() && !displayName.contains(nameFilter)) return false
@@ -2759,6 +2781,7 @@ object CombatMacroModule : Module("Combat Macro") {
     nextAttackNs = now + delayNs
     MouseUtils.leftClick()
     registerKillCandidate(target)
+    markOneTapTargetConsumed(target)
   }
 
   private fun attemptBowAttack(player: Player, target: LivingEntity) {
@@ -2780,7 +2803,7 @@ object CombatMacroModule : Module("Combat Macro") {
     MouseUtils.rightClick()
     registerKillCandidate(target)
     registerSpiderHatchlingShot(target)
-    if (oneTapMode.value) currentTargetId = null
+    markOneTapTargetConsumed(target)
   }
 
   private fun attemptMageAttack(player: Player, target: LivingEntity) {
@@ -2793,7 +2816,7 @@ object CombatMacroModule : Module("Combat Macro") {
     nextAttackNs = now + (1_000_000_000.0 / cps).toLong()
     MouseUtils.rightClick()
     registerKillCandidate(target)
-    if (oneTapMode.value) currentTargetId = null
+    markOneTapTargetConsumed(target)
   }
 
   private fun isRangedAttackReady(player: Player, target: LivingEntity, activeCombatMode: Int): Boolean {
@@ -2808,6 +2831,86 @@ object CombatMacroModule : Module("Combat Macro") {
     return yawError <= tolerance && pitchError <= tolerance
   }
 
+  private fun combatAimRotation(
+    player: Player,
+    target: LivingEntity,
+    activeCombatMode: Int = combatMode.value
+  ): Rotation {
+    return if (activeCombatMode == 0) {
+      AngleUtils.getRotation(player.eyePosition, combatAimPoint(target, activeCombatMode))
+    } else {
+      rangedAimRotation(player, target, activeCombatMode)
+    }
+  }
+
+  private fun combatAimPoint(target: LivingEntity, activeCombatMode: Int = combatMode.value): Vec3 {
+    if (combatAimTargetId != target.uuid || combatAimMode != activeCombatMode) {
+      combatAimTargetId = target.uuid
+      combatAimMode = activeCombatMode
+      val horizontalTightness = if (activeCombatMode == 0) 0.18 else 0.12
+      combatAimXFraction = 0.5 + randomCentered(horizontalTightness)
+      combatAimZFraction = 0.5 + randomCentered(horizontalTightness)
+      combatAimYFraction =
+        when (activeCombatMode) {
+          1 -> 0.70 + randomCentered(0.08)
+          2 -> 0.64 + randomCentered(0.08)
+          else -> 0.60 + randomCentered(0.10)
+        }
+    }
+
+    val box = target.boundingBox
+    val x = box.minX + (box.maxX - box.minX) * combatAimXFraction.coerceIn(0.32, 0.68)
+    val y = box.minY + (box.maxY - box.minY) * combatAimYFraction.coerceIn(0.42, 0.84)
+    val z = box.minZ + (box.maxZ - box.minZ) * combatAimZFraction.coerceIn(0.32, 0.68)
+    return Vec3(x, y, z)
+  }
+
+  private fun prepareOneTapHit(
+    player: Player,
+    target: LivingEntity,
+    aimRotation: Rotation,
+    nowTick: Long,
+  ): Boolean {
+    if (oneTapFocusTargetId != target.uuid) {
+      oneTapFocusTargetId = target.uuid
+      oneTapFocusStartTick = nowTick
+      oneTapAlignedSinceTick = -1L
+    }
+
+    val yawError = abs(AngleUtils.getRotationDelta(player.yRot, aimRotation.yaw))
+    val pitchError = abs(aimRotation.pitch - player.xRot)
+    val strictTolerance = min(ONE_TAP_MAX_AIM_TOLERANCE, aimTolerance.value * ONE_TAP_TOLERANCE_SCALE)
+      .coerceAtLeast(ONE_TAP_MIN_AIM_TOLERANCE)
+
+    if (yawError <= strictTolerance && pitchError <= strictTolerance) {
+      if (oneTapAlignedSinceTick < 0L) oneTapAlignedSinceTick = nowTick
+    } else {
+      oneTapAlignedSinceTick = -1L
+    }
+
+    val alignedTicks = if (oneTapAlignedSinceTick < 0L) 0L else nowTick - oneTapAlignedSinceTick
+    val focusTicks = nowTick - oneTapFocusStartTick
+    return alignedTicks >= ONE_TAP_ALIGNED_DWELL_TICKS && focusTicks >= ONE_TAP_MIN_FOCUS_TICKS
+  }
+
+  private fun markOneTapTargetConsumed(target: LivingEntity) {
+    if (!oneTapMode.value) return
+    currentTargetId = null
+    resetOneTapFocus()
+    mc.level?.let { level ->
+      oneTapSkipUntilTickById[target.uuid] = level.gameTime + ONE_TAP_TARGET_SKIP_TICKS
+    }
+  }
+
+  private fun resetOneTapFocus() {
+    oneTapFocusTargetId = null
+    oneTapFocusStartTick = -1L
+    oneTapAlignedSinceTick = -1L
+  }
+
+  private fun randomCentered(magnitude: Double): Double =
+    (Math.random() * 2.0 - 1.0) * magnitude
+
   /**
    * Returns the aim rotation for ranged modes, including upward pitch correction for
    * projectile drop/lead. Falls back to standard rotation in melee mode.
@@ -2817,10 +2920,10 @@ object CombatMacroModule : Module("Combat Macro") {
     target: LivingEntity,
     activeCombatMode: Int = combatMode.value
   ): org.cobalt.api.util.helper.Rotation {
-    val base = AngleUtils.getRotation(target)
     if (activeCombatMode == 1 && shouldUseSpiderPhaseBowCombat() && isSpiderBossHatchlingsPhaseActive() && matchesSpiderPhaseTarget(target)) {
       return SpiderSlayerPhase.aimRotation(player, target)
     }
+    val base = AngleUtils.getRotation(player.eyePosition, combatAimPoint(target, activeCombatMode))
     val elevPerBlock = when (activeCombatMode) {
       1    -> bowElevationPerBlock.value
       2    -> mageElevationPerBlock.value
@@ -3379,7 +3482,7 @@ object CombatMacroModule : Module("Combat Macro") {
       standoffMax = attackRange.value + EMAN_HITS_PHASE_STANDOFF_BUFFER
     }
     if (distanceToTarget > standoffMax + EMAN_HITS_PHASE_STANDOFF_HYSTERESIS) return false
-    val rotation = AngleUtils.getRotation(target)
+    val rotation = combatAimRotation(player, target, hitPhaseCombatMode)
     RotationExecutor.rotateTo(rotation, rotationStrategy)
     val yawError = abs(AngleUtils.getRotationDelta(player.yRot, rotation.yaw))
     val aligned = yawError <= EMAN_HITS_PHASE_YAW_TOLERANCE
@@ -4290,7 +4393,7 @@ object CombatMacroModule : Module("Combat Macro") {
   }
 
   private fun handleSoftChaseMovement(player: Player, target: LivingEntity, distanceToTarget: Double) {
-    val rotation = AngleUtils.getRotation(target)
+    val rotation = combatAimRotation(player, target, 0)
     RotationExecutor.rotateTo(rotation, rotationStrategy)
 
     val yawError = abs(AngleUtils.getRotationDelta(player.yRot, rotation.yaw))
@@ -4316,7 +4419,7 @@ object CombatMacroModule : Module("Combat Macro") {
     if (cooldown < minAttackCooldown.value.toFloat()) return false
     if (requireLos.value && !player.hasLineOfSight(target)) return false
 
-    val rotation = AngleUtils.getRotation(target)
+    val rotation = combatAimRotation(player, target, 0)
     val yawError = abs(AngleUtils.getRotationDelta(player.yRot, rotation.yaw))
     val pitchError = abs(rotation.pitch - player.xRot)
     val tolerance = aimTolerance.value
@@ -4685,6 +4788,10 @@ object CombatMacroModule : Module("Combat Macro") {
     startedPath = false
     backingAway = false
     currentTargetId = null
+    combatAimTargetId = null
+    combatAimMode = -1
+    resetOneTapFocus()
+    oneTapSkipUntilTickById.clear()
     resetCloseChase()
     lastPathStartTick = 0L
     clearKillCandidate()
@@ -4779,6 +4886,12 @@ object CombatMacroModule : Module("Combat Macro") {
   private const val SOFT_CHASE_STOP_BUFFER = 0.10
   private const val SOFT_CHASE_YAW_TOLERANCE = 7.5
   private const val SOFT_CHASE_PITCH_TOLERANCE = 18.0
+  private const val ONE_TAP_ALIGNED_DWELL_TICKS = 1L
+  private const val ONE_TAP_MIN_FOCUS_TICKS = 2L
+  private const val ONE_TAP_TARGET_SKIP_TICKS = 8L
+  private const val ONE_TAP_TOLERANCE_SCALE = 0.35
+  private const val ONE_TAP_MIN_AIM_TOLERANCE = 2.5
+  private const val ONE_TAP_MAX_AIM_TOLERANCE = 5.0
   private const val SLAYER_BOSS_DIRECT_CHASE_GAP_BONUS = 0.85
   private const val SLAYER_MINIBOSS_DIRECT_CHASE_GAP_BONUS = 0.45
   private const val EMAN_HITS_PHASE_MIN_STANDOFF = 2.5

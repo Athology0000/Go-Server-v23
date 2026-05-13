@@ -181,6 +181,16 @@ std::optional<SearchResult> findPathSingle(
 
     const int currStartIdx = nodeStartIndex[static_cast<size_t>(currIdx)];
 
+    // Direction the path came in on (parent -> curr). Used below to add a
+    // small "turn penalty" so equal-cost L-shapes lose to a straight run.
+    // Without this, A* often prefers zigzags whose summed cost ties with the
+    // straight continuation; the post-simplifier can't always undo it.
+    const int parentIdx = nodeParent[static_cast<size_t>(currIdx)];
+    const bool hasPrevDir = parentIdx >= 0;
+    const int prevDx = hasPrevDir ? (curr.x - nodeX[static_cast<size_t>(parentIdx)]) : 0;
+    const int prevDz = hasPrevDir ? (curr.z - nodeZ[static_cast<size_t>(parentIdx)]) : 0;
+    const int prevDy = hasPrevDir ? (curr.y - nodeY[static_cast<size_t>(parentIdx)]) : 0;
+
     if (isFly) {
       const double currFlyProgress = runtime.flyHorizontalProgress(curr.x, curr.z);
       for (const auto& move : detail::FLY_MOVES) {
@@ -188,7 +198,22 @@ std::optional<SearchResult> findPathSingle(
         if (!runtime.flyMove(curr, move, currFlyProgress, out)) continue;
         if (out.cost >= ActionCosts::INF_COST) continue;
 
-        const double newCost = currCost + out.cost + runtime.transientAvoidPenalty(out.pos.x, out.pos.y, out.pos.z);
+        double turnPenalty = 0.0;
+        if (hasPrevDir) {
+          const int newDx = out.pos.x - curr.x;
+          const int newDy = out.pos.y - curr.y;
+          const int newDz = out.pos.z - curr.z;
+          const int crossY = prevDz * newDx - prevDx * newDz;
+          const int crossX = prevDy * newDz - prevDz * newDy;
+          const int crossZ = prevDx * newDy - prevDy * newDx;
+          const bool prevNonZero = (prevDx | prevDy | prevDz) != 0;
+          const bool newNonZero = (newDx | newDy | newDz) != 0;
+          if (prevNonZero && newNonZero && (crossX | crossY | crossZ) != 0) {
+            turnPenalty = 0.06;
+          }
+        }
+
+        const double newCost = currCost + out.cost + turnPenalty + runtime.transientAvoidPenalty(out.pos.x, out.pos.y, out.pos.z);
         const uint64_t key = coordKey(out.pos.x, out.pos.y, out.pos.z);
 
         int nIdx = -1;
@@ -224,7 +249,26 @@ std::optional<SearchResult> findPathSingle(
       if (!runtime.walkMove(curr, move, out)) continue;
       if (out.cost >= ActionCosts::INF_COST) continue;
 
-      const double newCost = currCost + out.cost + runtime.transientAvoidPenalty(out.pos.x, out.pos.y, out.pos.z);
+      double turnPenalty = 0.0;
+      if (hasPrevDir) {
+        const int newDx = out.pos.x - curr.x;
+        const int newDy = out.pos.y - curr.y;
+        const int newDz = out.pos.z - curr.z;
+        // Two directions are "collinear" if their cross product is zero in
+        // every axis. Anything else is a turn (corner, sidestep, kink).
+        // 0.06 s ≈ one tick of walking — large enough to break ties, small
+        // enough that A* still corners when the geometry requires it.
+        const int crossY = prevDz * newDx - prevDx * newDz;
+        const int crossX = prevDy * newDz - prevDz * newDy;
+        const int crossZ = prevDx * newDy - prevDy * newDx;
+        const bool prevNonZero = (prevDx | prevDy | prevDz) != 0;
+        const bool newNonZero = (newDx | newDy | newDz) != 0;
+        if (prevNonZero && newNonZero && (crossX | crossY | crossZ) != 0) {
+          turnPenalty = 0.06;
+        }
+      }
+
+      const double newCost = currCost + out.cost + turnPenalty + runtime.transientAvoidPenalty(out.pos.x, out.pos.y, out.pos.z);
       const uint64_t key = coordKey(out.pos.x, out.pos.y, out.pos.z);
 
       int nIdx = -1;

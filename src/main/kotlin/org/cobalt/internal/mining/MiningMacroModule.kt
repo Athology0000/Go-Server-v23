@@ -322,6 +322,116 @@ object MiningMacroModule : Module("Mining Macro") {
     "mining:ore",
   )
 
+  // ─── Mining Ability tab ────────────────────────────────────────────────
+  internal val useMiningAbility = CheckboxSetting(
+    "Use Mining Ability",
+    "Automatically activate the pickaxe ability when chat says it's available.",
+    false,
+  )
+
+  internal val useMiningSpeedBoost = CheckboxSetting(
+    "Mining Speed Boost",
+    "Activate Mining Speed Boost on \"is now available!\" chat trigger.",
+    true,
+  )
+
+  internal val usePickobulus = CheckboxSetting(
+    "Pickobulus",
+    "Activate Pickobulus on \"is now available!\" chat trigger.",
+    false,
+  )
+
+  internal val useManiacMiner = CheckboxSetting(
+    "Maniac Miner",
+    "Activate Maniac Miner on \"is now available!\" chat trigger.",
+    false,
+  )
+
+  internal val useTunnelVision = CheckboxSetting(
+    "Tunnel Vision",
+    "Activate Tunnel Vision on \"is now available!\" chat trigger.",
+    false,
+  )
+
+  internal val useSheerForce = CheckboxSetting(
+    "Sheer Force",
+    "Activate Sheer Force on \"is now available!\" chat trigger.",
+    false,
+  )
+
+  internal val useGemstoneInfusion = CheckboxSetting(
+    "Gemstone Infusion",
+    "Activate Gemstone Infusion on \"is now available!\" chat trigger.",
+    false,
+  )
+
+  internal val abilityActivationDelay = SliderSetting(
+    "Ability Delay (ticks)",
+    "Ticks to wait after the trigger before right-clicking.",
+    4.0,
+    0.0,
+    40.0,
+    1.0,
+  )
+
+  // ─── Rod Swap tab ──────────────────────────────────────────────────────
+  internal val useRodSwap = CheckboxSetting(
+    "Use Rod Swap",
+    "Swap to a configured hotbar slot on a trigger, then swap back.",
+    false,
+  )
+
+  internal val rodSwapSlot = SliderSetting(
+    "Rod Slot",
+    "Hotbar slot (1-9) to swap to.",
+    1.0,
+    1.0,
+    9.0,
+    1.0,
+  )
+
+  internal val rodSwapReturnSlot = SliderSetting(
+    "Return Slot",
+    "Hotbar slot to swap back to after the rod action. 0 = remember previous.",
+    0.0,
+    0.0,
+    9.0,
+    1.0,
+  )
+
+  // Mining ability state (chat-driven).
+  internal var pickobulusAvailable = false
+  internal var miningSpeedBoostAvailable = false
+  internal var miningSpeedBoostActive = false
+  internal var maniacMinerAvailable = false
+  internal var maniacMinerActive = false
+  internal var tunnelVisionAvailable = false
+  internal var tunnelVisionActive = false
+  internal var sheerForceAvailable = false
+  internal var sheerForceActive = false
+  internal var gemstoneInfusionAvailable = false
+  internal var gemstoneInfusionActive = false
+  internal var pendingAbilityActivationTick = -1L
+  internal var pendingAbilityName: String? = null
+  internal var preAbilitySlot = -1
+  // Retry tracking: after firing the right-click we wait up to 2 s (40 ticks)
+  // for the "You used your X Pickaxe Ability!" confirmation. If it never lands
+  // we re-fire. Capped at a small max so we don't spam right-clicks forever.
+  internal var awaitingAbilityResponse = false
+  internal var abilityResponseDeadlineTick = -1L
+  internal var abilityRetryCount = 0
+  internal const val ABILITY_RESPONSE_TIMEOUT_TICKS = 40L
+  internal const val ABILITY_MAX_RETRIES = 4
+
+  // Drill class detection. On macro enable we right-click once with whatever
+  // pickaxe/drill is held; the resulting "You used your X Pickaxe Ability!"
+  // chat tells us which of the three classes (Mining Speed Boost / Pickobulus /
+  // any third ability) the held tool belongs to. Stored for ability routing.
+  internal var detectedDrillAbility: String? = null
+  internal var awaitingDrillProbeResponse = false
+  internal var drillProbePendingTick = -1L
+  private val PICKAXE_ABILITY_REGEX = Regex("you used your (.+?) pickaxe ability")
+
   init {
     MiningPrecisionTracker.ensureInitialized()
     MiningProfitTracker.ensureInitialized()
@@ -360,6 +470,17 @@ object MiningMacroModule : Module("Mining Macro") {
       rememberVeinSpots,
       clearLearnedSpots,
       returnToStartAfterVein,
+      useMiningAbility,
+      useMiningSpeedBoost,
+      usePickobulus,
+      useManiacMiner,
+      useTunnelVision,
+      useSheerForce,
+      useGemstoneInfusion,
+      abilityActivationDelay,
+      useRodSwap,
+      rodSwapSlot,
+      rodSwapReturnSlot,
     )
 
     val generalGroup = "General"
@@ -369,6 +490,8 @@ object MiningMacroModule : Module("Mining Macro") {
     val rotationGroup = "Rotation"
     val etherwarpGroup = "Etherwarp"
     val safetyGroup = "Safety"
+    val abilityGroup = "Mining Ability"
+    val rodSwapGroup = "Rod Swap"
 
     enabled.uiGroup = generalGroup
     toggleKeybind.uiGroup = generalGroup
@@ -406,6 +529,19 @@ object MiningMacroModule : Module("Mining Macro") {
 
     goldenGoblinInterrupt.uiGroup = safetyGroup
     occupiedRadius.uiGroup = safetyGroup
+
+    useMiningAbility.uiGroup = abilityGroup
+    useMiningSpeedBoost.uiGroup = abilityGroup
+    usePickobulus.uiGroup = abilityGroup
+    useManiacMiner.uiGroup = abilityGroup
+    useTunnelVision.uiGroup = abilityGroup
+    useSheerForce.uiGroup = abilityGroup
+    useGemstoneInfusion.uiGroup = abilityGroup
+    abilityActivationDelay.uiGroup = abilityGroup
+
+    useRodSwap.uiGroup = rodSwapGroup
+    rodSwapSlot.uiGroup = rodSwapGroup
+    rodSwapReturnSlot.uiGroup = rodSwapGroup
 
     EventBus.register(this)
     EventBus.register(BlockTypePickerPopup)
@@ -460,6 +596,25 @@ object MiningMacroModule : Module("Mining Macro") {
   internal var miningOnTargetTicks = 0
   internal var miningLockedTicks = 0
   internal var miningOnTarget: BlockPos? = null
+  // "Stuck stare" recovery: in-range + target selected but the crosshair pick
+  // keeps landing somewhere other than the target. Counts how many consecutive
+  // ticks we've been in that state for the same target so we can re-aim to the
+  // block center (which raycasts cleanly) instead of staring forever at a
+  // precision point that grazes a face edge.
+  internal var stareTarget: BlockPos? = null
+  internal var stareTicks: Int = 0
+  internal const val STARE_RECOVERY_TICKS = 6
+
+  // Aim quality tracker. Updated each render frame by the rotation debug
+  // renderer with whether the crosshair is currently on the target block and
+  // the distance between the rendered aim dot and the crosshair hit. Used to
+  // surface a "how well are my settings tracking the precision point?" stat.
+  internal var aimQualitySamples: Int = 0
+  internal var aimQualityOnTargetSamples: Int = 0
+  internal var aimQualityDistanceSum: Double = 0.0
+  internal var aimQualityLastTarget: BlockPos? = null
+  internal var aimQualityLastReportTick: Long = 0L
+  internal const val AIM_QUALITY_REPORT_INTERVAL_TICKS = 200L
   internal var cachedPreviewTarget: BlockPos? = null
   internal var previewCacheTick = -1L
   internal var lastPruneTick = 0L
@@ -598,6 +753,10 @@ object MiningMacroModule : Module("Mining Macro") {
       enabled.value = !enabled.value
     }
 
+    tickAbilityActivation()
+    tickDrillProbe()
+    tickAimQualityReport()
+
     if (!enabled.value) {
       if (wasEnabled) {
         stopMacro("Disabled.")
@@ -615,6 +774,11 @@ object MiningMacroModule : Module("Mining Macro") {
       macroStartAnchor = player.blockPosition().immutable()
       returningToStart = false
       MiningProfitTracker.resetSession()
+      // Probe the held drill class: one right-click, then wait for the
+      // "You used your X Pickaxe Ability!" reply to classify it.
+      detectedDrillAbility = null
+      awaitingDrillProbeResponse = true
+      drillProbePendingTick = level.gameTime + 2L
       val selections = resolveTypeSelections()
       if (selections.isEmpty()) {
         ChatUtils.sendMessage("Mining macro: no block types selected, cannot start.")
@@ -836,6 +1000,8 @@ object MiningMacroModule : Module("Mining Macro") {
 
       if (crosshairVeinBlock != null) {
         currentTarget = crosshairVeinBlock
+        stareTarget = null
+        stareTicks = 0
         if (maybeRefreshLantern(level, player)) {
           stopMiningKeys()
           if (startedPath && nativeActive()) {
@@ -874,13 +1040,49 @@ object MiningMacroModule : Module("Mining Macro") {
           }
           return
         }
-        val aim = resolveMiningAimPoint(player, target)
+        // Track stuck-stare: in-range + selected target but crosshair never
+        // lands on a vein block. After enough ticks, fall back from precision
+        // point to block center so the crosshair pick can resolve cleanly.
+        // If center still has no real LOS from this eye position, the block
+        // is occluded — drop the target so the selector can re-run (and the
+        // out-of-range branch can move us to a spot with a clear LOS).
+        if (stareTarget == target) {
+          stareTicks++
+        } else {
+          stareTarget = target
+          stareTicks = 1
+        }
+        val forceCenter = stareTicks > STARE_RECOVERY_TICKS
+        if (forceCenter) {
+          val visible = findVisibleAimPoint(level, player, player.eyePosition, target) != null
+          if (!visible) {
+            // Occluded — abandon this target. Next tick selector will pick a
+            // visible block or trigger out-of-range movement to a better spot.
+            CobaltRotation.blockController.setPrecisionPoint(null)
+            CobaltRotation.blockController.cancel()
+            frameRotTarget = null
+            frameRotPrevBlock = null
+            currentTarget = null
+            currentTargetNoLosTicks = 0
+            stareTarget = null
+            stareTicks = 0
+            setAimRenderTarget(null, null)
+            return
+          }
+        }
+        val aim = if (forceCenter) {
+          AimTarget(Vec3(target.x + 0.5, target.y + 0.5, target.z + 0.5), false)
+        } else {
+          resolveMiningAimPoint(player, target)
+        }
         val precisionRotScale =
           if (aim.usesPrecisionPoint) (precisionPointRotationSpeed.value / 100.0).coerceAtLeast(0.1)
           else 1.0
         // Drive the block-to-block controller on every new target. Duration is scaled
         // by angular distance: short hops finish in ~5 ticks, long hops up to ~16.
-        if (target != frameRotPrevBlock) {
+        // Also re-fire when forceCenter is true so the stare recovery actually
+        // re-aims to the center of the same target.
+        if (target != frameRotPrevBlock || forceCenter) {
           val initRot = AngleUtils.getRotation(aim.point)
           val initYaw = abs(AngleUtils.getRotationDelta(player.yRot, initRot.yaw))
           val initPitch = abs(initRot.pitch - player.xRot)
@@ -995,6 +1197,215 @@ object MiningMacroModule : Module("Mining Macro") {
         finishGoldenGoblinInterrupt()
       }
     }
+
+    handleAbilityChat(message)
+  }
+
+  private fun handleAbilityChat(message: String) {
+    // Drill-class probe response always runs (independent of useMiningAbility),
+    // since detecting the class is useful even with auto-activation disabled.
+    PICKAXE_ABILITY_REGEX.find(message)?.let { match ->
+      val ability = match.groupValues[1].trim().split(' ').joinToString(" ") { it.replaceFirstChar(Char::titlecase) }
+      if (awaitingDrillProbeResponse || enabled.value) {
+        if (detectedDrillAbility != ability) {
+          detectedDrillAbility = ability
+          if (awaitingDrillProbeResponse) {
+            ChatUtils.sendMessage("Mining macro: detected drill class → $ability")
+          }
+        }
+        awaitingDrillProbeResponse = false
+      }
+      // Activation confirm: clear available flag for whichever ability fired.
+      when (ability.lowercase()) {
+        "pickobulus" -> pickobulusAvailable = false
+        "mining speed boost" -> {
+          miningSpeedBoostAvailable = false
+          miningSpeedBoostActive = true
+        }
+        "maniac miner" -> {
+          maniacMinerAvailable = false
+          maniacMinerActive = true
+        }
+        "tunnel vision" -> {
+          tunnelVisionAvailable = false
+          tunnelVisionActive = true
+        }
+        "sheer force" -> {
+          sheerForceAvailable = false
+          sheerForceActive = true
+        }
+        "gemstone infusion" -> {
+          gemstoneInfusionAvailable = false
+          gemstoneInfusionActive = true
+        }
+      }
+      // Server confirmed an activation — close out any in-flight attempt so
+      // the retry loop doesn't fire again. Matches by name when one is in
+      // flight; clears unconditionally otherwise (manual user activations).
+      if (pendingAbilityName != null) {
+        ChatUtils.sendDebug("Mining Ability", "Mining ability successful — $ability.")
+      }
+      clearAbilityAttempt()
+    }
+
+    // Buff expiry — runs regardless of useMiningAbility so state stays correct.
+    if (message.contains("mining speed boost has expired")) miningSpeedBoostActive = false
+    if (message.contains("maniac miner has expired")) maniacMinerActive = false
+    if (message.contains("tunnel vision has expired")) tunnelVisionActive = false
+    if (message.contains("sheer force has expired")) sheerForceActive = false
+    if (message.contains("gemstone infusion has expired")) gemstoneInfusionActive = false
+
+    if (!enabled.value || !useMiningAbility.value) return
+
+    // "X is now available!" — ability came off cooldown.
+    when {
+      message.contains("pickobulus is now available") -> {
+        pickobulusAvailable = true
+        if (usePickobulus.value) queueAbilityActivation("Pickobulus")
+      }
+      message.contains("mining speed boost is now available") -> {
+        miningSpeedBoostAvailable = true
+        if (useMiningSpeedBoost.value) queueAbilityActivation("Mining Speed Boost")
+      }
+      message.contains("maniac miner is now available") -> {
+        maniacMinerAvailable = true
+        if (useManiacMiner.value) queueAbilityActivation("Maniac Miner")
+      }
+      message.contains("tunnel vision is now available") -> {
+        tunnelVisionAvailable = true
+        if (useTunnelVision.value) queueAbilityActivation("Tunnel Vision")
+      }
+      message.contains("sheer force is now available") -> {
+        sheerForceAvailable = true
+        if (useSheerForce.value) queueAbilityActivation("Sheer Force")
+      }
+      message.contains("gemstone infusion is now available") -> {
+        gemstoneInfusionAvailable = true
+        if (useGemstoneInfusion.value) queueAbilityActivation("Gemstone Infusion")
+      }
+    }
+  }
+
+  private fun queueAbilityActivation(name: String) {
+    val level = mc.level ?: return
+    val delay = abilityActivationDelay.value.toLong().coerceAtLeast(0L)
+    pendingAbilityName = name
+    pendingAbilityActivationTick = level.gameTime + delay
+    awaitingAbilityResponse = false
+    abilityResponseDeadlineTick = -1L
+    abilityRetryCount = 0
+  }
+
+  /**
+   * Fires the one-shot right-click probe used on macro start to detect the
+   * held drill class via its "You used your X Pickaxe Ability!" reply. Pending
+   * tick is set in onTick when wasEnabled flips.
+   */
+  internal fun tickDrillProbe() {
+    if (drillProbePendingTick < 0L) return
+    val level = mc.level ?: return
+    if (level.gameTime < drillProbePendingTick) return
+    drillProbePendingTick = -1L
+    mc.options.keyUse?.setDown(true)
+    mc.execute { mc.options.keyUse?.setDown(false) }
+  }
+
+  /**
+   * Fires the right-click for a queued ability and tracks the response. If the
+   * server doesn't reply with "You used your X Pickaxe Ability!" inside 2 s
+   * (40 ticks), the click is repeated up to [ABILITY_MAX_RETRIES] times. The
+   * gradient debug chat keeps the operator informed without spamming.
+   */
+  internal fun tickAbilityActivation() {
+    val level = mc.level ?: return
+    val pending = pendingAbilityName ?: return
+
+    // Initial fire — scheduled delay has elapsed and we're not yet awaiting.
+    if (!awaitingAbilityResponse && level.gameTime >= pendingAbilityActivationTick) {
+      fireAbilityRightClick(pending)
+      awaitingAbilityResponse = true
+      abilityResponseDeadlineTick = level.gameTime + ABILITY_RESPONSE_TIMEOUT_TICKS
+      return
+    }
+
+    // Retry — fired earlier but never saw the confirmation chat.
+    if (awaitingAbilityResponse && level.gameTime >= abilityResponseDeadlineTick) {
+      if (abilityRetryCount >= ABILITY_MAX_RETRIES) {
+        ChatUtils.sendDebug("Mining Ability", "Mining ability failed — $pending after ${abilityRetryCount + 1} attempts.")
+        clearAbilityAttempt()
+        return
+      }
+      abilityRetryCount++
+      ChatUtils.sendDebug("Mining Ability", "No response — retrying $pending (attempt ${abilityRetryCount + 1}).")
+      fireAbilityRightClick(pending)
+      abilityResponseDeadlineTick = level.gameTime + ABILITY_RESPONSE_TIMEOUT_TICKS
+    }
+  }
+
+  private fun fireAbilityRightClick(name: String) {
+    ChatUtils.sendDebug("Mining Ability", "Attempting to use $name…")
+    mc.options.keyUse?.setDown(true)
+    mc.execute { mc.options.keyUse?.setDown(false) }
+  }
+
+  private fun clearAbilityAttempt() {
+    pendingAbilityName = null
+    pendingAbilityActivationTick = -1L
+    awaitingAbilityResponse = false
+    abilityResponseDeadlineTick = -1L
+    abilityRetryCount = 0
+  }
+
+  /**
+   * Called from the rotation debug renderer once per frame. Accumulates a
+   * rolling sample of "is the crosshair on the target block?" and the distance
+   * between the rendered aim dot and the crosshair hit. Cleared when the
+   * target changes so the stats describe the *current* block, not the session.
+   */
+  fun recordAimQualitySample(
+    targetBlock: BlockPos?,
+    cursorOnTarget: Boolean,
+    cursorPoint: Vec3,
+    aimPoint: Vec3,
+  ) {
+    if (targetBlock == null) return
+    if (targetBlock != aimQualityLastTarget) {
+      aimQualityLastTarget = targetBlock
+      aimQualitySamples = 0
+      aimQualityOnTargetSamples = 0
+      aimQualityDistanceSum = 0.0
+    }
+    aimQualitySamples++
+    if (cursorOnTarget) aimQualityOnTargetSamples++
+    val dx = cursorPoint.x - aimPoint.x
+    val dy = cursorPoint.y - aimPoint.y
+    val dz = cursorPoint.z - aimPoint.z
+    aimQualityDistanceSum += kotlin.math.sqrt(dx * dx + dy * dy + dz * dz)
+  }
+
+  /** Returns the on-target hit rate of the current target as a 0..1 fraction. */
+  fun aimQualityOnTargetRate(): Double {
+    if (aimQualitySamples == 0) return 0.0
+    return aimQualityOnTargetSamples.toDouble() / aimQualitySamples
+  }
+
+  /** Returns the average aim-dot-to-cursor distance (blocks) for the current target. */
+  fun aimQualityAverageOffset(): Double {
+    if (aimQualitySamples == 0) return 0.0
+    return aimQualityDistanceSum / aimQualitySamples
+  }
+
+  /** One-line gradient debug readout — fires every 10 s while mining is active. */
+  internal fun tickAimQualityReport() {
+    if (!enabled.value) return
+    val level = mc.level ?: return
+    if (miningOnTarget == null) return
+    if (level.gameTime - aimQualityLastReportTick < AIM_QUALITY_REPORT_INTERVAL_TICKS) return
+    if (aimQualitySamples < 20) return
+    aimQualityLastReportTick = level.gameTime
+    val pct = (aimQualityOnTargetRate() * 100.0).toInt()
+    val avgPx = (aimQualityAverageOffset() * 100.0).toInt() / 100.0
+    ChatUtils.sendDebug("Aim Quality", "On-target: $pct%   Avg offset: ${avgPx}b   Samples: $aimQualitySamples")
   }
 
   @SubscribeEvent

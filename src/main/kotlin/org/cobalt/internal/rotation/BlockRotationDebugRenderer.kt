@@ -4,6 +4,7 @@ import java.awt.Color
 import net.minecraft.client.Minecraft
 import net.minecraft.world.level.ClipContext
 import net.minecraft.world.phys.AABB
+import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.Vec3
 import org.cobalt.api.event.annotation.SubscribeEvent
@@ -45,15 +46,32 @@ object BlockRotationDebugRenderer {
         )
         val currentLookPoint = if (hit.type == HitResult.Type.BLOCK) hit.location else end
 
+        // Hit-aware aim dot: green when the crosshair is currently on the aim
+        // target's block, white when it isn't. Gives an at-a-glance read of
+        // whether the rotation has actually landed the shot.
+        val targetBlock = controller.currentRequest()?.toBlock
+            ?: MiningMacroModule.aimRenderBlock
+        val cursorOnTarget = targetBlock != null
+            && hit is BlockHitResult
+            && hit.type == HitResult.Type.BLOCK
+            && hit.blockPos == targetBlock
+        val dotStroke = if (cursorOnTarget) AIM_DOT_GREEN else AIM_DOT_WHITE
+        val dotFill = if (cursorOnTarget) AIM_DOT_GREEN_FILL else AIM_DOT_WHITE_FILL
+        val lineColor = if (cursorOnTarget) AIM_LINE_GREEN else AIM_LINE_WHITE
+
+        // Accumulate the aim-quality stats once per render — same source of
+        // truth as the renderer so the HUD readout matches what the user sees.
+        MiningMacroModule.recordAimQualitySample(targetBlock, cursorOnTarget, currentLookPoint, aimEnd)
+
         Render3D.drawLine(
             context = event.context,
             start = currentLookPoint,
             end = aimEnd,
-            color = AIM_LINE,
+            color = lineColor,
             esp = true,
             thickness = 1.35f,
         )
-        drawAimDot(event.context, aimEnd, AIM_DOT, AIM_DOT_FILL, 0.052)
+        drawAimDot(event.context, aimEnd, dotStroke, dotFill, 0.052)
         drawCursorCross(event.context, currentLookPoint)
 
         if (miningDebug) {
@@ -111,9 +129,12 @@ object BlockRotationDebugRenderer {
         drawAimDot(context, point, CURSOR_CENTER, CURSOR_CENTER, 0.01)
     }
 
-    private val AIM_DOT = Color(255, 0, 16, 255)
-    private val AIM_DOT_FILL = Color(255, 0, 16, 230)
-    private val AIM_LINE = Color(255, 0, 16, 205)
+    private val AIM_DOT_WHITE = Color(240, 240, 240, 255)
+    private val AIM_DOT_WHITE_FILL = Color(240, 240, 240, 215)
+    private val AIM_DOT_GREEN = Color(90, 230, 110, 255)
+    private val AIM_DOT_GREEN_FILL = Color(90, 230, 110, 220)
+    private val AIM_LINE_WHITE = Color(220, 220, 220, 180)
+    private val AIM_LINE_GREEN = Color(90, 230, 110, 195)
     private val NEXT_DOT = Color(255, 55, 55, 210)
     private val NEXT_DOT_FILL = Color(255, 55, 55, 140)
     private val NEXT_LINE = Color(255, 55, 55, 145)

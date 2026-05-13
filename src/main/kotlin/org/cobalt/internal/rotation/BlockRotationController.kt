@@ -210,8 +210,26 @@ class BlockRotationController {
      */
     fun setPrecisionPoint(point: Vec3?) {
         if (point == null) {
+            // Dedupe: clearing a point that was never set is a no-op.
+            if (precisionPoint == null && pendingPrecisionPoint == null) return
             precisionPoint = null
             pendingPrecisionPoint = null
+            return
+        }
+
+        // Dedupe re-applies. Callers (mining macro) invoke this every tick with
+        // the same point; without this guard the elapsedSeconds=0 reset below
+        // restarts the eased curve every tick, the smoother never finishes
+        // catching up, and the camera visibly never reaches the precision aim.
+        // The crosshair flicker from constant retargets also causes vanilla's
+        // continueAttack to emit ABORT_DESTROY/START_DESTROY cycles, resetting
+        // server-side mining progress every tick the precision state shifts.
+        val existing = precisionPoint ?: pendingPrecisionPoint
+        if (existing != null &&
+            kotlin.math.abs(existing.x - point.x) < 1.0e-4 &&
+            kotlin.math.abs(existing.y - point.y) < 1.0e-4 &&
+            kotlin.math.abs(existing.z - point.z) < 1.0e-4
+        ) {
             return
         }
 
