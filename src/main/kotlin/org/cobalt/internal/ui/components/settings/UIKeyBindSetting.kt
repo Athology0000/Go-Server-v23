@@ -65,7 +65,7 @@ internal class UIKeyBindSetting(private val setting: KeyBindSetting) : UICompone
     val textWidth = NVGRenderer.textWidth(text, 15F)
 
     if (isListening) {
-      setting.value.keyCode = button
+      setting.value.keyCode = -1
       isListening = false
       return true
     } else if (isHoveringOver(

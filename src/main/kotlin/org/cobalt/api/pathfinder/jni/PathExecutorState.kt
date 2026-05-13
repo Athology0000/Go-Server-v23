@@ -1196,6 +1196,11 @@ object PathExecutorState {
 
         // Engaged — back off along the spline until the walk-line clears.
         val minDist = currentSplineDistance + KEYNODE_MIN_SPACING
+        if (minDist > spline.totalLength) {
+            currentKeynodePoint = null
+            keynodeSplineDistance = 0.0
+            return proposedAim
+        }
         val proposedDist = run {
             val proj = spline.project(
                 point = proposedAim,

@@ -79,6 +79,7 @@ object PathfindingModule : Module("Pathfinding") {
   private val COLOR_BLOCK_HAZARD = OverlayRenderEngine.Color(255, 150, 0, 170)       // orange: harmful stand/support block
   private val COLOR_MOVE_CURSOR = OverlayRenderEngine.Color(255, 255, 255, 255)      // white: current cursor
   private val COLOR_MOVE_TARGET = OverlayRenderEngine.Color(255, 240, 0, 255)        // yellow: steering target
+  private const val LOOK_POINT_EYE_OFFSET = 1.62
 
   // Weight-map quartiles: green = best alternatives, red = rejected/blocked.
   private val COLOR_WEIGHT_Q1 = OverlayRenderEngine.Color(  0, 220,  60, 120) // top quartile — viable, close to chosen
@@ -997,11 +998,7 @@ object PathfindingModule : Module("Pathfinding") {
     val targetPoint = PathExecutorState.currentLookaheadSplinePoint
       ?: PathExecutorState.currentTargetPoint
     if (targetPoint != null) {
-      val targetBlock = BlockPos(
-        Math.floor(targetPoint.x).toInt(),
-        Math.floor(targetPoint.y).toInt(),
-        Math.floor(targetPoint.z).toInt()
-      )
+      val targetBlock = steeringTargetSupportBlock(level, targetPoint)
       OverlayRenderEngine.outlineBlockColor(
         level, targetBlock,
         COLOR_MOVE_TARGET,
@@ -1011,6 +1008,32 @@ object PathfindingModule : Module("Pathfinding") {
         forceRender = true,
       )
     }
+  }
+
+  private fun steeringTargetSupportBlock(level: net.minecraft.world.level.Level, point: Vec3): BlockPos {
+    val x = Math.floor(point.x).toInt()
+    val z = Math.floor(point.z).toInt()
+    val estimatedFeetY = point.y - LOOK_POINT_EYE_OFFSET
+    val baseSupportY = Math.floor(estimatedFeetY - 0.05).toInt()
+
+    var best: BlockPos? = null
+    var bestScore = Double.MAX_VALUE
+    for (y in baseSupportY + 1 downTo baseSupportY - 3) {
+      val support = BlockPos(x, y, z)
+      val feet = support.above()
+      if (!isPassable(level, feet) || !isPassable(level, feet.above()) || !isStandable(level, support)) {
+        continue
+      }
+      val feetDelta = kotlin.math.abs((support.y + 1.0) - estimatedFeetY)
+      val descentBias = if (support.y <= baseSupportY) 0.08 else 0.0
+      val score = feetDelta - descentBias
+      if (score < bestScore) {
+        bestScore = score
+        best = support
+      }
+    }
+
+    return best ?: BlockPos(x, baseSupportY, z)
   }
 
   private fun renderMovementCandidateBlocks(

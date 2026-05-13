@@ -2,6 +2,7 @@ package org.cobalt.api.util.helper
 
 import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.Minecraft
+import org.lwjgl.glfw.GLFW
 
 class KeyBind(
   var keyCode: Int = -1,
@@ -10,7 +11,7 @@ class KeyBind(
   private var wasPressed = false
 
   fun isPressed(): Boolean {
-    if (keyCode == -1) return false
+    if (keyCode < GLFW.GLFW_KEY_SPACE) return false
     val mc = Minecraft.getInstance()
 
     val isPressed = mc.screen == null

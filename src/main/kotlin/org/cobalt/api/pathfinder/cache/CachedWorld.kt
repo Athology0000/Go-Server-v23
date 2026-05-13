@@ -34,6 +34,7 @@ object CachedWorld {
 
     private const val RUNTIME_WORLD_KEY = "runtime_memory"
     @Volatile private var worldKey: String = RUNTIME_WORLD_KEY
+    @Volatile private var worldDisplayName: String = "Runtime"
     @Volatile private var nativeWorldToken: String = ""
     @Volatile private var pendingNativeResync = true
     @Volatile private var dirty = false
@@ -92,7 +93,7 @@ object CachedWorld {
         }
         ClientPlayConnectionEvents.JOIN.register { _, _, client ->
             val key = deriveServerKey(client)
-            setWorldKey(key)
+            setWorldKey(key, key)
             if (key != null) load(key)
         }
         ClientPlayConnectionEvents.DISCONNECT.register { _, _ ->
@@ -201,19 +202,17 @@ object CachedWorld {
 
     fun saveAndClear(lobbyName: String) {
         val mapToSave = chunks
-        val count = mapToSave.values.count { it.ready }
         resetState()
         if (mapToSave.isNotEmpty()) {
             executor.submit {
                 try {
                     WorldSerializer.save(lobbyName, mapToSave)
-                    sendCacheMessage("World cache saved $count chunks for $lobbyName.")
                 } catch (e: Exception) { e.printStackTrace() }
             }
         }
     }
 
-    fun load(lobbyName: String) {
+    fun load(lobbyName: String, notify: Boolean = true) {
         resetState()
         val sessionMap = chunks
         executor.submit {
@@ -222,9 +221,13 @@ object CachedWorld {
                 if (loaded != null && chunks === sessionMap) {
                     for ((key, chunk) in loaded) sessionMap.putIfAbsent(key, chunk)
                     dirty = false
-                    sendCacheMessage("World cache loaded ${loaded.values.count { it.ready }} chunks for $lobbyName.")
-                } else if (loaded == null) {
-                    sendCacheMessage("World cache: no saved cache for $lobbyName yet.")
+                    if (notify) {
+                        sendCacheMessage("World cache: ${getWorldDisplayName()} loaded ${loaded.values.count { it.ready }} chunks.")
+                    }
+                } else if (loaded == null && chunks === sessionMap) {
+                    if (notify) {
+                        sendCacheMessage("World cache: ${getWorldDisplayName()} started fresh.")
+                    }
                 }
             } catch (e: Exception) { e.printStackTrace() }
         }
@@ -246,22 +249,32 @@ object CachedWorld {
         return "Cached: $ready, Pending: ${pendingChunks.size}"
     }
 
+    fun getWorldKey(): String = worldKey
+
+    fun getWorldDisplayName(): String = worldDisplayName
+
     fun setUnlimitedChunkCache(enabled: Boolean) {
         unlimitedChunkCache = enabled
     }
 
-    fun setWorldKey(newWorldKey: String?) {
+    fun setWorldKey(newWorldKey: String?, displayName: String? = null) {
         val normalized = newWorldKey?.ifBlank { RUNTIME_WORLD_KEY } ?: RUNTIME_WORLD_KEY
-        if (worldKey == normalized) return
+        val normalizedDisplayName = displayName?.takeIf { it.isNotBlank() }
+            ?: newWorldKey?.takeIf { it.isNotBlank() }
+            ?: "Runtime"
+        if (worldKey == normalized) {
+            worldDisplayName = normalizedDisplayName
+            return
+        }
         val previous = worldKey
         if (previous != RUNTIME_WORLD_KEY && dirty) {
             save(previous)
         }
         worldKey = normalized
+        worldDisplayName = normalizedDisplayName
         nativeWorldToken = ""
         pendingNativeResync = true
         NativePathfinderBridge.clearWorld()
-        sendCacheMessage("World cache key set to $worldKey.")
     }
 
     fun save(lobbyName: String = worldKey) {
@@ -273,7 +286,6 @@ object CachedWorld {
         executor.submit {
             try {
                 WorldSerializer.save(lobbyName, snapshot)
-                sendCacheMessage("World cache autosaved $count chunks for $lobbyName.")
             } catch (e: Exception) {
                 dirty = true
                 e.printStackTrace()

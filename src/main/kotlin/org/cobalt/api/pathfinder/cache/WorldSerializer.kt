@@ -92,7 +92,10 @@ object WorldSerializer {
                 map
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            System.err.println("[Cobalt] Ignoring corrupt world cache '${file.name}': ${e.javaClass.simpleName}: ${e.message}")
+            if (!file.delete()) {
+                System.err.println("[Cobalt] Failed to delete corrupt world cache '${file.name}'.")
+            }
             null
         }
     }

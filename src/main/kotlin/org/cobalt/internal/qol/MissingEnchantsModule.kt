@@ -106,7 +106,7 @@ object MissingEnchantsModule : Module("Missing Enchants") {
 
   private fun shouldShow(): Boolean {
     val code = keybind.value.keyCode
-    if (code == -1) return true
+    if (code < GLFW.GLFW_KEY_SPACE) return true
     return InputConstants.isKeyDown(mc.window, code)
   }
 

@@ -47,6 +47,7 @@ import org.cobalt.api.util.ChatUtils
 import org.cobalt.api.util.getSkyblockId
 import org.cobalt.api.util.getLoreLines
 import org.cobalt.api.util.render.Render3D
+import org.cobalt.internal.skyblock.HypixelManager
 import org.cobalt.mixin.client.TabOverlayAccessor
 import org.cobalt.mixin.client.MultiPlayerGameModeAccessor
 
@@ -696,6 +697,11 @@ object NoFrillsMiningModule : Module("NoFrills Mining") {
   }
 
   private fun resolveCurrentArea(): String? {
+    HypixelManager.currentAreaName()?.let { detected ->
+      AREA_NAMES.firstOrNull { it.equals(detected, ignoreCase = true) }?.let { return it }
+      if (detected.equals("Glacite Mineshafts", ignoreCase = true)) return AREA_MINESHAFT
+    }
+
     val searchableLines = readTabListLines() + readScoreboardLines()
     for (line in searchableLines) {
       for (area in AREA_NAMES) {

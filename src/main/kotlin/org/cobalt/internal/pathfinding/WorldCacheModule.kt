@@ -19,7 +19,9 @@ object WorldCacheModule : Module("World Cache HUD") {
     override val category = ModuleCategory.VISUAL
 
     private val textSize    = 13f
+    private val detailSize  = 10.5f
     private val lineHeight  = textSize + 5f
+    private val detailHeight = detailSize + 4f
     private val padding     = 10f
     private val barHeight   = 10f
     private val barTopGap   = 6f
@@ -34,24 +36,32 @@ object WorldCacheModule : Module("World Cache HUD") {
         val onlyInSkyblock = setting(CheckboxSetting("Only In SkyBlock", "Hide when not on a SkyBlock island", false))
 
         width {
-            max(NVGRenderer.textWidth(HypixelManager.currentPlaceName(), textSize), minWidth) + padding * 2
+            val lines = displayLines(HypixelManager.snapshot())
+            max(
+                max(NVGRenderer.textWidth(lines.first, textSize), NVGRenderer.textWidth(lines.second, detailSize)),
+                minWidth
+            ) + padding * 2
         }
 
         height {
-            lineHeight + barTopGap + barHeight + padding * 2
+            lineHeight + detailHeight + barTopGap + barHeight + padding * 2
         }
 
         render { x, y, _ ->
-            val map = HypixelManager.currentPlaceName()
-            if (onlyInSkyblock.value && map == "Unknown") return@render
+            val snapshot = HypixelManager.snapshot()
+            if (onlyInSkyblock.value && !snapshot.serverType.equals("SKYBLOCK", ignoreCase = true)) return@render
+            val lines = displayLines(snapshot)
 
             val ready  = CachedWorld.readyChunkCount
             val total  = CachedWorld.MAXIMUM_CACHED_CHUNKS
             val ratio  = (ready.toFloat() / total).coerceIn(0f, 1f)
             val pct    = (ratio * 100).toInt()
 
-            val panelW = max(NVGRenderer.textWidth(map, textSize), minWidth) + padding * 2
-            val panelH = lineHeight + barTopGap + barHeight + padding * 2
+            val panelW = max(
+                max(NVGRenderer.textWidth(lines.first, textSize), NVGRenderer.textWidth(lines.second, detailSize)),
+                minWidth
+            ) + padding * 2
+            val panelH = lineHeight + detailHeight + barTopGap + barHeight + padding * 2
             val (gradientStart, gradientEnd) = ThemeGradient.colors()
 
             NVGRenderer.rect(x, y, panelW, panelH, ThemeSurface.panelSolid(), corner)
@@ -59,10 +69,11 @@ object WorldCacheModule : Module("World Cache HUD") {
             NVGRenderer.hollowRect(x, y, panelW, panelH, 1.5f,
                 ThemeGradient.withAlpha(gradientStart, 0x55), corner)
 
-            NVGRenderer.text(map, x + padding, y + padding, textSize, ThemeManager.currentTheme.accent)
+            NVGRenderer.text(lines.first, x + padding, y + padding, textSize, ThemeManager.currentTheme.accent)
+            NVGRenderer.text(lines.second, x + padding, y + padding + lineHeight, detailSize, ThemeManager.currentTheme.textSecondary)
 
             val barX  = x + padding
-            val barY  = y + padding + lineHeight + barTopGap
+            val barY  = y + padding + lineHeight + detailHeight + barTopGap
             val barW  = panelW - padding * 2
             val fillW = (barW * ratio).coerceAtLeast(if (ratio > 0f) barHeight else 0f)
 
@@ -85,4 +96,23 @@ object WorldCacheModule : Module("World Cache HUD") {
             NVGRenderer.text(pctStr, barX + (barW - pctW) / 2f, barY - 0.5f, pctSize, 0xFFF4F7FB.toInt())
         }
     }
+
+    private fun displayLines(snapshot: HypixelManager.LocationSnapshot): Pair<String, String> {
+        val place = snapshot.placeName.takeIf(::isKnown)
+            ?: CachedWorld.getWorldDisplayName().takeIf(::isKnown)
+            ?: "Unknown"
+
+        val locationParts = mutableListOf<String>()
+        snapshot.serverType.takeIf(::isKnown)?.let { locationParts += it }
+        snapshot.mode.takeIf { isKnown(it) && !it.equals(place, ignoreCase = true) }?.let { locationParts += it }
+        snapshot.serverName.takeIf(::isKnown)?.let { locationParts += it }
+
+        val detailPrefix = locationParts.joinToString(" - ").takeIf { it.isNotBlank() }
+        val cacheStats = CachedWorld.getCacheStats()
+        val detail = if (detailPrefix != null) "$detailPrefix - $cacheStats" else cacheStats
+        return place to detail
+    }
+
+    private fun isKnown(value: String): Boolean =
+        value.isNotBlank() && !value.equals("Unknown", ignoreCase = true)
 }

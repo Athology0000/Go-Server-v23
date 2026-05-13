@@ -25,6 +25,7 @@ internal fun MiningMacroModule.selectMineTarget(
     var bestTiAngle = Float.POSITIVE_INFINITY
     for (pos in vein.blocks) {
       if (!isMineableTarget(level, player, pos, vein.targetIds)) continue
+      if (!canStepToNearbyTarget(player, pos)) continue
       if (blockIdAt(level, pos) !in titaniumIds) continue
       if (distanceToBlockSq(player, pos) > rangeSq) continue
       val visiblePoint = if (REQUIRE_MINE_LOS) findVisibleAimPoint(level, player, eye, pos) else null
@@ -47,7 +48,7 @@ internal fun MiningMacroModule.selectMineTarget(
     // Only keep sticky when the block is already in attack range (stable mid-mine targeting).
     // When out of range, fall through and re-select the nearest block every tick so the
     // macro always approaches the closest available block first.
-    if (inAttackRange) {
+    if (inAttackRange && canStepToNearbyTarget(player, sticky)) {
       // Use the same aim-point LOS standard the rotation actually needs — a
       // center-to-center hasLineOfSight can pass while every usable face is
       // occluded, leaving the macro to stare through a block. If no visible
@@ -81,6 +82,7 @@ internal fun MiningMacroModule.selectMineTarget(
   var bestScore = Double.POSITIVE_INFINITY
   for (pos in vein.blocks) {
     if (!isMineableTarget(level, player, pos, vein.targetIds)) continue
+    if (!canStepToNearbyTarget(player, pos)) continue
     if (distanceToBlockSq(player, pos) > rangeSq) continue
     val visiblePoint: Vec3? = if (REQUIRE_MINE_LOS) findVisibleAimPoint(level, player, eye, pos) else null
     if (REQUIRE_MINE_LOS && visiblePoint == null) continue
@@ -111,6 +113,7 @@ internal fun MiningMacroModule.selectMineTarget(
   var bestDist = Double.POSITIVE_INFINITY
   for (pos in vein.blocks) {
     if (!isMineableTarget(level, player, pos, vein.targetIds)) continue
+    if (!canStepToNearbyTarget(player, pos)) continue
     if (REQUIRE_MINE_LOS && !hasLineOfSight(level, player, pos)) continue
     val distSq = miningTargetScore(player, pos)
     if (distSq < bestDist) {
@@ -123,6 +126,7 @@ internal fun MiningMacroModule.selectMineTarget(
   if (best == null) {
     for (pos in vein.blocks) {
       if (!isMineableTarget(level, player, pos, vein.targetIds)) continue
+      if (!canStepToNearbyTarget(player, pos)) continue
       val distSq = distanceToBlockSq(player, pos)
       if (distSq > rangeSq) continue
       if (!isCrosshairOnTarget(pos)) continue
@@ -324,6 +328,7 @@ internal fun MiningMacroModule.selectNearestBlock(
   var bestDist = Double.POSITIVE_INFINITY
   for (pos in blocks) {
     if (!isMineableTarget(level, player, pos, allowedIds)) continue
+    if (!canStepToNearbyTarget(player, pos)) continue
     val distSq = miningTargetScore(player, pos)
     if (distSq < bestDist) {
       bestDist = distSq
@@ -349,6 +354,7 @@ internal fun MiningMacroModule.resolvePreviewTarget(
   for (pos in vein.blocks) {
     if (pos == active) continue
     if (!isMineableTarget(level, player, pos, vein.targetIds)) continue
+    if (!canStepToNearbyTarget(player, pos)) continue
     if (REQUIRE_MINE_LOS && !hasLineOfSight(level, player, pos)) continue
     val distSq = miningTargetScore(player, pos)
     if (distSq < bestDist) {

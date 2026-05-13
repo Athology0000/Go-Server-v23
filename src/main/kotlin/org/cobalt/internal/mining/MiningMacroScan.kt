@@ -350,19 +350,18 @@ internal fun MiningMacroModule.buildOffsets(radius: Int, vertical: Int): List<Sc
   return list
 }
 
-internal fun MiningMacroModule.veinNeighborOffsets26(): List<ScanOffset> {
-  val list = ArrayList<ScanOffset>(26)
+internal fun MiningMacroModule.veinNeighborOffsets6(): List<ScanOffset> {
+  val list = ArrayList<ScanOffset>(6)
   for (dy in -1..1) {
     for (dx in -1..1) {
       for (dz in -1..1) {
         if (dx == 0 && dy == 0 && dz == 0) continue
+        if (abs(dx) + abs(dy) + abs(dz) != 1) continue
         val distSq = dx * dx + dy * dy + dz * dz
         list.add(ScanOffset(dx, dy, dz, distSq))
       }
     }
   }
-  // Straight neighbors first, then diagonal/corner neighbors. This still collects
-  // diagonal vein pieces, but it keeps the main connected body stable.
   list.sortWith(compareBy<ScanOffset>({ it.distSq }, { abs(it.dy) }, { -it.dy }))
   return list
 }
@@ -387,7 +386,7 @@ internal fun MiningMacroModule.buildVein(
   var maxY = seed.y
   var maxZ = seed.z
 
-  val neighborOffsets = veinNeighborOffsets26()
+  val neighborOffsets = veinNeighborOffsets6()
   while (queue.isNotEmpty() && blocks.size < maxBlocks) {
     val pos = queue.removeFirst()
     for (off in neighborOffsets) {

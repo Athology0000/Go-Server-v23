@@ -1,6 +1,6 @@
 ﻿package org.cobalt.internal.mining
 
-import java.util.Locale
+import java.util.*
 import kotlin.math.sqrt
 import net.minecraft.ChatFormatting
 import net.minecraft.client.Minecraft
@@ -8,7 +8,6 @@ import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 import net.minecraft.client.player.LocalPlayer
 import net.minecraft.core.BlockPos
 import net.minecraft.world.entity.Entity
-import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.player.Inventory
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.inventory.ClickType
@@ -23,20 +22,12 @@ import org.cobalt.api.event.impl.client.ChatEvent
 import org.cobalt.api.event.impl.client.TickEvent
 import org.cobalt.api.module.Module
 import org.cobalt.api.module.ModuleCategory
-import org.cobalt.api.module.setting.impl.CheckboxSetting
-import org.cobalt.api.module.setting.impl.InfoSetting
-import org.cobalt.api.module.setting.impl.InfoType
-import org.cobalt.api.module.setting.impl.SliderSetting
-import org.cobalt.api.module.setting.impl.TextSetting
+import org.cobalt.api.module.setting.impl.*
 import org.cobalt.api.pathfinder.jni.NativePathfinder
 import org.cobalt.api.pathfinder.jni.PathStatus
 import org.cobalt.api.pathfinder.minecraft.MinecraftPathingRules
 import org.cobalt.api.rotation.RotationExecutor
-import org.cobalt.api.util.AngleUtils
-import org.cobalt.api.util.ChatUtils
-import org.cobalt.api.util.InventoryUtils
-import org.cobalt.api.util.MouseClickType
-import org.cobalt.api.util.getLoreLines
+import org.cobalt.api.util.*
 import org.cobalt.api.util.player.MovementManager
 import org.cobalt.internal.combat.CombatMacroModule
 import org.cobalt.internal.pathfinding.PathfindingModule
@@ -164,7 +155,7 @@ object CommissionMacroModule : Module("Commission Macro") {
   )
 
   val statusDisplay: String get() = statusText.value
-  val modeDisplay: String get() = "RDBT V5"
+  val modeDisplay: String get() = "DUTTV2"
   val commissionDisplay: String get() = commissionText.value
   val currentZoneDisplay: String get() = detectAreaFromTabList() ?: "Unknown"
   val targetedCommissionName: String? get() = currentCommission?.name

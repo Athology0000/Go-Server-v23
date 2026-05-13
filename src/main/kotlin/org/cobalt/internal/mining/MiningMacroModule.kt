@@ -1603,34 +1603,108 @@ object MiningMacroModule : Module("Mining Macro") {
     val baseY = player.blockY
     val baseZ = player.blockZ
     val outline = OverlayRenderEngine.Color(0xFF, 0x55, 0x44, 0xC0)
-    val fill = OverlayRenderEngine.Color(0xFF, 0x55, 0x44, 0x30)
     val cursor = BlockPos.MutableBlockPos()
     val vertical = (radius / 2).coerceAtLeast(2)
     for (dy in -vertical..vertical) {
       for (dx in -radius..radius) {
         for (dz in -radius..radius) {
           cursor.set(baseX + dx, baseY + dy, baseZ + dz)
-          if (level.getBlockState(cursor).isAir) continue
-          val id = BuiltInRegistries.BLOCK.getKey(level.getBlockState(cursor).block).toString()
+          val state = level.getBlockState(cursor)
+          if (state.isAir) continue
+          val id = BuiltInRegistries.BLOCK.getKey(state.block).toString()
           val flagged = id in MiningBlockRegistry.PERMANENT_LOS_OCCLUDERS ||
             MiningBlockRegistry.isBlacklisted(id)
           if (!flagged) continue
-          OverlayRenderEngine.addBox(
-            level,
-            cursor.x.toDouble(),
-            cursor.y.toDouble(),
-            cursor.z.toDouble(),
-            cursor.x + 1.0,
-            cursor.y + 1.0,
-            cursor.z + 1.0,
-            fill,
-            outline,
-            1.4f,
-            2,
-            OVERLAY_TAG,
-          )
+          for (direction in Direction.values()) {
+            if (isBedrockFaceExposed(level, cursor, direction)) {
+              renderBedrockFace(level, cursor, direction, outline)
+            }
+          }
         }
       }
+    }
+  }
+
+  private fun isBedrockFaceExposed(
+    level: net.minecraft.world.level.Level,
+    pos: BlockPos,
+    direction: Direction,
+  ): Boolean {
+    val neighbor = pos.relative(direction)
+    val neighborState = level.getBlockState(neighbor)
+    return neighborState.isAir || neighborState.getCollisionShape(level, neighbor).isEmpty
+  }
+
+  private fun renderBedrockFace(
+    level: net.minecraft.world.level.Level,
+    pos: BlockPos,
+    direction: Direction,
+    color: OverlayRenderEngine.Color,
+  ) {
+    val pad = 0.003
+    val x0 = pos.x.toDouble()
+    val y0 = pos.y.toDouble()
+    val z0 = pos.z.toDouble()
+    val x1 = x0 + 1.0
+    val y1 = y0 + 1.0
+    val z1 = z0 + 1.0
+
+    val corners = when (direction) {
+      Direction.DOWN -> listOf(
+        Vec3(x0, y0 - pad, z0),
+        Vec3(x1, y0 - pad, z0),
+        Vec3(x1, y0 - pad, z1),
+        Vec3(x0, y0 - pad, z1),
+      )
+      Direction.UP -> listOf(
+        Vec3(x0, y1 + pad, z0),
+        Vec3(x1, y1 + pad, z0),
+        Vec3(x1, y1 + pad, z1),
+        Vec3(x0, y1 + pad, z1),
+      )
+      Direction.NORTH -> listOf(
+        Vec3(x0, y0, z0 - pad),
+        Vec3(x1, y0, z0 - pad),
+        Vec3(x1, y1, z0 - pad),
+        Vec3(x0, y1, z0 - pad),
+      )
+      Direction.SOUTH -> listOf(
+        Vec3(x0, y0, z1 + pad),
+        Vec3(x1, y0, z1 + pad),
+        Vec3(x1, y1, z1 + pad),
+        Vec3(x0, y1, z1 + pad),
+      )
+      Direction.WEST -> listOf(
+        Vec3(x0 - pad, y0, z0),
+        Vec3(x0 - pad, y0, z1),
+        Vec3(x0 - pad, y1, z1),
+        Vec3(x0 - pad, y1, z0),
+      )
+      Direction.EAST -> listOf(
+        Vec3(x1 + pad, y0, z0),
+        Vec3(x1 + pad, y0, z1),
+        Vec3(x1 + pad, y1, z1),
+        Vec3(x1 + pad, y1, z0),
+      )
+    }
+
+    for (index in corners.indices) {
+      val start = corners[index]
+      val end = corners[(index + 1) % corners.size]
+      OverlayRenderEngine.addLine(
+        level,
+        start.x,
+        start.y,
+        start.z,
+        end.x,
+        end.y,
+        end.z,
+        color,
+        1.6f,
+        1,
+        OVERLAY_TAG,
+        forceRender = true,
+      )
     }
   }
 
@@ -1648,15 +1722,13 @@ object MiningMacroModule : Module("Mining Macro") {
   ) {
     if (!highlightPossibleBlocks.value) return
 
-    val bounds = when {
-      vein != null && vein.blocks.isNotEmpty() -> boundsForBlocks(vein.blocks)
-      fallbackBlocks.isNotEmpty() -> boundsForBlocks(fallbackBlocks)
-      else -> return
-    }
+    val blocks = fallbackBlocks.takeIf { it.isNotEmpty() }
+      ?: vein?.blocks?.takeIf { it.isNotEmpty() }
+      ?: return
+    val bounds = boundsForBlocks(blocks)
 
-    // One big outline for the full vein. This intentionally does NOT draw one box
-    // per block, so the scan preview looks like one connected vein shell instead
-    // of a pile of separate cubes.
+    // One outline around the currently reachable highlight set, so stale or distant
+    // scan members do not stretch the preview box away from the blocks being mined.
     val pad = 0.025
     OverlayRenderEngine.addBox(
       level,

@@ -20,7 +20,7 @@ class KeyBindSetting(
 
   val keyName: String
     get() = when (value.keyCode) {
-      -1 -> "None"
+      in Int.MIN_VALUE until GLFW.GLFW_KEY_SPACE -> "None"
       GLFW.GLFW_KEY_LEFT_SUPER, GLFW.GLFW_KEY_RIGHT_SUPER -> "Super"
       GLFW.GLFW_KEY_LEFT_SHIFT -> "Left Shift"
       GLFW.GLFW_KEY_RIGHT_SHIFT -> "Right Shift"
@@ -36,7 +36,7 @@ class KeyBindSetting(
     }
 
   override fun read(element: JsonElement) {
-    this.value.keyCode = element.asInt
+    this.value.keyCode = element.asInt.takeIf { it >= GLFW.GLFW_KEY_SPACE } ?: -1
   }
 
   override fun write(): JsonElement {

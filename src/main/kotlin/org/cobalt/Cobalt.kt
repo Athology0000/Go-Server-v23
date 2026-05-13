@@ -232,6 +232,7 @@ object Cobalt : ClientModInitializer {
       TitleScreenRenderer,
       MacroTimeTracker,
       RouteEditMode,
+      HypixelManager,
       SkyblockEventManager,
     ).forEach { EventBus.register(it) }
   }

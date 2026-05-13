@@ -26,7 +26,9 @@ public class ConnectionMixin {
     }
 
     if (packet instanceof ClientboundSystemChatPacket) {
-      new ChatEvent.Receive(packet).post();
+      if (new ChatEvent.Receive(packet).post()) {
+        callbackInfo.cancel();
+      }
     }
   }
 
@@ -40,7 +42,9 @@ public class ConnectionMixin {
     }
 
     if (packet instanceof ServerboundChatPacket) {
-      new ChatEvent.Send(packet).post();
+      if (new ChatEvent.Send(packet).post()) {
+        callbackInfo.cancel();
+      }
     }
   }
 

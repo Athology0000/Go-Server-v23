@@ -7,6 +7,7 @@ import org.cobalt.api.pathfinder.jni.NativePathfinderBridge
 import org.cobalt.api.pathfinder.jni.NativePathResult
 import org.cobalt.api.pathfinder.jni.NativeStateEncoder
 import org.cobalt.api.pathfinder.jni.NativeVoxelFlags
+import org.cobalt.internal.skyblock.HypixelManager
 import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.floor
@@ -494,12 +495,7 @@ object PathManager {
         else ETHERWARP_LEGACY_SNEAK_OFFSET
 
     private fun getCurrentHypixelArea(): String? {
-        for (name in org.cobalt.api.util.TabListUtils.rawDisplayNames()) {
-            if (!name.contains("Area:")) continue
-            val value = name.substringAfter("Area:", "").trim()
-            if (value.isNotEmpty()) return value
-        }
-        return null
+        return HypixelManager.currentAreaName()
     }
 
     private fun isModernEtherwarpArea(area: String?): Boolean = area != null && area in MODERN_ETHERWARP_AREAS
