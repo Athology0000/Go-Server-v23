@@ -31,7 +31,6 @@ import org.cobalt.api.pathfinder.jni.ActionType
 import org.cobalt.api.pathfinder.jni.NativePathfinder
 import org.cobalt.api.pathfinder.jni.PathHazards
 import org.cobalt.api.pathfinder.jni.PathExecutorState
-import org.cobalt.api.pathfinder.jni.PathRotationConfig
 import org.cobalt.api.pathfinder.jni.PathStatus
 import org.cobalt.api.pathfinder.minecraft.MinecraftPathingRules
 import org.cobalt.api.ui.theme.ThemeManager
@@ -276,36 +275,6 @@ object PathfindingModule : Module("Pathfinding") {
     90.0, 15.0, 180.0
   )
 
-  private val rotationYawSpeed = SliderSetting(
-    "Rotation: Yaw Speed",
-    "Base exp-smoother rate for yaw during pathfinding (1/sec). Higher = snappier head turns. The corner-anticipation term adds to this when the path is curving.",
-    9.0, 3.0, 25.0
-  )
-
-  private val rotationPitchSpeed = SliderSetting(
-    "Rotation: Pitch Speed",
-    "Base exp-smoother rate for pitch during pathfinding (1/sec). Higher = pitch tracks vertical lookahead faster — main fix for terrain-pitch lag.",
-    14.0, 3.0, 30.0
-  )
-
-  private val rotationCornerAnticipation = SliderSetting(
-    "Rotation: Corner Anticipation",
-    "Per-unit-of-rising-curvature boost added to yaw rate. 0 = react-only (legacy). Higher = the head starts speeding up before a corner peaks.",
-    5.0, 0.0, 12.0
-  )
-
-  private val rotationVerticalAnticipation = SliderSetting(
-    "Rotation: Vertical Anticipation",
-    "Pitch rate boost driven by the vertical delta between the active lookahead point and the player's eye. 0 = disabled. Higher = pitch reacts harder to upcoming Y changes.",
-    6.0, 0.0, 12.0
-  )
-
-  private val rotationHumanizationDrift = SliderSetting(
-    "Rotation: Humanization Drift",
-    "Scalar on optional anti-bot drift. 0 = crisp deterministic motion. Higher = subtle organic wobble. Defaults to 0 to keep tracking responsive.",
-    0.0, 0.0, 1.0
-  )
-
   private val jumpCooldownFloor = SliderSetting(
     "Jump Cooldown Floor",
     "Minimum ticks between consecutive jumps. Stops double-jumps from one trigger resetting while another fires.",
@@ -514,11 +483,6 @@ object PathfindingModule : Module("Pathfinding") {
       movementDebugCandidateRadius,
       weightMapEnabled,
       weightMapForward,
-      rotationYawSpeed,
-      rotationPitchSpeed,
-      rotationCornerAnticipation,
-      rotationVerticalAnticipation,
-      rotationHumanizationDrift,
       debugFileLogging,
       debugChatLogging,
       aotvSlot,
@@ -571,11 +535,6 @@ object PathfindingModule : Module("Pathfinding") {
     PathExecutorState.forwardYawTolerance = forwardYawTolerance.value
     PathExecutorState.jumpCooldownFloor = jumpCooldownFloor.value.toInt()
     PathExecutorState.edgeScanDistance = edgeScanDistance.value
-    PathRotationConfig.baseYawRate = rotationYawSpeed.value
-    PathRotationConfig.basePitchRate = rotationPitchSpeed.value
-    PathRotationConfig.cornerAnticipation = rotationCornerAnticipation.value
-    PathRotationConfig.verticalAnticipation = rotationVerticalAnticipation.value
-    PathRotationConfig.humanizationDrift = rotationHumanizationDrift.value
     org.cobalt.api.pathfinder.jni.executor.JumpDetector.jumpRiseMin = jumpMinRise.value
     org.cobalt.api.pathfinder.jni.executor.JumpDetector.jumpRangeMultiplier = jumpRangeMultiplier.value
 

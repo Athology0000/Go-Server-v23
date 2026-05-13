@@ -7,6 +7,7 @@ import org.cobalt.api.rotation.RotationExecutor
 import org.cobalt.api.util.AngleUtils
 import org.cobalt.api.util.helper.Rotation
 import org.cobalt.api.util.player.MovementManager
+import org.cobalt.internal.rotation.CobaltRotation
 import kotlin.math.abs
 
 data class PathCommand(
@@ -70,7 +71,7 @@ data class PathCommand(
         if (applyRotation) {
             MovementManager.setLookLock(true)
             // Stop the legacy PD/humanization strategy if it was running from a prior
-            // path tick — PathRotationStrategy now owns pathfinding rotation.
+            // path tick — block-to-block now owns pathfinding rotation.
             RotationExecutor.stopIfUsing(PathfinderRotationStrategy)
             drivePathRotation(player)
         } else {
@@ -79,10 +80,10 @@ data class PathCommand(
             // Soft-release: let the smoother finish converging to the last
             // path aim over a few frames instead of cutting it dead, which
             // produced a visible "clamp" at the end of the path.
-            if (PathExecutorState.pathRotationOwned) {
-                PathRotationStrategy.requestSoftRelease(maxFrames = 20)
-                PathExecutorState.pathRotationOwned = false
-                PathExecutorState.pathRotationLastTarget = null
+            if (PathExecutorState.blockRotationOwned) {
+                CobaltRotation.blockController.releaseWhenSettled(maxFrames = 20)
+                PathExecutorState.blockRotationOwned = false
+                PathExecutorState.blockRotationLastTarget = null
             }
         }
     }
@@ -146,10 +147,10 @@ data class PathCommand(
     }
 
     /**
-     * Pathfinding rotation: feeds the live lookahead aim into PathRotationStrategy
-     * via the central RotationExecutor. The strategy's exp-smoother runs each
-     * render frame with decoupled yaw/pitch rates and anticipation terms; all
-     * tuning lives on PathRotationConfig (driven by PathfindingModule sliders).
+     * Pathfinding rotation: continuously chases the live lookahead aim each
+     * tick instead of doing a fresh easing segment per block. The exp smoother
+     * inside the controller absorbs the per-tick target changes, so the camera
+     * sweeps smoothly across the entire path without segment-boundary kinks.
      *
      * The yaw/pitch used here are the values the native executor already
      * solved this tick (rawTargetYaw/Pitch via [resolveGuidedRotation], or the
@@ -159,11 +160,27 @@ data class PathCommand(
         if (player == null) return
 
         val aim = resolveGuidedRotation(player)
-        RotationExecutor.rotateTo(Rotation(aim.yaw, aim.pitch), PathRotationStrategy)
+        val controller = CobaltRotation.blockController
 
-        PathExecutorState.pathRotationOwned = true
-        if (PathExecutorState.pathRotationLastTarget == null) {
-            PathExecutorState.pathRotationLastTarget = player.blockPosition()
+        // Adaptive smoothing: tighter rate through corners so we don't undershoot
+        // the turn, looser on straights so the camera stays cinematic. Also
+        // accounts for the raw angular error between the smoother's current
+        // output and the live aim — if we're way off (after a teleport / replan
+        // / sharp corner), bias toward catching up.
+        // Soft, humanlike tracking. No error-boost: lookahead jumps used to spike
+        // the smoothing rate, which is what produced the snappy feel. A wider
+        // lookahead distance gives the rotation room to anticipate turns instead.
+        // Curvature contribution is gentle — only enough to keep the camera
+        // honest through sharp corners, not enough to feel mechanical.
+        val curvature = PathExecutorState.pathCurvature
+        val curvatureBoost = (curvature * 5.0).coerceIn(0.0, 6.0)
+        controller.smoothingRate = 4.5 + curvatureBoost
+
+        controller.setDirectTarget(aim.yaw, aim.pitch)
+
+        PathExecutorState.blockRotationOwned = true
+        if (PathExecutorState.blockRotationLastTarget == null) {
+            PathExecutorState.blockRotationLastTarget = player.blockPosition()
         }
     }
 

@@ -30,11 +30,11 @@ object PathExecutorState {
     var initialTurnBoostTicks: Int = 0
     var jumpSuppressTicks: Int = 0
 
-    // ── Pathfinding rotation handoff ──
-    // Tracks whether pathfinding currently owns PathRotationStrategy so we only
-    // request a soft-release when path-rotation actually started it.
-    var pathRotationOwned: Boolean = false
-    var pathRotationLastTarget: BlockPos? = null
+    // ── Block-to-block rotation handoff ──
+    // Tracks whether pathfinding currently owns CobaltRotation.blockController so we
+    // only cancel it when path-rotation actually started it (not when a macro is driving).
+    var blockRotationOwned: Boolean = false
+    var blockRotationLastTarget: BlockPos? = null
 
     // ── Path position (indexed into lookPoints) ──
     var currentPathPosition: Double = 0.0
