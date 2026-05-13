@@ -923,15 +923,8 @@ internal fun MiningMacroModule.findVisibleAimPoint(
       return point
     }
   }
-  // Fallback to legacy sampling ONLY for the corner case where no face has
-  // air adjacent (rare; would mean a fully buried block, which we shouldn't
   // mine anyway — but the original code took inset samples that could still
   // resolve. Keep it as a last resort for ceiling-style edge blocks.)
-  for (point in buildAimSamplePoints(eye, target)) {
-    if (canSeeAimPoint(level, entity, eye, point, target, ignorePlayerObstructions)) {
-      return point
-    }
-  }
   return null
 }
 

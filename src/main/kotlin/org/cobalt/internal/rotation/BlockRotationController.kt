@@ -33,8 +33,10 @@ class BlockRotationController {
     private var smoothedPitch: Float = 0f
     private var smoothingInitialized: Boolean = false
 
-    /** Smoothing rate constant (1/seconds). Higher = snappier, lower = floatier. */
-    var smoothingRate: Double = 28.0
+    /** Smoothing rate constant (1/seconds). Higher = snappier, lower = floatier.
+     *  ~16 gives a 60 ms time constant — reaches 63% catchup in 60 ms and 95%
+     *  in ~190 ms, which matches the cadence of a human flicking and settling. */
+    var smoothingRate: Double = 16.0
 
     /**
      * Optional precision point set by the caller (e.g. mining macro) once the
@@ -92,7 +94,7 @@ class BlockRotationController {
         // Reset smoothing rate to the default whenever a new segment begins.
         // Pathfinding's continuous mode adjusts this per frame; mining etc.
         // should always start fresh.
-        smoothingRate = 28.0
+        smoothingRate = 16.0
         // Keep smoothingInitialized — preserves velocity continuity across retargets.
         precisionPoint = null
         pendingPrecisionPoint = null

@@ -161,6 +161,8 @@ object NativePathfinder {
     private const val AOTV_FLUID_STRAIGHTNESS_BONUS = 10.0
     private const val AOTV_FLUID_MIN_GAIN_FACTOR = 0.7
     private const val AOTV_NEEDED_MIN_GAIN = 4.0
+    private const val AOTV_MAX_VERTICAL_DELTA = 3.0
+    private const val ETHERWARP_HIGH_VERTICAL_GAIN = 8.5
     private const val TELEPORT_FORWARD_DOT_MIN = 0.92
     private const val TELEPORT_LOOK_DOT_MIN = 0.45
     private const val NODE_REACHED_RANGE = 0.75
@@ -1060,8 +1062,6 @@ object NativePathfinder {
             val aimPoint = Vec3(aimBlock.x + 0.5, aimBlock.y + 0.92, aimBlock.z + 0.5)
             val gain = estimatePathGain(nodes, cursor, i)
             if (gain < effectiveMinGain) continue
-            if (!isForwardTeleportCandidate(player, nodes, cursor, i)) continue
-            if (!isTeleportSegmentStraightEnough(nodes, cursor, i, effectiveStraightnessTolerance)) continue
             if (!isTeleportLandingCandidateSafe(level, nodes, i, aimBlock)) continue
 
             val dx = aimPoint.x - player.eyePosition.x
@@ -1072,17 +1072,34 @@ object NativePathfinder {
 
             val yaw = Math.toDegrees(atan2(-dx, dz)).toFloat()
             val pitch = Math.toDegrees(-atan2(dy, sqrt(dx * dx + dz * dz))).toFloat()
+            val verticalGain = node.y - player.y
+            val highVerticalClimb = verticalGain >= ETHERWARP_HIGH_VERTICAL_GAIN
 
-            if (PathTeleportConfig.v5EtherwarpEnabled) {
+            if (highVerticalClimb && PathTeleportConfig.v5EtherwarpEnabled) {
                 val direct = EtherwarpLogic.getEtherwarpResultTo(aimBlock, aimPoint)
                 if (direct.succeeded && direct.pos == aimBlock) {
                     best = TeleportCandidate(i, yaw, pitch, ActionType.ETHERWARP)
                     break
                 }
+                continue
             }
 
-            if (PathTeleportConfig.v5AotvEnabled && gain >= AOTV_NODE_DISTANCE_MIN && gain <= AOTV_NODE_DISTANCE_MAX) {
-                best = TeleportCandidate(i, yaw, 0f, ActionType.AOTV)
+            if (!isForwardTeleportCandidate(player, nodes, cursor, i)) continue
+            if (!isTeleportSegmentStraightEnough(nodes, cursor, i, effectiveStraightnessTolerance)) continue
+            if (!isTeleportSegmentOpen(level, nodes, cursor, i)) continue
+
+            if (
+                !highVerticalClimb &&
+                abs(verticalGain) <= AOTV_MAX_VERTICAL_DELTA &&
+                PathTeleportConfig.v5AotvEnabled &&
+                gain >= AOTV_NODE_DISTANCE_MIN &&
+                gain <= AOTV_NODE_DISTANCE_MAX
+            ) {
+                val nodeCenter = centerNode(node)
+                val ndx = nodeCenter.x - player.x
+                val ndz = nodeCenter.z - player.z
+                val directionYaw = Math.toDegrees(atan2(-ndx, ndz)).toFloat()
+                best = TeleportCandidate(i, directionYaw, 0f, ActionType.AOTV)
                 break
             }
         }
@@ -1152,10 +1169,11 @@ object NativePathfinder {
 
     private fun hasTeleportNeedAhead(level: Level, nodes: List<Vec3>, cursor: Int): Boolean {
         val scanEnd = minOf(nodes.lastIndex, cursor + TELEPORT_NEED_LOOKAHEAD_NODES)
+        val baseY = nodes.getOrNull(cursor)?.y ?: return false
         for (i in cursor..scanEnd) {
             val flags = cachedKeyNodeFlags.getOrElse(i) { 0 }
             if (flags and FLAG_LOW_HEADROOM != 0 || flags and FLAG_TIGHT_CORRIDOR != 0) return true
-            if (flags and FLAG_STEP_UP_NEXT != 0 && i > cursor) return true
+            if (nodes[i].y - baseY >= ETHERWARP_HIGH_VERTICAL_GAIN) return true
             if (PathHazards.isHarmfulStandPosition(level, PathHazards.walkPosForNode(nodes[i]))) return true
         }
         return false

@@ -173,8 +173,8 @@ data class PathCommand(
         // Curvature contribution is gentle — only enough to keep the camera
         // honest through sharp corners, not enough to feel mechanical.
         val curvature = PathExecutorState.pathCurvature
-        val curvatureBoost = (curvature * 10.0).coerceIn(0.0, 14.0)
-        controller.smoothingRate = 9.0 + curvatureBoost
+        val curvatureBoost = (curvature * 5.0).coerceIn(0.0, 6.0)
+        controller.smoothingRate = 4.5 + curvatureBoost
 
         controller.setDirectTarget(aim.yaw, aim.pitch)
 

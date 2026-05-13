@@ -451,6 +451,7 @@ object MiningMacroModule : Module("Mining Macro") {
 
   internal var warpStage = 0
   internal var warpTarget: BlockPos? = null
+  internal var warpUseEtherwarp = false
   internal var warpStageTicks = 0
   internal var warpCooldownUntil = 0L
   internal var warpRestoreSlot = -1
@@ -929,6 +930,24 @@ object MiningMacroModule : Module("Mining Macro") {
         stepToNearbyBlocks.value &&
           canStepToNearbyTarget(player, target) &&
           distSq <= nudgeThresh * nudgeThresh
+      // Fast path: target is just barely out of mining range (≤ mineRange + 2).
+      // The native pathfinder is unreliable at these tiny distances — it
+      // oscillates between PLANNING and ARRIVED, and during those states the
+      // early-tick block calls clearForcedMovement, killing any step. Drive a
+      // direct nudge in that window so the player actually walks the half-block
+      // they need to put the block in range.
+      val closeNudgeRange = mineRange.value + 2.0
+      if (canShortStep && blockingPlayer == null && distSq <= closeNudgeRange * closeNudgeRange) {
+        if (startedPath && nativeActive()) {
+          nativeStop()
+        }
+        startedPath = false
+        lastPathTarget = null
+        resetApproachTracking()
+        nudgeTowardApproach(level, player, target)
+        focusApproachTarget(player, target)
+        return
+      }
         when {
           blockingPlayer != null && usePathfinding.value && canShortStep -> {
             moveToward(
@@ -993,22 +1012,51 @@ object MiningMacroModule : Module("Mining Macro") {
     if (!stillTarget) {
       vein.blocks.remove(event.pos)
       precisionRolls.remove(event.pos.asLong())
+      val wasRotationTarget = currentTarget == event.pos || miningOnTarget == event.pos ||
+        frameRotPrevBlock == event.pos
       if (currentTarget == event.pos) {
         currentTarget = null
         currentTargetNoLosTicks = 0
-        // Block broke while we were rotating toward it; surface the next-closest
-        // remaining vein block to the debug renderer so it can draw the recovery line.
-        val playerPos = mc.player?.blockPosition()
-        val fallback = if (playerPos != null && vein.blocks.isNotEmpty()) {
-          vein.blocks.minByOrNull { it.distSqr(playerPos) }
-        } else null
-        CobaltRotation.blockController.setFallbackBlock(fallback)
       }
       if (approachTarget == event.pos || lastPathTarget == event.pos) {
         stopApproachMovement()
       }
       if (miningOnTarget == event.pos) {
         stopMiningKeys()
+      }
+      // Block under the rotation controller just turned to bedrock/air. Immediately
+      // retarget the controller to the next-nearest mineable vein block (or cancel)
+      // so the camera doesn't linger on the now-exposed bedrock until the next
+      // onTick happens to pick an in-range target.
+      if (wasRotationTarget) {
+        val playerNow = mc.player
+        val levelNow = mc.level
+        val fallback = if (playerNow != null && levelNow != null && vein.blocks.isNotEmpty()) {
+          val playerPos = playerNow.blockPosition()
+          vein.blocks
+            .asSequence()
+            .filter { isMineableTarget(levelNow, playerNow, it, vein.targetIds) }
+            .minByOrNull { it.distSqr(playerPos) }
+        } else null
+        CobaltRotation.blockController.setFallbackBlock(fallback)
+        if (fallback != null) {
+          CobaltRotation.blockController.rotate(
+            BlockRotationRequest(
+              fromBlock = event.pos,
+              toBlock = fallback,
+              durationTicks = 5,
+              useFromBlockAsStartRotation = false,
+              maxDegreesPerTick = 12f,
+              easing = RotationEasingType.EASE_IN_OUT_SINE,
+            )
+          )
+          frameRotPrevBlock = fallback
+          frameRotTarget = null
+        } else {
+          CobaltRotation.blockController.cancel()
+          frameRotPrevBlock = null
+          frameRotTarget = null
+        }
       }
     } else if (!vein.blocks.contains(event.pos)) {
       // Block refreshed/respawned back to a target ore - re-add it to the active vein.

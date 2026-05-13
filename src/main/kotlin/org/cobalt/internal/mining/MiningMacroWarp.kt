@@ -27,6 +27,10 @@ import org.cobalt.internal.rotation.RotationsModule
 internal typealias WarpAimTarget = MiningMacroModule.AimTarget
 internal typealias WarpVein = MiningMacroModule.Vein
 
+private const val ETHERWARP_VERTICAL_GAIN_BLOCKS = 9
+private const val INSTANT_TRANSMISSION_MAX_DISTANCE = 12.5
+private const val INSTANT_TRANSMISSION_MAX_VERTICAL_DELTA = 3
+
 internal fun MiningMacroModule.tryStartWarp(
   player: Player,
   level: net.minecraft.world.level.Level,
@@ -39,14 +43,24 @@ internal fun MiningMacroModule.tryStartWarp(
 
   val eye = player.eyePosition
   val targetCenter = Vec3(target.x + 0.5, target.y + 0.5, target.z + 0.5)
+  val etherwarpAimPoint = Vec3(target.x + 0.5, target.y + 0.92, target.z + 0.5)
   val distSq = eye.distanceToSqr(targetCenter)
   val minDistSq = warpMinDistance.value * warpMinDistance.value
   if (distSq < minDistSq) return false
 
-  val range = EtherwarpLogic.getEtherwarpRange().toDouble()
-  if (distSq > range * range) return false
+  val verticalDelta = target.y - player.blockY
+  val useEtherwarpForClimb = verticalDelta >= ETHERWARP_VERTICAL_GAIN_BLOCKS
+  if (useEtherwarpForClimb) {
+    val range = EtherwarpLogic.getEtherwarpRange().toDouble()
+    if (distSq > range * range) return false
+    if (!hasLineOfSight(level, player, target)) return false
+    val direct = EtherwarpLogic.getEtherwarpResultTo(target, etherwarpAimPoint)
+    if (!direct.succeeded || direct.pos != target) return false
+  } else {
+    if (abs(verticalDelta) > INSTANT_TRANSMISSION_MAX_VERTICAL_DELTA) return false
+    if (distSq > INSTANT_TRANSMISSION_MAX_DISTANCE * INSTANT_TRANSMISSION_MAX_DISTANCE) return false
+  }
 
-  if (!hasLineOfSight(level, player, target)) return false
   if (!ensureEtherwarpHotbarSelected()) return false
 
   if (startedPath && nativeActive()) {
@@ -61,6 +75,7 @@ internal fun MiningMacroModule.tryStartWarp(
   mc.options.keyShift?.setDown(false)
 
   warpTarget = target
+  warpUseEtherwarp = useEtherwarpForClimb
   warpStage = 0
   warpStageTicks = 0
   return true
@@ -75,15 +90,19 @@ internal fun MiningMacroModule.handleWarp(
     return
   }
 
-  val targetCenter = Vec3(target.x + 0.5, target.y + 0.5, target.z + 0.5)
-  frameRotTarget = targetCenter
+  val targetAimPoint = if (warpUseEtherwarp) {
+    Vec3(target.x + 0.5, target.y + 0.92, target.z + 0.5)
+  } else {
+    Vec3(target.x + 0.5, target.y + 0.5, target.z + 0.5)
+  }
+  frameRotTarget = targetAimPoint
   frameRotSnapThreshold = 0f
   frameRotSpeedScale = RotationsModule.sample(RotationsModule.warpSpeedScale.value).toFloat()
   frameRotAccelScale = RotationsModule.sample(RotationsModule.warpAccelScale.value).toFloat()
   frameRotPitchStep = RotationsModule.sample(RotationsModule.miningPitchStep.value).toFloat()
   frameRotMaxSpeed = RotationsModule.sample(RotationsModule.miningMaxSpeed.value).toFloat()
   frameRotMaxAccel = RotationsModule.sample(RotationsModule.miningMaxAccel.value).toFloat()
-  val targetRotation = AngleUtils.getRotation(targetCenter)
+  val targetRotation = AngleUtils.getRotation(targetAimPoint)
   val yawError = abs(AngleUtils.getRotationDelta(player.yRot, targetRotation.yaw)).toDouble()
   val pitchError = abs(targetRotation.pitch - player.xRot).toDouble()
 
@@ -91,8 +110,15 @@ internal fun MiningMacroModule.handleWarp(
     0 -> {
       val tol = warpAimTolerance.value
       if ((yawError <= tol && pitchError <= tol) || warpStageTicks >= WARP_ALIGN_TICKS) {
-        mc.options.keyShift?.setDown(true)
-        warpStage = 1
+        if (warpUseEtherwarp) {
+          mc.options.keyShift?.setDown(true)
+          warpStage = 1
+        } else {
+          if (!EtherwarpLogic.tryConsumeTeleportUseThisTick()) return
+          mc.options.keyShift?.setDown(false)
+          mc.options.keyUse?.setDown(true)
+          warpStage = 2
+        }
         warpStageTicks = 0
         return
       }
@@ -256,6 +282,7 @@ internal fun MiningMacroModule.resetWarp() {
   mc.options.keyShift?.setDown(false)
   warpStage = 0
   warpTarget = null
+  warpUseEtherwarp = false
   warpStageTicks = 0
   frameRotTarget = null
   frameRotSnapThreshold = 0f

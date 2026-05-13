@@ -51,7 +51,6 @@ inline bool Runtime::moveAscend(const Int3& current, const int dx, const int dz,
 
   const bool srcStair = isStairsBottom(current.x, current.y - 1, current.z);
   const bool destStair = isStairsBottom(destX, current.y, destZ);
-  if (srcStair && !isStairAscentDirection(current.x, current.y - 1, current.z, dx, dz)) return false;
   if (destStair && !isStairAscentDirection(destX, current.y, destZ, dx, dz)) return false;
 
   out.pos = {destX, current.y + 1, destZ};

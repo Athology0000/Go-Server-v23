@@ -73,21 +73,28 @@ internal fun MiningMacroModule.selectMineTarget(
   val rangeSq = mineRange.value * mineRange.value
   val eye = player.eyePosition
 
-  // For in-range blocks, prefer the one whose visible face is closest to the
-  // player's current aim. Using the actual face point (not block center) gives
-  // the real rotation cost and avoids picking blocks that require more turn than
-  // their center angle implies.
+  // For in-range blocks, score = squared distance to the visible aim point + a
+  // mild angular penalty. Distance dominates so the closest reachable block is
+  // chosen; the angle term kicks in only enough to break ties and to push back
+  // against picking blocks the camera would have to spin most of the way around
+  // to reach when a comparable block sits in front of the player.
   var bestInRange: net.minecraft.core.BlockPos? = null
-  var bestAngle = Float.POSITIVE_INFINITY
+  var bestScore = Double.POSITIVE_INFINITY
   for (pos in vein.blocks) {
     if (!isMineableTarget(level, player, pos, vein.targetIds)) continue
     if (distanceToBlockSq(player, pos) > rangeSq) continue
     val visiblePoint: Vec3? = if (REQUIRE_MINE_LOS) findVisibleAimPoint(level, player, eye, pos) else null
     if (REQUIRE_MINE_LOS && visiblePoint == null) continue
     val aimPoint = visiblePoint ?: Vec3(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5)
-    val ang = angularDistanceTo(player, aimPoint)
-    if (ang < bestAngle) {
-      bestAngle = ang
+    val dx = aimPoint.x - eye.x
+    val dy = aimPoint.y - eye.y
+    val dz = aimPoint.z - eye.z
+    val eyeDistSq = dx * dx + dy * dy + dz * dz
+    val ang = angularDistanceTo(player, aimPoint).toDouble()
+    val anglePenalty = (ang / 90.0) * (ang / 90.0) * 1.5
+    val score = eyeDistSq + anglePenalty
+    if (score < bestScore) {
+      bestScore = score
       bestInRange = pos
     }
   }
@@ -373,6 +380,16 @@ internal fun MiningMacroModule.startMining(player: Player, target: net.minecraft
   frameRotSnapThreshold = RotationsModule.bezierSnapThreshold.value.toFloat()
   frameRotTarget = aim.point
   setAimRenderTarget(target, aim.point)
+  // Route the precision aim point into the rotation controller. Without this,
+  // a precision point that only becomes available *after* mining starts (the
+  // common case — the precision tracker resolves the sub-block aim during the
+  // first few mining ticks) never reaches the controller and the chance % has
+  // no visible effect.
+  if (aim.usesPrecisionPoint) {
+    org.cobalt.internal.rotation.CobaltRotation.blockController.setPrecisionPoint(aim.point)
+  } else {
+    org.cobalt.internal.rotation.CobaltRotation.blockController.setPrecisionPoint(null)
+  }
   frameRotSpeedScale = (RotationsModule.sample(RotationsModule.miningSpeedScale.value) * precisionRotScale).toFloat()
   frameRotAccelScale = (RotationsModule.sample(RotationsModule.miningAccelScale.value) * precisionRotScale).toFloat()
   frameRotPitchStep = (RotationsModule.sample(RotationsModule.miningPitchStep.value) * precisionRotScale).toFloat()

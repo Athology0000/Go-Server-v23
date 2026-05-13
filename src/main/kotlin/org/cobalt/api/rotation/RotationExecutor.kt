@@ -5,6 +5,7 @@ import net.minecraft.client.Minecraft
 import org.cobalt.api.event.annotation.SubscribeEvent
 import org.cobalt.api.event.impl.render.WorldRenderEvent
 import org.cobalt.api.util.AngleUtils
+import org.cobalt.api.util.ChatUtils
 import org.cobalt.api.util.helper.Rotation
 import org.cobalt.internal.pathfinding.DebugLog
 
@@ -21,6 +22,8 @@ object RotationExecutor {
 
   private var currStrat: IRotationStrategy? = null
   private var isRotating: Boolean = false
+  private var currentOwnerName: String? = null
+  private var lastConflictWarnTick: Long = Long.MIN_VALUE
 
   fun rotateTo(
     endRot: Rotation,
@@ -32,11 +35,15 @@ object RotationExecutor {
       return
     }
 
-    stopRotating()
+    if (isRotating && currStrat !== strategy) {
+      warnRotationConflict(strategy)
+      return
+    }
 
     targetYaw = endRot.yaw
     targetPitch = endRot.pitch
     currStrat = strategy
+    currentOwnerName = strategyName(strategy)
 
     strategy.onStart()
     isRotating = true
@@ -46,6 +53,7 @@ object RotationExecutor {
     currStrat?.onStop()
     currStrat = null
     isRotating = false
+    currentOwnerName = null
   }
 
   fun stopIfUsing(strategy: IRotationStrategy) {
@@ -56,8 +64,28 @@ object RotationExecutor {
 
   fun isUsing(strategy: IRotationStrategy): Boolean = currStrat === strategy
 
+  fun currentOwner(): String? = if (isRotating) currentOwnerName else null
+
   fun isRotating(): Boolean {
     return isRotating
+  }
+
+  private fun warnRotationConflict(requestedStrategy: IRotationStrategy) {
+    val nowTick = mc.level?.gameTime ?: return
+    if (nowTick - lastConflictWarnTick < CONFLICT_WARN_INTERVAL_TICKS) return
+    lastConflictWarnTick = nowTick
+
+    val active = currentOwnerName ?: strategyName(currStrat)
+    val requested = strategyName(requestedStrategy)
+    ChatUtils.sendMessage("Rotation failsafe: $requested tried to rotate while $active is active.")
+  }
+
+  private fun strategyName(strategy: IRotationStrategy?): String {
+    if (strategy == null) return "unknown"
+    return strategy::class.simpleName
+      ?.takeIf { it.isNotBlank() }
+      ?: strategy.javaClass.simpleName.takeIf { it.isNotBlank() }
+      ?: strategy.javaClass.name.substringAfterLast('.')
   }
 
   @SubscribeEvent
@@ -143,5 +171,7 @@ object RotationExecutor {
 
     return result.toFloat()
   }
+
+  private const val CONFLICT_WARN_INTERVAL_TICKS = 20L
 
 }
