@@ -11,6 +11,7 @@ import (
 
 	"github.com/cobalt/server/internal/audit"
 	"github.com/cobalt/server/internal/cache"
+	"github.com/cobalt/server/internal/config"
 	"github.com/cobalt/server/internal/crypto"
 	"github.com/cobalt/server/internal/db"
 	"github.com/cobalt/server/internal/entitlement"
@@ -69,6 +70,7 @@ func New(
 	auditSvc *audit.Service,
 	masterKey []byte,
 	pepper []byte,
+	baseURL string,
 	cfg *config.Config,
 ) *Service {
 	return &Service{
@@ -79,8 +81,7 @@ func New(
 		masterKey: masterKey,
 		pepper:    pepper,
 		baseURL:   strings.TrimRight(baseURL, "/"),
-		cfg:       cfg
-		baseURL:   strings.TrimRight(baseURL, "/"),
+		cfg:       cfg,
 	}
 }
 
@@ -128,8 +129,8 @@ func (s *Service) Start(ctx context.Context, username, rawHWID, minecraftUsernam
 			"reason": "device_not_enrolled",
 		})
 		return nil, ErrNotFound
-	}fully_bound" && s.cfg.StrictSessionIP {
-		if device.LastSeenIP == nil || *device.LastSeen
+	}
+
 	if device.BindingStatus == "hwid_pending" {
 		if device.EnrollmentIP == nil || *device.EnrollmentIP != sourceIP {
 			s.auditSvc.Log("auth.start.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
@@ -263,10 +264,10 @@ func (s *Service) Finish(ctx context.Context, username, proofHex, sourceIP, mine
 			AccountID:      account.ID,
 			Username:       account.Username,
 			Reason:         ent.Reason,
-		}, nilDuration(s.cfg.SessionTTLHours) * time.
+		}, nil
 	}
 
-	expiresAt := time.Now().Add(time.Hour)
+	expiresAt := time.Now().Add(time.Duration(s.cfg.SessionTTLHours) * time.Hour)
 
 	rawToken, tokenHash, err := crypto.GenerateToken()
 	if err != nil {
@@ -307,13 +308,13 @@ func (s *Service) Finish(ctx context.Context, username, proofHex, sourceIP, mine
 	manifestURL := s.baseURL + "/content/manifest/stable"
 	manifestSig := ""
 
-	if manifest, err := db.GetLatestManifest(ctx, s.pool, ent.ContentChannel); err == nil {
-		 else {
+	manifest, err := db.GetLatestManifest(ctx, s.pool, ent.ContentChannel)
+	if err != nil {
 		log.Printf("[auth.finish] no manifest found for channel %s: %v", ent.ContentChannel, err)
 		return nil, errors.New("no manifest available for your plan")
-	}manifestURL = s.baseURL + "/content/manifest/" + manifest.ID
-		manifestSig = manifest.Signature
 	}
+	manifestURL = s.baseURL + "/content/manifest/" + manifest.ID
+	manifestSig = manifest.Signature
 
 	s.auditSvc.Log("auth.finish.success", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
 		"plan_tier": planTier,
@@ -347,7 +348,10 @@ func (s *Service) Finish(ctx context.Context, username, proofHex, sourceIP, mine
 }
 
 func (s *Service) Heartbeat(ctx context.Context, sessionToken, sourceIP string) error {
-	tokenHash := crypto.HashToken(sessionToken)
+	tokenHash, err := crypto.HashToken(sessionToken)
+	if err != nil {
+		return ErrSessionInvalid
+	}
 
 	session, err := db.GetSessionByTokenHash(ctx, s.pool, tokenHash)
 	if err != nil {

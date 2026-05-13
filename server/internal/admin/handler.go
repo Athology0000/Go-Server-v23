@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"crypto/subtle"
 	"errors"
 	"strings"
 	"time"
@@ -13,18 +14,21 @@ import (
 	"github.com/cobalt/server/internal/db"
 	"github.com/cobalt/server/internal/logbuf"
 	"github.com/cobalt/server/internal/middleware"
+	"github.com/redis/go-redis/v9"
 )
 
-func RegisterRoutes(app *fiber.App, pool *pgxpool.Pool, signingKey []byte, auditSvc *audit.Service, adminAPISecret string) {
+func RegisterRoutes(app *fiber.App, pool *pgxpool.Pool, rdb *redis.Client, signingKey []byte, auditSvc *audit.Service, adminAPISecret string) {
 	viewer := middleware.AdminAuth(pool, "viewer")
 	support := middleware.AdminAuth(pool, "support")
 	super := middleware.AdminAuth(pool, "super_admin")
+	setupLimit := middleware.RateLimit(rdb, 3, time.Hour, middleware.IPKey("admin-setup"))
+	loginLimit := middleware.RateLimit(rdb, 5, time.Minute, middleware.IPAndUsernameKey("admin-login"))
 
 	// Bootstrap — seed the first super_admin (protected by ADMIN_API_SECRET)
-	app.Post("/admin/setup", handleAdminSetup(pool, adminAPISecret))
+	app.Post("/admin/setup", setupLimit, handleAdminSetup(pool, adminAPISecret))
 
 	// Auth
-	app.Post("/admin/auth/login", handleAdminLogin(pool))
+	app.Post("/admin/auth/login", loginLimit, handleAdminLogin(pool))
 
 	// Users (frontend-facing aggregated endpoints)
 	app.Get("/admin/users", viewer, handleListUsers(pool))
@@ -873,8 +877,17 @@ func handleAdminSetup(pool *pgxpool.Pool, adminAPISecret string) fiber.Handler {
 		if adminAPISecret == "" {
 			return c.Status(503).JSON(fiber.Map{"error": "setup_disabled"})
 		}
+
+		hasAdmin, err := db.HasActiveAdminToken(c.Context(), pool)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
+		}
+		if hasAdmin {
+			return c.Status(403).JSON(fiber.Map{"error": "setup_disabled"})
+		}
+
 		raw, err := middleware.ParseBearerToken(c.Get("Authorization"))
-		if err != nil || raw != adminAPISecret {
+		if err != nil || subtle.ConstantTimeCompare([]byte(raw), []byte(adminAPISecret)) != 1 {
 			return c.Status(401).JSON(fiber.Map{"error": "invalid_secret"})
 		}
 
@@ -901,10 +914,17 @@ func handleAdminSetup(pool *pgxpool.Pool, adminAPISecret string) fiber.Handler {
 			if err != nil {
 				return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 			}
+		} else if err := db.UpdateAccountPassword(c.Context(), pool, account.ID, hash); err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
+		}
+
+		_, tokenHash, err := crypto.GenerateToken()
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 
 		expiresAt := time.Now().Add(365 * 24 * time.Hour * 10)
-		_, err = db.CreateAdminToken(c.Context(), pool, "setup-seed:"+account.ID, account.Username, "super_admin", expiresAt)
+		_, err = db.CreateAdminToken(c.Context(), pool, tokenHash, account.Username, "super_admin", expiresAt)
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "seed_failed"})
 		}

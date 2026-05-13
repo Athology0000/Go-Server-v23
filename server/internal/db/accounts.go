@@ -59,6 +59,13 @@ func UpdateAccountStatus(ctx context.Context, pool *pgxpool.Pool, accountID, sta
 	return err
 }
 
+func UpdateAccountPassword(ctx context.Context, pool *pgxpool.Pool, accountID, passwordHash string) error {
+	_, err := pool.Exec(ctx,
+		`UPDATE accounts SET password_hash = $1, updated_at = now() WHERE id = $2`,
+		passwordHash, accountID)
+	return err
+}
+
 func ListAccounts(ctx context.Context, pool *pgxpool.Pool, limit, offset int) ([]*Account, error) {
 	rows, err := pool.Query(ctx,
 		`SELECT id, username, password_hash, email, status, created_at, updated_at

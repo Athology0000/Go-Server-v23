@@ -24,6 +24,7 @@ type Config struct {
 	BaseURL               string
 	StrictSessionIP       bool
 	AppEnv                string
+	AllowPublicRegistration bool
 	PublicCORSAllowOrigins string
 	AdminCORSAllowOrigins  string
 	BodyLimit             int
@@ -62,10 +63,15 @@ func Load() (*Config, error) {
 		BaseURL:               getEnvOr("BASE_URL", "http://localhost:8080"),
 		StrictSessionIP:       getEnvOr("STRICT_SESSION_IP", "true") == "true",
 		AppEnv:                strings.ToLower(getEnvOr("APP_ENV", "development")),
+		AllowPublicRegistration: getEnvOr("ALLOW_PUBLIC_REGISTRATION", "") == "true",
 		PublicCORSAllowOrigins: publicOrigins,
 		AdminCORSAllowOrigins:  adminOrigins,
 		SessionTTLHours:       getEnvIntOr("SESSION_TTL_HOURS", 1),
 		BodyLimit:             getEnvIntOr("BODY_LIMIT_BYTES", 10*1024*1024),
+	}
+
+	if cfg.AppEnv != "production" && os.Getenv("ALLOW_PUBLIC_REGISTRATION") == "" {
+		cfg.AllowPublicRegistration = true
 	}
 
 	if cfg.AppEnv == "production" && !strings.HasPrefix(cfg.BaseURL, "https://") {

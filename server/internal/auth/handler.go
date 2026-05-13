@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/cobalt/server/internal/audit"
+	"github.com/cobalt/server/internal/config"
 	"github.com/cobalt/server/internal/crypto"
 	"github.com/cobalt/server/internal/db"
 	"github.com/cobalt/server/internal/middleware"
@@ -45,7 +46,7 @@ type heartbeatRequest struct {
 	Activity     []string `json:"activity"`
 }
 
-func RegisterRoutes(app *fiber.App, svc *Service, pool *pgxpool.Pool, rdb *redis.Client, auditSvc *audit.Service) {
+func RegisterRoutes(app *fiber.App, svc *Service, pool *pgxpool.Pool, rdb *redis.Client, auditSvc *audit.Service, cfg *config.Config) {
 	authLimit := middleware.RateLimit(rdb, 10, time.Minute, middleware.IPAndUsernameKey("auth"))
 	heartbeatLimit := middleware.RateLimit(rdb, 60, time.Minute, middleware.IPAndUsernameKey("heartbeat"))
 
@@ -57,7 +58,7 @@ func RegisterRoutes(app *fiber.App, svc *Service, pool *pgxpool.Pool, rdb *redis
 
 	panelLimit := middleware.RateLimit(rdb, 20, time.Minute, middleware.IPKey("panel-auth"))
 	app.Post("/auth/login", panelLimit, handlePanelLogin(pool, auditSvc))
-	app.Post("/auth/register", panelLimit, handlePanelRegister(pool))
+	app.Post("/auth/register", panelLimit, handlePanelRegister(pool, cfg.AllowPublicRegistration))
 	app.Get("/user/me", handleGetMe(pool))
 }
 
@@ -165,8 +166,15 @@ func handlePanelLogin(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.Handler
 	}
 }
 
-func handlePanelRegister(pool *pgxpool.Pool) fiber.Handler {
+func handlePanelRegister(pool *pgxpool.Pool, allowPublicRegistration bool) fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		if !allowPublicRegistration {
+			return c.Status(403).JSON(fiber.Map{
+				"error":   "registration_disabled",
+				"message": "Public registration is disabled",
+			})
+		}
+
 		var body struct {
 			Username string `json:"username"`
 			Email    string `json:"email"`
@@ -537,7 +545,7 @@ func handleHeartbeat(svc *Service) fiber.Handler {
 
 		ip := middleware.GetRealIP(c)
 
-		err := svc.Heartbeat(c.Context(), req.SessionToken, ip, req.Activity)
+		err := svc.Heartbeat(c.Context(), req.SessionToken, ip)
 		if errors.Is(err, ErrSessionInvalid) {
 			return c.Status(401).JSON(fiber.Map{"error": "session_invalid"})
 		}

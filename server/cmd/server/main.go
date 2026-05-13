@@ -62,11 +62,10 @@ func main() {
 	pub.Use(middleware.RateLimit(rdb, 120, time.Minute, middleware.IPKey("global")))
 	pub.Use(middleware.SecurityHeaders())
 
-	auth.RegisterRoutes(pub, authSvc, pool, rdb, auditSvc)
+	auth.RegisterRoutes(pub, authSvc, pool, rdb, auditSvc, cfg)
 	enrollment.RegisterRoutes(pub, enrollSvc, rdb)
 	panel.RegisterRoutes(pub, pool, rdb, auditSvc, cfg.MasterKey)
 	content.RegisterRoutes(pub, contentSvc, pool, rdb, cfg.StrictSessionIP)
-	admin.RegisterRoutes(pub, pool, cfg.ManifestSigningKey, auditSvc, cfg.AdminAPISecret)
 	registerAdminUI(pub)
 
 	// Admin server
@@ -75,7 +74,7 @@ func main() {
 	adm.Use(cors.New(cors.Config{AllowOrigins: cfg.AdminCORSAllowOrigins, AllowHeaders: "Content-Type,Authorization"}))
 	adm.Use(middleware.RateLimit(rdb, 60, time.Minute, middleware.IPKey("admin-global")))
 	adm.Use(middleware.SecurityHeaders())
-	admin.RegisterRoutes(adm, pool, cfg.ManifestSigningKey, auditSvc, cfg.AdminAPISecret)
+	admin.RegisterRoutes(adm, pool, rdb, cfg.ManifestSigningKey, auditSvc, cfg.AdminAPISecret)
 	registerAdminUI(adm)
 
 	quit := make(chan os.Signal, 1)

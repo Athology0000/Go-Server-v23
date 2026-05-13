@@ -47,6 +47,16 @@ func RevokeAdminToken(ctx context.Context, pool *pgxpool.Pool, tokenID string) e
 	return err
 }
 
+func HasActiveAdminToken(ctx context.Context, pool *pgxpool.Pool) (bool, error) {
+	var exists bool
+	err := pool.QueryRow(ctx,
+		`SELECT EXISTS (
+			SELECT 1 FROM admin_tokens
+			WHERE revoked = false AND expires_at > now()
+		)`).Scan(&exists)
+	return exists, err
+}
+
 func GetHighestAdminRole(ctx context.Context, pool *pgxpool.Pool, adminUsername string) (string, error) {
 	var role string
 	err := pool.QueryRow(ctx,
