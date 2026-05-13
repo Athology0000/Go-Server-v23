@@ -171,7 +171,12 @@ internal fun MiningMacroModule.resolveMiningAimPoint(player: Player, target: Blo
   if (level != null && usePrecision) {
     MiningPrecisionTracker.getPrecisionPointFor(target, allowTentative = true)?.let { point ->
       val clampedPoint = clampAimPointInsideBlock(point, target)
-      if (canSeeAimPoint(level, player, eye, clampedPoint, target) || losCheck(level, player, eye, target)) {
+      // Precision aim must be DIRECTLY reachable. The previous `|| losCheck`
+      // fallback let the macro lock onto a precision point on a buried face
+      // whenever *any other* face of the target was visible — staring at a
+      // bedrock-occluded face forever because the crosshair raycast hit the
+      // bedrock first and mining never started.
+      if (canSeeAimPoint(level, player, eye, clampedPoint, target)) {
         return WarpAimTarget(clampedPoint, true)
       }
     }

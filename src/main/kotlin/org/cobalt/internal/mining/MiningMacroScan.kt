@@ -75,6 +75,75 @@ internal fun MiningMacroModule.parseSelectedTypes(raw: String): List<String> {
   return result.toList()
 }
 
+/** Horizontal distance the player must be within from a route mine point to
+ *  pass the manual-start precondition. ~12 blocks is loose enough to allow
+ *  standing on a platform or one floor up from the actual ore, tight enough
+ *  that a vein on the other side of the room won't pass. */
+internal const val MANUAL_START_NEAR_MINE_DIST = 12.0
+
+/**
+ * Manual macro start gate. Two paths:
+ *  1. A route is loaded for [org.cobalt.internal.routes.RouteType.ORE_MINER]:
+ *     player must be within [MANUAL_START_NEAR_MINE_DIST] of one of its
+ *     MINE/VEIN points. If yes, arm the route and run the immediate scan
+ *     so mining starts on whatever ore is in front of you while the route
+ *     stays available for downstream automation (RoutesModule).
+ *  2. No route: require an immediate vein near the player. Step-to-nearby
+ *     handles small in-vein movement during mining; it's not a substitute
+ *     for actually being at the vein when you press the toggle.
+ *
+ * Returns true if the macro is allowed to start.
+ */
+internal fun MiningMacroModule.validateManualStartPreconditions(
+  level: net.minecraft.world.level.Level,
+  player: Player,
+  selections: List<ScanTypeSelection>
+): Boolean {
+  val pickedRouteName = oreMinerRoutePicker.value.trim()
+  if (pickedRouteName.isNotEmpty()) {
+    val route = org.cobalt.internal.routes.RouteStore.loadAll().firstOrNull {
+      it.name == pickedRouteName && it.type == org.cobalt.internal.routes.RouteType.ORE_MINER
+    }
+    if (route != null) {
+      val minePoints = (route.loopOrArea + route.travelRoute).filter {
+        it.type == org.cobalt.internal.routes.RoutePointType.MINE ||
+          it.type == org.cobalt.internal.routes.RoutePointType.VEIN
+      }
+      if (minePoints.isNotEmpty()) {
+        val pp = player.blockPosition()
+        val nearestDistSq = minePoints.minOf { pt ->
+          val dx = (pt.x - pp.x).toDouble()
+          val dy = (pt.y - pp.y).toDouble()
+          val dz = (pt.z - pp.z).toDouble()
+          dx * dx + dy * dy + dz * dz
+        }
+        if (nearestDistSq > MANUAL_START_NEAR_MINE_DIST * MANUAL_START_NEAR_MINE_DIST) {
+          val dist = kotlin.math.sqrt(nearestDistSq)
+          ChatUtils.sendMessage(
+            "Mining macro: route '$pickedRouteName' is loaded but you're " +
+              "${"%.1f".format(dist)}b from its nearest mine point. " +
+              "Move within ${MANUAL_START_NEAR_MINE_DIST.toInt()}b and try again."
+          )
+          return false
+        }
+        org.cobalt.internal.routes.RouteStore.setLoaded(route)
+        ChatUtils.sendMessage("Mining macro: route '${route.name}' armed at mine point.")
+        if (!immediateStartScan(level, player, selections)) {
+          ChatUtils.sendMessage("Mining macro: at route mine point, waiting for vein refresh...")
+        }
+        return true
+      }
+    }
+  }
+
+  // No route configured (or no usable mine points in it). Require a vein here.
+  if (immediateStartScan(level, player, selections)) return true
+  ChatUtils.sendMessage(
+    "Mining macro: not in or near a vein. Stand next to ore (or load an Ore Miner route) and try again."
+  )
+  return false
+}
+
 internal fun MiningMacroModule.immediateStartScan(
   level: net.minecraft.world.level.Level,
   player: Player,

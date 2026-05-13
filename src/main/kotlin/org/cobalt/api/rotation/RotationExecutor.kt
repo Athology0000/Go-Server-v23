@@ -24,26 +24,43 @@ object RotationExecutor {
   private var isRotating: Boolean = false
   private var currentOwnerName: String? = null
   private var lastConflictWarnTick: Long = Long.MIN_VALUE
+  // Owner heartbeat. Updated on every same-owner rotateTo call. A different
+  // caller requesting rotation while the heartbeat is older than
+  // STALE_OWNER_TICKS triggers a forced handover — without this guard, a
+  // module that forgets stopRotating() blocks every future rotation forever.
+  private var lastOwnerHeartbeatTick: Long = Long.MIN_VALUE
 
   fun rotateTo(
     endRot: Rotation,
     strategy: IRotationStrategy,
   ) {
+    val nowTick = mc.level?.gameTime ?: 0L
     if (isRotating && currStrat === strategy) {
       targetYaw = endRot.yaw
       targetPitch = endRot.pitch
+      lastOwnerHeartbeatTick = nowTick
       return
     }
 
     if (isRotating && currStrat !== strategy) {
-      warnRotationConflict(strategy)
-      return
+      val stale = nowTick - lastOwnerHeartbeatTick >= STALE_OWNER_TICKS
+      if (!stale) {
+        warnRotationConflict(strategy)
+        return
+      }
+      // Owner stopped heartbeating long enough that we assume it's dead.
+      // Tear it down and let the new caller take over cleanly.
+      val stolenFrom = currentOwnerName ?: strategyName(currStrat)
+      val takingOver = strategyName(strategy)
+      DebugLog.status(mc, "Rotation", "Preempting stale rotation owner '$stolenFrom' for '$takingOver' (heartbeat ${nowTick - lastOwnerHeartbeatTick}t stale).")
+      stopRotating()
     }
 
     targetYaw = endRot.yaw
     targetPitch = endRot.pitch
     currStrat = strategy
     currentOwnerName = strategyName(strategy)
+    lastOwnerHeartbeatTick = nowTick
 
     strategy.onStart()
     isRotating = true
@@ -54,6 +71,7 @@ object RotationExecutor {
     currStrat = null
     isRotating = false
     currentOwnerName = null
+    lastOwnerHeartbeatTick = Long.MIN_VALUE
   }
 
   fun stopIfUsing(strategy: IRotationStrategy) {
@@ -173,5 +191,10 @@ object RotationExecutor {
   }
 
   private const val CONFLICT_WARN_INTERVAL_TICKS = 20L
+  // 60 ticks = 3 s. A rotation animation that hasn't seen a rotateTo refresh
+  // for this long is treated as abandoned and can be preempted by another
+  // caller. Most legitimate rotations refresh every tick; long convergence
+  // animations that don't refresh externally complete inside this window.
+  private const val STALE_OWNER_TICKS = 60L
 
 }

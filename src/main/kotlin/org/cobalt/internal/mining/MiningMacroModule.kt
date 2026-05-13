@@ -215,6 +215,21 @@ object MiningMacroModule : Module("Mining Macro") {
     true
   )
 
+  private val highlightBedrock = CheckboxSetting(
+    "Highlight Bedrock",
+    "Outline every block the macro currently treats as bedrock/blacklisted around the player. Use to confirm the macro's view of the world matches reality.",
+    false
+  )
+
+  private val highlightBedrockRadius = SliderSetting(
+    "Bedrock Highlight Radius",
+    "Horizontal radius (blocks) scanned for the bedrock highlight.",
+    6.0,
+    2.0,
+    16.0,
+    1.0,
+  )
+
   internal val stepToNearbyBlocks = CheckboxSetting(
     "Step To Nearby Blocks",
     "Walk a short distance to reach blocks that are just outside mining range while staying near the vein start.",
@@ -453,6 +468,8 @@ object MiningMacroModule : Module("Mining Macro") {
       highlightPossibleLimit,
       mineRange,
       highlightAimPoint,
+      highlightBedrock,
+      highlightBedrockRadius,
       stepToNearbyBlocks,
       anchorRadius,
       goldenGoblinInterrupt,
@@ -515,6 +532,8 @@ object MiningMacroModule : Module("Mining Macro") {
 
     mineRange.uiGroup = miningGroup
     highlightAimPoint.uiGroup = miningGroup
+    highlightBedrock.uiGroup = miningGroup
+    highlightBedrockRadius.uiGroup = miningGroup
     stepToNearbyBlocks.uiGroup = miningGroup
 
     precisionPointRotationSpeed.uiGroup = rotationGroup
@@ -786,11 +805,20 @@ object MiningMacroModule : Module("Mining Macro") {
         wasEnabled = false
         return
       }
-      // Attempt an immediate synchronous vein scan. If it succeeds the vein is ready on the
-      // very next tick. If it fails (wrong type selected or no ore immediately nearby) just
-      // allow the normal progressive scan to run - don't block the user from starting.
-      if (!immediateStartScan(level, player, selections)) {
-        ChatUtils.sendMessage("Mining macro: scanning for vein...")
+      // Automation start (RoutesModule, etc.) sets automationScanAnchor and
+      // is trusted — skip manual preconditions and run the same scan flow as
+      // before. Manual starts validate: either you have a route loaded and
+      // you're standing near one of its mine points, or you have no route
+      // and you're standing in/next to a vein. Anything else refuses to
+      // start with a clear message rather than silently spinning.
+      if (automationScanAnchor != null) {
+        if (!immediateStartScan(level, player, selections)) {
+          ChatUtils.sendMessage("Mining macro: scanning for vein...")
+        }
+      } else if (!validateManualStartPreconditions(level, player, selections)) {
+        enabled.value = false
+        wasEnabled = false
+        return
       }
       return
     }
@@ -1053,25 +1081,30 @@ object MiningMacroModule : Module("Mining Macro") {
           stareTicks = 1
         }
         val forceCenter = stareTicks > STARE_RECOVERY_TICKS
-        if (forceCenter) {
-          val visible = findVisibleAimPoint(level, player, player.eyePosition, target) != null
-          if (!visible) {
-            // Occluded — abandon this target. Next tick selector will pick a
-            // visible block or trigger out-of-range movement to a better spot.
-            CobaltRotation.blockController.setPrecisionPoint(null)
-            CobaltRotation.blockController.cancel()
-            frameRotTarget = null
-            frameRotPrevBlock = null
-            currentTarget = null
-            currentTargetNoLosTicks = 0
-            stareTarget = null
-            stareTicks = 0
-            setAimRenderTarget(null, null)
-            return
-          }
+        val visibleFacePoint: Vec3? = if (forceCenter) {
+          findVisibleAimPoint(level, player, player.eyePosition, target)
+        } else null
+        if (forceCenter && visibleFacePoint == null) {
+          // Truly occluded from this eye position — abandon. Next tick the
+          // selector picks a visible block or the out-of-range branch fires
+          // movement to reposition. Crucially this no longer falls back to
+          // the geometric block center, which itself could be inside a wall.
+          CobaltRotation.blockController.setPrecisionPoint(null)
+          CobaltRotation.blockController.cancel()
+          frameRotTarget = null
+          frameRotPrevBlock = null
+          currentTarget = null
+          currentTargetNoLosTicks = 0
+          stareTarget = null
+          stareTicks = 0
+          setAimRenderTarget(null, null)
+          return
         }
-        val aim = if (forceCenter) {
-          AimTarget(Vec3(target.x + 0.5, target.y + 0.5, target.z + 0.5), false)
+        val aim = if (forceCenter && visibleFacePoint != null) {
+          // Recovery: drop precision and aim at the actual visible-face point
+          // findVisibleAimPoint chose. This is guaranteed to be a face the
+          // raycast can hit, unlike the block's geometric center.
+          AimTarget(visibleFacePoint, false)
         } else {
           resolveMiningAimPoint(player, target)
         }
@@ -1512,9 +1545,9 @@ object MiningMacroModule : Module("Mining Macro") {
     val connectedBlocks = collectConnectedHighlightBlocks(level, player, active, preview)
     val vein = currentVein
     OverlayRenderEngine.clearTag(OVERLAY_TAG)
-    if (active == null && preview == null && returnPos == null && connectedBlocks.isEmpty() && vein == null) {
-      return
-    }
+    val nothingToRender =
+      active == null && preview == null && returnPos == null && connectedBlocks.isEmpty() && vein == null
+    if (nothingToRender && !highlightBedrock.value) return
 
     val activeFill = OverlayRenderEngine.Color(0x2D, 0xE2, 0xFF, 0x44)
     val activeOutline = OverlayRenderEngine.Color(0x2D, 0xE2, 0xFF, 0xFF)
@@ -1545,6 +1578,59 @@ object MiningMacroModule : Module("Mining Macro") {
     }
     if (returnPos != null) {
       renderReturnSpotMarker(level, returnPos, returnOutline)
+    }
+    if (highlightBedrock.value) {
+      renderBedrockHighlight(level, player)
+    }
+  }
+
+  /**
+   * Outlines every block within [highlightBedrockRadius] of the player whose
+   * current world state is in [MiningBlockRegistry.PERMANENT_LOS_OCCLUDERS] or
+   * is flagged blacklisted by the registry. Reads block state live from
+   * [level.getBlockState] each render frame — no cache — so a block that's
+   * actually been mined will stop being highlighted the same frame the world
+   * sees the update. If a highlighted block looks like it should be air or
+   * ore, the world packet for that change hasn't arrived yet (or the macro is
+   * holding a stale reference somewhere else worth chasing down).
+   */
+  private fun renderBedrockHighlight(
+    level: net.minecraft.world.level.Level,
+    player: Player,
+  ) {
+    val radius = highlightBedrockRadius.value.toInt().coerceIn(2, 24)
+    val baseX = player.blockX
+    val baseY = player.blockY
+    val baseZ = player.blockZ
+    val outline = OverlayRenderEngine.Color(0xFF, 0x55, 0x44, 0xC0)
+    val fill = OverlayRenderEngine.Color(0xFF, 0x55, 0x44, 0x30)
+    val cursor = BlockPos.MutableBlockPos()
+    val vertical = (radius / 2).coerceAtLeast(2)
+    for (dy in -vertical..vertical) {
+      for (dx in -radius..radius) {
+        for (dz in -radius..radius) {
+          cursor.set(baseX + dx, baseY + dy, baseZ + dz)
+          if (level.getBlockState(cursor).isAir) continue
+          val id = BuiltInRegistries.BLOCK.getKey(level.getBlockState(cursor).block).toString()
+          val flagged = id in MiningBlockRegistry.PERMANENT_LOS_OCCLUDERS ||
+            MiningBlockRegistry.isBlacklisted(id)
+          if (!flagged) continue
+          OverlayRenderEngine.addBox(
+            level,
+            cursor.x.toDouble(),
+            cursor.y.toDouble(),
+            cursor.z.toDouble(),
+            cursor.x + 1.0,
+            cursor.y + 1.0,
+            cursor.z + 1.0,
+            fill,
+            outline,
+            1.4f,
+            2,
+            OVERLAY_TAG,
+          )
+        }
+      }
     }
   }
 
