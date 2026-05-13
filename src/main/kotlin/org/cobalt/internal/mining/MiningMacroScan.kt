@@ -190,10 +190,15 @@ internal fun MiningMacroModule.tryStartFromLearnedAnchors(
 ): Boolean {
   val merged = mergeSelections(selections)
   val playerPos = player.blockPosition()
+  val anchorKeys = linkedSetOf<Long>()
+  for (area in MiningAnchorStore.areasForTypes(selections.map { it.label }, player.blockY)) {
+    anchorKeys.addAll(MiningAnchorStore.get(area))
+  }
+  if (anchorKeys.isEmpty()) return false
 
   data class AnchorCandidate(val pos: BlockPos, val distSq: Double)
-  val candidates = ArrayList<AnchorCandidate>(learnedVeinAnchors.size)
-  for (key in learnedVeinAnchors) {
+  val candidates = ArrayList<AnchorCandidate>(anchorKeys.size)
+  for (key in anchorKeys) {
     val pos = BlockPos.of(key)
     if (skippedSeeds.contains(key)) continue
     candidates.add(AnchorCandidate(pos, distanceToBlockSq(player, pos)))
@@ -241,13 +246,16 @@ private fun MiningMacroModule.findMineableNear(
 }
 
 /**
- * Persist the vein seed to the correct per-area file. Area is determined by
- * the seed's Y coordinate (Y<189 = Dwarven, Y>=189 = Glacite) so anchors
- * always end up in the right file no matter where the player stands.
+ * Persist the vein seed to the correct per-area file. Known Glacite tunnel
+ * ore types override the Y fallback because those veins overlap Dwarven Y
+ * ranges.
  */
 internal fun MiningMacroModule.rememberVeinAnchor(pos: BlockPos) {
   if (!rememberVeinSpots.value) return
-  MiningAnchorStore.add(pos, MiningMacroModule.LEARNED_ANCHOR_CAP)
+  val type = mc.level
+    ?.let { level -> MiningBlockRegistry.BLOCK_ID_TO_TYPE[blockIdAt(level, pos)] }
+  val area = MiningAnchorStore.areaForType(type, pos.y)
+  MiningAnchorStore.add(pos, MiningMacroModule.LEARNED_ANCHOR_CAP, area)
 }
 
 internal fun MiningMacroModule.startOrContinueScan(
@@ -258,7 +266,7 @@ internal fun MiningMacroModule.startOrContinueScan(
   // Fixed-spot maps (Dwarven, Glacite camp): the same vein anchors respawn at
   // the same coordinates. Walking through the learned list is O(N) cheap, so
   // do it before the radius scan and we usually pick the right spot first try.
-  if (rememberVeinSpots.value && learnedVeinAnchors.isNotEmpty()) {
+  if (rememberVeinSpots.value) {
     if (tryStartFromLearnedAnchors(level, player, selections)) {
       return
     }

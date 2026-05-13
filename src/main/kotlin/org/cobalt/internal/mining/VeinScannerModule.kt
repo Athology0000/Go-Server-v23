@@ -745,6 +745,22 @@ object VeinScanStore {
     return loadAllVeins().map { it.target.toBlockPos() }.distinct()
   }
 
+  fun loadMiningAnchorsFor(area: MiningArea): List<BlockPos> {
+    val anchors = LinkedHashSet<BlockPos>()
+
+    for (vein in loadAllVeins()) {
+      if (!matchesMiningArea(vein.area ?: "general", area)) continue
+
+      anchors += vein.seed.toBlockPos()
+      anchors += vein.center.toBlockPos()
+      for (block in vein.blocks) {
+        anchors += block.toBlockPos()
+      }
+    }
+
+    return anchors.toList()
+  }
+
   fun normalizeAreaKey(value: String): String =
     value
       .lowercase()
@@ -760,6 +776,16 @@ object VeinScanStore {
       .listFiles { file -> file.isFile && file.extension.equals("json", ignoreCase = true) }
       ?.flatMap { scanFile -> load(scanFile.name).veins }
       ?: emptyList()
+  }
+
+  private fun matchesMiningArea(rawArea: String, area: MiningArea): Boolean {
+    val key = normalizeAreaKey(rawArea)
+    if (key == "general") return true
+
+    return when (area) {
+      MiningArea.GLACITE -> key == "glacite"
+      MiningArea.DWARVEN -> key != "glacite"
+    }
   }
 
   private fun areaKeysForTask(task: CommissionTask): Set<String> {

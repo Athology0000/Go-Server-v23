@@ -84,7 +84,14 @@ class BlockRotationController {
     }
 
     fun rotate(newRequest: BlockRotationRequest) {
-        if (softReleaseFrames > 0) return
+        // An explicit retarget supersedes any in-progress soft-release. The
+        // pathfinder triggers releaseWhenSettled() the moment it reports
+        // ARRIVED, which used to silently drop every rotate() call from the
+        // mining macro for the next ~20 frames — the camera stayed locked on
+        // the last path aim point and the macro never aimed at the in-range
+        // target. soft-release should yield to anything that explicitly asks
+        // for a new aim.
+        softReleaseFrames = 0
         val player = mc.player ?: return
 
         request = newRequest
@@ -101,14 +108,26 @@ class BlockRotationController {
         arrivedAtBlockEdge = false
         nextFallbackBlock = null
 
-        fromPoint = BlockAimPointResolver.resolve(
+        fromPoint = newRequest.fromAimPoint?.let { point ->
+            BlockAimPoint(
+                block = newRequest.fromBlock,
+                point = point,
+                faceHint = newRequest.fromFaceHint,
+            )
+        } ?: BlockAimPointResolver.resolve(
             player = player,
             block = newRequest.fromBlock,
             faceHint = newRequest.fromFaceHint,
             offsetStrength = newRequest.aimOffsetStrength
         )
 
-        toPoint = BlockAimPointResolver.resolve(
+        toPoint = newRequest.toAimPoint?.let { point ->
+            BlockAimPoint(
+                block = newRequest.toBlock,
+                point = point,
+                faceHint = newRequest.toFaceHint,
+            )
+        } ?: BlockAimPointResolver.resolve(
             player = player,
             block = newRequest.toBlock,
             faceHint = newRequest.toFaceHint,

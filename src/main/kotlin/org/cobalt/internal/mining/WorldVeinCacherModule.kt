@@ -281,7 +281,7 @@ object WorldVeinCacherModule : Module("World Vein Cacher") {
         val id = BuiltInRegistries.BLOCK.getKey(state.block).toString()
         if (MiningBlockRegistry.isBlacklisted(id)) return
         val type = MiningBlockRegistry.BLOCK_ID_TO_TYPE[id] ?: return
-        val area = MiningAnchorStore.areaForY(pos.y)
+        val area = MiningAnchorStore.areaForType(type, pos.y)
         if (AREA_ID_BLACKLIST[area]?.contains(id) == true) return
         val groupKey = type to area
         val set = cache.getOrPut(groupKey) { LinkedHashSet() }

@@ -41,5 +41,46 @@ data class TunnelVein(
 )
 
 object TunnelVeinData {
-  fun getVeins(selectedOres: Set<TunnelOreType>): List<TunnelVein> = emptyList()
+  private val veinsByOre: Map<TunnelOreType, List<TunnelVein>> by lazy {
+    TunnelOreType.entries.associateWith { ore -> toTunnelVeins(ore, dataFor(ore)) }
+  }
+
+  fun getVeins(selectedOres: Set<TunnelOreType>): List<TunnelVein> {
+    val ores = selectedOres.ifEmpty { TunnelOreType.entries.toSet() }
+
+    return buildList {
+      for (ore in TunnelOreType.entries) {
+        if (ore !in ores) continue
+        addAll(veinsByOre[ore].orEmpty())
+      }
+    }
+  }
+
+  private fun dataFor(ore: TunnelOreType): Array<Array<IntArray>> =
+    when (ore) {
+      TunnelOreType.GLACITE -> GlaciteData.glacite
+      TunnelOreType.TUNGSTEN -> GlaciteData.tungsten
+      TunnelOreType.UMBER -> GlaciteData.umber
+      TunnelOreType.PERIDOT -> GlaciteData.peridot
+      TunnelOreType.AQUAMARINE -> GlaciteData.aquamarine
+      TunnelOreType.ONYX -> GlaciteData.onyx
+      TunnelOreType.CITRINE -> GlaciteData.citrine
+    }
+
+  private fun toTunnelVeins(
+    ore: TunnelOreType,
+    rawVeins: Array<Array<IntArray>>
+  ): List<TunnelVein> =
+    rawVeins.mapIndexed { index, rawBlocks ->
+      TunnelVein(
+        ore = ore,
+        index = index,
+        blocks = rawBlocks.mapNotNull { coords -> coords.toBlockPosOrNull() }
+      )
+    }.filter { it.blocks.isNotEmpty() }
+
+  private fun IntArray.toBlockPosOrNull(): BlockPos? {
+    if (size < 3) return null
+    return BlockPos(this[0], this[1], this[2])
+  }
 }

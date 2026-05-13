@@ -25,10 +25,41 @@ internal object MiningAnchorStore {
 
     private val gson = GsonBuilder().setPrettyPrinting().create()
     private val cache = mutableMapOf<MiningArea, LinkedHashSet<Long>>()
+    private val glaciteTypeNames = setOf(
+        "Glacite",
+        "Tungsten",
+        "Umber",
+        "Peridot Gemstone",
+        "Aquamarine Gemstone",
+        "Onyx Gemstone",
+        "Citrine Gemstone",
+    )
 
     fun areaForY(y: Int): MiningArea = if (y < 189) MiningArea.DWARVEN else MiningArea.GLACITE
 
     fun areaFor(pos: BlockPos): MiningArea = areaForY(pos.y)
+
+    fun areaForType(typeLabel: String?, fallbackY: Int): MiningArea {
+        val normalized = typeLabel?.let { MiningBlockRegistry.normalizeType(it) }
+        return if (normalized in glaciteTypeNames) MiningArea.GLACITE else areaForY(fallbackY)
+    }
+
+    fun areasForTypes(typeLabels: Iterable<String>, fallbackY: Int): LinkedHashSet<MiningArea> {
+        val areas = linkedSetOf(areaForY(fallbackY))
+        var includeAll = false
+
+        for (label in typeLabels) {
+            val normalized = MiningBlockRegistry.normalizeType(label)
+            if (normalized.equals("Custom", ignoreCase = true)) {
+                includeAll = true
+            } else {
+                areas += areaForType(normalized, fallbackY)
+            }
+        }
+
+        if (includeAll) areas += MiningArea.entries
+        return areas
+    }
 
     fun get(area: MiningArea): LinkedHashSet<Long> =
         cache.getOrPut(area) { loadAllForArea(area) }
@@ -38,8 +69,8 @@ internal object MiningAnchorStore {
         cache.clear()
     }
 
-    fun add(pos: BlockPos, cap: Int) {
-        val area = areaFor(pos)
+    fun add(pos: BlockPos, cap: Int, areaOverride: MiningArea? = null) {
+        val area = areaOverride ?: areaFor(pos)
         val set = get(area)
         val key = pos.asLong()
         set.remove(key)
@@ -67,15 +98,17 @@ internal object MiningAnchorStore {
         File(Minecraft.getInstance().gameDirectory, "config/cobalt")
 
     /**
-     * Load the area's primary file PLUS every `*_<area>_data.json` material file
-     * produced by [WorldVeinCacherModule]. All keys are merged so the mining
-     * macro sees one unified anchor pool per area regardless of which file the
-     * anchor lives in. The mining macro still filters by selected ID at scan
-     * time so non-relevant types don't get mined.
+     * Load the area's primary file, every `*_<area>_data.json` material file
+     * produced by [WorldVeinCacherModule], and captured vein scan JSON
+     * data. All keys are merged so the mining macro sees one unified anchor
+     * pool per area regardless of which file the anchor lives in. The mining
+     * macro still filters by selected ID at scan time so non-relevant types
+     * don't get mined.
      */
     private fun loadAllForArea(area: MiningArea): LinkedHashSet<Long> {
         val combined = LinkedHashSet<Long>()
         combined.addAll(loadFromDisk(area))
+        combined.addAll(VeinScanStore.loadMiningAnchorsFor(area).map { it.asLong() })
 
         val dir = configDir()
         if (!dir.isDirectory) return combined

@@ -177,8 +177,8 @@ object MiningMacroModule : Module("Mining Macro") {
 
   /**
    * Anchors of the area the player is currently in. Backed by [MiningAnchorStore]
-   * which writes to dwarven_data.json or glacite_data.json based on the player's
-   * Y coordinate (Y<189 = Dwarven, Y>=189 = Glacite).
+   * which writes to dwarven_data.json or glacite_data.json using the ore type
+   * when it is known, with Y coordinate as the fallback.
    */
   internal val learnedVeinAnchors: LinkedHashSet<Long>
     get() {
@@ -1100,13 +1100,40 @@ object MiningMacroModule : Module("Mining Macro") {
           setAimRenderTarget(null, null)
           return
         }
-        val aim = if (forceCenter && visibleFacePoint != null) {
+        val resolvedAim = if (forceCenter && visibleFacePoint != null) {
           // Recovery: drop precision and aim at the actual visible-face point
           // findVisibleAimPoint chose. This is guaranteed to be a face the
           // raycast can hit, unlike the block's geometric center.
           AimTarget(visibleFacePoint, false)
         } else {
           resolveMiningAimPoint(player, target)
+        }
+        // resolveMiningAimPoint can return the block's geometric center as a
+        // last-resort fallback (Warp.kt:191) when no visible face is found,
+        // or a precision/crosshair point that is no longer reachable from the
+        // current eye position. Re-probe with findVisibleAimPoint instead of
+        // bailing out — bailing here cancels the in-progress rotation and the
+        // same target gets reselected next tick, producing the "selects target
+        // but freezes" symptom.
+        val aim = if (canSeeAimPoint(level, player, player.eyePosition, resolvedAim.point, target)) {
+          resolvedAim
+        } else {
+          val recoveryPoint = findVisibleAimPoint(level, player, player.eyePosition, target)
+          if (recoveryPoint != null) {
+            AimTarget(recoveryPoint, false)
+          } else {
+            // Truly occluded from current eye position. Drop the target so the
+            // next tick's selector picks a visible block (and the out-of-range
+            // branch can move us if needed). Don't cancel the controller —
+            // killing it mid-sweep was the freeze-causing behavior.
+            frameRotTarget = null
+            currentTarget = null
+            currentTargetNoLosTicks = 0
+            stareTarget = null
+            stareTicks = 0
+            setAimRenderTarget(null, null)
+            return
+          }
         }
         val precisionRotScale =
           if (aim.usesPrecisionPoint) (precisionPointRotationSpeed.value / 100.0).coerceAtLeast(0.1)
@@ -1136,6 +1163,7 @@ object MiningMacroModule : Module("Mining Macro") {
               useFromBlockAsStartRotation = false,
               maxDegreesPerTick = 12f,
               easing = RotationEasingType.EASE_IN_OUT_SINE,
+              toAimPoint = aim.point,
             )
           )
           frameRotPrevBlock = target
@@ -1475,15 +1503,20 @@ object MiningMacroModule : Module("Mining Macro") {
       if (wasRotationTarget) {
         val playerNow = mc.player
         val levelNow = mc.level
-        val fallback = if (playerNow != null && levelNow != null && vein.blocks.isNotEmpty()) {
-          val playerPos = playerNow.blockPosition()
+        val fallbackWithAim = if (playerNow != null && levelNow != null && vein.blocks.isNotEmpty()) {
+          val eye = playerNow.eyePosition
           vein.blocks
             .asSequence()
             .filter { isMineableTarget(levelNow, playerNow, it, vein.targetIds) }
-            .minByOrNull { it.distSqr(playerPos) }
+            .mapNotNull { pos ->
+              val aim = findVisibleAimPoint(levelNow, playerNow, eye, pos) ?: return@mapNotNull null
+              pos to aim
+            }
+            .minByOrNull { (pos, _) -> miningTargetScore(playerNow, pos) }
         } else null
-        CobaltRotation.blockController.setFallbackBlock(fallback)
-        if (fallback != null) {
+        CobaltRotation.blockController.setFallbackBlock(fallbackWithAim?.first)
+        if (fallbackWithAim != null) {
+          val (fallback, fallbackAim) = fallbackWithAim
           CobaltRotation.blockController.rotate(
             BlockRotationRequest(
               fromBlock = event.pos,
@@ -1492,6 +1525,7 @@ object MiningMacroModule : Module("Mining Macro") {
               useFromBlockAsStartRotation = false,
               maxDegreesPerTick = 12f,
               easing = RotationEasingType.EASE_IN_OUT_SINE,
+              toAimPoint = fallbackAim,
             )
           )
           frameRotPrevBlock = fallback
@@ -1602,7 +1636,8 @@ object MiningMacroModule : Module("Mining Macro") {
     val baseX = player.blockX
     val baseY = player.blockY
     val baseZ = player.blockZ
-    val outline = OverlayRenderEngine.Color(0xFF, 0x55, 0x44, 0xC0)
+    val outline = OverlayRenderEngine.Color(0xFF, 0x55, 0x44, 0xD8)
+    val fill = OverlayRenderEngine.Color(0xFF, 0x55, 0x44, 0x3A)
     val cursor = BlockPos.MutableBlockPos()
     val vertical = (radius / 2).coerceAtLeast(2)
     for (dy in -vertical..vertical) {
@@ -1617,7 +1652,7 @@ object MiningMacroModule : Module("Mining Macro") {
           if (!flagged) continue
           for (direction in Direction.values()) {
             if (isBedrockFaceExposed(level, cursor, direction)) {
-              renderBedrockFace(level, cursor, direction, outline)
+              renderBedrockFace(level, cursor, direction, fill, outline)
             }
           }
         }
@@ -1639,15 +1674,42 @@ object MiningMacroModule : Module("Mining Macro") {
     level: net.minecraft.world.level.Level,
     pos: BlockPos,
     direction: Direction,
-    color: OverlayRenderEngine.Color,
+    fill: OverlayRenderEngine.Color,
+    outline: OverlayRenderEngine.Color,
   ) {
     val pad = 0.003
+    val thickness = 0.012
     val x0 = pos.x.toDouble()
     val y0 = pos.y.toDouble()
     val z0 = pos.z.toDouble()
     val x1 = x0 + 1.0
     val y1 = y0 + 1.0
     val z1 = z0 + 1.0
+
+    val faceBox = when (direction) {
+      Direction.DOWN -> doubleArrayOf(x0, y0 - thickness, z0, x1, y0, z1)
+      Direction.UP -> doubleArrayOf(x0, y1, z0, x1, y1 + thickness, z1)
+      Direction.NORTH -> doubleArrayOf(x0, y0, z0 - thickness, x1, y1, z0)
+      Direction.SOUTH -> doubleArrayOf(x0, y0, z1, x1, y1, z1 + thickness)
+      Direction.WEST -> doubleArrayOf(x0 - thickness, y0, z0, x0, y1, z1)
+      Direction.EAST -> doubleArrayOf(x1, y0, z0, x1 + thickness, y1, z1)
+    }
+
+    OverlayRenderEngine.addBox(
+      level,
+      faceBox[0],
+      faceBox[1],
+      faceBox[2],
+      faceBox[3],
+      faceBox[4],
+      faceBox[5],
+      fill,
+      null,
+      1.0f,
+      1,
+      OVERLAY_TAG,
+      forceRender = true,
+    )
 
     val corners = when (direction) {
       Direction.DOWN -> listOf(
@@ -1699,7 +1761,7 @@ object MiningMacroModule : Module("Mining Macro") {
         end.x,
         end.y,
         end.z,
-        color,
+        outline,
         1.6f,
         1,
         OVERLAY_TAG,
