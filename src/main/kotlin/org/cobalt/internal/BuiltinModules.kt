@@ -18,6 +18,7 @@ import org.cobalt.internal.combat.slayer.SpiderSlayerMacroModule
 import org.cobalt.internal.combat.slayer.VampireSlayerMacroModule
 import org.cobalt.internal.combat.slayer.WolfSlayerMacroModule
 import org.cobalt.internal.combat.slayer.ZombieSlayerMacroModule
+import org.cobalt.internal.crimson.AutoDojoModule
 import org.cobalt.internal.diana.DianaHelperModule
 import org.cobalt.internal.diana.DianaMacroModule
 import org.cobalt.internal.dungeons.BloodCampHelperModule
@@ -186,6 +187,7 @@ internal object BuiltinModules {
     DungeonRoutesModule,
     BloodCampHelperModule,
     DungeonMobEspModule,
+    AutoDojoModule,
 
     // Etherwarp / movement helpers
     EtherwarpHelperModule,
