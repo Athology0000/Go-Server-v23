@@ -33,7 +33,12 @@ internal object SpiderSlayerPhase {
     hatchlingShotCounts.clear()
     selectedHatchlingTargetId = null
   }
-
+enum class phases {
+    BOSS_SPAWNED,
+    DAMAGEPHASE,
+    HATCHLINGPHASE,
+    FLIPPEDPHASE,
+}
   fun clear() {
     hatchlingsActive = false
     hatchlingsActivatedTick = -1L
