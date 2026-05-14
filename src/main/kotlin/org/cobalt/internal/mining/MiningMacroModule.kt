@@ -624,6 +624,13 @@ object MiningMacroModule : Module("Mining Macro") {
   internal var stareTicks: Int = 0
   internal const val STARE_RECOVERY_TICKS = 6
 
+  // Block keys (BlockPos.asLong) → gameTime tick when the skip expires. A
+  // target gets added here when stuck-stare recovery gives up on it, so the
+  // selector picks a different (next-closest) block instead of immediately
+  // re-locking on the same unmineable one. Cleared on vein change / stop.
+  internal val stuckMiningTargets = HashMap<Long, Long>()
+  internal const val STUCK_TARGET_SKIP_TICKS = 60L
+
   // Aim quality tracker. Updated each render frame by the rotation debug
   // renderer with whether the crosshair is currently on the target block and
   // the distance between the rendered aim dot and the crosshair hit. Used to
@@ -1018,8 +1025,25 @@ object MiningMacroModule : Module("Mining Macro") {
     if (inRange) {
       // Crosshair-first mining: mine whatever valid vein block the crosshair is on.
       // This prevents dig packets firing at bedrock while the camera is still rotating.
-      val hitPos = (mc.hitResult as? BlockHitResult)
-        ?.takeIf { it.type == HitResult.Type.BLOCK }?.blockPos
+      // Use a fresh raycast off the *current* player rotation rather than mc.hitResult
+      // — mc.hitResult is computed once per frame against last-frame rotation, so the
+      // tick after the rotation controller's smoother converges it can still report
+      // the pre-rotation hit (bedrock/adjacent block), making the macro stare at a
+      // perfectly-aimed vein block without ever pressing attack.
+      val reach = (mineRange.value + 0.5).coerceAtLeast(4.5)
+      val viewVec = player.getViewVector(1.0f)
+      val from = player.eyePosition
+      val to = from.add(viewVec.x * reach, viewVec.y * reach, viewVec.z * reach)
+      val freshHit = level.clip(
+        net.minecraft.world.level.ClipContext(
+          from,
+          to,
+          net.minecraft.world.level.ClipContext.Block.OUTLINE,
+          net.minecraft.world.level.ClipContext.Fluid.NONE,
+          player,
+        )
+      )
+      val hitPos = if (freshHit.type == HitResult.Type.BLOCK) freshHit.blockPos else null
       val crosshairVeinBlock = hitPos?.takeIf { pos ->
         vein.blocks.contains(pos) &&
           isMineableTarget(level, player, pos, vein.targetIds) &&
@@ -1079,6 +1103,23 @@ object MiningMacroModule : Module("Mining Macro") {
         } else {
           stareTarget = target
           stareTicks = 1
+        }
+        // Hard-give-up: if we've been aimed at the same target this long
+        // without the crosshair ever landing on a vein block, the chosen
+        // visible aim point is not actually mineable from this position
+        // (smoothing residual lands the crosshair on adjacent geometry).
+        // Drop the target AND blacklist it briefly so the next tick's
+        // selector picks a different (next-closest) block — without the
+        // skip the macro would just re-lock on the same unmineable target.
+        if (stareTicks > STARE_RECOVERY_TICKS * 2) {
+          stuckMiningTargets[target.asLong()] = level.gameTime + STUCK_TARGET_SKIP_TICKS
+          currentTarget = null
+          currentTargetNoLosTicks = 0
+          stareTarget = null
+          stareTicks = 0
+          frameRotTarget = null
+          setAimRenderTarget(null, null)
+          return
         }
         val forceCenter = stareTicks > STARE_RECOVERY_TICKS
         val visibleFacePoint: Vec3? = if (forceCenter) {
@@ -2013,6 +2054,7 @@ object MiningMacroModule : Module("Mining Macro") {
     lastLanternRefreshTick = -1L
     resetScanState()
     skippedSeeds.clear()
+    stuckMiningTargets.clear()
     miningOnTarget = null
     miningOnTargetTicks = 0
     frameRotSnapThreshold = 0f

@@ -352,6 +352,20 @@ class BlockRotationController {
         smoothedPitch = (smoothedPitch + (curvePitch - smoothedPitch) * blend)
             .coerceIn(-90f, 90f)
 
+        // Once the eased curve has reached the target and the smoother is
+        // essentially settled, snap to the exact target rotation. The exp
+        // smoother only ever asymptotes — without this, the player rotation
+        // sits ~0.01–0.05° off the computed aim point indefinitely, which is
+        // enough to make the pick raycast graze past the block onto adjacent
+        // geometry (the "macro stares but never mines" symptom).
+        if (progress >= 1.0 &&
+            kotlin.math.abs(yawDelta) < 0.25f &&
+            kotlin.math.abs(curvePitch - smoothedPitch) < 0.25f
+        ) {
+            smoothedYaw = curveYaw
+            smoothedPitch = curvePitch.coerceIn(-90f, 90f)
+        }
+
         // Seed the *O ("previous render frame") fields from the value we wrote
         // last frame so MC's renderer interpolates from that anchor — no gap.
         player.yRotO = player.yRot

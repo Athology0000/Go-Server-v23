@@ -73,34 +73,28 @@ internal fun MiningMacroModule.selectMineTarget(
   val rangeSq = mineRange.value * mineRange.value
   val eye = player.eyePosition
 
-  // For in-range blocks, score = squared distance to the visible aim point + a
-  // mild angular penalty. Distance dominates so the closest reachable block is
-  // chosen; the angle term kicks in only enough to break ties and to push back
-  // against picking blocks the camera would have to spin most of the way around
-  // to reach when a comparable block sits in front of the player.
+  // Strict closest-first: distance to the visible aim point is the only
+  // criterion. Angle/pitch penalties were causing the macro to skip the
+  // obviously-closest block in favor of slightly-better-aimed but farther
+  // blocks, forcing the user to manually nudge the camera. Sticky targeting
+  // (above) keeps the current pick stable across ticks, so the selector only
+  // matters when the previous target is gone or invalid.
+  val now = level.gameTime
   var bestInRange: net.minecraft.core.BlockPos? = null
   var bestScore = Double.POSITIVE_INFINITY
   for (pos in vein.blocks) {
     if (!isMineableTarget(level, player, pos, vein.targetIds)) continue
     if (!canStepToNearbyTarget(player, pos)) continue
     if (distanceToBlockSq(player, pos) > rangeSq) continue
+    val skipUntil = MiningMacroModule.stuckMiningTargets[pos.asLong()]
+    if (skipUntil != null && skipUntil > now) continue
     val visiblePoint: Vec3? = if (REQUIRE_MINE_LOS) findVisibleAimPoint(level, player, eye, pos) else null
     if (REQUIRE_MINE_LOS && visiblePoint == null) continue
     val aimPoint = visiblePoint ?: Vec3(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5)
     val dx = aimPoint.x - eye.x
     val dy = aimPoint.y - eye.y
     val dz = aimPoint.z - eye.z
-    val eyeDistSq = dx * dx + dy * dy + dz * dz
-    val ang = angularDistanceTo(player, aimPoint).toDouble()
-    val anglePenalty = (ang / 90.0) * (ang / 90.0) * 1.5
-    // Pitch penalty: blocks that require steep up/down look produce
-    // unstable raycasts (face edges align poorly) and are slower for the
-    // smoother to settle on. Penalty grows past ~45° pitch.
-    val pitchAbs = kotlin.math.abs(
-      Math.toDegrees(kotlin.math.atan2(dy, kotlin.math.sqrt(dx * dx + dz * dz)))
-    )
-    val pitchPenalty = if (pitchAbs > 45.0) ((pitchAbs - 45.0) / 45.0).let { it * it * 1.2 } else 0.0
-    val score = eyeDistSq + anglePenalty + pitchPenalty
+    val score = dx * dx + dy * dy + dz * dz
     if (score < bestScore) {
       bestScore = score
       bestInRange = pos
