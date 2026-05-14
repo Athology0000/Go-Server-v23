@@ -21,6 +21,9 @@ import org.cobalt.api.util.ChatUtils
 import org.cobalt.api.util.player.MovementManager
 import org.cobalt.internal.combat.CombatMacroModule
 import org.cobalt.internal.pathfinding.PathfindingModule
+import org.cobalt.internal.rotation.BlockRotationRequest
+import org.cobalt.internal.rotation.CobaltRotation
+import org.cobalt.internal.rotation.RotationEasingType
 import org.cobalt.internal.rotation.RotationsModule
 
 internal fun MiningMacroModule.nudgeToward(player: Player, target: BlockPos) {
@@ -510,10 +513,11 @@ internal fun MiningMacroModule.moveToward(
     // doesn't eat into the execution budget.
     approachStartTick = level.gameTime
     approachStartDistance = currentDistance
-  } else if (
-    level.gameTime - approachStartTick >= APPROACH_TIMEOUT_TICKS &&
-    approachStartDistance - currentDistance < APPROACH_MIN_PROGRESS_BLOCKS
-  ) {
+  } else if (approachStartDistance - currentDistance >= APPROACH_MIN_PROGRESS_BLOCKS) {
+    // Fresh progress — slide the baseline forward so a later stall still trips the timeout.
+    approachStartTick = level.gameTime
+    approachStartDistance = currentDistance
+  } else if (level.gameTime - approachStartTick >= APPROACH_TIMEOUT_TICKS) {
     abandonApproachTarget(target)
     warnOnce("Mining macro: approach timed out, skipping block.")
     return
@@ -590,6 +594,40 @@ internal fun MiningMacroModule.focusApproachTarget(player: Player, target: Block
   val precisionRotScale =
     if (aim.usesPrecisionPoint) (precisionPointRotationSpeed.value / 100.0).coerceAtLeast(0.1)
     else 1.0
+  // Drive the active rotation controller while approaching. The legacy frameRot*
+  // fields below are no longer wired to a renderer — without this request the
+  // macro walks toward the target without turning, and the camera doesn't catch
+  // up until the in-range branch fires its own .rotate(). Guard with
+  // frameRotPrevBlock so we don't re-issue every tick.
+  if (target != frameRotPrevBlock) {
+    val initRot = AngleUtils.getRotation(aim.point)
+    val initYaw = abs(AngleUtils.getRotationDelta(player.yRot, initRot.yaw))
+    val initPitch = abs(initRot.pitch - player.xRot)
+    val initialDist = maxOf(initYaw, initPitch).coerceAtLeast(1f)
+    frameRotInitialDist = initialDist
+    val baseDuration = (initialDist / 30f * 3f).toInt().coerceIn(3, 12)
+    val scaledDuration = (baseDuration / precisionRotScale.coerceAtLeast(0.1))
+      .toInt().coerceIn(3, 18)
+    val fromBlock = frameRotPrevBlock ?: target
+    CobaltRotation.blockController.rotate(
+      BlockRotationRequest(
+        fromBlock = fromBlock,
+        toBlock = target,
+        durationTicks = scaledDuration,
+        useFromBlockAsStartRotation = false,
+        maxDegreesPerTick = 12f,
+        easing = RotationEasingType.EASE_IN_OUT_SINE,
+        toAimPoint = aim.point,
+      )
+    )
+    frameRotPrevBlock = target
+    frameRotLastNs = 0L
+  }
+  if (aim.usesPrecisionPoint) {
+    CobaltRotation.blockController.setPrecisionPoint(aim.point)
+  } else {
+    CobaltRotation.blockController.setPrecisionPoint(null)
+  }
   frameRotTarget = aim.point
   setAimRenderTarget(target, aim.point)
   frameRotSnapThreshold = RotationsModule.bezierSnapThreshold.value.toFloat()

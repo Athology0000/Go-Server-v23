@@ -363,7 +363,7 @@ internal object JumpDetector {
         return true
     }
 
-    private fun effectiveJumpRiseMin(): Double = jumpRiseMin.coerceAtLeast(1.12)
+    private fun effectiveJumpRiseMin(): Double = jumpRiseMin.coerceAtLeast(0.95)
 
     private fun effectiveJumpRangeMultiplier(): Double = jumpRangeMultiplier.coerceAtMost(0.55)
 

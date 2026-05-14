@@ -380,6 +380,24 @@ internal fun MiningMacroModule.distanceToBlockSq(player: Player, pos: BlockPos):
   return dx * dx + dy * dy + dz * dz
 }
 
+// Squared distance from the eye to the nearest point on the block AABB — the same
+// geometry vanilla reach checks resolve to. Feet-to-center over-states reach for
+// blocks above the player (eye sits ~1.62 closer) and for any block whose visible
+// face is nearer than the center.
+internal fun MiningMacroModule.mineReachDistanceSq(player: Player, pos: BlockPos): Double {
+  val eye = player.eyePosition
+  val minX = pos.x.toDouble()
+  val minY = pos.y.toDouble()
+  val minZ = pos.z.toDouble()
+  val cx = eye.x.coerceIn(minX, minX + 1.0)
+  val cy = eye.y.coerceIn(minY, minY + 1.0)
+  val cz = eye.z.coerceIn(minZ, minZ + 1.0)
+  val dx = eye.x - cx
+  val dy = eye.y - cy
+  val dz = eye.z - cz
+  return dx * dx + dy * dy + dz * dz
+}
+
 internal fun MiningMacroModule.isVeinOccupied(
   level: net.minecraft.world.level.Level,
   vein: WarpVein,

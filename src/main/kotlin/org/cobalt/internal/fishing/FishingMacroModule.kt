@@ -613,6 +613,7 @@ object FishingMacroModule : Module("Fishing Macro") {
   private var etherwarpNavConfirmed = false
   private var lastSmoothnessApplied = -1.0
   private var rareLoadoutTriggered = false
+  private var preCombatRotation: Rotation? = null
 
   init {
     addSetting(
@@ -1124,6 +1125,7 @@ object FishingMacroModule : Module("Fishing Macro") {
       return false
     }
 
+    suspendRotationLockForCombat(player)
     InventoryUtils.holdHotbarSlot(weaponSlot)
     RotationExecutor.rotateTo(combatAimRotation(player, target, activeCombatMethod(target)), combatRotationStrategy)
     nextActionTick = gameTick + weaponSwapDelayTicksSetting.value.toLong()
@@ -1133,6 +1135,7 @@ object FishingMacroModule : Module("Fishing Macro") {
 
   private fun beginSwitchBack(rodSlot: Int, gameTick: Long) {
     RotationExecutor.stopIfUsing(combatRotationStrategy)
+    restoreRotationLockAfterCombat()
     InventoryUtils.holdHotbarSlot(rodSlot)
     combatAnchorPos = null
     killStartTick = 0L
@@ -1884,6 +1887,31 @@ object FishingMacroModule : Module("Fishing Macro") {
     if (ungrabMouseSetting.value) MouseUtils.ungrabMouse()
   }
 
+  private fun suspendRotationLockForCombat(player: Player) {
+    if (!lockRotationSetting.value) return
+
+    if (preCombatRotation == null) {
+      preCombatRotation =
+        if (FishingRotationLock.isLocked) {
+          Rotation(FishingRotationLock.lockedYaw, FishingRotationLock.lockedPitch)
+        } else {
+          Rotation(player.yRot, player.xRot)
+        }
+    }
+
+    FishingRotationLock.unlock()
+  }
+
+  private fun restoreRotationLockAfterCombat() {
+    val rotation = preCombatRotation
+    preCombatRotation = null
+
+    if (!lockRotationSetting.value || rotation == null) return
+
+    FishingRotationLock.lock(rotation.yaw, rotation.pitch)
+    FishingRotationLock.applyLock()
+  }
+
   private fun exitRotationLock() {
     FishingRotationLock.unlock()
     MouseUtils.grabMouse()
@@ -1911,6 +1939,7 @@ object FishingMacroModule : Module("Fishing Macro") {
     etherwarpNavTriggered = false
     etherwarpNavConfirmed = false
     rareLoadoutTriggered = false
+    preCombatRotation = null
     NativePathfinder.stop()
     MovementManager.setMovementLock(false)
     RotationExecutor.stopIfUsing(combatRotationStrategy)

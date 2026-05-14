@@ -35,6 +35,9 @@ public final class WorldGlowRenderer {
             GL20.glAttachShader(prog, vert);
             GL20.glAttachShader(prog, frag);
             GL20.glLinkProgram(prog);
+            if (GL20.glGetProgrami(prog, GL20.GL_LINK_STATUS) == GL11.GL_FALSE) {
+                throw new RuntimeException("program link failed: " + GL20.glGetProgramInfoLog(prog));
+            }
             uLoc  = GL20.glGetUniformLocation(prog, "u_projview");
 
             glVao = GL30.glGenVertexArrays();
@@ -51,8 +54,21 @@ public final class WorldGlowRenderer {
             GL30.glBindVertexArray(0);
             ok = true;
         } catch (Exception e) {
+            ok = false;
             Minecraft.getInstance().execute(() ->
                 System.err.println("[WorldGlowRenderer] init failed: " + e.getMessage()));
+            if (prog > 0) {
+                GL20.glDeleteProgram(prog);
+                prog = -1;
+            }
+            if (glVao != 0) {
+                GL30.glDeleteVertexArrays(glVao);
+                glVao = 0;
+            }
+            if (glVbo != 0) {
+                GL15.glDeleteBuffers(glVbo);
+                glVbo = 0;
+            }
         } finally {
             if (vert > 0) GL20.glDeleteShader(vert);
             if (frag > 0) GL20.glDeleteShader(frag);
@@ -95,8 +111,10 @@ public final class WorldGlowRenderer {
         int prevProg  = GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM);
         int prevVao   = GL11.glGetInteger(GL30.GL_VERTEX_ARRAY_BINDING);
         int prevVbo   = GL11.glGetInteger(GL15.GL_ARRAY_BUFFER_BINDING);
-        int prevBlendSrc = GL11.glGetInteger(GL30.GL_BLEND_SRC_RGB);
-        int prevBlendDst = GL11.glGetInteger(GL30.GL_BLEND_DST_RGB);
+        int prevBlendSrcRgb   = GL11.glGetInteger(GL30.GL_BLEND_SRC_RGB);
+        int prevBlendDstRgb   = GL11.glGetInteger(GL30.GL_BLEND_DST_RGB);
+        int prevBlendSrcAlpha = GL11.glGetInteger(GL30.GL_BLEND_SRC_ALPHA);
+        int prevBlendDstAlpha = GL11.glGetInteger(GL30.GL_BLEND_DST_ALPHA);
         boolean depthTest = GL11.glIsEnabled(GL11.GL_DEPTH_TEST);
         boolean blend     = GL11.glIsEnabled(GL11.GL_BLEND);
         boolean cull      = GL11.glIsEnabled(GL11.GL_CULL_FACE);
@@ -127,7 +145,7 @@ public final class WorldGlowRenderer {
             GL20.glUseProgram(prevProg);
             GL30.glBindVertexArray(prevVao);
             GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, prevVbo);
-            GL30.glBlendFuncSeparate(prevBlendSrc, prevBlendDst, prevBlendSrc, prevBlendDst);
+            GL30.glBlendFuncSeparate(prevBlendSrcRgb, prevBlendDstRgb, prevBlendSrcAlpha, prevBlendDstAlpha);
             if (depthTest) GL11.glEnable(GL11.GL_DEPTH_TEST); else GL11.glDisable(GL11.GL_DEPTH_TEST);
             if (!blend)    GL11.glDisable(GL11.GL_BLEND);
             if (cull)      GL11.glEnable(GL11.GL_CULL_FACE); else GL11.glDisable(GL11.GL_CULL_FACE);
@@ -138,6 +156,11 @@ public final class WorldGlowRenderer {
         int id = GL20.glCreateShader(type);
         GL20.glShaderSource(id, src);
         GL20.glCompileShader(id);
+        if (GL20.glGetShaderi(id, GL20.GL_COMPILE_STATUS) == GL11.GL_FALSE) {
+            String log = GL20.glGetShaderInfoLog(id);
+            GL20.glDeleteShader(id);
+            throw new RuntimeException("shader compile failed (type=" + type + "): " + log);
+        }
         return id;
     }
 

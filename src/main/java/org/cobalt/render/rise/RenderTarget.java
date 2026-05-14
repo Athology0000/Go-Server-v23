@@ -14,6 +14,7 @@ public final class RenderTarget {
     private int depthBufferId;
     private int width;
     private int height;
+    private boolean complete;
 
     public RenderTarget() {
         this(false);
@@ -59,11 +60,13 @@ public final class RenderTarget {
         }
 
         int status = GL30.glCheckFramebufferStatus(GL30.GL_FRAMEBUFFER);
+        GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0);
         if (status != GL30.GL_FRAMEBUFFER_COMPLETE) {
             System.err.println("[RenderTarget] Framebuffer incomplete: 0x" + Integer.toHexString(status));
+            cleanup();
+            return;
         }
-
-        GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0);
+        complete = true;
     }
 
     public void bind() {
@@ -87,7 +90,7 @@ public final class RenderTarget {
     }
 
     public boolean isReady() {
-        return fboId != 0 && textureId != 0 && width > 0 && height > 0;
+        return complete && fboId != 0 && textureId != 0 && width > 0 && height > 0;
     }
 
     public int getTextureId() {
@@ -121,5 +124,6 @@ public final class RenderTarget {
         }
         width = 0;
         height = 0;
+        complete = false;
     }
 }

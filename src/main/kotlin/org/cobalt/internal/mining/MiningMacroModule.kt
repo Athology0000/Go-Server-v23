@@ -1019,7 +1019,7 @@ object MiningMacroModule : Module("Mining Macro") {
     }
 
     currentTarget = target
-    val distSq = distanceToBlockSq(player, target)
+    val distSq = mineReachDistanceSq(player, target)
     val inRange = distSq <= mineRange.value * mineRange.value
 
     if (inRange) {
@@ -1047,7 +1047,7 @@ object MiningMacroModule : Module("Mining Macro") {
       val crosshairVeinBlock = hitPos?.takeIf { pos ->
         vein.blocks.contains(pos) &&
           isMineableTarget(level, player, pos, vein.targetIds) &&
-          distanceToBlockSq(player, pos) <= mineRange.value * mineRange.value
+          mineReachDistanceSq(player, pos) <= mineRange.value * mineRange.value
       }
 
       if (crosshairVeinBlock != null) {

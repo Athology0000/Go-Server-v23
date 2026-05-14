@@ -7,6 +7,7 @@ package org.cobalt.api.module.setting.impl
  * - Static ARGB color
  * - Per-instance rainbow with adjustable parameters
  * - Globally synced rainbow
+ * - Two-color gradient
  * - Theme property reference
  * - Theme property with HSB tweaks
  */
@@ -51,6 +52,16 @@ sealed class ColorMode {
   ) : ColorMode()
 
   /**
+   * Two-color gradient. Consumers that only support a single ARGB color should
+   * use the first color as the compatibility fallback.
+   */
+  data class Gradient(
+    val startArgb: Int,
+    val endArgb: Int,
+    val direction: String = DIRECTION_LEFT_TO_RIGHT,
+  ) : ColorMode()
+
+  /**
    * Reference to a theme property by name (e.g. "accent", "background").
    * @param propertyName The theme property name (see ThemeColorResolver for valid names)
    */
@@ -72,5 +83,11 @@ sealed class ColorMode {
     val brightnessMultiplier: Float = 1f,
     val opacityMultiplier: Float = 1f
   ) : ColorMode()
+
+  companion object {
+    const val DIRECTION_LEFT_TO_RIGHT = "left_to_right"
+    const val DIRECTION_TOP_TO_BOTTOM = "top_to_bottom"
+    const val DIRECTION_DIAGONAL = "diagonal"
+  }
 
 }

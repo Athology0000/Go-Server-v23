@@ -241,6 +241,17 @@ object PathExecutorState {
     private const val KEYNODE_ENGAGE_HYSTERESIS = 2
     private const val KEYNODE_DISENGAGE_HYSTERESIS = 4
 
+    // Incline-end keynote aim — distinguishes a sustained climb/descent from
+    // flat travel and lets the camera stare straight at the first flat point
+    // past the incline (when LOS to it is clear) instead of jittering with the
+    // per-tick lookahead. Movement decisions are untouched; this only changes
+    // the rotation target.
+    private const val INCLINE_SCAN_DISTANCE = 12.0
+    private const val INCLINE_SAMPLE_STEP = 0.5
+    private const val INCLINE_DY_THRESHOLD = 0.05
+    private const val INCLINE_MIN_RUN_LENGTH = 1.5
+    private const val INCLINE_KEYNOTE_OFFSET = 0.5
+
     // =========================================================================
     // Public API
     // =========================================================================
@@ -552,6 +563,30 @@ object PathExecutorState {
         }
 
         var targetPoint = findResult.point
+        // Incline-end keynote aim: when an ascending/descending spline run lies
+        // ahead and the eye has clear LOS to the first flat point past it,
+        // pin the rotation target to that point. Gives a stable, human-looking
+        // gaze across long stair/hill traversals. Curves between the player
+        // and the incline-end break LOS so the spline aim is used instead;
+        // when the corridor opens back up the smoother handles the transition.
+        var inclineKeynoteActive = false
+        if (level != null) {
+            val incline = findInclineAhead(spline)
+            if (incline != null && isPointVisible(eye, incline.endPoint, level)) {
+                targetPoint = incline.endPoint
+                inclineKeynoteActive = true
+            }
+        }
+        // World-space distance floor on the spline aim: when the player has
+        // drifted off the spline, `cursor + N` along the path can be only a
+        // few world-blocks from the player, which makes the camera trail.
+        // Walk further along the spline until the world-space distance to the
+        // chosen sample is ≥ lookaheadDistanceFar (and LOS stays clear). Only
+        // runs in the spline-aim branch — the keynote aim already has a known
+        // geometry.
+        if (!inclineKeynoteActive && level != null) {
+            targetPoint = extendToMinWorldDistance(eye, spline, targetPoint, level, lookaheadDistanceFar)
+        }
         currentLookaheadSplinePoint = targetPoint
         val rawDx = targetPoint.x - eye.x
         val rawDy = targetPoint.y - eye.y
@@ -583,7 +618,7 @@ object PathExecutorState {
         // along [lookahead, lookahead + window]. Falls back to single-point aim
         // when safety/precision is active or when the blend has no visible
         // samples — keeps the existing safe behavior in tight spots.
-        val safeForBlend = !requiresPrecisionMovement && !dropAhead && targetVisible
+        val safeForBlend = !requiresPrecisionMovement && !dropAhead && targetVisible && !inclineKeynoteActive
         val blended = if (safeForBlend) blendedAimRotation(
             eye = eye,
             sample = { d -> spline.sample(minOf(spline.totalLength, d)) },
@@ -1120,6 +1155,99 @@ object PathExecutorState {
         val close = maxOf(RECOVERY_MIN_LOOKAHEAD, MIN_LOOKAHEAD - 0.2)
         val point = spline.sample(minOf(spline.totalLength, currentSplineDistance + close))
         return FindResult(point, close, isPointVisible(eye, point, level))
+    }
+
+    // =========================================================================
+    // Incline-end keynote aim
+    // =========================================================================
+
+    private data class InclineSegment(val endPoint: Vec3, val descending: Boolean)
+
+    /**
+     * Scans the spline ahead of the cursor for the next sustained run of
+     * ascending or descending samples and returns the first flat-ish point
+     * just past the run end. Used as a stable rotation target for the camera
+     * while the player walks a stair / hill — keeps the gaze on the
+     * incline-end keynote instead of jittering with the per-tick lookahead.
+     *
+     * Returns null when no incline of [INCLINE_MIN_RUN_LENGTH] blocks of
+     * horizontal extent is found within [INCLINE_SCAN_DISTANCE].
+     */
+    private fun findInclineAhead(spline: SplinePath): InclineSegment? {
+        val maxScan = minOf(INCLINE_SCAN_DISTANCE, spline.totalLength - currentSplineDistance)
+        if (maxScan < INCLINE_MIN_RUN_LENGTH) return null
+        val step = INCLINE_SAMPLE_STEP
+        var prev = spline.sample(currentSplineDistance)
+        var runDir = 0
+        var runStartDist = 0.0
+        var runEndDist = 0.0
+        var d = step
+        while (d <= maxScan) {
+            val sample = spline.sample(currentSplineDistance + d)
+            val dy = sample.y - prev.y
+            val dir = when {
+                dy > INCLINE_DY_THRESHOLD -> 1
+                dy < -INCLINE_DY_THRESHOLD -> -1
+                else -> 0
+            }
+            if (runDir == 0) {
+                if (dir != 0) {
+                    runDir = dir
+                    runStartDist = d - step
+                    runEndDist = d
+                }
+            } else if (dir == runDir) {
+                runEndDist = d
+            } else {
+                break
+            }
+            prev = sample
+            d += step
+        }
+        if (runDir == 0) return null
+        if (runEndDist - runStartDist < INCLINE_MIN_RUN_LENGTH) return null
+        val keynoteDist = (runEndDist + INCLINE_KEYNOTE_OFFSET).coerceAtMost(maxScan)
+        val keynotePoint = spline.sample(currentSplineDistance + keynoteDist)
+        return InclineSegment(keynotePoint, runDir == -1)
+    }
+
+    /**
+     * Walks the spline forward from the cursor until the world-space distance
+     * from [eye] to the sampled point is at least [minDist], OR the spline
+     * ends, OR the line of sight breaks. Used to compensate for the player
+     * drifting off the path: when the spline cursor is the nearest projection
+     * of a drifted player, `cursor + N along the spline` can be only 2-3
+     * world-blocks away from the player. This walks until the chosen aim is
+     * far enough in world space that the camera stops trailing.
+     *
+     * Returns [current] unchanged when it is already far enough or no
+     * far-enough LOS-clear sample exists.
+     */
+    private fun extendToMinWorldDistance(
+        eye: Vec3,
+        spline: SplinePath,
+        current: Vec3,
+        level: Level,
+        minDist: Double,
+    ): Vec3 {
+        val cdx = current.x - eye.x
+        val cdy = current.y - eye.y
+        val cdz = current.z - eye.z
+        if (sqrt(cdx * cdx + cdy * cdy + cdz * cdz) >= minDist) return current
+        val step = 0.5
+        val minDistSq = minDist * minDist
+        var probe = currentSplineDistance + step
+        while (probe <= spline.totalLength) {
+            val sample = spline.sample(probe)
+            val dx = sample.x - eye.x
+            val dy = sample.y - eye.y
+            val dz = sample.z - eye.z
+            if (dx * dx + dy * dy + dz * dz >= minDistSq) {
+                return if (isPointVisible(eye, sample, level)) sample else current
+            }
+            probe += step
+        }
+        return current
     }
 
     /**

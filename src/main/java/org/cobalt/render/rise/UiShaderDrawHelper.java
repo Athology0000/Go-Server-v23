@@ -126,8 +126,64 @@ public final class UiShaderDrawHelper {
         });
     }
 
+    public static void drawBlueCompositeRoundedRect(
+        float x,
+        float y,
+        float width,
+        float height,
+        float radius,
+        float alpha,
+        float intensity,
+        int framebufferHeight
+    ) {
+        drawBlueCompositeRoundedRect(
+            x,
+            y,
+            width,
+            height,
+            radius,
+            0xCC07142A,
+            0xB50B52C8,
+            0xFF4BE7FF,
+            alpha,
+            intensity,
+            (System.currentTimeMillis() % 1_000_000L) / 1000.0f,
+            framebufferHeight
+        );
+    }
+
+    public static void drawBlueCompositeRoundedRect(
+        float x,
+        float y,
+        float width,
+        float height,
+        float radius,
+        int baseColor,
+        int glowColor,
+        int shineColor,
+        float alpha,
+        float intensity,
+        float timeSeconds,
+        int framebufferHeight
+    ) {
+        drawShader(ShaderRegistry.BLUE_COMPOSITE_ROUNDED_RECT, x, y, width, height, framebufferHeight, program -> {
+            program.set2f("u_size", width, height);
+            program.set1f("u_radius", radius);
+            program.set1f("u_alpha", clamp01(alpha));
+            program.set1f("u_intensity", Math.max(0.0f, intensity));
+            program.set1f("u_time", timeSeconds);
+            UniformHelper.setColor(program, "u_base_color", baseColor);
+            UniformHelper.setColor(program, "u_glow_color", glowColor);
+            UniformHelper.setColor(program, "u_shine_color", shineColor);
+        });
+    }
+
     private static void applyGradientDirection(ShaderProgram program, Gradient gradient) {
         program.set1i("u_direction", gradient == Gradient.TopToBottom ? 1 : 0);
+    }
+
+    private static float clamp01(float value) {
+        return Math.max(0.0f, Math.min(1.0f, value));
     }
 
     private static void drawShader(

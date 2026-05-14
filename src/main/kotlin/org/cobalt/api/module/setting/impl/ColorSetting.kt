@@ -57,6 +57,8 @@ class ColorSetting(
         (alpha shl 24) or (rgb and 0x00FFFFFF)
       }
 
+      is ColorMode.Gradient -> m.startArgb
+
       is ColorMode.ThemeColor -> {
         ThemeColorResolver.resolve(m.propertyName)
       }
@@ -134,6 +136,17 @@ class ColorSetting(
           )
         }
 
+        "gradient" -> {
+          val startArgb = obj.get("startArgb")?.asInt ?: super.value
+          val endArgb = obj.get("endArgb")?.asInt ?: startArgb
+          super.value = startArgb
+          ColorMode.Gradient(
+            startArgb = startArgb,
+            endArgb = endArgb,
+            direction = obj.get("direction")?.asString ?: ColorMode.DIRECTION_LEFT_TO_RIGHT,
+          )
+        }
+
         "tweaked_theme" -> {
           ColorMode.TweakedTheme(
             propertyName = obj.get("propertyName")?.asString ?: "accent",
@@ -184,6 +197,15 @@ class ColorSetting(
         JsonObject().apply {
           addProperty("mode", "theme")
           addProperty("propertyName", m.propertyName)
+        }
+      }
+
+      is ColorMode.Gradient -> {
+        JsonObject().apply {
+          addProperty("mode", "gradient")
+          addProperty("startArgb", m.startArgb)
+          addProperty("endArgb", m.endArgb)
+          addProperty("direction", m.direction)
         }
       }
 

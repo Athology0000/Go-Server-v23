@@ -17,7 +17,7 @@ public class HudGlassBlurRenderer {
 
   private static HudGlassBlurShader blurShader;
   private static boolean initialized = false;
-  private static final boolean ENABLE_SHADER_BLUR = false;
+  private static final boolean ENABLE_SHADER_BLUR = true;
 
   private static int quadVao;
   private static int quadVbo;

@@ -65,6 +65,12 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
   private var hexFocused = false
   private var hexDragging = false
   private var hexValid = true
+  private val gradientStartInputHandler = TextInputHandler("", 9)
+  private val gradientEndInputHandler = TextInputHandler("", 9)
+  private var focusedGradientInput: Int = 0
+  private var gradientInputDragging = false
+  private var gradientStartValid = true
+  private var gradientEndValid = true
 
   init {
     // Initialize static HSB from current mode if Static
@@ -77,6 +83,17 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
         staticBrightness = hsb[2]
         staticOpacity = color.alpha / 255f
         hexInputHandler.setText(argbToHex(mode.argb))
+      }
+      is ColorMode.Gradient -> {
+        val color = Color(mode.startArgb, true)
+        val hsb = Color.RGBtoHSB(color.red, color.green, color.blue, null)
+        staticHue = hsb[0]
+        staticSaturation = hsb[1]
+        staticBrightness = hsb[2]
+        staticOpacity = color.alpha / 255f
+        hexInputHandler.setText(argbToHex(mode.startArgb))
+        gradientStartInputHandler.setText(argbToHex(mode.startArgb))
+        gradientEndInputHandler.setText(argbToHex(mode.endArgb))
       }
       is ColorMode.ThemeColor -> {
         selectedThemeProperty = mode.propertyName
@@ -104,7 +121,7 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
     NVGRenderer.text(setting.name, x + 20F, y + (height / 2F) - 15.5F, 15F, ThemeManager.currentTheme.text)
     NVGRenderer.text(setting.description, x + 20F, y + (height / 2F) + 2F, 12F, ThemeManager.currentTheme.textSecondary)
 
-    NVGRenderer.rect(x + width - 50F, y + (height / 2F) - 15F, 30F, 30F, setting.value, 6F)
+    drawColorSwatch(x + width - 50F, y + (height / 2F) - 15F, 30F, 30F, 6F)
     NVGRenderer.hollowRect(x + width - 50F, y + (height / 2F) - 15F, 30F, 30F, 1.5F, ThemeManager.currentTheme.controlBorder, 6F)
   }
 
@@ -116,6 +133,7 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
 
     val pickerHeight = when (setting.mode) {
       is ColorMode.Static -> 450F
+      is ColorMode.Gradient -> 360F
       is ColorMode.Rainbow, is ColorMode.SyncedRainbow -> 360F
       is ColorMode.ThemeColor -> 400F
       is ColorMode.TweakedTheme -> 470F
@@ -132,6 +150,7 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
     val controlsY = py + 75F
     when (setting.mode) {
       is ColorMode.Static -> drawStaticPanel(px, controlsY)
+      is ColorMode.Gradient -> drawGradientPanel(px, controlsY, setting.mode as ColorMode.Gradient)
       is ColorMode.Rainbow -> drawRainbowPanel(px, controlsY, setting.mode as ColorMode.Rainbow)
       is ColorMode.SyncedRainbow -> drawSyncedRainbowPanel(px, controlsY, setting.mode as ColorMode.SyncedRainbow)
       is ColorMode.ThemeColor -> drawThemePanel(px, controlsY, setting.mode as ColorMode.ThemeColor)
@@ -187,6 +206,10 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
       val syncX = bx + 100F
       val isSynced = setting.mode is ColorMode.SyncedRainbow
       drawCheckbox(syncX, by, checkboxSize, isSynced, "Sync")
+
+      val gradientX = bx + 170F
+      val isGradient = setting.mode is ColorMode.Gradient
+      drawCheckbox(gradientX, by, checkboxSize, isGradient, "Gradient")
     } else {
       val isAdjusted = setting.mode is ColorMode.TweakedTheme
       drawCheckbox(bx, by, checkboxSize, isAdjusted, "Adjust")
@@ -294,6 +317,79 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
 
      NVGRenderer.popScissor()
    }
+
+  private fun drawGradientPanel(px: Float, py: Float, mode: ColorMode.Gradient) {
+    val bx = px + 10F
+    var currentY = py + 10F
+    val panelWidth = 320F
+
+    NVGRenderer.gradientRect(bx, currentY, panelWidth, 48F, mode.startArgb, mode.endArgb, gradientDirection(mode.direction), 6F)
+    NVGRenderer.hollowRect(bx, currentY, panelWidth, 48F, 1F, ThemeManager.currentTheme.controlBorder, 6F)
+    currentY += 66F
+
+    drawGradientHexInput(bx, currentY, "Start", 1, gradientStartInputHandler, gradientStartValid, mode.startArgb)
+    currentY += 58F
+    drawGradientHexInput(bx, currentY, "End", 2, gradientEndInputHandler, gradientEndValid, mode.endArgb)
+    currentY += 58F
+
+    NVGRenderer.text("Direction", bx, currentY, 13F, ThemeManager.currentTheme.text)
+    currentY += 22F
+
+    val labels = listOf(
+      "Horizontal" to ColorMode.DIRECTION_LEFT_TO_RIGHT,
+      "Vertical" to ColorMode.DIRECTION_TOP_TO_BOTTOM,
+      "Diagonal" to ColorMode.DIRECTION_DIAGONAL,
+    )
+    val gap = 8F
+    val buttonWidth = (panelWidth - gap * 2F) / 3F
+    labels.forEachIndexed { index, (label, direction) ->
+      val buttonX = bx + index * (buttonWidth + gap)
+      val selected = mode.direction == direction
+      val bg = if (selected) ThemeManager.currentTheme.accent else ThemeManager.currentTheme.controlBg
+      val textColor = if (selected) ThemeManager.currentTheme.white else ThemeManager.currentTheme.text
+      NVGRenderer.rect(buttonX, currentY, buttonWidth, 28F, bg, 5F)
+      NVGRenderer.hollowRect(buttonX, currentY, buttonWidth, 28F, 1F, ThemeManager.currentTheme.controlBorder, 5F)
+      val textWidth = NVGRenderer.textWidth(label, 12F)
+      NVGRenderer.text(label, buttonX + (buttonWidth - textWidth) / 2F, currentY + 8F, 12F, textColor)
+    }
+  }
+
+  private fun drawGradientHexInput(
+    x: Float,
+    y: Float,
+    label: String,
+    index: Int,
+    handler: TextInputHandler,
+    valid: Boolean,
+    color: Int,
+  ) {
+    NVGRenderer.text(label, x, y, 13F, ThemeManager.currentTheme.text)
+    val inputY = y + 20F
+    val focused = focusedGradientInput == index
+    val borderColor = if (focused) {
+      ThemeManager.currentTheme.accent
+    } else if (!valid) {
+      ThemeManager.currentTheme.error
+    } else {
+      ThemeManager.currentTheme.inputBorder
+    }
+
+    NVGRenderer.rect(x, inputY, 320F, 30F, ThemeManager.currentTheme.inputBg, 5F)
+    NVGRenderer.hollowRect(x, inputY, 320F, 30F, 2F, borderColor, 5F)
+    NVGRenderer.rect(x + 286F, inputY + 6F, 18F, 18F, color, 3F)
+    NVGRenderer.hollowRect(x + 286F, inputY + 6F, 18F, 18F, 1F, ThemeManager.currentTheme.controlBorder, 3F)
+
+    if (focused) handler.updateScroll(260F, 13F)
+    NVGRenderer.pushScissor(x + 10F, inputY, 260F, 30F)
+    if (focused) {
+      handler.renderSelection(x + 10F, inputY + 9F, 13F, 13F, ThemeManager.currentTheme.selection)
+    }
+    NVGRenderer.text(handler.getText(), x + 10F - handler.getTextOffset(), inputY + 9F, 13F, ThemeManager.currentTheme.text)
+    if (focused) {
+      handler.renderCursor(x + 10F, inputY + 9F, 13F, ThemeManager.currentTheme.text)
+    }
+    NVGRenderer.popScissor()
+  }
 
   private fun drawRainbowPanel(px: Float, py: Float, mode: ColorMode.Rainbow) {
     val bx = px + 20F
@@ -482,7 +578,7 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
     val swatchY = panelY + 8F
     val swatchSize = 40F
 
-    NVGRenderer.rect(swatchX, swatchY, swatchSize, swatchSize, setting.value, 6F)
+    drawColorSwatch(swatchX, swatchY, swatchSize, swatchSize, 6F)
     NVGRenderer.hollowRect(swatchX, swatchY, swatchSize, swatchSize, 1.5F, ThemeManager.currentTheme.controlBorder, 6F)
 
     NVGRenderer.text("Preview", swatchX + 50F, swatchY + 14F, 13F, ThemeManager.currentTheme.text)
@@ -490,6 +586,15 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
     val hexText = argbToHex(setting.value)
     val hexWidth = NVGRenderer.textWidth(hexText, 12F)
     NVGRenderer.text(hexText, panelX + panelWidth - hexWidth - 10F, swatchY + 15F, 12F, ThemeManager.currentTheme.textSecondary)
+  }
+
+  private fun drawColorSwatch(x: Float, y: Float, w: Float, h: Float, radius: Float) {
+    val mode = setting.mode
+    if (mode is ColorMode.Gradient) {
+      NVGRenderer.gradientRect(x, y, w, h, mode.startArgb, mode.endArgb, gradientDirection(mode.direction), radius)
+    } else {
+      NVGRenderer.rect(x, y, w, h, setting.value, radius)
+    }
   }
 
   private fun argbToHex(argb: Int): String {
@@ -566,6 +671,7 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
     val controlsY = py + 75F
     return when (setting.mode) {
       is ColorMode.Static -> handleStaticPanelClick(px, controlsY)
+      is ColorMode.Gradient -> handleGradientPanelClick(px, controlsY)
       is ColorMode.Rainbow -> handleRainbowPanelClick(px, controlsY)
       is ColorMode.SyncedRainbow -> handleSyncedRainbowPanelClick(px, controlsY)
       is ColorMode.ThemeColor -> handleThemePanelClick(px, controlsY)
@@ -621,6 +727,12 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
       return true
     }
 
+    val gradientX = bx + 170F
+    if (isHoveringOver(gradientX, checkboxY, checkboxSize + 75F, checkboxSize)) {
+      toggleGradientMode()
+      return true
+    }
+
     return false
   }
 
@@ -647,6 +759,22 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
         setting.mode = ColorMode.SyncedRainbow()
       }
     }
+  }
+
+  private fun toggleGradientMode() {
+    val current = setting.mode
+    if (current is ColorMode.Gradient) {
+      setStaticModeFromArgb(current.startArgb)
+      return
+    }
+
+    val start = setting.value
+    val end = lightenColor(start)
+    gradientStartInputHandler.setText(argbToHex(start))
+    gradientEndInputHandler.setText(argbToHex(end))
+    gradientStartValid = true
+    gradientEndValid = true
+    setting.mode = ColorMode.Gradient(start, end)
   }
 
   private fun handleThemeCheckboxClicks(bx: Float, checkboxY: Float, checkboxSize: Float): Boolean {
@@ -702,6 +830,52 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
 
      return false
    }
+
+  private fun handleGradientPanelClick(px: Float, py: Float): Boolean {
+    val bx = px + 10F
+    val startInputY = py + 96F
+    val endInputY = py + 154F
+
+    if (isHoveringOver(bx, startInputY, 320F, 30F)) {
+      focusedGradientInput = 1
+      gradientInputDragging = true
+      gradientStartInputHandler.startSelection(mouseX.toFloat(), bx + 10F, 13F)
+      return true
+    }
+
+    if (isHoveringOver(bx, endInputY, 320F, 30F)) {
+      focusedGradientInput = 2
+      gradientInputDragging = true
+      gradientEndInputHandler.startSelection(mouseX.toFloat(), bx + 10F, 13F)
+      return true
+    }
+
+    val directionY = py + 234F
+    val gap = 8F
+    val buttonWidth = (320F - gap * 2F) / 3F
+    val directions = listOf(
+      ColorMode.DIRECTION_LEFT_TO_RIGHT,
+      ColorMode.DIRECTION_TOP_TO_BOTTOM,
+      ColorMode.DIRECTION_DIAGONAL,
+    )
+    directions.forEachIndexed { index, direction ->
+      val buttonX = bx + index * (buttonWidth + gap)
+      if (isHoveringOver(buttonX, directionY, buttonWidth, 28F)) {
+        val mode = setting.mode as? ColorMode.Gradient ?: return true
+        setting.mode = mode.copy(direction = direction)
+        focusedGradientInput = 0
+        return true
+      }
+    }
+
+    if (focusedGradientInput != 0) {
+      commitGradientInput(focusedGradientInput)
+      focusedGradientInput = 0
+      return true
+    }
+
+    return false
+  }
 
   private fun handleRainbowPanelClick(px: Float, py: Float): Boolean {
     val bx = px + 20F
@@ -800,6 +974,20 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
         }
         return true
       }
+      is ColorMode.Gradient -> {
+        val bx = px + 10F
+        when {
+          gradientInputDragging && focusedGradientInput == 1 -> {
+            gradientStartInputHandler.updateSelection(mouseX.toFloat(), bx + 10F, 13F)
+            return true
+          }
+          gradientInputDragging && focusedGradientInput == 2 -> {
+            gradientEndInputHandler.updateSelection(mouseX.toFloat(), bx + 10F, 13F)
+            return true
+          }
+          else -> return false
+        }
+      }
       is ColorMode.Rainbow, is ColorMode.SyncedRainbow -> {
         val bx = px + 20F
         val sliderWidth = 300F
@@ -840,6 +1028,7 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
       draggingBrightnessMult = false
       draggingOpacityMult = false
       hexDragging = false
+      gradientInputDragging = false
     }
     return false
   }
@@ -862,6 +1051,44 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
     }
 
     return false
+  }
+
+  private fun setStaticModeFromArgb(argb: Int) {
+    val color = Color(argb, true)
+    val hsb = Color.RGBtoHSB(color.red, color.green, color.blue, null)
+    staticHue = hsb[0]
+    staticSaturation = hsb[1]
+    staticBrightness = hsb[2]
+    staticOpacity = color.alpha / 255f
+    setting.mode = ColorMode.Static(argb)
+    hexInputHandler.setText(argbToHex(argb))
+    hexValid = true
+  }
+
+  private fun lightenColor(argb: Int): Int {
+    val color = Color(argb, true)
+    val hsb = Color.RGBtoHSB(color.red, color.green, color.blue, null)
+    val rgb = Color.HSBtoRGB((hsb[0] + 0.08f) % 1f, (hsb[1] * 0.75f).coerceIn(0f, 1f), (hsb[2] + 0.22f).coerceIn(0f, 1f))
+    return (color.alpha shl 24) or (rgb and 0x00FFFFFF)
+  }
+
+  private fun gradientDirection(direction: String): Gradient {
+    return when (direction) {
+      ColorMode.DIRECTION_TOP_TO_BOTTOM -> Gradient.TopToBottom
+      ColorMode.DIRECTION_DIAGONAL -> Gradient.TopLeftToBottomRight
+      else -> Gradient.LeftToRight
+    }
+  }
+
+  private fun commitGradientInput(index: Int) {
+    val mode = setting.mode as? ColorMode.Gradient ?: return
+    val handler = if (index == 1) gradientStartInputHandler else gradientEndInputHandler
+    val parsed = parseHexToARGB(handler.getText()) ?: return
+    setting.mode = if (index == 1) {
+      mode.copy(startArgb = parsed)
+    } else {
+      mode.copy(endArgb = parsed)
+    }
   }
 
    private fun updateStaticColorFromBox(boxX: Float, boxY: Float) {
@@ -934,12 +1161,23 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
   }
 
   override fun charTyped(input: CharacterEvent): Boolean {
-    if (!hexFocused || !pickerOpen || setting.mode !is ColorMode.Static) return false
+    if (!pickerOpen) return false
 
     val char = input.codepoint.toChar()
     val isHexChar = char in '0'..'9' || char in 'a'..'f' || char in 'A'..'F' || char == '#'
     val isPrintable = char.code >= 32 && char != '\u007f'
-    
+
+    if (focusedGradientInput != 0 && setting.mode is ColorMode.Gradient) {
+      if (isHexChar && isPrintable) {
+        activeGradientHandler()?.insertText(char.toString())
+        validateGradientInputs()
+        return true
+      }
+      return false
+    }
+
+    if (!hexFocused || setting.mode !is ColorMode.Static) return false
+
     if (isHexChar && isPrintable) {
       hexInputHandler.insertText(char.toString())
       hexValid = validateHexInput(hexInputHandler.getText())
@@ -950,40 +1188,94 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
   }
 
   override fun keyPressed(input: KeyEvent): Boolean {
-    if (!hexFocused || !pickerOpen || setting.mode !is ColorMode.Static) return false
+    if (!pickerOpen) return false
 
     val ctrl = input.modifiers and GLFW.GLFW_MOD_CONTROL != 0
     val shift = input.modifiers and GLFW.GLFW_MOD_SHIFT != 0
 
+    if (focusedGradientInput != 0 && setting.mode is ColorMode.Gradient) {
+      val handler = activeGradientHandler() ?: return false
+      if (ctrl) {
+        val handled = handleCtrlKeyCombo(input.key, handler) {
+          validateGradientInputs()
+        }
+        if (handled) return true
+      }
+      return handleGradientInputKey(input.key, shift, handler)
+    }
+
+    if (!hexFocused || setting.mode !is ColorMode.Static) return false
+
     if (ctrl) {
-      val handled = handleCtrlKeyCombo(input.key)
+      val handled = handleCtrlKeyCombo(input.key, hexInputHandler) {
+        hexValid = validateHexInput(hexInputHandler.getText())
+      }
       if (handled) return true
     }
 
     return handleHexInputKey(input.key, shift)
   }
 
-  private fun handleCtrlKeyCombo(key: Int): Boolean {
+  private fun handleCtrlKeyCombo(key: Int, handler: TextInputHandler, afterEdit: () -> Unit): Boolean {
     return when (key) {
       GLFW.GLFW_KEY_A -> {
-        hexInputHandler.selectAll()
+        handler.selectAll()
         true
       }
       GLFW.GLFW_KEY_C -> {
-        hexInputHandler.copy()?.let { Minecraft.getInstance().keyboardHandler.clipboard = it }
+        handler.copy()?.let { Minecraft.getInstance().keyboardHandler.clipboard = it }
         true
       }
       GLFW.GLFW_KEY_X -> {
-        hexInputHandler.cut()?.let { Minecraft.getInstance().keyboardHandler.clipboard = it }
-        hexValid = validateHexInput(hexInputHandler.getText())
+        handler.cut()?.let { Minecraft.getInstance().keyboardHandler.clipboard = it }
+        afterEdit()
         true
       }
       GLFW.GLFW_KEY_V -> {
         val clipboard = Minecraft.getInstance().keyboardHandler.clipboard
         if (clipboard.isNotEmpty()) {
-          hexInputHandler.insertText(clipboard)
-          hexValid = validateHexInput(hexInputHandler.getText())
+          handler.insertText(clipboard)
+          afterEdit()
         }
+        true
+      }
+      else -> false
+    }
+  }
+
+  private fun handleGradientInputKey(key: Int, shift: Boolean, handler: TextInputHandler): Boolean {
+    return when (key) {
+      GLFW.GLFW_KEY_ESCAPE, GLFW.GLFW_KEY_ENTER -> {
+        if (if (focusedGradientInput == 1) gradientStartValid else gradientEndValid) {
+          commitGradientInput(focusedGradientInput)
+        }
+        focusedGradientInput = 0
+        true
+      }
+      GLFW.GLFW_KEY_BACKSPACE -> {
+        handler.backspace()
+        validateGradientInputs()
+        true
+      }
+      GLFW.GLFW_KEY_DELETE -> {
+        handler.delete()
+        validateGradientInputs()
+        true
+      }
+      GLFW.GLFW_KEY_LEFT -> {
+        handler.moveCursorLeft(shift)
+        true
+      }
+      GLFW.GLFW_KEY_RIGHT -> {
+        handler.moveCursorRight(shift)
+        true
+      }
+      GLFW.GLFW_KEY_HOME -> {
+        handler.moveCursorToStart(shift)
+        true
+      }
+      GLFW.GLFW_KEY_END -> {
+        handler.moveCursorToEnd(shift)
         true
       }
       else -> false
@@ -1025,6 +1317,19 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
       }
       else -> false
     }
+  }
+
+  private fun activeGradientHandler(): TextInputHandler? {
+    return when (focusedGradientInput) {
+      1 -> gradientStartInputHandler
+      2 -> gradientEndInputHandler
+      else -> null
+    }
+  }
+
+  private fun validateGradientInputs() {
+    gradientStartValid = validateHexInput(gradientStartInputHandler.getText())
+    gradientEndValid = validateHexInput(gradientEndInputHandler.getText())
   }
 
   companion object {

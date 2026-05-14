@@ -24,6 +24,8 @@ public final class ShaderRegistry {
         ShaderProgram.fromResources("/assets/cobalt/shaders/rise/quad.vert", "/assets/minecraft/rise/shader/roq.glsl");
     public static final ShaderProgram GRADIENT_OUTLINE =
         ShaderProgram.fromResources("/assets/cobalt/shaders/rise/quad.vert", "/assets/minecraft/rise/shader/rogq.frag");
+    public static final ShaderProgram BLUE_COMPOSITE_ROUNDED_RECT =
+        ShaderProgram.fromResources("/assets/cobalt/shaders/rise/quad.vert", "/assets/cobalt/shaders/rise/ui/blue_composite_rounded_rect.frag");
 
     private ShaderRegistry() {}
 
@@ -42,6 +44,7 @@ public final class ShaderRegistry {
         TRI_GRADIENT_ROUNDED_RECT.cleanup();
         ROUNDED_OUTLINE.cleanup();
         GRADIENT_OUTLINE.cleanup();
+        BLUE_COMPOSITE_ROUNDED_RECT.cleanup();
         FullscreenQuadRenderer.cleanup();
     }
 }

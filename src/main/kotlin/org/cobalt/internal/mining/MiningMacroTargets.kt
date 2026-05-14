@@ -27,7 +27,7 @@ internal fun MiningMacroModule.selectMineTarget(
       if (!isMineableTarget(level, player, pos, vein.targetIds)) continue
       if (!canStepToNearbyTarget(player, pos)) continue
       if (blockIdAt(level, pos) !in titaniumIds) continue
-      if (distanceToBlockSq(player, pos) > rangeSq) continue
+      if (mineReachDistanceSq(player, pos) > rangeSq) continue
       val visiblePoint = if (REQUIRE_MINE_LOS) findVisibleAimPoint(level, player, eye, pos) else null
       if (REQUIRE_MINE_LOS && visiblePoint == null) continue
       val aimPoint = visiblePoint ?: Vec3(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5)
@@ -42,7 +42,7 @@ internal fun MiningMacroModule.selectMineTarget(
 
   val sticky = currentTarget?.takeIf { vein.blocks.contains(it) && isMineableTarget(level, player, it, vein.targetIds) }
   if (sticky != null) {
-    val distSq = distanceToBlockSq(player, sticky)
+    val distSq = mineReachDistanceSq(player, sticky)
     val inAttackRange = distSq <= mineRange.value * mineRange.value
 
     // Only keep sticky when the block is already in attack range (stable mid-mine targeting).
@@ -85,7 +85,7 @@ internal fun MiningMacroModule.selectMineTarget(
   for (pos in vein.blocks) {
     if (!isMineableTarget(level, player, pos, vein.targetIds)) continue
     if (!canStepToNearbyTarget(player, pos)) continue
-    if (distanceToBlockSq(player, pos) > rangeSq) continue
+    if (mineReachDistanceSq(player, pos) > rangeSq) continue
     val skipUntil = MiningMacroModule.stuckMiningTargets[pos.asLong()]
     if (skipUntil != null && skipUntil > now) continue
     val visiblePoint: Vec3? = if (REQUIRE_MINE_LOS) findVisibleAimPoint(level, player, eye, pos) else null
@@ -121,7 +121,7 @@ internal fun MiningMacroModule.selectMineTarget(
     for (pos in vein.blocks) {
       if (!isMineableTarget(level, player, pos, vein.targetIds)) continue
       if (!canStepToNearbyTarget(player, pos)) continue
-      val distSq = distanceToBlockSq(player, pos)
+      val distSq = mineReachDistanceSq(player, pos)
       if (distSq > rangeSq) continue
       if (!isCrosshairOnTarget(pos)) continue
       if (distSq < bestDist) {
