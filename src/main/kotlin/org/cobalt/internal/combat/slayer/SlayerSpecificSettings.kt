@@ -85,6 +85,7 @@ internal object EndermanSlayerSettings {
   private const val LOCATION_GROUP = "Location"
   private const val WEAPONS_GROUP = "Weapons"
   private const val HIT_PHASE_GROUP = "Hit Phase"
+  private const val LASERS_GROUP = "Lasers / Beacons"
 
   val location = ModeSetting(
     "Enderman Location",
@@ -165,6 +166,18 @@ internal object EndermanSlayerSettings {
     false
   ).inGroup(HIT_PHASE_GROUP)
 
+  val laserPhase = CheckboxSetting(
+    "Detect Lasers Phase",
+    "Detect Voidgloom laser text and use laser-phase movement.",
+    true
+  ).inGroup(LASERS_GROUP)
+
+  val beaconPhase = CheckboxSetting(
+    "Clear Beacons",
+    "During laser phase, scan for nearby beacons and AOTV onto them.",
+    true
+  ).inGroup(LASERS_GROUP)
+
   val bossWeapon = TextSetting(
     "Eman Boss Weapon",
     "Comma-separated hotbar keywords in priority order for Enderman Slayer boss DPS phases.",
@@ -184,6 +197,8 @@ internal object EndermanSlayerSettings {
     hitPhaseBowWeapon,
     hitPhaseSwordWeapon,
     hitPhaseSneakWhenHitting,
+    laserPhase,
+    beaconPhase,
     bossWeapon,
   )
 }

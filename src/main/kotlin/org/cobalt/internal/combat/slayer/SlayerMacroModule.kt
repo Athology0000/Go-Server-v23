@@ -8,6 +8,8 @@ import org.cobalt.api.module.ModuleCategory
 import org.cobalt.api.module.setting.inGroup
 import org.cobalt.api.module.setting.impl.ActionSetting
 import org.cobalt.api.module.setting.impl.CheckboxSetting
+import org.cobalt.api.module.setting.impl.InfoSetting
+import org.cobalt.api.module.setting.impl.InfoType
 import org.cobalt.api.module.setting.impl.KeyBindSetting
 import org.cobalt.api.util.helper.KeyBind
 import org.cobalt.internal.combat.CombatMacroModule
@@ -19,6 +21,7 @@ internal abstract class SlayerMacroModule(
 ) : Module(name) {
 
   override val category = ModuleCategory.COMBAT
+  protected val definition: SlayerDefinition? = SlayerDefinitions.forType(typeIndex)
 
   private val enabled = CheckboxSetting(
     "Enabled",
@@ -45,11 +48,18 @@ internal abstract class SlayerMacroModule(
   private val warpToLocation = SlayerLocationSettings.warpToLocationSetting(typeIndex)
   private val autoSlayer = SlayerLocationSettings.autoSlayerSetting(typeIndex)
   private val primordialBelt = SlayerLocationSettings.primordialBeltSetting(typeIndex)
+  private val phaseDefinitions = InfoSetting(
+    "Phase Definitions",
+    definition?.phases
+      ?.joinToString(" | ") { phase -> phase.displayName }
+      ?: "Spawn Farming | Boss Damage",
+    InfoType.INFO,
+  ).inGroup(GENERAL_GROUP)
 
   private var lastEnabled: Boolean? = null
 
   init {
-    addSetting(enabled, toggleKeybind, startStopAction, warpToLocation, autoSlayer, primordialBelt)
+    addSetting(enabled, toggleKeybind, startStopAction, warpToLocation, autoSlayer, primordialBelt, phaseDefinitions)
     SlayerMacroModuleRegistry.register(this)
   }
 

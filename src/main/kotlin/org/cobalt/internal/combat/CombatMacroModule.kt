@@ -58,9 +58,11 @@ import org.cobalt.internal.mining.RoutesModule
 import org.cobalt.internal.routes.RouteStore
 import org.cobalt.internal.routes.RouteType
 import org.cobalt.internal.combat.slayer.BlazeSlayerSettings
+import org.cobalt.internal.combat.slayer.EndermanSlayerPhase
 import org.cobalt.internal.combat.slayer.EndermanSlayerSettings
 import org.cobalt.internal.combat.slayer.SlayerLocationSettings
 import org.cobalt.internal.combat.slayer.SlayerQuestSignals
+import org.cobalt.internal.combat.slayer.SlayerDefinitions
 import org.cobalt.internal.combat.slayer.SpiderSlayerPhase
 import org.cobalt.internal.combat.slayer.SpiderSlayerSettings
 import org.cobalt.internal.combat.slayer.VampireSlayerSettings
@@ -76,6 +78,7 @@ object CombatMacroModule : Module("Combat Macro") {
   private val rotationStrategy = CombatRotationStrategy()
   private val builtInBlacklistedNames = CombatTargetDenylist.builtInNames
   private val targetMatchNamesCache = HashMap<Int, List<String>>(64)
+  private val currentSlayerDefinition get() = SlayerDefinitions.forType(slayerType.value)
   private val spiderMeleeWeapon get() = SpiderSlayerSettings.meleeWeapon
   private val spiderBowWeapon get() = SpiderSlayerSettings.bowWeapon
   private val spiderAutoDetectSword get() = SpiderSlayerSettings.autoDetectSword
@@ -103,6 +106,8 @@ object CombatMacroModule : Module("Combat Macro") {
   private val emanHitPhaseBowWeapon get() = EndermanSlayerSettings.hitPhaseBowWeapon
   private val emanHitPhaseSwordWeapon get() = EndermanSlayerSettings.hitPhaseSwordWeapon
   private val emanHitPhaseSneakWhenHitting get() = EndermanSlayerSettings.hitPhaseSneakWhenHitting
+  private val emanLaserPhase get() = EndermanSlayerSettings.laserPhase
+  private val emanBeaconPhase get() = EndermanSlayerSettings.beaconPhase
   private val emanBossWeapon get() = EndermanSlayerSettings.bossWeapon
   private val vampireLocation get() = VampireSlayerSettings.location
   private val blazeLocation get() = BlazeSlayerSettings.location
@@ -2630,6 +2635,17 @@ object CombatMacroModule : Module("Combat Macro") {
     }
   }
 
+  private fun currentSlayerLocationIndex(): Int =
+    when (slayerType.value) {
+      0 -> slayerLocation.value
+      1 -> wolfLocation.value
+      2 -> spiderLocation.value
+      3 -> endermanLocation.value
+      4 -> vampireLocation.value
+      5 -> blazeLocation.value
+      else -> 0
+    }
+
   private fun readTabListLines(nowTick: Long): List<String> {
     if (slayerLastTabScanTick >= 0L && nowTick - slayerLastTabScanTick < SLAYER_TAB_SCAN_INTERVAL_TICKS) {
       return slayerTabCache
@@ -3122,7 +3138,7 @@ object CombatMacroModule : Module("Combat Macro") {
   }
 
   private fun isTransientAttachedLabel(normalizedName: String): Boolean {
-    return ENDERMAN_HITS_PATTERNS.any { pattern -> pattern.containsMatchIn(normalizedName) } ||
+    return EndermanSlayerPhase.isHitShieldText(normalizedName) ||
       ATTACHED_LABEL_TRANSIENT_KEYWORDS.any { keyword -> normalizedName.contains(keyword) }
   }
 
@@ -3518,37 +3534,25 @@ object CombatMacroModule : Module("Combat Macro") {
       )
     }
 
-    // AOTV onto nearby beacon blocks to disable them.
-    tryAotvOntoBeacon(player)
+    // Beacon clearing is its own Enderman phase behavior, even though it is
+    // only reachable during the laser movement window.
+    if (emanBeaconPhase.value) {
+      tryAotvOntoBeacon(player)
+    }
 
     return true
   }
 
   private fun tryAotvOntoBeacon(player: Player) {
-    val level = mc.level ?: return
     val aotvSlot = findHotbarSlotByKeywords(player, EMAN_LASER_AOTV_KEYWORDS)
     if (aotvSlot !in 0..8) return
+    val level = mc.level ?: return
+    val pos = EndermanSlayerPhase.nearestBeacon(level, player) ?: return
 
-    val px = player.blockX
-    val py = player.blockY
-    val pz = player.blockZ
-
-    for (dx in -EMAN_BEACON_SCAN_RADIUS..EMAN_BEACON_SCAN_RADIUS) {
-      for (dz in -EMAN_BEACON_SCAN_RADIUS..EMAN_BEACON_SCAN_RADIUS) {
-        for (dy in -EMAN_BEACON_SCAN_RADIUS..EMAN_BEACON_SCAN_RADIUS) {
-          val pos = net.minecraft.core.BlockPos(px + dx, py + dy, pz + dz)
-          val state = level.getBlockState(pos)
-          if (state.`is`(net.minecraft.world.level.block.Blocks.BEACON)) {
-            // Aim at the top of the beacon and use AOTV.
-            val beaconTop = net.minecraft.world.phys.Vec3(pos.x + 0.5, pos.y + 1.0, pos.z + 0.5)
-            val rotation = AngleUtils.getRotation(player.eyePosition, beaconTop)
-            RotationExecutor.rotateTo(rotation, rotationStrategy)
-            useHotbarUtilityItem(player, EMAN_LASER_AOTV_KEYWORDS, teleportUse = true)
-            return
-          }
-        }
-      }
-    }
+    val beaconTop = Vec3(pos.x + 0.5, pos.y + 1.0, pos.z + 0.5)
+    val rotation = AngleUtils.getRotation(player.eyePosition, beaconTop)
+    RotationExecutor.rotateTo(rotation, rotationStrategy)
+    useHotbarUtilityItem(player, EMAN_LASER_AOTV_KEYWORDS, teleportUse = true)
   }
 
   private fun updateSlayerBossPhaseState(level: ClientLevel, boss: LivingEntity?) {
@@ -3558,7 +3562,7 @@ object CombatMacroModule : Module("Combat Macro") {
   }
 
   private fun updateEndermanLaserPhaseState(level: ClientLevel, boss: LivingEntity?) {
-    if (!shouldUseEndermanDynamicCombat()) {
+    if (!shouldUseEndermanLaserPhase()) {
       if (emanLaserPhaseActive) clearEndermanLaserPhase()
       return
     }
@@ -3578,12 +3582,12 @@ object CombatMacroModule : Module("Combat Macro") {
   }
 
   private fun isEndermanBossLaserPhase(target: LivingEntity): Boolean {
-    if (!shouldUseEndermanDynamicCombat()) return false
+    if (!shouldUseEndermanLaserPhase()) return false
     if (!isSlayerBossEntity(target)) return false
-    return findAttachedArmorStandNames(target, ENDERMAN_HITS_HORIZONTAL_RANGE_SQ)
+    return findAttachedArmorStandNames(target, EndermanSlayerPhase.ATTACHED_TEXT_RANGE_SQ)
       .asSequence()
       .map(::normalizeNameForMatch)
-      .any { name -> ENDERMAN_LASER_TEXT_KEYWORDS.any { kw -> name.contains(kw) } }
+      .any(EndermanSlayerPhase::isLaserText)
   }
 
   private fun resolveSlayerPhaseTarget(
@@ -3773,14 +3777,14 @@ object CombatMacroModule : Module("Combat Macro") {
   private fun isEndermanBossHitPhase(target: LivingEntity): Boolean {
     if (!shouldUseEndermanDynamicCombat()) return false
     if (!isSlayerBossEntity(target)) return false
-    return findAttachedArmorStandNames(target, ENDERMAN_HITS_HORIZONTAL_RANGE_SQ)
+    return findAttachedArmorStandNames(target, EndermanSlayerPhase.ATTACHED_TEXT_RANGE_SQ)
       .asSequence()
       .map(::normalizeNameForMatch)
-      .any { name ->
-        ENDERMAN_HITS_PATTERNS.any { pattern -> pattern.containsMatchIn(name) } ||
-          ENDERMAN_HITS_TEXT_KEYWORDS.any { keyword -> name.contains(keyword) }
-      }
+      .any(EndermanSlayerPhase::isHitShieldText)
   }
+
+  private fun shouldUseEndermanLaserPhase(): Boolean =
+    shouldUseEndermanDynamicCombat() && emanLaserPhase.value
 
   private fun keywordSettingValues(raw: String, fallback: Array<String>): Array<String> {
     val parsed = raw
@@ -4368,15 +4372,7 @@ object CombatMacroModule : Module("Combat Macro") {
   }
 
   private fun slayerBossDisplayName(): String =
-    when (slayerType.value) {
-      0 -> if (slayerTier.value.toInt() >= 5) "Atoned Horror" else "Revenant Horror"
-      1 -> "Sven Packmaster"
-      2 -> "Tarantula Broodfather"
-      3 -> "Voidgloom Seraph"
-      4 -> "Riftstalker Bloodfiend"
-      5 -> "Inferno Demonlord"
-      else -> "Slayer Boss"
-    }
+    currentSlayerDefinition?.bossDisplayName(slayerTier.value.toInt().coerceIn(1, 5)) ?: "Slayer Boss"
 
   private fun holdStillNoStrafe() {
     MovementManager.setForcedMovement(
@@ -4892,7 +4888,6 @@ object CombatMacroModule : Module("Combat Macro") {
   private const val EMAN_HITS_PHASE_STANDOFF_BUFFER = 0.5
   private const val EMAN_HITS_PHASE_STANDOFF_HYSTERESIS = 0.35
   private const val EMAN_HITS_PHASE_YAW_TOLERANCE = 25.0
-  private const val EMAN_BEACON_SCAN_RADIUS = 16
   private const val CRYPT_WALKBACK_ROUTE_NAME = "cryptwalkback"
   private const val SLAYER_WALKIN_WARP_DELAY_TICKS = 40L  // ticks to wait after warp hub before starting walkin route
   private const val CRYPT_PROXIMITY_RANGE_SQ = 1600.0    // 40-block radius - if within this of any patrol point, already in crypt
@@ -4905,18 +4900,10 @@ object CombatMacroModule : Module("Combat Macro") {
   private const val ATTACHED_NAMEPLATE_HORIZONTAL_RANGE_SQ = 2.25
   private const val SLAYER_OWNER_ENTITY_ID_SCAN_OFFSETS = 4
   private const val SLAYER_OWNER_STAND_MAX_DIST_SQ = 9.0 // 3-block radius max for owner stand ID scan
-  private const val ENDERMAN_HITS_HORIZONTAL_RANGE_SQ = 9.0
   private const val TARGET_BOX_INFLATE = 0.08
   private const val SLAYER_ESP_MID_INFLATE = 0.22
   private const val SLAYER_ESP_OUTER_INFLATE = 0.38
   private const val BOW_REFIRE_DELAY_NS = 200_000_000L  // 200 ms between shots
-  private val ENDERMAN_HITS_PATTERNS = arrayOf(
-    Regex("\\b\\d+[,.]?\\d*\\s+hits?\\b"),
-    Regex("\\bhits?\\s*[:x-]?\\s*\\d+[,.]?\\d*\\b"),
-    Regex("\\b\\d+[,.]?\\d*\\s+hit shield\\b"),
-  )
-  private val ENDERMAN_HITS_TEXT_KEYWORDS = arrayOf("hits", "shield", "shielded", "immune")
-  private val ENDERMAN_LASER_TEXT_KEYWORDS = arrayOf("aligning", "lasers", "laser", "align")
   private val EMAN_LASER_AOTV_KEYWORDS = arrayOf("aspect of the void", "aotv")
   private val ATTACHED_LABEL_TRANSIENT_KEYWORDS = arrayOf("hits", "hit shield", "shielded", "immune")
   private val SLAYER_BOSS_OWNER_PATTERN = Regex("\\bspawned by:\\s*([A-Za-z0-9_]{1,16})\\b", RegexOption.IGNORE_CASE)
@@ -4925,73 +4912,17 @@ object CombatMacroModule : Module("Combat Macro") {
   private val SANITIZE_SYMBOL_PREFIX = Regex("^[^A-Za-z0-9]+")
   private val SANITIZE_HP_SUFFIX     = Regex("\\s+[0-9.,]+(?:/[0-9.,]+)?(?:[kKmMbB])?\\s*[❤]?$")
   private val SANITIZE_WHITESPACE    = Regex("\\s+")
-  private val SLAYER_BOSS_ENTITY_KEYWORDS get() = when (slayerType.value) {
-    0 -> arrayOf("revenant horror", "atoned horror")
-    1 -> arrayOf("sven packmaster")
-    2 -> arrayOf("tarantula broodfather", "conjoined brood")
-    3 -> arrayOf("voidgloom seraph")
-    4 -> arrayOf("riftstalker bloodfiend")
-    5 -> arrayOf("inferno demonlord")
-    else -> arrayOf()
-  }
-  // Priority mobs: rare/high-XP mobs that should be targeted over regular farm mobs.
-  // Only applies at the relevant tier (zombie: tier 3+).
-  private val SLAYER_PRIORITY_MOB_KEYWORDS get() = when {
-    slayerType.value == 0 && slayerTier.value >= 3 -> arrayOf(
-      "revenant sycophant", "revenant champion", "deformed revenant",
-      "atoned champion", "atoned revenant"
-    )
-    slayerType.value == 1 && slayerTier.value >= 3 -> arrayOf(
-      "pack enforcer", "sven follower", "sven alpha"
-    )
-    slayerType.value == 2 && slayerTier.value >= 3 -> arrayOf(
-      "tarantula vermin", "tarantula beast", "mutant tarantula",
-      "primordial jockey", "primordial viscount"
-    )
-    slayerType.value == 3 && slayerTier.value >= 3 -> arrayOf(
-      "voidling devotee", "voidling radical", "voidcrazed maniac"
-    )
-    slayerType.value == 5 && slayerTier.value >= 3 -> arrayOf(
-      "flare demon", "kindleheart demon", "burningsoul demon"
-    )
-    else -> arrayOf()
-  }
-  private val SLAYER_HIGH_TIER_PRIORITY_MOB_KEYWORDS get() = when {
-    slayerType.value == 0 && slayerTier.value >= 3 -> arrayOf(
-      "revenant champion", "deformed revenant", "atoned champion", "atoned revenant"
-    )
-    slayerType.value == 1 && slayerTier.value >= 3 -> arrayOf(
-      "sven alpha"
-    )
-    slayerType.value == 2 && slayerTier.value >= 3 -> arrayOf(
-      "mutant tarantula", "primordial jockey", "primordial viscount"
-    )
-    slayerType.value == 3 && slayerTier.value >= 3 -> arrayOf(
-      "voidling radical", "voidcrazed maniac"
-    )
-    slayerType.value == 5 && slayerTier.value >= 3 -> arrayOf(
-      "kindleheart demon", "burningsoul demon"
-    )
-    else -> arrayOf()
-  }
-  private val SLAYER_FARM_MOB_KEYWORDS get() = when (slayerType.value) {
-    0 -> when (slayerLocation.value) {
-      0 -> arrayOf("zombie") // Zombie Graveyard: regular zombies only
-      1 -> arrayOf("crypt ghoul", "golden ghoul") // Zombie Crypt
-      else -> arrayOf("zombie", "crypt ghoul", "golden ghoul")
-    }
-    1 -> arrayOf("pack wolf", "old wolf", "pit wolf", "zombie wolf", "wolf", "pup", "pups")
-    2 -> arrayOf("dasher spider", "voracious spider", "weaver spider", "spider", "hatchling", "hatchlings", "broodling")
-    3 -> when (endermanLocation.value) {
-      0 -> arrayOf(ENDERMAN_END_FARM_MOB_KEYWORD)
-      1 -> arrayOf(ENDERMAN_HIDEOUT_FARM_MOB_KEYWORD)
-      2 -> arrayOf(ENDERMAN_VOID_FARM_MOB_KEYWORD)
-      else -> arrayOf(ENDERMAN_END_FARM_MOB_KEYWORD)
-    }
-    4 -> arrayOf("bat", "vampiric bat", "bloodfiend")
-    5 -> arrayOf("blaze", "smoldering blaze", "emerald slime")
-    else -> arrayOf()
-  }
+  private val SLAYER_BOSS_ENTITY_KEYWORDS get() =
+    currentSlayerDefinition?.bossKeywords ?: emptyArray()
+
+  private val SLAYER_PRIORITY_MOB_KEYWORDS get() =
+    currentSlayerDefinition?.priorityKeywords(slayerTier.value.toInt().coerceIn(1, 5)) ?: emptyArray()
+
+  private val SLAYER_HIGH_TIER_PRIORITY_MOB_KEYWORDS get() =
+    currentSlayerDefinition?.highTierPriorityKeywords(slayerTier.value.toInt().coerceIn(1, 5)) ?: emptyArray()
+
+  private val SLAYER_FARM_MOB_KEYWORDS get() =
+    currentSlayerDefinition?.farmKeywords(currentSlayerLocationIndex()) ?: emptyArray()
   // Items that are NOT weapons - switch away from these when preparing to attack
   private val SLAYER_NON_WEAPON_KEYWORDS = arrayOf(
     "batphone", "overflux", "ragnarok", "ragnorak", "wand of atonement",
