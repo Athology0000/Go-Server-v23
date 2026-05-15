@@ -210,6 +210,12 @@ object PathExecutorState {
     private const val CATCHUP_PROJECTION_DISTANCE = 6.0
     private const val YAW_DEADZONE = 0.18f
     private const val PITCH_DEADZONE = 0.25f
+    // On a near-straight path the lookahead point micro-jitters as the player
+    // moves; with the single passthrough smoother that jitter became visible
+    // head wobble. A wide deadzone on straights ignores sub-degree changes so
+    // the camera holds steady. Turns (curvature >= 0.15) keep the tight
+    // YAW_DEADZONE so responsiveness is unaffected.
+    private const val STRAIGHT_YAW_DEADZONE = 0.9f
     private const val TARGET_SMOOTH_MIN = 0.22f
     private const val TARGET_SMOOTH_MAX = 0.65f
     private const val TARGET_SMOOTH_YAW_SCALE = 24.0
@@ -648,7 +654,7 @@ object PathExecutorState {
         val remainingPath = spline.totalLength - currentSplineDistance
         val finishFactor = if (remainingPath < 4.0) maxOf(0.25, remainingPath / 4.0) else 1.0
         val isStraight = pathCurvature < 0.15
-        val dynamicYawDeadzone = (if (isStraight) YAW_DEADZONE * 1.5f else YAW_DEADZONE) * finishFactor.toFloat()
+        val dynamicYawDeadzone = (if (isStraight) STRAIGHT_YAW_DEADZONE else YAW_DEADZONE) * finishFactor.toFloat()
 
         updateSmoothedRotationTarget(
             targetYaw = r.yaw,
@@ -835,7 +841,7 @@ object PathExecutorState {
         val remainingPath = lastIndex - currentPathPosition
         val finishFactor = if (remainingPath < 4.0) maxOf(0.25, remainingPath / 4.0) else 1.0
         val isStraight = pathCurvature < 0.15
-        val dynamicYawDeadzone = (if (isStraight) YAW_DEADZONE * 1.5f else YAW_DEADZONE) * finishFactor.toFloat()
+        val dynamicYawDeadzone = (if (isStraight) STRAIGHT_YAW_DEADZONE else YAW_DEADZONE) * finishFactor.toFloat()
 
         updateSmoothedRotationTarget(
             targetYaw = targetYaw,
