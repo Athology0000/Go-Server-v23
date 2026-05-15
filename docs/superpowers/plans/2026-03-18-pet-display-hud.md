@@ -14,22 +14,22 @@
 
 | Action | File |
 |---|---|
-| Create | `src/main/kotlin/org/cobalt/internal/visual/PetTabListParser.kt` |
-| Create | `src/main/kotlin/org/cobalt/internal/visual/PetDisplayModule.kt` |
-| Create | `src/main/java/org/cobalt/mixin/client/TabOverlayAccessor.java` |
-| Modify | `src/main/kotlin/org/cobalt/Cobalt.kt` |
+| Create | `src/main/kotlin/org/phantom/internal/visual/PetTabListParser.kt` |
+| Create | `src/main/kotlin/org/phantom/internal/visual/PetDisplayModule.kt` |
+| Create | `src/main/java/org/phantom/mixin/client/TabOverlayAccessor.java` |
+| Modify | `src/main/kotlin/org/phantom/Phantom.kt` |
 
 ---
 
 ## Task 1: TabOverlayAccessor mixin
 
 **Files:**
-- Create: `src/main/java/org/cobalt/mixin/client/TabOverlayAccessor.java`
+- Create: `src/main/java/org/phantom/mixin/client/TabOverlayAccessor.java`
 
 - [ ] **Step 1: Create the accessor**
 
 ```java
-package org.cobalt.mixin.client;
+package org.phantom.mixin.client;
 
 import net.minecraft.client.gui.components.PlayerTabOverlay;
 import net.minecraft.network.chat.Component;
@@ -56,7 +56,7 @@ Expected: `BUILD SUCCESSFUL`
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/java/org/cobalt/mixin/client/TabOverlayAccessor.java
+git add src/main/java/org/phantom/mixin/client/TabOverlayAccessor.java
 git commit -m "feat: add TabOverlayAccessor mixin for pet/tab data"
 ```
 
@@ -65,23 +65,23 @@ git commit -m "feat: add TabOverlayAccessor mixin for pet/tab data"
 ## Task 2: PetTabListParser
 
 **Files:**
-- Create: `src/main/kotlin/org/cobalt/internal/visual/PetTabListParser.kt`
+- Create: `src/main/kotlin/org/phantom/internal/visual/PetTabListParser.kt`
 
-Hypixel SkyBlock embeds pet info in the tab list header. Strip MC formatting codes (`§[0-9a-fk-or]`) then regex-match.
+Hypixel SkyBlock embeds pet info in the tab list header. Strip MC formatting codes (`Â§[0-9a-fk-or]`) then regex-match.
 
 - [ ] **Step 1: Create parser**
 
 ```kotlin
-package org.cobalt.internal.visual
+package org.phantom.internal.visual
 
 import net.minecraft.ChatFormatting
 import net.minecraft.client.Minecraft
-import org.cobalt.mixin.client.TabOverlayAccessor
+import org.phantom.mixin.client.TabOverlayAccessor
 
 data class PetData(
     val name: String,         // e.g. "Tiger"
     val level: Int,           // e.g. 98
-    val heldItem: String,     // e.g. "Tier Boost" — empty if none
+    val heldItem: String,     // e.g. "Tier Boost" â€” empty if none
     val xpCurrent: Long,      // current XP in this level
     val xpRequired: Long,     // XP required to next level (0 = max level)
     val isMaxLevel: Boolean,
@@ -91,7 +91,7 @@ object PetTabListParser {
 
     private val mc = Minecraft.getInstance()
 
-    /** Cached result — updated each tick by PetDisplayModule */
+    /** Cached result â€” updated each tick by PetDisplayModule */
     var current: PetData? = null
         private set
 
@@ -174,7 +174,7 @@ object PetTabListParser {
     }
 
     private fun stripFormatting(text: String): String =
-        text.replace(Regex("§[0-9a-fk-or]"), "")
+        text.replace(Regex("Â§[0-9a-fk-or]"), "")
 }
 ```
 
@@ -188,7 +188,7 @@ Expected: `BUILD SUCCESSFUL`
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/visual/PetTabListParser.kt
+git add src/main/kotlin/org/phantom/internal/visual/PetTabListParser.kt
 git commit -m "feat: add PetTabListParser for tab list pet data extraction"
 ```
 
@@ -197,12 +197,12 @@ git commit -m "feat: add PetTabListParser for tab list pet data extraction"
 ## Task 3: PetDisplayModule with NVG HUD
 
 **Files:**
-- Create: `src/main/kotlin/org/cobalt/internal/visual/PetDisplayModule.kt`
+- Create: `src/main/kotlin/org/phantom/internal/visual/PetDisplayModule.kt`
 
 **Design:**
 - Navy blue pill background: `NVGRenderer.rect(x, y, w, h, 0xFF0A0F2E.toInt(), radius)`
 - Glow: 3 hollow rects with decreasing alpha + increasing stroke/radius
-- Border: `NVGRenderer.hollowGradientRect(...)` light blue `0xFFADD8FF` → `0xFF7EC8FF`
+- Border: `NVGRenderer.hollowGradientRect(...)` light blue `0xFFADD8FF` â†’ `0xFF7EC8FF`
 - Title row: `[petName  Lv N]`
 - Held item row (optional): item name
 - XP bar background: dark rect, `0xFF1A1F4E.toInt()`
@@ -210,20 +210,20 @@ git commit -m "feat: add PetTabListParser for tab list pet data extraction"
 - XP label: "78%" or "MAX" when at max level
 
 ```kotlin
-package org.cobalt.internal.visual
+package org.phantom.internal.visual
 
 import kotlin.math.cos
 import net.minecraft.client.Minecraft
-import org.cobalt.api.event.EventBus
-import org.cobalt.api.event.annotation.SubscribeEvent
-import org.cobalt.api.event.impl.client.TickEvent
-import org.cobalt.api.hud.HudAnchor
-import org.cobalt.api.hud.hudElement
-import org.cobalt.api.module.Module
-import org.cobalt.api.module.setting.impl.CheckboxSetting
-import org.cobalt.api.module.setting.impl.SliderSetting
-import org.cobalt.api.util.ui.NVGRenderer
-import org.cobalt.api.util.ui.helper.Gradient
+import org.phantom.api.event.EventBus
+import org.phantom.api.event.annotation.SubscribeEvent
+import org.phantom.api.event.impl.client.TickEvent
+import org.phantom.api.hud.HudAnchor
+import org.phantom.api.hud.hudElement
+import org.phantom.api.module.Module
+import org.phantom.api.module.setting.impl.CheckboxSetting
+import org.phantom.api.module.setting.impl.SliderSetting
+import org.phantom.api.util.ui.NVGRenderer
+import org.phantom.api.util.ui.helper.Gradient
 
 object PetDisplayModule : Module("Pet Display") {
 
@@ -379,22 +379,22 @@ Expected: `BUILD SUCCESSFUL`
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/visual/PetDisplayModule.kt
+git add src/main/kotlin/org/phantom/internal/visual/PetDisplayModule.kt
 git commit -m "feat: add PetDisplayModule with animated gradient XP bar and glow border"
 ```
 
 ---
 
-## Task 4: Register in Cobalt.kt
+## Task 4: Register in Phantom.kt
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/Cobalt.kt`
+- Modify: `src/main/kotlin/org/phantom/Phantom.kt`
 
 - [ ] **Step 1: Add import and register**
 
 Add import:
 ```kotlin
-import org.cobalt.internal.visual.PetDisplayModule
+import org.phantom.internal.visual.PetDisplayModule
 ```
 
 Add to `ModuleManager.addModules(listOf(...))` list:
@@ -412,6 +412,6 @@ Expected: `BUILD SUCCESSFUL`
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/Cobalt.kt
+git add src/main/kotlin/org/phantom/Phantom.kt
 git commit -m "feat: register PetDisplayModule"
 ```

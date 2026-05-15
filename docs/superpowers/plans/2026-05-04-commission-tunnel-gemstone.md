@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Port rdbt v5 commission-macro guard patterns into `CommissionMacroModule`, add multi-ore support to `TunnelMinerModule`, and redesign `GemstoneMinerModule` from scanner-based to a route-following etherwarp loop.
+**Goal:** Port rdbt phantom commission-macro guard patterns into `CommissionMacroModule`, add multi-ore support to `TunnelMinerModule`, and redesign `GemstoneMinerModule` from scanner-based to a route-following etherwarp loop.
 
-**Architecture:** CommissionMacroModule receives targeted field additions and method rewrites that preserve all existing infrastructure (routes, watchdog, maintenance controller). TunnelMinerModule gets a minimal generalization of `oreOverride` → `oreOverrides: Set`. GemstoneMinerModule replaces its `GemstoneScanner` scanning with a cyclic route loop loaded from `GemstoneRouteStoreBridge`; the existing warp state machine (WARP_TARGETING → WARP_ALIGNING → WARP_USING → WARP_VERIFYING) is preserved and reused.
+**Architecture:** CommissionMacroModule receives targeted field additions and method rewrites that preserve all existing infrastructure (routes, watchdog, maintenance controller). TunnelMinerModule gets a minimal generalization of `oreOverride` â†’ `oreOverrides: Set`. GemstoneMinerModule replaces its `GemstoneScanner` scanning with a cyclic route loop loaded from `GemstoneRouteStoreBridge`; the existing warp state machine (WARP_TARGETING â†’ WARP_ALIGNING â†’ WARP_USING â†’ WARP_VERIFYING) is preserved and reused.
 
-**Tech Stack:** Kotlin, Fabric MC 1.21.11, Cobalt module/event/pathfinding APIs, existing `RouteStore`, `MiningLoopController`, `StrictMiningTargetFilter`, `StyleEtherwarpTargeting`
+**Tech Stack:** Kotlin, Fabric MC 1.21.11, Phantom module/event/pathfinding APIs, existing `RouteStore`, `MiningLoopController`, `StrictMiningTargetFilter`, `StyleEtherwarpTargeting`
 
 ---
 
@@ -14,18 +14,18 @@
 
 | File | Action |
 |---|---|
-| `src/main/kotlin/org/cobalt/internal/mining/CommissionMacroModule.kt` | Modify — add 5 fields, rewrite 4 methods, add 4 methods |
-| `src/main/kotlin/org/cobalt/internal/mining/tunnels/TunnelMinerModule.kt` | Modify — `oreOverride` → `oreOverrides: Set`, update `startForAutomation` + `selectedOres` |
-| `src/main/kotlin/org/cobalt/internal/mining/gemstone/GemstoneTypes.kt` | Modify — add `pointType: RoutePointType` to `GemstoneRoutePoint` |
-| `src/main/kotlin/org/cobalt/internal/mining/gemstone/GemstoneRouteStoreBridge.kt` | Rewrite — implement `loadActiveGemstoneRoute()` mirroring `TunnelRouteStoreBridge` |
-| `src/main/kotlin/org/cobalt/internal/mining/gemstone/GemstoneMinerModule.kt` | Modify — replace scanner target with route loop; update settings, fields, all target-using methods |
+| `src/main/kotlin/org/phantom/internal/mining/CommissionMacroModule.kt` | Modify â€” add 5 fields, rewrite 4 methods, add 4 methods |
+| `src/main/kotlin/org/phantom/internal/mining/tunnels/TunnelMinerModule.kt` | Modify â€” `oreOverride` â†’ `oreOverrides: Set`, update `startForAutomation` + `selectedOres` |
+| `src/main/kotlin/org/phantom/internal/mining/gemstone/GemstoneTypes.kt` | Modify â€” add `pointType: RoutePointType` to `GemstoneRoutePoint` |
+| `src/main/kotlin/org/phantom/internal/mining/gemstone/GemstoneRouteStoreBridge.kt` | Rewrite â€” implement `loadActiveGemstoneRoute()` mirroring `TunnelRouteStoreBridge` |
+| `src/main/kotlin/org/phantom/internal/mining/gemstone/GemstoneMinerModule.kt` | Modify â€” replace scanner target with route loop; update settings, fields, all target-using methods |
 
 ---
 
-## Task 1: CommissionMacroModule — Add 5 new state fields
+## Task 1: CommissionMacroModule â€” Add 5 new state fields
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/mining/CommissionMacroModule.kt:123-148`
+- Modify: `src/main/kotlin/org/phantom/internal/mining/CommissionMacroModule.kt:123-148`
 
 - [ ] **Step 1: Add the 5 new fields after the existing state block**
 
@@ -74,18 +74,18 @@ Expected: BUILD SUCCESSFUL (existing warnings are fine)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/mining/CommissionMacroModule.kt
-git commit -m "feat(commission): add v5 state fields for stale-guard and pigeon cap"
+git add src/main/kotlin/org/phantom/internal/mining/CommissionMacroModule.kt
+git commit -m "feat(commission): add phantom state fields for stale-guard and pigeon cap"
 ```
 
 ---
 
-## Task 2: CommissionMacroModule — Rewrite `updateCommissionsIfChanged()`
+## Task 2: CommissionMacroModule â€” Rewrite `updateCommissionsIfChanged()`
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/mining/CommissionMacroModule.kt` — `updateCommissionsIfChanged()`
+- Modify: `src/main/kotlin/org/phantom/internal/mining/CommissionMacroModule.kt` â€” `updateCommissionsIfChanged()`
 
-- [ ] **Step 1: Replace the body of `updateCommissionsIfChanged()` (lines ~1230–1241)**
+- [ ] **Step 1: Replace the body of `updateCommissionsIfChanged()` (lines ~1230â€“1241)**
 
 Replace the current method entirely with:
 
@@ -136,16 +136,16 @@ Expected: BUILD SUCCESSFUL
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/mining/CommissionMacroModule.kt
-git commit -m "feat(commission): v5 updateCommissionsIfChanged with stale tab-update guard"
+git add src/main/kotlin/org/phantom/internal/mining/CommissionMacroModule.kt
+git commit -m "feat(commission): phantom updateCommissionsIfChanged with stale tab-update guard"
 ```
 
 ---
 
-## Task 3: CommissionMacroModule — Add `shouldWaitForLastCompleted()`
+## Task 3: CommissionMacroModule â€” Add `shouldWaitForLastCompleted()`
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/mining/CommissionMacroModule.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/mining/CommissionMacroModule.kt`
 
 - [ ] **Step 1: Add the new private method anywhere in the private helpers section (e.g. before `handleChoosing()`)**
 
@@ -170,16 +170,16 @@ Expected: BUILD SUCCESSFUL
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/mining/CommissionMacroModule.kt
+git add src/main/kotlin/org/phantom/internal/mining/CommissionMacroModule.kt
 git commit -m "feat(commission): add shouldWaitForLastCompleted() guard helper"
 ```
 
 ---
 
-## Task 4: CommissionMacroModule — Update `onCommissionComplete()` + fix `handleChoosing()` guard order
+## Task 4: CommissionMacroModule â€” Update `onCommissionComplete()` + fix `handleChoosing()` guard order
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/mining/CommissionMacroModule.kt` — `onCommissionComplete()`, `handleChoosing()`
+- Modify: `src/main/kotlin/org/phantom/internal/mining/CommissionMacroModule.kt` â€” `onCommissionComplete()`, `handleChoosing()`
 
 - [ ] **Step 1: Update `onCommissionComplete()` to set `lastCompletedCommissionName` and reset pigeon counters**
 
@@ -191,9 +191,9 @@ In `onCommissionComplete()` (line ~938), after the existing `lastCommissionName 
     pigeonAttempts = 0
 ```
 
-- [ ] **Step 2: Rewrite the guard block at the top of `handleChoosing()` (lines ~391–441)**
+- [ ] **Step 2: Rewrite the guard block at the top of `handleChoosing()` (lines ~391â€“441)**
 
-Replace from the top of `handleChoosing()` up through and including the `if (completed != null && !awaitingTabUpdate)` block with the v5 guard order:
+Replace from the top of `handleChoosing()` up through and including the `if (completed != null && !awaitingTabUpdate)` block with the phantom guard order:
 
 ```kotlin
   private fun handleChoosing() {
@@ -238,7 +238,7 @@ Replace from the top of `handleChoosing()` up through and including the `if (com
       return
     }
 
-    // v5 guard order
+    // phantom guard order
     if (shouldWaitForLastCompleted()) return
     if (awaitingTabUpdate) return
 
@@ -296,16 +296,16 @@ Expected: BUILD SUCCESSFUL
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/mining/CommissionMacroModule.kt
-git commit -m "feat(commission): v5 handleChoosing guard order + double-claim guard + onCommissionComplete fields"
+git add src/main/kotlin/org/phantom/internal/mining/CommissionMacroModule.kt
+git commit -m "feat(commission): phantom handleChoosing guard order + double-claim guard + onCommissionComplete fields"
 ```
 
 ---
 
-## Task 5: CommissionMacroModule — Add `updateCommissionsFromGui()` + call it before closing claim GUI
+## Task 5: CommissionMacroModule â€” Add `updateCommissionsFromGui()` + call it before closing claim GUI
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/mining/CommissionMacroModule.kt` — add method, update `handleClaiming()`
+- Modify: `src/main/kotlin/org/phantom/internal/mining/CommissionMacroModule.kt` â€” add method, update `handleClaiming()`
 
 - [ ] **Step 1: Add `updateCommissionsFromGui()` as a private method**
 
@@ -355,16 +355,16 @@ Expected: BUILD SUCCESSFUL
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/mining/CommissionMacroModule.kt
+git add src/main/kotlin/org/phantom/internal/mining/CommissionMacroModule.kt
 git commit -m "feat(commission): add updateCommissionsFromGui() with 5s tab-lock, call before closing claim GUI"
 ```
 
 ---
 
-## Task 6: CommissionMacroModule — Add `ensureDrillEquippedForClaim()` + pigeon attempt cap in `handleClaiming()`
+## Task 6: CommissionMacroModule â€” Add `ensureDrillEquippedForClaim()` + pigeon attempt cap in `handleClaiming()`
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/mining/CommissionMacroModule.kt` — add method, rewrite pigeon and emissary sections of `handleClaiming()`
+- Modify: `src/main/kotlin/org/phantom/internal/mining/CommissionMacroModule.kt` â€” add method, rewrite pigeon and emissary sections of `handleClaiming()`
 
 - [ ] **Step 1: Add `ensureDrillEquippedForClaim()` as a private method**
 
@@ -382,7 +382,7 @@ git commit -m "feat(commission): add updateCommissionsFromGui() with 5s tab-lock
   }
 ```
 
-- [ ] **Step 2: Rewrite the non-GUI part of `handleClaiming()` (the pigeon + emissary section, lines ~680–718)**
+- [ ] **Step 2: Rewrite the non-GUI part of `handleClaiming()` (the pigeon + emissary section, lines ~680â€“718)**
 
 Replace from `val player = mc.player ?: return` through the end of `handleClaiming()` with:
 
@@ -448,18 +448,18 @@ Expected: BUILD SUCCESSFUL
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/mining/CommissionMacroModule.kt
+git add src/main/kotlin/org/phantom/internal/mining/CommissionMacroModule.kt
 git commit -m "feat(commission): pigeon attempt cap (3/4s), ensureDrillEquippedForClaim() before emissary"
 ```
 
 ---
 
-## Task 7: CommissionMacroModule — Extend `getAvoidanceEntities()` for Crystal/Star Sentries
+## Task 7: CommissionMacroModule â€” Extend `getAvoidanceEntities()` for Crystal/Star Sentries
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/mining/CommissionMacroModule.kt` — `getAvoidanceEntities()`
+- Modify: `src/main/kotlin/org/phantom/internal/mining/CommissionMacroModule.kt` â€” `getAvoidanceEntities()`
 
-- [ ] **Step 1: Replace `getAvoidanceEntities()` (lines ~1123–1130) with Sentry-aware version**
+- [ ] **Step 1: Replace `getAvoidanceEntities()` (lines ~1123â€“1130) with Sentry-aware version**
 
 ```kotlin
   private fun getAvoidanceEntities(): List<Entity> {
@@ -486,16 +486,16 @@ Expected: BUILD SUCCESSFUL
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/mining/CommissionMacroModule.kt
+git add src/main/kotlin/org/phantom/internal/mining/CommissionMacroModule.kt
 git commit -m "feat(commission): include Crystal/Star Sentry entities in avoidance check"
 ```
 
 ---
 
-## Task 8: TunnelMinerModule — Multi-ore: `oreOverride` → `oreOverrides: Set`
+## Task 8: TunnelMinerModule â€” Multi-ore: `oreOverride` â†’ `oreOverrides: Set`
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/mining/tunnels/TunnelMinerModule.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/mining/tunnels/TunnelMinerModule.kt`
 
 - [ ] **Step 1: Change the `oreOverride` field declaration (line ~210)**
 
@@ -510,7 +510,7 @@ With:
 
 - [ ] **Step 2: Replace `startForAutomation(ore: TunnelOreType, ...)` with a set-accepting version plus a single-ore overload**
 
-Replace the existing `startForAutomation` method (lines ~249–268):
+Replace the existing `startForAutomation` method (lines ~249â€“268):
 
 ```kotlin
   fun startForAutomation(
@@ -605,22 +605,22 @@ Expected: BUILD SUCCESSFUL
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/mining/tunnels/TunnelMinerModule.kt
-git commit -m "feat(tunnel): multi-ore support — oreOverride → oreOverrides: Set with single-ore overload"
+git add src/main/kotlin/org/phantom/internal/mining/tunnels/TunnelMinerModule.kt
+git commit -m "feat(tunnel): multi-ore support â€” oreOverride â†’ oreOverrides: Set with single-ore overload"
 ```
 
 ---
 
-## Task 9: GemstoneTypes — Add `pointType` field to `GemstoneRoutePoint`
+## Task 9: GemstoneTypes â€” Add `pointType` field to `GemstoneRoutePoint`
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/mining/gemstone/GemstoneTypes.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/mining/gemstone/GemstoneTypes.kt`
 
 - [ ] **Step 1: Add the `RoutePointType` import and `pointType` field**
 
 Add import after `import net.minecraft.core.BlockPos`:
 ```kotlin
-import org.cobalt.internal.routes.RoutePointType
+import org.phantom.internal.routes.RoutePointType
 ```
 
 Replace `GemstoneRoutePoint` data class:
@@ -646,27 +646,27 @@ Expected: BUILD SUCCESSFUL
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/mining/gemstone/GemstoneTypes.kt
+git add src/main/kotlin/org/phantom/internal/mining/gemstone/GemstoneTypes.kt
 git commit -m "feat(gemstone): add pointType field to GemstoneRoutePoint"
 ```
 
 ---
 
-## Task 10: GemstoneRouteStoreBridge — Implement `loadActiveGemstoneRoute()`
+## Task 10: GemstoneRouteStoreBridge â€” Implement `loadActiveGemstoneRoute()`
 
 **Files:**
-- Rewrite: `src/main/kotlin/org/cobalt/internal/mining/gemstone/GemstoneRouteStoreBridge.kt`
+- Rewrite: `src/main/kotlin/org/phantom/internal/mining/gemstone/GemstoneRouteStoreBridge.kt`
 
 - [ ] **Step 1: Replace the stub file entirely**
 
 ```kotlin
-package org.cobalt.internal.mining.gemstone
+package org.phantom.internal.mining.gemstone
 
 import net.minecraft.core.BlockPos
-import org.cobalt.internal.routes.RoutePoint
-import org.cobalt.internal.routes.RoutePointType
-import org.cobalt.internal.routes.RouteStore
-import org.cobalt.internal.routes.RouteType
+import org.phantom.internal.routes.RoutePoint
+import org.phantom.internal.routes.RoutePointType
+import org.phantom.internal.routes.RouteStore
+import org.phantom.internal.routes.RouteType
 
 /**
  * Loads the active RouteType.GEMSTONE route from RouteStore and converts it to
@@ -750,20 +750,20 @@ Expected: BUILD SUCCESSFUL
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/mining/gemstone/GemstoneRouteStoreBridge.kt
+git add src/main/kotlin/org/phantom/internal/mining/gemstone/GemstoneRouteStoreBridge.kt
 git commit -m "feat(gemstone): implement GemstoneRouteStoreBridge mirroring TunnelRouteStoreBridge"
 ```
 
 ---
 
-## Task 11: GemstoneMinerModule — Route-following loop redesign
+## Task 11: GemstoneMinerModule â€” Route-following loop redesign
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/mining/gemstone/GemstoneMinerModule.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/mining/gemstone/GemstoneMinerModule.kt`
 
-This task rewires the module from scanner-based to route-indexed. The warp state machine (WARP_TARGETING → WARP_ALIGNING → WARP_USING → WARP_VERIFYING) is preserved; only the "scan / decide" and "mark complete" steps change.
+This task rewires the module from scanner-based to route-indexed. The warp state machine (WARP_TARGETING â†’ WARP_ALIGNING â†’ WARP_USING â†’ WARP_VERIFYING) is preserved; only the "scan / decide" and "mark complete" steps change.
 
-### Step 1 — Update fields
+### Step 1 â€” Update fields
 
 - [ ] Replace `private var gemstoneOverride: GemstoneType? = null` with:
 
@@ -781,7 +781,7 @@ This task rewires the module from scanner-based to route-indexed. The warp state
     private set
 ```
 
-### Step 2 — Remove settings `dynamicScan`, `routePoints`, `orderedRoutes`; add `routeName`
+### Step 2 â€” Remove settings `dynamicScan`, `routePoints`, `orderedRoutes`; add `routeName`
 
 - [ ] Remove the three `CheckboxSetting` field declarations for `dynamicScan`, `routePoints`, `orderedRoutes`.
 
@@ -815,7 +815,7 @@ This task rewires the module from scanner-based to route-indexed. The warp state
     )
 ```
 
-### Step 3 — Add `loadRoute()`, `advanceRoute()`, `findClosestRouteIndex()`
+### Step 3 â€” Add `loadRoute()`, `advanceRoute()`, `findClosestRouteIndex()`
 
 - [ ] Add these private helpers:
 
@@ -847,7 +847,7 @@ This task rewires the module from scanner-based to route-indexed. The warp state
   }
 ```
 
-### Step 4 — Update `startForAutomation()`
+### Step 4 â€” Update `startForAutomation()`
 
 - [ ] Replace the body of `startForAutomation()` with:
 
@@ -889,7 +889,7 @@ This task rewires the module from scanner-based to route-indexed. The warp state
   }
 ```
 
-### Step 5 — Update `IDLE` handler in `onTick()`
+### Step 5 â€” Update `IDLE` handler in `onTick()`
 
 - [ ] Replace the `State.IDLE -> { ... }` block with:
 
@@ -911,7 +911,7 @@ This task rewires the module from scanner-based to route-indexed. The warp state
       }
 ```
 
-### Step 6 — Rewrite `scanForTarget()` to use route index
+### Step 6 â€” Rewrite `scanForTarget()` to use route index
 
 - [ ] Replace the entire `scanForTarget()` method with:
 
@@ -967,7 +967,7 @@ This task rewires the module from scanner-based to route-indexed. The warp state
   }
 ```
 
-### Step 7 — Update `tickWarpTargeting()` to use `lookPos` instead of `standPos`
+### Step 7 â€” Update `tickWarpTargeting()` to use `lookPos` instead of `standPos`
 
 - [ ] In `tickWarpTargeting()`, change the `StyleEtherwarpTargeting.findTargetWithRetryProfile` calls from `target.standPos.below()` / `target.standPos` to:
 
@@ -981,7 +981,7 @@ This task rewires the module from scanner-based to route-indexed. The warp state
     )
 ```
 
-### Step 8 — Update `tickWarpVerifying()` to handle WARP-only points
+### Step 8 â€” Update `tickWarpVerifying()` to handle WARP-only points
 
 - [ ] In `tickWarpVerifying()`, replace `onArrivedAtGemstoneTarget()` call with point-type check:
 
@@ -1002,7 +1002,7 @@ This task rewires the module from scanner-based to route-indexed. The warp state
     }
 ```
 
-### Step 9 — Update `startPath()` to accept `GemstoneRoutePoint`
+### Step 9 â€” Update `startPath()` to accept `GemstoneRoutePoint`
 
 - [ ] Replace `startPath(target: GemstoneScanner.GemstoneTarget)` with:
 
@@ -1045,7 +1045,7 @@ This task rewires the module from scanner-based to route-indexed. The warp state
   }
 ```
 
-### Step 10 — Update `tickPathing()` display
+### Step 10 â€” Update `tickPathing()` display
 
 - [ ] Replace `status.value = "Pathing: ${target.type.displayName}"` with:
 
@@ -1053,7 +1053,7 @@ This task rewires the module from scanner-based to route-indexed. The warp state
     status.value = "Pathing: ${target.gemstoneTypes.firstOrNull()?.displayName ?: "gemstone"}"
 ```
 
-### Step 11 — Update `onArrivedAtGemstoneTarget()`
+### Step 11 â€” Update `onArrivedAtGemstoneTarget()`
 
 - [ ] Replace `onArrivedAtGemstoneTarget()` entirely:
 
@@ -1085,7 +1085,7 @@ This task rewires the module from scanner-based to route-indexed. The warp state
   }
 ```
 
-### Step 12 — Update `tickMining()` to advance route instead of calling GemstoneScanner
+### Step 12 â€” Update `tickMining()` to advance route instead of calling GemstoneScanner
 
 - [ ] Replace the `if (!MiningMacroModule.isActive && miningStarted)` block in `tickMining()` with:
 
@@ -1116,11 +1116,11 @@ This task rewires the module from scanner-based to route-indexed. The warp state
     status.value = "Mining ${target.gemstoneTypes.firstOrNull()?.displayName ?: "gemstone"} ${miningTicks / 20}s"
 ```
 
-### Step 13 — Update `markCurrentTargetFailed()` — remove GemstoneScanner call, advance route
+### Step 13 â€” Update `markCurrentTargetFailed()` â€” remove GemstoneScanner call, advance route
 
 - [ ] Replace `GemstoneScanner.markRouteTargetFailed(target)` with `advanceRoute()` in `markCurrentTargetFailed()`.
 
-### Step 14 — Update `stopAll()` — clear new fields, remove GemstoneScanner calls
+### Step 14 â€” Update `stopAll()` â€” clear new fields, remove GemstoneScanner calls
 
 - [ ] In `stopAll()`, add route field resets and remove `GemstoneScanner.markRouteTargetFailed` references:
 
@@ -1133,7 +1133,7 @@ This task rewires the module from scanner-based to route-indexed. The warp state
 
 (These go after the existing clears. Remove `gemstoneOverride = null` from its current position if it exists and only keep it here.)
 
-### Step 15 — Replace the `GemstoneScanner.GemstoneTarget.toLoopTarget()` extension
+### Step 15 â€” Replace the `GemstoneScanner.GemstoneTarget.toLoopTarget()` extension
 
 - [ ] Remove `private fun GemstoneScanner.GemstoneTarget.toLoopTarget()` and add:
 
@@ -1154,12 +1154,12 @@ This task rewires the module from scanner-based to route-indexed. The warp state
   }
 ```
 
-### Step 16 — Add missing imports and build
+### Step 16 â€” Add missing imports and build
 
 - [ ] Add imports at the top of `GemstoneMinerModule.kt` if not already present:
 
 ```kotlin
-import org.cobalt.internal.routes.RoutePointType
+import org.phantom.internal.routes.RoutePointType
 ```
 
 - [ ] Remove unused import for `GemstoneScanner` if it is no longer referenced anywhere in the file.
@@ -1175,7 +1175,7 @@ Expected: BUILD SUCCESSFUL
 - [ ] **Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/mining/gemstone/GemstoneMinerModule.kt
+git add src/main/kotlin/org/phantom/internal/mining/gemstone/GemstoneMinerModule.kt
 git commit -m "feat(gemstone): replace scanner-based targeting with route-following loop using GemstoneRouteStoreBridge"
 ```
 
@@ -1187,19 +1187,19 @@ git commit -m "feat(gemstone): replace scanner-based targeting with route-follow
 
 | Spec section | Task |
 |---|---|
-| §1.1 Five new fields | Task 1 |
-| §1.2 updateCommissionsIfChanged v5 | Task 2 |
-| §1.3 shouldWaitForLastCompleted | Task 3 |
-| §1.4 handleChoosing guard order + double-claim | Task 4 |
-| §1.5 onCommissionComplete sets lastCompletedCommissionName + pigeon reset | Task 4 (step 1) |
-| §1.6 updateCommissionsFromGui | Task 5 |
-| §1.7 Pigeon cap + ensureDrillEquippedForClaim | Task 6 |
-| §1.8 Crystal/Star Sentry avoidance | Task 7 |
-| §2.1 Multi-ore oreOverrides: Set | Task 8 |
-| §2.2 TunnelVeinData JSON resource | *Not included — deferred: requires converting 470KB GlaciteData.js external file* |
-| §3.1–3.4 Route-following loop, state machine, route index | Task 11 |
-| §3.5 GemstoneRouteStoreBridge | Task 10 |
-| §3.6 Settings update | Task 11 step 2 |
+| Â§1.1 Five new fields | Task 1 |
+| Â§1.2 updateCommissionsIfChanged phantom | Task 2 |
+| Â§1.3 shouldWaitForLastCompleted | Task 3 |
+| Â§1.4 handleChoosing guard order + double-claim | Task 4 |
+| Â§1.5 onCommissionComplete sets lastCompletedCommissionName + pigeon reset | Task 4 (step 1) |
+| Â§1.6 updateCommissionsFromGui | Task 5 |
+| Â§1.7 Pigeon cap + ensureDrillEquippedForClaim | Task 6 |
+| Â§1.8 Crystal/Star Sentry avoidance | Task 7 |
+| Â§2.1 Multi-ore oreOverrides: Set | Task 8 |
+| Â§2.2 TunnelVeinData JSON resource | *Not included â€” deferred: requires converting 470KB GlaciteData.js external file* |
+| Â§3.1â€“3.4 Route-following loop, state machine, route index | Task 11 |
+| Â§3.5 GemstoneRouteStoreBridge | Task 10 |
+| Â§3.6 Settings update | Task 11 step 2 |
 | GemstoneTypes pointType | Task 9 |
 
-**TunnelVeinData note:** The `TunnelVeinData.getVeins()` stub (`return emptyList()`) is not fixed in this plan. Implementing it requires a separate conversion script to transform `GlaciteData.js` (470 KB, at `C:\Users\aeare\Downloads\V5-main\data\GlaciteData.js`) into `src/main/resources/cobalt/glacite_veins.json`. This can be done in a follow-up — it only affects the "Recorded Data" checkbox in TunnelMinerModule, not the route-store or dynamic scan modes.
+**TunnelVeinData note:** The `TunnelVeinData.getVeins()` stub (`return emptyList()`) is not fixed in this plan. Implementing it requires a separate conversion script to transform `GlaciteData.js` (470 KB, at `C:\Users\aeare\Downloads\Phantom-main\data\GlaciteData.js`) into `src/main/resources/phantom/glacite_veins.json`. This can be done in a follow-up â€” it only affects the "Recorded Data" checkbox in TunnelMinerModule, not the route-store or dynamic scan modes.

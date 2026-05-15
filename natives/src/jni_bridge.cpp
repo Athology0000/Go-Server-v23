@@ -178,7 +178,7 @@ std::vector<jfloat> toJFloatVector(const std::vector<float>& values) {
 
 extern "C" {
 
-JNIEXPORT jboolean JNICALL Java_org_cobalt_api_pathfinder_jni_NativePathfinderJNI_initNative(JNIEnv* env, jclass) {
+JNIEXPORT jboolean JNICALL Java_org_phantom_api_pathfinder_jni_NativePathfinderJNI_initNative(JNIEnv* env, jclass) {
   try {
     return JNI_TRUE;
   } catch (const std::exception& ex) {
@@ -190,7 +190,7 @@ JNIEXPORT jboolean JNICALL Java_org_cobalt_api_pathfinder_jni_NativePathfinderJN
   }
 }
 
-JNIEXPORT void JNICALL Java_org_cobalt_api_pathfinder_jni_NativePathfinderJNI_setWorld(
+JNIEXPORT void JNICALL Java_org_phantom_api_pathfinder_jni_NativePathfinderJNI_setWorld(
   JNIEnv* env,
   jclass,
   jstring worldKey,
@@ -218,7 +218,7 @@ JNIEXPORT void JNICALL Java_org_cobalt_api_pathfinder_jni_NativePathfinderJNI_se
   }
 }
 
-JNIEXPORT void JNICALL Java_org_cobalt_api_pathfinder_jni_NativePathfinderJNI_clearWorld(JNIEnv* env, jclass) {
+JNIEXPORT void JNICALL Java_org_phantom_api_pathfinder_jni_NativePathfinderJNI_clearWorld(JNIEnv* env, jclass) {
   try {
     g_worldState.clear();
   } catch (const std::exception& ex) {
@@ -228,7 +228,7 @@ JNIEXPORT void JNICALL Java_org_cobalt_api_pathfinder_jni_NativePathfinderJNI_cl
   }
 }
 
-JNIEXPORT void JNICALL Java_org_cobalt_api_pathfinder_jni_NativePathfinderJNI_upsertChunk(
+JNIEXPORT void JNICALL Java_org_phantom_api_pathfinder_jni_NativePathfinderJNI_upsertChunk(
   JNIEnv* env,
   jclass,
   jint chunkX,
@@ -266,7 +266,7 @@ JNIEXPORT void JNICALL Java_org_cobalt_api_pathfinder_jni_NativePathfinderJNI_up
   }
 }
 
-JNIEXPORT void JNICALL Java_org_cobalt_api_pathfinder_jni_NativePathfinderJNI_applyBlockUpdates(
+JNIEXPORT void JNICALL Java_org_phantom_api_pathfinder_jni_NativePathfinderJNI_applyBlockUpdates(
   JNIEnv* env,
   jclass,
   jintArray updates
@@ -300,7 +300,7 @@ JNIEXPORT void JNICALL Java_org_cobalt_api_pathfinder_jni_NativePathfinderJNI_ap
   }
 }
 
-JNIEXPORT jobject JNICALL Java_org_cobalt_api_pathfinder_jni_NativePathfinderJNI_findPath(
+JNIEXPORT jobject JNICALL Java_org_phantom_api_pathfinder_jni_NativePathfinderJNI_findPath(
   JNIEnv* env,
   jclass,
   jintArray startPoints,
@@ -430,7 +430,7 @@ JNIEXPORT jobject JNICALL Java_org_cobalt_api_pathfinder_jni_NativePathfinderJNI
       return nullptr;
     }
 
-    jclass resultClass = env->FindClass("org/cobalt/api/pathfinder/jni/NativePathResult");
+    jclass resultClass = env->FindClass("org/phantom/api/pathfinder/jni/NativePathResult");
     if (resultClass == nullptr) {
       env->DeleteLocalRef(pathArray);
       env->DeleteLocalRef(keyPathArray);
@@ -479,7 +479,7 @@ JNIEXPORT jobject JNICALL Java_org_cobalt_api_pathfinder_jni_NativePathfinderJNI
   }
 }
 
-JNIEXPORT jobject JNICALL Java_org_cobalt_api_pathfinder_jni_NativePathfinderJNI_findEtherwarpPath(
+JNIEXPORT jobject JNICALL Java_org_phantom_api_pathfinder_jni_NativePathfinderJNI_findEtherwarpPath(
   JNIEnv* env,
   jclass,
   jint goalX,
@@ -543,7 +543,7 @@ JNIEXPORT jobject JNICALL Java_org_cobalt_api_pathfinder_jni_NativePathfinderJNI
       env->SetFloatArrayRegion(angleArray, 0, static_cast<jsize>(packedAngles.size()), packedAngles.data());
     }
 
-    jclass resultClass = env->FindClass("org/cobalt/api/pathfinder/jni/NativeEtherwarpResult");
+    jclass resultClass = env->FindClass("org/phantom/api/pathfinder/jni/NativeEtherwarpResult");
     if (resultClass == nullptr) {
       return nullptr;
     }
@@ -571,7 +571,7 @@ JNIEXPORT jobject JNICALL Java_org_cobalt_api_pathfinder_jni_NativePathfinderJNI
   }
 }
 
-JNIEXPORT void JNICALL Java_org_cobalt_api_pathfinder_jni_NativePathfinderJNI_cancelSearch(JNIEnv* env, jclass) {
+JNIEXPORT void JNICALL Java_org_phantom_api_pathfinder_jni_NativePathfinderJNI_cancelSearch(JNIEnv* env, jclass) {
   try {
     g_cancelSearch.store(true);
   } catch (const std::exception& ex) {

@@ -1,8 +1,8 @@
-# Server Docker Local Hosting — Implementation Plan
+# Server Docker Local Hosting â€” Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Run the full Cobalt server stack (Go API + Postgres + Redis + admin UI + panel UI) locally in Docker with a single `docker compose up`.
+**Goal:** Run the full Phantom server stack (Go API + Postgres + Redis + admin UI + panel UI) locally in Docker with a single `docker compose up`.
 
 **Architecture:** Six services managed by `server/docker-compose.yml`. Postgres and Redis are standard images. The Go API is built from a multi-stage Dockerfile. A one-shot `migrate` container applies SQL migrations before the API starts. Two nginx containers serve the pre-built `admin/dist/` and `panel/dist/` SPAs as static files.
 
@@ -14,7 +14,7 @@
 
 | File | Action | Purpose |
 |---|---|---|
-| `server/Dockerfile` | Create | Multi-stage Go build → minimal alpine runtime |
+| `server/Dockerfile` | Create | Multi-stage Go build â†’ minimal alpine runtime |
 | `server/docker-compose.yml` | Create | All 6 services, volumes, env wiring |
 | `server/.env.example` | Create | Template showing all required vars |
 | `server/.gitignore` | Create/modify | Ignore `.env` and `content/` |
@@ -38,21 +38,21 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o cobalt-server ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -o phantom-server ./cmd/server
 
 FROM alpine:3.20
 RUN apk add --no-cache ca-certificates
 WORKDIR /app
-COPY --from=builder /app/cobalt-server .
+COPY --from=builder /app/phantom-server .
 EXPOSE 8080 8081
-CMD ["./cobalt-server"]
+CMD ["./phantom-server"]
 ```
 
 - [ ] **Step 2: Verify it builds**
 
 Run from `server/`:
 ```bash
-docker build -t cobalt-api-test .
+docker build -t phantom-api-test .
 ```
 Expected: image builds successfully, no errors. Final image should be ~20-30 MB.
 
@@ -156,7 +156,7 @@ Save to `server/docker/nginx-admin.conf`.
 
 - [ ] **Step 2: Create nginx-panel.conf**
 
-Identical content — save to `server/docker/nginx-panel.conf`:
+Identical content â€” save to `server/docker/nginx-panel.conf`:
 
 ```nginx
 server {
@@ -199,7 +199,7 @@ ENV_FILE="${1:-.env}"
 warn_if_exists() {
   local key="$1"
   if [ -f "$ENV_FILE" ] && grep -q "^${key}=" "$ENV_FILE" 2>/dev/null; then
-    echo "WARNING: $key already exists in $ENV_FILE — skipping" >&2
+    echo "WARNING: $key already exists in $ENV_FILE â€” skipping" >&2
     return 1
   fi
   return 0
@@ -298,15 +298,15 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: cobalt
-      POSTGRES_PASSWORD: cobalt
-      POSTGRES_DB: cobalt
+      POSTGRES_USER: phantom
+      POSTGRES_PASSWORD: phantom
+      POSTGRES_DB: phantom
     volumes:
-      - cobalt_pgdata:/var/lib/postgresql/data
+      - phantom_pgdata:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cobalt"]
+      test: ["CMD-SHELL", "pg_isready -U phantom"]
       interval: 3s
       timeout: 5s
       retries: 10
@@ -314,7 +314,7 @@ services:
   redis:
     image: redis:7-alpine
     volumes:
-      - cobalt_redisdata:/data
+      - phantom_redisdata:/data
     ports:
       - "6379:6379"
 
@@ -324,7 +324,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgres://cobalt:cobalt@postgres:5432/cobalt?sslmode=disable
+      DATABASE_URL: postgres://phantom:phantom@postgres:5432/phantom?sslmode=disable
       MIGRATIONS_DIR: /migrations
     volumes:
       - ./migrations:/migrations:ro
@@ -341,7 +341,7 @@ services:
         condition: service_completed_successfully
     env_file: .env
     environment:
-      DB_URL: postgres://cobalt:cobalt@postgres:5432/cobalt?sslmode=disable
+      DB_URL: postgres://phantom:phantom@postgres:5432/phantom?sslmode=disable
       REDIS_URL: redis://redis:6379
       PUBLIC_PORT: "8080"
       ADMIN_PORT: "8081"
@@ -370,8 +370,8 @@ services:
       - "3002:80"
 
 volumes:
-  cobalt_pgdata:
-  cobalt_redisdata:
+  phantom_pgdata:
+  phantom_redisdata:
 ```
 
 Save to `server/docker-compose.yml`.
@@ -401,7 +401,7 @@ cd server
 cat .env   # verify 4 variables were generated
 ```
 
-Expected output: 5 lines — 1 comment + `MASTER_KEY`, `SERVER_PEPPER`, `MANIFEST_SIGNING_KEY`, `ADMIN_API_SECRET`.
+Expected output: 5 lines â€” 1 comment + `MASTER_KEY`, `SERVER_PEPPER`, `MANIFEST_SIGNING_KEY`, `ADMIN_API_SECRET`.
 
 - [ ] **Step 3: Start all services**
 
@@ -422,7 +422,7 @@ Watch logs. Expected sequence:
 curl -s http://localhost:8080/health || curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/auth/login
 ```
 
-Expected: any HTTP response (200, 400, or 404 — as long as the server responds, not a connection refused).
+Expected: any HTTP response (200, 400, or 404 â€” as long as the server responds, not a connection refused).
 
 - [ ] **Step 5: Smoke test admin API**
 
@@ -430,18 +430,18 @@ Expected: any HTTP response (200, 400, or 404 — as long as the server responds
 curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/admin/accounts
 ```
 
-Expected: `401` (unauthorized — server is up, auth is working).
+Expected: `401` (unauthorized â€” server is up, auth is working).
 
 - [ ] **Step 6: Smoke test frontends**
 
 Open in browser:
-- `http://localhost:3001` — should show the admin UI
-- `http://localhost:3002` — should show the panel UI
+- `http://localhost:3001` â€” should show the admin UI
+- `http://localhost:3002` â€” should show the panel UI
 
 - [ ] **Step 7: Verify migrations are tracked**
 
 ```bash
-docker compose exec postgres psql -U cobalt -d cobalt -c "SELECT filename, applied_at FROM schema_migrations ORDER BY applied_at;"
+docker compose exec postgres psql -U phantom -d phantom -c "SELECT filename, applied_at FROM schema_migrations ORDER BY applied_at;"
 ```
 
 Expected: two rows, `001_initial.sql` and `002_manifest_min_loader_version.sql`.
@@ -486,5 +486,5 @@ docker compose down -v
 docker compose logs -f api
 
 # Connect to postgres directly
-docker compose exec postgres psql -U cobalt -d cobalt
+docker compose exec postgres psql -U phantom -d phantom
 ```

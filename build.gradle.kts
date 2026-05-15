@@ -15,18 +15,18 @@ val modName: String by project
 val gradlePropertiesFile = rootProject.file("gradle.properties")
 val requestedTaskNames = gradle.startParameter.taskNames.map { it.substringAfterLast(':') }.toSet()
 val buildChannel =
-  providers.gradleProperty("cobaltBuildChannel").orNull?.trim()?.lowercase()
+  providers.gradleProperty("phantomBuildChannel").orNull?.trim()?.lowercase()
     ?: when {
       requestedTaskNames.any { it in setOf("buildDev", "deployDev", "deploydev") } -> "dev"
       else -> "release"
     }
 
 if (buildChannel !in setOf("dev", "release")) {
-  throw GradleException("cobaltBuildChannel must be 'dev' or 'release', found '$buildChannel'.")
+  throw GradleException("phantomBuildChannel must be 'dev' or 'release', found '$buildChannel'.")
 }
 
 val isDevBuild = buildChannel == "dev"
-val artifactDisplayName = if (isDevBuild) "Dutt Client Dev" else "Dutt Client"
+val artifactDisplayName = if (isDevBuild) "Phantom Client Dev" else "Phantom Client"
 val artifactBaseName = if (isDevBuild) "${modName}-dev" else modName
 
 fun shouldAutoBumpBuildVersion(): Boolean =
@@ -98,10 +98,10 @@ dependencies {
 tasks {
   named<JavaExec>("runClient") {
     val devMockAuth =
-      System.getProperty("cobalt.devMockAuth")
-        ?: System.getenv("COBALT_DEV_MOCK_AUTH")
+      System.getProperty("phantom.devMockAuth")
+        ?: System.getenv("PHANTOM_DEV_MOCK_AUTH")
         ?: "true"
-    systemProperty("cobalt.devMockAuth", devMockAuth)
+    systemProperty("phantom.devMockAuth", devMockAuth)
   }
 
   processResources {
@@ -139,14 +139,14 @@ java {
   }
 }
 
-// ── Native DLL build (Windows, requires VS2026 + CMake) ───────────────────────
+// â”€â”€ Native DLL build (Windows, requires VS2026 + CMake) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 val nativesDir = file("natives")
-val dllReleasePath = file("natives/build/Release/cobalt_pathfinder.dll")
+val dllReleasePath = file("natives/build/Release/phantom_pathfinder.dll")
 val dllResourceDest = file("src/main/resources/natives/windows")
 
 tasks.register<Exec>("buildNative") {
   group = "build"
-  description = "Compiles cobalt_pathfinder.dll via CMake."
+  description = "Compiles phantom_pathfinder.dll via CMake."
   workingDir = nativesDir
   commandLine(
     "cmd", "/c",
@@ -157,7 +157,7 @@ tasks.register<Exec>("buildNative") {
 
 tasks.register<Copy>("copyNativeDll") {
   group = "build"
-  description = "Copies the built cobalt_pathfinder.dll into resources."
+  description = "Copies the built phantom_pathfinder.dll into resources."
   dependsOn("buildNative")
   from(dllReleasePath)
   into(dllResourceDest)
@@ -168,7 +168,7 @@ tasks.named("processResources") {
   dependsOn("copyNativeDll")
 }
 
-// ── Deploy JAR to Prism mods folder ──────────────────────────────────────────
+// â”€â”€ Deploy JAR to Prism mods folder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 val modsDir = file("C:/Users/aeare/AppData/Roaming/PrismLauncher/instances/1.21.11(1)/minecraft/mods")
 val releaseBranchName = "release"
 
@@ -254,7 +254,7 @@ tasks.register("deploy") {
   dependsOn("verifyReleaseBranch", "copyBuiltMod")
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 tasks.register<Copy>("collectObfLibs") {
   group = "build"

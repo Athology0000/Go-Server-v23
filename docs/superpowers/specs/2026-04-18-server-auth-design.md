@@ -1,4 +1,4 @@
-# Server Authentication & Entitlements — Design Spec
+# Server Authentication & Entitlements â€” Design Spec
 
 **Date:** 2026-04-18
 **Status:** Approved for implementation
@@ -7,37 +7,37 @@
 
 ## Overview
 
-A zero-trust Go backend service that authenticates enrolled Cobalt client devices,
+A zero-trust Go backend service that authenticates enrolled Phantom client devices,
 validates entitlements, and delivers signed content manifests for protected modules
 and native components. No protected payload is ever served before both authentication
 and entitlement validation succeed.
 
-**Stack:** Go + Fiber · PostgreSQL · Redis · Caddy (TLS reverse proxy) · Windows VPS
+**Stack:** Go + Fiber Â· PostgreSQL Â· Redis Â· Caddy (TLS reverse proxy) Â· Windows VPS
 
 ---
 
 ## Architecture
 
-Single Go binary (`cobalt-server.exe`) split into clean internal packages:
+Single Go binary (`phantom-server.exe`) split into clean internal packages:
 
 ```
-cmd/server/          ← entry point, service wiring
+cmd/server/          â† entry point, service wiring
 internal/
-  enrollment/        ← redeem, handshake
-  auth/              ← start, finish, challenge
-  entitlement/       ← plan resolution, overrides
-  content/           ← manifest, module, native download
-  admin/             ← admin API, token auth, role enforcement
-  audit/             ← append-only audit log writer
-  crypto/            ← argon2id, HMAC, AES-GCM, Ed25519 helpers
-  db/                ← PostgreSQL queries (sqlc or pgx)
-  cache/             ← Redis helpers (challenges, rate limits)
-  middleware/        ← session auth, admin token auth, rate limit, zero-trust
+  enrollment/        â† redeem, handshake
+  auth/              â† start, finish, challenge
+  entitlement/       â† plan resolution, overrides
+  content/           â† manifest, module, native download
+  admin/             â† admin API, token auth, role enforcement
+  audit/             â† append-only audit log writer
+  crypto/            â† argon2id, HMAC, AES-GCM, Ed25519 helpers
+  db/                â† PostgreSQL queries (sqlc or pgx)
+  cache/             â† Redis helpers (challenges, rate limits)
+  middleware/        â† session auth, admin token auth, rate limit, zero-trust
 ```
 
 **Two listeners:**
-- `:8080` — public client-facing routes (proxied by Caddy over HTTPS)
-- `127.0.0.1:8081` — admin routes (localhost only, admin token auth required)
+- `:8080` â€” public client-facing routes (proxied by Caddy over HTTPS)
+- `127.0.0.1:8081` â€” admin routes (localhost only, admin token auth required)
 
 ---
 
@@ -55,30 +55,30 @@ Devices progress through five states stored in `devices.binding_status`:
 
 **IP enforcement rule:** `enrollment_ip` must match the live connection IP at every step
 from key redemption through the first `/auth/finish`. After `fully_bound`, IP is no
-longer checked — users may authenticate from any network. The stored `enrollment_ip`
+longer checked â€” users may authenticate from any network. The stored `enrollment_ip`
 is retained for audit purposes only.
 
 ---
 
 ## Enrollment Flow
 
-### Step 1 — License key redemption (`POST /enroll/redeem`, panel)
-1. User submits license key + Cobalt credentials in the panel
+### Step 1 â€” License key redemption (`POST /enroll/redeem`, panel)
+1. User submits license key + Phantom credentials in the panel
 2. Server hashes the key, looks up `license_keys` record
 3. Validates: key exists, status is `available`, account is active
 4. Captures real source IP from connection (never from request body)
 5. Creates `devices` record: `binding_status=unbound`, `enrollment_ip=<source_ip>`
 6. Marks key `redeemed`, writes audit log
-7. Admin must have already created a `licenses` record for the account (via `/admin/accounts` or `/admin/keys` flow) — redemption validates the key exists, the license record is a prerequisite
+7. Admin must have already created a `licenses` record for the account (via `/admin/accounts` or `/admin/keys` flow) â€” redemption validates the key exists, the license record is a prerequisite
 
-### Step 2 — Bootstrapper handshake (`POST /enroll/handshake`)
-1. Bootstrapper sends: `cobalt_username`, `cobalt_password`, `hwid`
+### Step 2 â€” Bootstrapper handshake (`POST /enroll/handshake`)
+1. Bootstrapper sends: `phantom_username`, `phantom_password`, `hwid`
 2. Server validates credentials (argon2id verify)
-3. Reads real source IP; verifies it matches `devices.enrollment_ip` — reject if different
+3. Reads real source IP; verifies it matches `devices.enrollment_ip` â€” reject if different
 4. Normalizes and HMAC-hashes incoming HWID with `SERVER_PEPPER`
 5. Stores `hwid_hash`, generates 32-byte `device_secret` (crypto/rand)
 6. Encrypts `device_secret` with AES-256-GCM using `MASTER_KEY`, stores in `devices`
-7. Returns `device_secret` (plaintext, base64) **once** — never transmitted again
+7. Returns `device_secret` (plaintext, base64) **once** â€” never transmitted again
 8. Sets `binding_status=hwid_pending`, writes audit log
 9. Bootstrapper stores `device_secret` encrypted via Windows DPAPI
 
@@ -87,7 +87,7 @@ is retained for audit purposes only.
 ## Authentication Flow
 
 ### `/auth/start`
-**Input:** `cobalt_username`, `hwid`, `minecraft_username`, `client_version`, `bootstrap_build_id`
+**Input:** `phantom_username`, `hwid`, `minecraft_username`, `client_version`, `bootstrap_build_id`
 
 Server actions:
 1. Normalize username; load device record
@@ -101,7 +101,7 @@ Server actions:
 9. Return `{ challenge, expires_in: 30, auth_context_id }`
 
 ### `/auth/finish`
-**Input:** `cobalt_username`, `proof` (HMAC-SHA256 hex)
+**Input:** `phantom_username`, `proof` (HMAC-SHA256 hex)
 
 Server actions:
 1. Normalize username; load pending challenge from Redis
@@ -113,7 +113,7 @@ Server actions:
 7. Mark challenge used / delete from Redis
 8. Increment `devices.failed_attempts` on failure; auto-suspend at 5 failures
 
-**On success (first auth — `hwid_pending` device):**
+**On success (first auth â€” `hwid_pending` device):**
 - Lock `minecraft_username` from request into device record
 - Set `binding_status=fully_bound`
 - Clear IP enforcement (enrollment_ip kept for audit, no longer validated)
@@ -121,7 +121,7 @@ Server actions:
 **On success (any auth):**
 - Run entitlement validation (see below)
 - If authorized: create session, return session token + manifest URL
-  - Manifest URL points to the latest non-expired, non-revoked `content_manifests` record matching the account's `content_channel` — selected server-side, never client-chosen
+  - Manifest URL points to the latest non-expired, non-revoked `content_manifests` record matching the account's `content_channel` â€” selected server-side, never client-chosen
 - If not authorized: return `{ authenticated: true, authorized: false, reason: "entitlement_inactive" }`
 
 ---
@@ -154,7 +154,7 @@ Session record stores the resolved `enabled_modules` + `enabled_features` + `pla
 ## Content Delivery
 
 All content endpoints require a valid session token (Bearer header). Zero trust:
-session is re-verified against DB on every request — no trust in token claims alone.
+session is re-verified against DB on every request â€” no trust in token claims alone.
 
 ### `GET /content/manifest/:id`
 1. Verify session token (DB lookup, check `revoked`, check `expires_at`)
@@ -174,15 +174,15 @@ session is re-verified against DB on every request — no trust in token claims 
 ## Zero-Trust Admin API (`127.0.0.1:8081`)
 
 Every admin request requires `Authorization: Bearer <admin-token>` regardless of
-source IP. Localhost binding is defense-in-depth only — not the trust gate.
+source IP. Localhost binding is defense-in-depth only â€” not the trust gate.
 
 **Admin roles:**
 
 | Role | Permissions |
 |---|---|
-| `super_admin` | Full access — all endpoints |
-| `support` | Reset bindings, view accounts/sessions/audit — no key gen, no content upload |
-| `viewer` | Read-only — accounts, audit, sessions |
+| `super_admin` | Full access â€” all endpoints |
+| `support` | Reset bindings, view accounts/sessions/audit â€” no key gen, no content upload |
+| `viewer` | Read-only â€” accounts, audit, sessions |
 
 **Admin token policy:** 32 random bytes (crypto/rand), stored as SHA-256 hash in
 `admin_tokens` table, 8h expiry, revocable. Every request writes `last_used_at`.
@@ -357,15 +357,15 @@ created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 
 | Purpose | Algorithm / Parameters |
 |---|---|
-| Password hashing | Argon2id — memory 64MB, iterations 3, parallelism 2 |
+| Password hashing | Argon2id â€” memory 64MB, iterations 3, parallelism 2 |
 | HWID storage | `HMAC-SHA256(SERVER_PEPPER, normalize(hwid))` |
 | Device secret generation | `crypto/rand` 32 bytes |
 | Device secret at rest | AES-256-GCM with `MASTER_KEY` |
-| Auth proof | `HMAC-SHA256(device_secret, challenge)` — constant-time compare |
+| Auth proof | `HMAC-SHA256(device_secret, challenge)` â€” constant-time compare |
 | Challenge | `crypto/rand` 32 bytes, base64, 30s TTL in Redis |
 | Session / admin tokens | `crypto/rand` 32 bytes, stored as SHA-256 hash |
-| License keys | `crypto/rand` 32 bytes, base32 formatted as `COBALT-XXXX-XXXX-XXXX-XXXX` |
-| Manifest signing | Ed25519 — server signs with `MANIFEST_SIGNING_KEY`, client verifies with embedded public key |
+| License keys | `crypto/rand` 32 bytes, base32 formatted as `PHANTOM-XXXX-XXXX-XXXX-XXXX` |
+| Manifest signing | Ed25519 â€” server signs with `MANIFEST_SIGNING_KEY`, client verifies with embedded public key |
 
 ---
 
@@ -390,7 +390,7 @@ Suspension requires manual admin lift.
 
 ## Error Handling
 
-External responses are always generic — clients never learn which field failed:
+External responses are always generic â€” clients never learn which field failed:
 
 ```json
 { "error": "authentication_failed" }
@@ -399,7 +399,7 @@ External responses are always generic — clients never learn which field failed
 { "error": "rate_limited" }
 ```
 
-Exception — entitlement failure after successful auth:
+Exception â€” entitlement failure after successful auth:
 ```json
 { "authenticated": true, "authorized": false, "reason": "entitlement_inactive" }
 ```
@@ -413,7 +413,7 @@ to prevent timing oracles.
 
 ## Secrets Management
 
-All secrets are environment variables set on the Windows service — never in files
+All secrets are environment variables set on the Windows service â€” never in files
 committed to git.
 
 | Variable | Purpose |
@@ -430,18 +430,18 @@ committed to git.
 ## Deployment Layout
 
 ```
-C:\cobalt-server\
-  cobalt-server.exe       ← single static binary (go build)
+C:\phantom-server\
+  phantom-server.exe       â† single static binary (go build)
   logs\
   content\
-    modules\              ← uploaded module payloads
-    native\               ← uploaded native components
+    modules\              â† uploaded module payloads
+    native\               â† uploaded native components
 ```
 
-- **Caddy** as HTTPS reverse proxy on port 443 → forwards to `localhost:8080`
-- Admin API on `127.0.0.1:8081` — not proxied, manage via SSH tunnel
+- **Caddy** as HTTPS reverse proxy on port 443 â†’ forwards to `localhost:8080`
+- Admin API on `127.0.0.1:8081` â€” not proxied, manage via SSH tunnel
 - PostgreSQL + Redis as Windows services, listening on localhost only
-- `cobalt-server.exe` runs as a Windows service via **NSSM**
+- `phantom-server.exe` runs as a Windows service via **NSSM**
 - TLS 1.2 minimum, HSTS enabled via Caddy
 
 ---

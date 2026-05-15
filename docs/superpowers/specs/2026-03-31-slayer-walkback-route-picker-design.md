@@ -1,4 +1,4 @@
-# Slayer Walkback Route Picker — Design Spec
+# Slayer Walkback Route Picker â€” Design Spec
 
 **Date:** 2026-03-31
 
@@ -11,7 +11,7 @@ Add a per-slayer-type walkback route selector to each slayer section in the `TAB
 ## 1. Settings Changes
 
 ### Remove
-- `slayerWalkbackRoute` (TextSetting in `TAB_SLAYER_GROUP`) — removed entirely.
+- `slayerWalkbackRoute` (TextSetting in `TAB_SLAYER_GROUP`) â€” removed entirely.
 
 ### Add (per slayer type)
 Six hidden `TextSetting` instances, registered in `settings` list and persisted via config but not rendered directly by the UI (they serve as the backing store):
@@ -29,22 +29,22 @@ Six `ActionSetting` buttons, each placed directly after the corresponding separa
 
 - **name:** `"Walkback Route"`
 - **description:** `"Route to follow back to farming area after boss kill."`
-- **buttonLabel:** dynamic — shows current route name or `"None"` if blank. Requires modifying `ActionSetting` to accept an optional `buttonLabelProvider: (() -> String)? = null` parameter; when non-null, `buttonLabel` returns `buttonLabelProvider.invoke()`. `UIActionSetting` reads `setting.buttonLabel` each render frame, so no UI change needed.
+- **buttonLabel:** dynamic â€” shows current route name or `"None"` if blank. Requires modifying `ActionSetting` to accept an optional `buttonLabelProvider: (() -> String)? = null` parameter; when non-null, `buttonLabel` returns `buttonLabelProvider.invoke()`. `UIActionSetting` reads `setting.buttonLabel` each render frame, so no UI change needed.
 - **onClick:** opens `WalkbackRoutePickerPopup.open(slayerTypeName, backingTextSetting)`
 
-Helper function `walkbackRouteForCurrentType(): TextSetting` — returns the correct backing `TextSetting` based on `slayerType.value` (0=Zombie, 1=Wolf, 2=Spider, 3=Enderman, 4=Vampire, 5=Blaze).
+Helper function `walkbackRouteForCurrentType(): TextSetting` â€” returns the correct backing `TextSetting` based on `slayerType.value` (0=Zombie, 1=Wolf, 2=Spider, 3=Enderman, 4=Vampire, 5=Blaze).
 
 ---
 
 ## 2. WalkbackRoutePickerPopup (new file)
 
-**Location:** `src/main/kotlin/org/cobalt/internal/ui/hud/WalkbackRoutePickerPopup.kt`
+**Location:** `src/main/kotlin/org/phantom/internal/ui/hud/WalkbackRoutePickerPopup.kt`
 
 ### Appearance
 Matches the visual style of `UICommissionRoutesPanel`:
 
-- Panel: 320×500px, centered on screen, rounded corners, `theme.background` fill
-- **Title:** `"Walkback Route — <Slayer Type>"` (13px, `theme.text`)
+- Panel: 320Ã—500px, centered on screen, rounded corners, `theme.background` fill
+- **Title:** `"Walkback Route â€” <Slayer Type>"` (13px, `theme.text`)
 - **Subtitle:** `"Select a route to follow to walk back to the area if killed or teleported away."` (9px, `theme.textSecondary`, wraps if needed)
 - **Top-right buttons:** `Refresh` | `Clear`
   - `Refresh` reloads `RoutesModule.getSavedRouteInfos()`
@@ -60,12 +60,12 @@ Matches the visual style of `UICommissionRoutesPanel`:
 - **Semi-transparent dark overlay** behind panel (0,0,0,120 alpha) covering full screen
 
 ### Interaction
-- Click a route row → sets `backingTextSetting.value = route.name`, closes popup
-- Click `Refresh` → reloads route list, does not close
-- Click `Clear` → sets `backingTextSetting.value = ""`, closes popup
-- Click outside panel → closes without change
-- Right-click anywhere → closes without change
-- Mouse scroll over panel → scrolls list
+- Click a route row â†’ sets `backingTextSetting.value = route.name`, closes popup
+- Click `Refresh` â†’ reloads route list, does not close
+- Click `Clear` â†’ sets `backingTextSetting.value = ""`, closes popup
+- Click outside panel â†’ closes without change
+- Right-click anywhere â†’ closes without change
+- Mouse scroll over panel â†’ scrolls list
 
 ### Notes on cursor/movement locking
 Unlike `PatrolPointPopup`, this popup opens from within the settings UI where the cursor is already free. No `lockPlayer` or `MouseUtils.ungrabMouse` calls are needed.
@@ -102,11 +102,11 @@ Each tick, while:
 - Not already dead/respawning
 
 Check: player is farther than `GRAVEYARD_PROXIMITY_RANGE_SQ` from **all** patrol points.
-If true → call `triggerWalkToFarmArea(justFarm = false)`, reset `enteredFarmingArea = false`.
+If true â†’ call `triggerWalkToFarmArea(justFarm = false)`, reset `enteredFarmingArea = false`.
 
 The Crypt-specific `slayerEnteredCrypt` tracking is unchanged.
 
-### 3c. Death → Walkback for All Slayer Types
+### 3c. Death â†’ Walkback for All Slayer Types
 Currently death-triggered walkback is guarded by `cryptZombieSlayer.value`. Remove that guard so all slayer types queue a walkback on respawn.
 
 ### 3d. World/Server Change Detection
@@ -123,7 +123,7 @@ Replace all references to `slayerWalkbackRoute.value` with calls to `walkbackRou
 This affects:
 - `triggerWalkToFarmArea()`
 - `finishSlayerClaim()`
-- The startup proximity check at macro start (lines ~1163–1164)
+- The startup proximity check at macro start (lines ~1163â€“1164)
 
 ---
 
@@ -132,7 +132,7 @@ This affects:
 | File | Change |
 |------|--------|
 | `CombatMacroModule.kt` | Remove `slayerWalkbackRoute`; add 6 backing TextSettings + 6 ActionSettings; register `WalkbackRoutePickerPopup`; add area tracking flags + logic; update all route lookups; fix death guard; fix world-change walkback |
-| `WalkbackRoutePickerPopup.kt` | **New file** — modal route picker popup styled like UICommissionRoutesPanel |
+| `WalkbackRoutePickerPopup.kt` | **New file** â€” modal route picker popup styled like UICommissionRoutesPanel |
 | `ActionSetting.kt` | Add optional `buttonLabelProvider: (() -> String)? = null`; make `buttonLabel` a computed property |
 
 No changes to `RoutesModule`, `WalkbackBridge`, `UIActionSetting`, or the UI panel system.

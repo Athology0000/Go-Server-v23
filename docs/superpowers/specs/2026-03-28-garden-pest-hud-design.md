@@ -1,4 +1,4 @@
-# Garden Pest HUD — Design Spec
+# Garden Pest HUD â€” Design Spec
 
 **Date:** 2026-03-28
 
@@ -12,7 +12,7 @@ Reference UI (the HUD to replicate):
 - Last pest spawned: X ago
 - Pest Cooldown: Xs
 - Farming Bonus: active/inactive
-- X Pests Expire On Y+ (out of scope — data source unknown)
+- X Pests Expire On Y+ (out of scope â€” data source unknown)
 
 ## Scope
 
@@ -20,7 +20,7 @@ Reference UI (the HUD to replicate):
 - `hudElement()` on a new `GardenHudModule` (or added to `GardenMacroModule` if appropriate)
 - Real-time pest cooldown countdown (tick-driven, not just the raw tab-list value)
 - Alive pest count and infested plot count/list from `PestTabListParser`
-- "Last pest spawned" timestamp — track when `lastAliveCount` increases
+- "Last pest spawned" timestamp â€” track when `lastAliveCount` increases
 - Internal cleaning cooldown remaining (from `PestManager.cleaningCooldownUntil`)
 - Farming bonus indicator
 - Only visible when the player is in the Garden (detected via scoreboard/tab list/island check)
@@ -34,12 +34,12 @@ Reference UI (the HUD to replicate):
 
 ### Module: `GardenHudModule`
 
-`object GardenHudModule : Module("Garden HUD")` — separate module so the HUD works without enabling the macro. Registered in `Cobalt.onInitializeClient()`.
+`object GardenHudModule : Module("Garden HUD")` â€” separate module so the HUD works without enabling the macro. Registered in `Phantom.onInitializeClient()`.
 
 Subscribes to `TickEvent.Start` to poll `PestTabListParser` and update state. On each tick:
-1. Call `PestTabListParser.parse()` → `TabListData`
+1. Call `PestTabListParser.parse()` â†’ `TabListData`
 2. Update `lastAliveCount`, `cooldownSeconds`, `infestedPlots`, `bonusActive`
-3. If `data.alivePests > previousAliveCount` → record `lastSpawnedAt = System.currentTimeMillis()`
+3. If `data.alivePests > previousAliveCount` â†’ record `lastSpawnedAt = System.currentTimeMillis()`
 4. Derive a local `cooldownDeadline: Long` from `data.cooldownSeconds`: each tick when `cooldownSeconds > 0`, set `cooldownDeadline = now + cooldownSeconds * 1000`. Between ticks the HUD counts down in real time from this deadline.
 
 ### HUD Element
@@ -76,7 +76,7 @@ The countdown display for `Pest Cooldown` is computed from `cooldownDeadline - S
 
 ### Garden Detection
 
-Only render the HUD when in the Garden island. Detection: check tab list or scoreboard text contains `"Garden"` — same approach used by `PestTabListParser` (it already parses the tab list header/footer). Add a simple `isInGarden(): Boolean` helper that checks `TabOverlayAccessor.header` for the word "Garden".
+Only render the HUD when in the Garden island. Detection: check tab list or scoreboard text contains `"Garden"` â€” same approach used by `PestTabListParser` (it already parses the tab list header/footer). Add a simple `isInGarden(): Boolean` helper that checks `TabOverlayAccessor.header` for the word "Garden".
 
 ### State Tracking (in `GardenHudModule`)
 
@@ -94,14 +94,14 @@ private var internalCdUntil    = 0L   // mirrors PestManager.cleaningCooldownUnt
 ### No New Data Sources Needed
 
 All data comes from existing systems:
-- `PestTabListParser.parse()` — alive count, tab-list cooldown, infested plots, bonus
-- `PestManager.cleaningCooldownUntil` — internal post-clean cooldown
+- `PestTabListParser.parse()` â€” alive count, tab-list cooldown, infested plots, bonus
+- `PestManager.cleaningCooldownUntil` â€” internal post-clean cooldown
 - Local timestamp tracking for "last spawned"
 
 ## File Layout
 
 ```
-src/main/kotlin/org/cobalt/internal/garden/
+src/main/kotlin/org/phantom/internal/garden/
   GardenHudModule.kt     # New module: HUD element + tick-driven state updates
 ```
 
@@ -109,6 +109,6 @@ No new managers or mixins needed.
 
 ## Key Constraints
 
-- `PestTabListParser.parse()` reads MC GUI state — must be called on the MC main thread (inside `TickEvent.Start` handler, which already runs on the game thread).
-- The `hudElement` `render {}` block runs inside an NVG frame — no `GuiGraphics` calls there.
+- `PestTabListParser.parse()` reads MC GUI state â€” must be called on the MC main thread (inside `TickEvent.Start` handler, which already runs on the game thread).
+- The `hudElement` `render {}` block runs inside an NVG frame â€” no `GuiGraphics` calls there.
 - The HUD should be a no-op (skip rendering entirely) when `isInGarden()` returns false.

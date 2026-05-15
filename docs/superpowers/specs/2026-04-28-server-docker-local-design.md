@@ -1,7 +1,7 @@
-# Server Docker Local Hosting — Design
+# Server Docker Local Hosting â€” Design
 
 **Date:** 2026-04-28
-**Goal:** Run the full Cobalt server stack locally in Docker for end-to-end testing of all components.
+**Goal:** Run the full Phantom server stack locally in Docker for end-to-end testing of all components.
 
 ---
 
@@ -10,49 +10,49 @@
 Six Docker services managed by a single `docker-compose.yml` in `server/`:
 
 ```
-┌─────────────┐   ┌─────────────┐
-│ nginx-admin │   │ nginx-panel │
-│  :3001      │   │  :3002      │
-│ admin/dist/ │   │ panel/dist/ │
-└─────────────┘   └─────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”   â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚ nginx-admin â”‚   â”‚ nginx-panel â”‚
+â”‚  :3001      â”‚   â”‚  :3002      â”‚
+â”‚ admin/dist/ â”‚   â”‚ panel/dist/ â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜   â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 
-┌──────────────────────────────────┐
-│            api (Go)              │
-│  public :8080  │  admin :8081    │
-└──────────────────────────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚            api (Go)              â”‚
+â”‚  public :8080  â”‚  admin :8081    â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 
-┌─────────────┐   ┌─────────────┐
-│  postgres   │   │    redis    │
-│   :5432     │   │   :6379     │
-└─────────────┘   └─────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”   â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚  postgres   â”‚   â”‚    redis    â”‚
+â”‚   :5432     â”‚   â”‚   :6379     â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜   â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 
-┌─────────────┐
-│   migrate   │  (init, exits 0 after applying migrations)
-└─────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚   migrate   â”‚  (init, exits 0 after applying migrations)
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 ```
 
 ## Services
 
 ### postgres
 - Image: `postgres:16-alpine`
-- Persistent named volume: `cobalt_pgdata`
+- Persistent named volume: `phantom_pgdata`
 - Health check: `pg_isready`
 - Host port 5432 exposed for DB inspection tools (e.g. TablePlus, psql)
 
 ### redis
 - Image: `redis:7-alpine`
-- Persistent named volume: `cobalt_redisdata`
+- Persistent named volume: `phantom_redisdata`
 - Host port 6379 exposed
 
 ### migrate
 - Image: `postgres:16-alpine` (reuses already-pulled image, has `psql`)
 - Mounts `server/migrations/` read-only
-- Runs `server/docker/migrate.sh` — iterates SQL files in lexicographic order, runs each with `psql`, skips already-applied files via a `schema_migrations` tracking table
+- Runs `server/docker/migrate.sh` â€” iterates SQL files in lexicographic order, runs each with `psql`, skips already-applied files via a `schema_migrations` tracking table
 - `depends_on: postgres` with health check condition
 - `restart: on-failure` so compose re-runs it if postgres isn't ready yet
 
 ### api
-- Built from `server/Dockerfile` (multi-stage: `golang:1.22-alpine` builder → `alpine:3.20` runtime)
+- Built from `server/Dockerfile` (multi-stage: `golang:1.22-alpine` builder â†’ `alpine:3.20` runtime)
 - Reads all config from environment variables (loaded from `.env` via docker-compose)
 - `depends_on: migrate` with `condition: service_completed_successfully`
 - `CONTENT_DIR` points to a bind-mounted `./content` volume so mod JARs can be dropped in without rebuilding
@@ -60,14 +60,14 @@ Six Docker services managed by a single `docker-compose.yml` in `server/`:
 
 ### nginx-admin
 - Image: `nginx:alpine`
-- Bind-mounts `./admin/dist/` (already built) into the container — no rebuild needed
+- Bind-mounts `./admin/dist/` (already built) into the container â€” no rebuild needed
 - Serves on port 3001
 - Config in `server/docker/nginx-admin.conf`: `try_files $uri $uri/ /index.html` for SPA routing
-- No dependency on `api` — starts independently
+- No dependency on `api` â€” starts independently
 
 ### nginx-panel
 - Image: `nginx:alpine`
-- Bind-mounts `./panel/dist/` (already built) into the container — no rebuild needed
+- Bind-mounts `./panel/dist/` (already built) into the container â€” no rebuild needed
 - Serves on port 3002
 - Config in `server/docker/nginx-panel.conf`: same SPA routing
 - No dependency on `api`
@@ -75,8 +75,8 @@ Six Docker services managed by a single `docker-compose.yml` in `server/`:
 ## Startup Order
 
 ```
-postgres (healthy) → migrate (exits 0) → api (starts)
-                                        ↗
+postgres (healthy) â†’ migrate (exits 0) â†’ api (starts)
+                                        â†—
 nginx-admin, nginx-panel (start immediately, no deps)
 ```
 
@@ -98,19 +98,19 @@ Loaded from `server/.env` (git-ignored). All required unless a default is noted.
 
 | Variable | Description | Default |
 |---|---|---|
-| `MASTER_KEY` | AES-256 key, base64(32 bytes) | — |
-| `SERVER_PEPPER` | HMAC key, base64(32 bytes) | — |
-| `MANIFEST_SIGNING_KEY` | Ed25519 private key, base64(64 bytes) | — |
+| `MASTER_KEY` | AES-256 key, base64(32 bytes) | â€” |
+| `SERVER_PEPPER` | HMAC key, base64(32 bytes) | â€” |
+| `MANIFEST_SIGNING_KEY` | Ed25519 private key, base64(64 bytes) | â€” |
 | `DB_URL` | Postgres connection string | set by compose |
 | `REDIS_URL` | Redis connection string | set by compose |
-| `ADMIN_API_SECRET` | Shared secret for admin API | — |
+| `ADMIN_API_SECRET` | Shared secret for admin API | â€” |
 | `PUBLIC_PORT` | Public server port | `8080` |
 | `ADMIN_PORT` | Admin server port | `8081` |
 | `CONTENT_DIR` | Path to content directory | `./content` |
 | `BASE_URL` | Public base URL | `http://localhost:8080` |
 | `STRICT_SESSION_IP` | Enforce session IP binding | `false` (local dev) |
 
-`DB_URL` and `REDIS_URL` are constructed by docker-compose using the internal service hostnames (`postgres`, `redis`) and injected directly — they do not need to appear in `.env`.
+`DB_URL` and `REDIS_URL` are constructed by docker-compose using the internal service hostnames (`postgres`, `redis`) and injected directly â€” they do not need to appear in `.env`.
 
 ## Secret Generation
 
@@ -133,7 +133,7 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 );
 ```
 
-Each SQL file is applied only if its filename is not already in this table. This makes re-running `docker compose up` safe — existing migrations are skipped.
+Each SQL file is applied only if its filename is not already in this table. This makes re-running `docker compose up` safe â€” existing migrations are skipped.
 
 ## Data Flow (Testing)
 

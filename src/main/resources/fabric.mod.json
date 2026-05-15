@@ -1,34 +1,34 @@
 {
   "schemaVersion": 1,
-  "id": "cobalt",
+  "id": "phantom",
   "version": "${version}",
   "name": "${displayName}",
-  "description": "Core mod that loads and manages external modules through a shared API for Dutt Client",
+  "description": "Core mod that loads and manages external modules through a shared API for Phantom Client",
   "authors": [
     "QuiteBoring",
     "Twiston",
     "oblongboot"
   ],
   "contact": {
-    "homepage": "https://cobalt.quiteboring.dev/",
-    "sources": "https://github.com/CobaltScripts/Cobalt"
+    "homepage": "https://phantom.quiteboring.dev/",
+    "sources": "https://github.com/PhantomScripts/Phantom"
   },
   "license": "GPL-3.0",
-  "icon": "assets/cobalt/icon.png",
+  "icon": "assets/phantom/icon.png",
   "environment": "*",
   "entrypoints": {
     "client": [
       {
         "adapter": "kotlin",
-        "value": "org.cobalt.Cobalt"
+        "value": "org.phantom.Phantom"
       }
     ],
     "preLaunch": [
-      "org.cobalt.PreLaunch"
+      "org.phantom.PreLaunch"
     ]
   },
   "mixins": [
-    "cobalt.mixins.json"
+    "phantom.mixins.json"
   ],
   "depends": {
     "fabric-language-kotlin": ">=$fabricKotlinVersion",

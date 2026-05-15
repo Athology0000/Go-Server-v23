@@ -14,18 +14,18 @@
 
 | File | Action | Responsibility |
 |------|--------|----------------|
-| `src/main/kotlin/org/cobalt/internal/mining/RoutesModule.kt` | Modify | Expose `routeOwnsMining` public getter |
-| `src/main/kotlin/org/cobalt/internal/mining/MiningMacroModule.kt` | Modify | Add `anchorRadius` setting, replace drift constant, fix else-branch, call `resetSession` on start |
-| `src/main/kotlin/org/cobalt/internal/mining/MiningProfitTracker.kt` | Create | Session timing, bazaar prices, chat parsing, coins/hr |
-| `src/main/kotlin/org/cobalt/internal/mining/CommissionMacroModule.kt` | Modify | Call `MiningProfitTracker.resetSession()` when macro starts |
-| `src/main/kotlin/org/cobalt/internal/mining/MiningHudModule.kt` | Modify | Add `Show Profit` setting and profit section to bottom of panel |
+| `src/main/kotlin/org/phantom/internal/mining/RoutesModule.kt` | Modify | Expose `routeOwnsMining` public getter |
+| `src/main/kotlin/org/phantom/internal/mining/MiningMacroModule.kt` | Modify | Add `anchorRadius` setting, replace drift constant, fix else-branch, call `resetSession` on start |
+| `src/main/kotlin/org/phantom/internal/mining/MiningProfitTracker.kt` | Create | Session timing, bazaar prices, chat parsing, coins/hr |
+| `src/main/kotlin/org/phantom/internal/mining/CommissionMacroModule.kt` | Modify | Call `MiningProfitTracker.resetSession()` when macro starts |
+| `src/main/kotlin/org/phantom/internal/mining/MiningHudModule.kt` | Modify | Add `Show Profit` setting and profit section to bottom of panel |
 
 ---
 
 ## Task 1: Expose `routeOwnsMining` in RoutesModule
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/mining/RoutesModule.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/mining/RoutesModule.kt`
 
 The field `routeOwnsMiningMacro` is `private var`. We need a public getter so `MiningMacroModule` can read it without reflection.
 
@@ -51,7 +51,7 @@ Expected: `BUILD SUCCESSFUL`
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/mining/RoutesModule.kt
+git add src/main/kotlin/org/phantom/internal/mining/RoutesModule.kt
 git commit -m "feat: expose routeOwnsMining getter on RoutesModule"
 ```
 
@@ -60,7 +60,7 @@ git commit -m "feat: expose routeOwnsMining getter on RoutesModule"
 ## Task 2: Add `anchorRadius` setting + fix drift constant + fix step-closer else-branch
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/mining/MiningMacroModule.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/mining/MiningMacroModule.kt`
 
 Three changes in one file:
 1. Add `anchorRadius` `SliderSetting`
@@ -159,7 +159,7 @@ Replace with:
 
 - [ ] **Step 6: Fix the `target == null` else-branch**
 
-Find this block (around line 615–618) inside the `target == null` guard. It is the `else` that fires when `shortStepAllowed` is false:
+Find this block (around line 615â€“618) inside the `target == null` guard. It is the `else` that fires when `shortStepAllowed` is false:
 ```kotlin
         } else {
           MovementManager.clearForcedMovement()
@@ -186,7 +186,7 @@ Expected: `BUILD SUCCESSFUL`. If the compiler says `NEARBY_STEP_MAX_DRIFT` is un
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/mining/MiningMacroModule.kt
+git add src/main/kotlin/org/phantom/internal/mining/MiningMacroModule.kt
 git commit -m "feat: add anchorRadius setting, fix drift constant, fix step-closer pathfinding fallback"
 ```
 
@@ -195,22 +195,22 @@ git commit -m "feat: add anchorRadius setting, fix drift constant, fix step-clos
 ## Task 3: Create `MiningProfitTracker`
 
 **Files:**
-- Create: `src/main/kotlin/org/cobalt/internal/mining/MiningProfitTracker.kt`
+- Create: `src/main/kotlin/org/phantom/internal/mining/MiningProfitTracker.kt`
 
 Tracks session start time and accumulated coin value. Parses `+N ItemName` chat messages, looks up bazaar prices, and provides `coinsPerHour()` and `runtimeMs()`. Uses the same Hypixel bazaar endpoint as `ProfitManager` in garden.
 
 - [ ] **Step 1: Create the file**
 
-Create `src/main/kotlin/org/cobalt/internal/mining/MiningProfitTracker.kt`:
+Create `src/main/kotlin/org/phantom/internal/mining/MiningProfitTracker.kt`:
 
 ```kotlin
-package org.cobalt.internal.mining
+package org.phantom.internal.mining
 
 import com.google.gson.JsonParser
 import net.minecraft.client.Minecraft
-import org.cobalt.api.event.EventBus
-import org.cobalt.api.event.annotation.SubscribeEvent
-import org.cobalt.api.event.impl.client.ChatEvent
+import org.phantom.api.event.EventBus
+import org.phantom.api.event.annotation.SubscribeEvent
+import org.phantom.api.event.impl.client.ChatEvent
 import java.net.URL
 
 object MiningProfitTracker {
@@ -278,7 +278,7 @@ object MiningProfitTracker {
                     bazaarPrices.clear()
                     bazaarPrices.putAll(prices)
                 }
-            } catch (_: Exception) { /* network failure — keep cached prices */ }
+            } catch (_: Exception) { /* network failure â€” keep cached prices */ }
         }, "mining-bazaar-refresh").also { it.isDaemon = true }.start()
     }
 }
@@ -294,7 +294,7 @@ Expected: `BUILD SUCCESSFUL`
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/mining/MiningProfitTracker.kt
+git add src/main/kotlin/org/phantom/internal/mining/MiningProfitTracker.kt
 git commit -m "feat: add MiningProfitTracker with bazaar fetch and chat-based coin tracking"
 ```
 
@@ -303,8 +303,8 @@ git commit -m "feat: add MiningProfitTracker with bazaar fetch and chat-based co
 ## Task 4: Wire `MiningProfitTracker` into macro start points
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/mining/MiningMacroModule.kt`
-- Modify: `src/main/kotlin/org/cobalt/internal/mining/CommissionMacroModule.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/mining/MiningMacroModule.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/mining/CommissionMacroModule.kt`
 
 `MiningProfitTracker` must be initialized (so its `init` block runs and it registers with EventBus) and `resetSession()` must be called each time a mining session starts.
 
@@ -362,8 +362,8 @@ Expected: `BUILD SUCCESSFUL`
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/mining/MiningMacroModule.kt \
-        src/main/kotlin/org/cobalt/internal/mining/CommissionMacroModule.kt
+git add src/main/kotlin/org/phantom/internal/mining/MiningMacroModule.kt \
+        src/main/kotlin/org/phantom/internal/mining/CommissionMacroModule.kt
 git commit -m "feat: wire MiningProfitTracker reset into macro start points"
 ```
 
@@ -372,7 +372,7 @@ git commit -m "feat: wire MiningProfitTracker reset into macro start points"
 ## Task 5: Add profit section to `MiningHudModule`
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/mining/MiningHudModule.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/mining/MiningHudModule.kt`
 
 Adds a `Show Profit` `CheckboxSetting` and a new section at the bottom of the existing panel. The section shows: active macro name, coins/hr, runtime.
 
@@ -385,7 +385,7 @@ At the bottom of `MiningHudModule.kt`, just before the closing `}` of the object
     RoutesModule.isRunning && RoutesModule.routeOwnsMining -> "Routes"
     CommissionMacroModule.isRunning                       -> "Commission Macro"
     MiningMacroModule.isActive                            -> "Mining Macro"
-    else                                                  -> "—"
+    else                                                  -> "â€”"
   }
 
   private fun formatRuntime(ms: Long): String {
@@ -509,7 +509,7 @@ Replace with:
 
 - [ ] **Step 5: Add the profit section render block**
 
-The profit section is anchored to the bottom of the panel, so Y positions are computed from `panelH` downward — no need to track intermediate Y values from the sections above.
+The profit section is anchored to the bottom of the panel, so Y positions are computed from `panelH` downward â€” no need to track intermediate Y values from the sections above.
 
 In the `render` lambda, find this closing sequence (the `}` that ends the commissions `if` block, immediately before the `render` lambda's closing `}`):
 ```kotlin
@@ -545,11 +545,11 @@ Replace that closing sequence with:
 
 At the top of `MiningHudModule.kt`, add the missing import lines. Find the existing import block and add:
 ```kotlin
-import org.cobalt.internal.mining.CommissionMacroModule
-import org.cobalt.internal.mining.MiningProfitTracker
-import org.cobalt.internal.mining.RoutesModule
+import org.phantom.internal.mining.CommissionMacroModule
+import org.phantom.internal.mining.MiningProfitTracker
+import org.phantom.internal.mining.RoutesModule
 ```
-(These may already be present via wildcard — the build in step 7 will confirm.)
+(These may already be present via wildcard â€” the build in step 7 will confirm.)
 
 - [ ] **Step 7: Build**
 
@@ -561,6 +561,6 @@ Expected: `BUILD SUCCESSFUL`. If there are unresolved reference errors on `Route
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/mining/MiningHudModule.kt
+git add src/main/kotlin/org/phantom/internal/mining/MiningHudModule.kt
 git commit -m "feat: add profit section to Mining HUD (active macro, coins/hr, runtime)"
 ```

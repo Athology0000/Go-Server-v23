@@ -21,8 +21,8 @@ void main(){
     vec4 ur = texture2D(DiffuseSampler, texCoord + vec2( oneTexel.x, -oneTexel.y));
 
     vec4 v4 = min(ul, dr);
-    vec4 v5 = min(ur, dl);
-    vec4 v6 = min(v4, v5);
+    vec4 phantom = min(ur, dl);
+    vec4 v6 = min(v4, phantom);
 
     vec4 v7 = min(v3, v6);
 

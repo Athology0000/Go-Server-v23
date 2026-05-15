@@ -6,7 +6,7 @@
 
 **Architecture:** New `internal/routes/` package owns data (RouteStore, SavedRoute, RouteType), edit-mode UX (RouteEditMode, RoutePointTypePopup). New `UIRoutesPanel` and `UINewRouteModal` live in the existing UI panels package. Macros read the armed route name from `RouteStore`. Old per-macro panels (UICommissionRoutesPanel, UICombatWalkbackRoutesPanel, UIRoutePointPicker) and legacy singletons (PatrolWaypointStore, WalkbackBridge) are removed after migration.
 
-**Scope note:** This plan covers the data layer, edit mode, and routes screen (spec sections 1–3 plus section 4.1 route-selection UI). The full execution rewrites per spec sections 4.2–4.6 depend on a separate deep-dive into each macro and are left as a follow-up.
+**Scope note:** This plan covers the data layer, edit mode, and routes screen (spec sections 1â€“3 plus section 4.1 route-selection UI). The full execution rewrites per spec sections 4.2â€“4.6 depend on a separate deep-dive into each macro and are left as a follow-up.
 
 **Tech Stack:** Kotlin, Fabric MC 1.21.11, NanoVG (NVGRenderer), OverlayRenderEngine + Render3D for 3D overlays, Gson for JSON file I/O, EventBus (`@SubscribeEvent`), UIPanel / ScrollHandler / TextInputHandler pattern.
 
@@ -15,43 +15,43 @@
 ## File Map
 
 **New files:**
-- `src/main/kotlin/org/cobalt/internal/routes/RouteType.kt` — RouteType, SubRouteKey, RoutePointType enums with allowed-type-per-sub-route logic
-- `src/main/kotlin/org/cobalt/internal/routes/SavedRoute.kt` — SavedRoute, RoutePoint data classes + JSON serialisation helpers
-- `src/main/kotlin/org/cobalt/internal/routes/RouteStore.kt` — load / save / list / delete / migrate routes; `arm` / `getArmed` per type
-- `src/main/kotlin/org/cobalt/internal/routes/RoutePointTypePopup.kt` — Shift+right-click type picker (NvgEvent popup)
-- `src/main/kotlin/org/cobalt/internal/routes/RouteEditMode.kt` — sticky HUD controller: normal recording, insert mode, undo, in-world rendering
-- `src/main/kotlin/org/cobalt/internal/ui/panel/panels/UIRoutesPanel.kt` — unified routes screen (expandable cards, filter tabs, Load/Edit/Insert/Delete, + New)
-- `src/main/kotlin/org/cobalt/internal/ui/panel/panels/UINewRouteModal.kt` — 5-type picker + name input modal
+- `src/main/kotlin/org/phantom/internal/routes/RouteType.kt` â€” RouteType, SubRouteKey, RoutePointType enums with allowed-type-per-sub-route logic
+- `src/main/kotlin/org/phantom/internal/routes/SavedRoute.kt` â€” SavedRoute, RoutePoint data classes + JSON serialisation helpers
+- `src/main/kotlin/org/phantom/internal/routes/RouteStore.kt` â€” load / save / list / delete / migrate routes; `arm` / `getArmed` per type
+- `src/main/kotlin/org/phantom/internal/routes/RoutePointTypePopup.kt` â€” Shift+right-click type picker (NvgEvent popup)
+- `src/main/kotlin/org/phantom/internal/routes/RouteEditMode.kt` â€” sticky HUD controller: normal recording, insert mode, undo, in-world rendering
+- `src/main/kotlin/org/phantom/internal/ui/panel/panels/UIRoutesPanel.kt` â€” unified routes screen (expandable cards, filter tabs, Load/Edit/Insert/Delete, + New)
+- `src/main/kotlin/org/phantom/internal/ui/panel/panels/UINewRouteModal.kt` â€” 5-type picker + name input modal
 
 **Modified files:**
-- `src/main/kotlin/org/cobalt/Cobalt.kt` — register RouteEditMode + RoutePointTypePopup with EventBus, call RouteStore.init(), remove PatrolWaypointStore.load()
-- `src/main/kotlin/org/cobalt/internal/ui/panel/panels/UISidebar.kt` — wire routes button to `UIConfig.swapBodyPanel(UIRoutesPanel())`
-- `src/main/kotlin/org/cobalt/internal/mining/CommissionMacroModule.kt` — `getAvailableRouteInfos()` now reads from RouteStore
-- `src/main/kotlin/org/cobalt/internal/mining/MiningMacroModule.kt` — add `getArmedRoute()` / `setArmedRoute()` backed by RouteStore
-- `src/main/kotlin/org/cobalt/internal/combat/CombatMacroModule.kt` — remove WalkbackBridge, add RouteStore PATROL-route arm support
+- `src/main/kotlin/org/phantom/Phantom.kt` â€” register RouteEditMode + RoutePointTypePopup with EventBus, call RouteStore.init(), remove PatrolWaypointStore.load()
+- `src/main/kotlin/org/phantom/internal/ui/panel/panels/UISidebar.kt` â€” wire routes button to `UIConfig.swapBodyPanel(UIRoutesPanel())`
+- `src/main/kotlin/org/phantom/internal/mining/CommissionMacroModule.kt` â€” `getAvailableRouteInfos()` now reads from RouteStore
+- `src/main/kotlin/org/phantom/internal/mining/MiningMacroModule.kt` â€” add `getArmedRoute()` / `setArmedRoute()` backed by RouteStore
+- `src/main/kotlin/org/phantom/internal/combat/CombatMacroModule.kt` â€” remove WalkbackBridge, add RouteStore PATROL-route arm support
 
 **Deleted files (Task 9):**
-- `src/main/kotlin/org/cobalt/internal/ui/panel/panels/UICommissionRoutesPanel.kt`
-- `src/main/kotlin/org/cobalt/internal/ui/panel/panels/UICombatWalkbackRoutesPanel.kt`
-- `src/main/kotlin/org/cobalt/internal/ui/panel/panels/UIRoutePointPicker.kt`
-- `src/main/kotlin/org/cobalt/internal/ui/hud/RoutePointPopup.kt`
-- `src/main/kotlin/org/cobalt/internal/ui/hud/PatrolPointPopup.kt`
-- `src/main/kotlin/org/cobalt/internal/ui/hud/WalkbackRoutePickerPopup.kt`
-- `src/main/kotlin/org/cobalt/internal/pathfinding/PatrolWaypointStore.kt`
-- `src/main/kotlin/org/cobalt/internal/helper/WalkbackBridge.kt`
+- `src/main/kotlin/org/phantom/internal/ui/panel/panels/UICommissionRoutesPanel.kt`
+- `src/main/kotlin/org/phantom/internal/ui/panel/panels/UICombatWalkbackRoutesPanel.kt`
+- `src/main/kotlin/org/phantom/internal/ui/panel/panels/UIRoutePointPicker.kt`
+- `src/main/kotlin/org/phantom/internal/ui/hud/RoutePointPopup.kt`
+- `src/main/kotlin/org/phantom/internal/ui/hud/PatrolPointPopup.kt`
+- `src/main/kotlin/org/phantom/internal/ui/hud/WalkbackRoutePickerPopup.kt`
+- `src/main/kotlin/org/phantom/internal/pathfinding/PatrolWaypointStore.kt`
+- `src/main/kotlin/org/phantom/internal/helper/WalkbackBridge.kt`
 
 ---
 
-## Task 1: Data Types — RouteType.kt and SavedRoute.kt
+## Task 1: Data Types â€” RouteType.kt and SavedRoute.kt
 
 **Files:**
-- Create: `src/main/kotlin/org/cobalt/internal/routes/RouteType.kt`
-- Create: `src/main/kotlin/org/cobalt/internal/routes/SavedRoute.kt`
+- Create: `src/main/kotlin/org/phantom/internal/routes/RouteType.kt`
+- Create: `src/main/kotlin/org/phantom/internal/routes/SavedRoute.kt`
 
 - [ ] **Step 1: Create RouteType.kt**
 
 ```kotlin
-package org.cobalt.internal.routes
+package org.phantom.internal.routes
 
 enum class RouteType(val label: String, val color: Long) {
     ORE_MINER("Ore Miner",   0xFF4DE2C5),
@@ -63,17 +63,17 @@ enum class RouteType(val label: String, val color: Long) {
 
 /** The sub-route inside a SavedRoute that a point belongs to. */
 enum class SubRouteKey(val label: String, val icon: String) {
-    TRAVEL("Travel Route", "\uD83D\uDEB6"),   // 🚶
-    LOOP("Loop Route",     "\uD83D\uDD04"),    // 🔄
-    AREA("Patrol Area",    "\u2694"),          // ⚔
-    POINTS("Route Points", "\uD83D\uDCC4"),   // 📄
+    TRAVEL("Travel Route", "\uD83D\uDEB6"),   // ðŸš¶
+    LOOP("Loop Route",     "\uD83D\uDD04"),    // ðŸ”„
+    AREA("Patrol Area",    "\u2694"),          // âš”
+    POINTS("Route Points", "\uD83D\uDCC4"),   // ðŸ“„
 }
 
 enum class RoutePointType(val id: String, val label: String, val icon: String) {
-    WALK("walk", "Walk", "\uD83D\uDEB6"),   // 🚶
-    WARP("warp", "Warp", "\u26A1"),         // ⚡
-    MINE("mine", "Mine", "\u26CF"),         // ⛏
-    KILL("kill", "Kill", "\u2694");         // ⚔
+    WALK("walk", "Walk", "\uD83D\uDEB6"),   // ðŸš¶
+    WARP("warp", "Warp", "\u26A1"),         // âš¡
+    MINE("mine", "Mine", "\u26CF"),         // â›
+    KILL("kill", "Kill", "\u2694");         // âš”
 
     companion object {
         fun fromId(id: String?): RoutePointType =
@@ -120,7 +120,7 @@ fun subRoutesFor(type: RouteType): List<SubRouteKey> = when (type) {
 - [ ] **Step 2: Create SavedRoute.kt**
 
 ```kotlin
-package org.cobalt.internal.routes
+package org.phantom.internal.routes
 
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
@@ -150,9 +150,9 @@ data class RoutePoint(
 data class SavedRoute(
     val name: String,
     val type: RouteType,
-    /** Travel sub-route (ORE_MINER → travelRoute, PATROL → travelRoute). */
+    /** Travel sub-route (ORE_MINER â†’ travelRoute, PATROL â†’ travelRoute). */
     val travelRoute: List<RoutePoint> = emptyList(),
-    /** Second sub-route (ORE_MINER → loopRoute, PATROL → area). */
+    /** Second sub-route (ORE_MINER â†’ loopRoute, PATROL â†’ area). */
     val loopOrArea: List<RoutePoint> = emptyList(),
     /** Single sub-route (COMMISSION, GEMSTONE, TUNNEL). */
     val points: List<RoutePoint> = emptyList(),
@@ -258,22 +258,22 @@ Expected: `BUILD SUCCESSFUL` (no compile errors in new files)
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/routes/RouteType.kt \
-        src/main/kotlin/org/cobalt/internal/routes/SavedRoute.kt
+git add src/main/kotlin/org/phantom/internal/routes/RouteType.kt \
+        src/main/kotlin/org/phantom/internal/routes/SavedRoute.kt
 git commit -m "feat: add RouteType and SavedRoute data classes for route system rewrite"
 ```
 
 ---
 
-## Task 2: RouteStore — File I/O and Migration
+## Task 2: RouteStore â€” File I/O and Migration
 
 **Files:**
-- Create: `src/main/kotlin/org/cobalt/internal/routes/RouteStore.kt`
+- Create: `src/main/kotlin/org/phantom/internal/routes/RouteStore.kt`
 
 - [ ] **Step 1: Create RouteStore.kt**
 
 ```kotlin
-package org.cobalt.internal.routes
+package org.phantom.internal.routes
 
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
@@ -282,7 +282,7 @@ import java.io.File
 import net.minecraft.client.Minecraft
 
 /**
- * Singleton that owns the on-disk route library at config/cobalt/routes2/.
+ * Singleton that owns the on-disk route library at config/phantom/routes2/.
  *
  * Call init() once at startup. It migrates old routes/ files and loads the library.
  */
@@ -292,15 +292,15 @@ object RouteStore {
     private val mc = Minecraft.getInstance()
 
     private val routes2Dir: File
-        get() = File(mc.gameDirectory, "config/cobalt/routes2").also { it.mkdirs() }
+        get() = File(mc.gameDirectory, "config/phantom/routes2").also { it.mkdirs() }
 
     private val oldRoutesDir: File
-        get() = File(mc.gameDirectory, "config/cobalt/routes")
+        get() = File(mc.gameDirectory, "config/phantom/routes")
 
     /** In-memory list, refreshed by load(). */
     private var cached: MutableList<SavedRoute> = mutableListOf()
 
-    /** Armed route name per RouteType — cleared on level load, not persisted. */
+    /** Armed route name per RouteType â€” cleared on level load, not persisted. */
     private val armed: MutableMap<RouteType, String> = mutableMapOf()
 
     // ---- Lifecycle ----
@@ -435,7 +435,7 @@ Expected: `BUILD SUCCESSFUL`
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/routes/RouteStore.kt
+git add src/main/kotlin/org/phantom/internal/routes/RouteStore.kt
 git commit -m "feat: add RouteStore with load/save/delete/migrate for routes2/ directory"
 ```
 
@@ -444,30 +444,30 @@ git commit -m "feat: add RouteStore with load/save/delete/migrate for routes2/ d
 ## Task 3: RoutePointTypePopup
 
 **Files:**
-- Create: `src/main/kotlin/org/cobalt/internal/routes/RoutePointTypePopup.kt`
+- Create: `src/main/kotlin/org/phantom/internal/routes/RoutePointTypePopup.kt`
 
 The popup shows only the allowed types for the active sub-route. It's triggered by Shift+right-click during edit mode (and always during insert mode). The caller passes the allowed types and a callback.
 
 - [ ] **Step 1: Create RoutePointTypePopup.kt**
 
 ```kotlin
-package org.cobalt.internal.routes
+package org.phantom.internal.routes
 
 import java.awt.Color
 import net.minecraft.client.Minecraft
-import org.cobalt.api.event.EventBus
-import org.cobalt.api.event.annotation.SubscribeEvent
-import org.cobalt.api.event.impl.client.MouseEvent
-import org.cobalt.api.event.impl.client.TickEvent
-import org.cobalt.api.event.impl.render.NvgEvent
-import org.cobalt.api.ui.theme.ThemeManager
-import org.cobalt.api.util.MouseUtils
-import org.cobalt.api.util.player.MovementManager
-import org.cobalt.api.util.ui.NVGRenderer
-import org.cobalt.internal.ui.animation.ColorAnimation
-import org.cobalt.internal.ui.util.isHoveringOver
-import org.cobalt.internal.ui.util.mouseX
-import org.cobalt.internal.ui.util.mouseY
+import org.phantom.api.event.EventBus
+import org.phantom.api.event.annotation.SubscribeEvent
+import org.phantom.api.event.impl.client.MouseEvent
+import org.phantom.api.event.impl.client.TickEvent
+import org.phantom.api.event.impl.render.NvgEvent
+import org.phantom.api.ui.theme.ThemeManager
+import org.phantom.api.util.MouseUtils
+import org.phantom.api.util.player.MovementManager
+import org.phantom.api.util.ui.NVGRenderer
+import org.phantom.internal.ui.animation.ColorAnimation
+import org.phantom.internal.ui.util.isHoveringOver
+import org.phantom.internal.ui.util.mouseX
+import org.phantom.internal.ui.util.mouseY
 
 /**
  * NVG overlay popup for picking a RoutePointType.
@@ -625,28 +625,28 @@ Expected: `BUILD SUCCESSFUL`
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/routes/RoutePointTypePopup.kt
+git add src/main/kotlin/org/phantom/internal/routes/RoutePointTypePopup.kt
 git commit -m "feat: add RoutePointTypePopup for type selection during route edit"
 ```
 
 ---
 
-## Task 4: RouteEditMode — Sticky HUD, Recording, and In-World Rendering
+## Task 4: RouteEditMode â€” Sticky HUD, Recording, and In-World Rendering
 
 **Files:**
-- Create: `src/main/kotlin/org/cobalt/internal/routes/RouteEditMode.kt`
+- Create: `src/main/kotlin/org/phantom/internal/routes/RouteEditMode.kt`
 
 RouteEditMode is an `object` registered with EventBus. It manages two phases:
-- `NORMAL` — sticky HUD shows mode buttons, right-click records, Shift+right-click opens RoutePointTypePopup
-- `INSERT_PICKING` — shows gap-slot list as an NVG overlay
-- `INSERT_RECORDING` — after gap selected, right-click always opens popup; point inserted at gap index
+- `NORMAL` â€” sticky HUD shows mode buttons, right-click records, Shift+right-click opens RoutePointTypePopup
+- `INSERT_PICKING` â€” shows gap-slot list as an NVG overlay
+- `INSERT_RECORDING` â€” after gap selected, right-click always opens popup; point inserted at gap index
 
 It also renders small boxes + lines for the current sub-route in-world via WorldRenderEvent.
 
 - [ ] **Step 1: Create RouteEditMode.kt**
 
 ```kotlin
-package org.cobalt.internal.routes
+package org.phantom.internal.routes
 
 import java.awt.Color
 import net.minecraft.client.Minecraft
@@ -655,20 +655,20 @@ import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
-import org.cobalt.api.event.annotation.SubscribeEvent
-import org.cobalt.api.event.impl.client.MouseEvent
-import org.cobalt.api.event.impl.client.TickEvent
-import org.cobalt.api.event.impl.render.NvgEvent
-import org.cobalt.api.event.impl.render.WorldRenderEvent
-import org.cobalt.api.ui.theme.ThemeManager
-import org.cobalt.api.util.MouseUtils
-import org.cobalt.api.util.player.MovementManager
-import org.cobalt.api.util.render.Render3D
-import org.cobalt.api.util.ui.NVGRenderer
-import org.cobalt.internal.pathfinding.OverlayRenderEngine
-import org.cobalt.internal.ui.util.isHoveringOver
-import org.cobalt.internal.ui.util.mouseX
-import org.cobalt.internal.ui.util.mouseY
+import org.phantom.api.event.annotation.SubscribeEvent
+import org.phantom.api.event.impl.client.MouseEvent
+import org.phantom.api.event.impl.client.TickEvent
+import org.phantom.api.event.impl.render.NvgEvent
+import org.phantom.api.event.impl.render.WorldRenderEvent
+import org.phantom.api.ui.theme.ThemeManager
+import org.phantom.api.util.MouseUtils
+import org.phantom.api.util.player.MovementManager
+import org.phantom.api.util.render.Render3D
+import org.phantom.api.util.ui.NVGRenderer
+import org.phantom.internal.pathfinding.OverlayRenderEngine
+import org.phantom.internal.ui.util.isHoveringOver
+import org.phantom.internal.ui.util.mouseX
+import org.phantom.internal.ui.util.mouseY
 
 object RouteEditMode {
 
@@ -701,7 +701,7 @@ object RouteEditMode {
     private var overlayX = 0f
     private var overlayY = 0f
 
-    /** Set by external code (e.g. UIRoutesPanel → Done callback). */
+    /** Set by external code (e.g. UIRoutesPanel â†’ Done callback). */
     private var onDone: (() -> Unit)? = null
 
     // ---- Public API ----
@@ -717,7 +717,7 @@ object RouteEditMode {
         if (mc.screen != null) mc.setScreen(null)
     }
 
-    /** Enter insert-picking mode — gap selector overlays the screen. */
+    /** Enter insert-picking mode â€” gap selector overlays the screen. */
     fun enterInsertMode(route: SavedRoute, sub: SubRouteKey, onDone: () -> Unit) {
         this.route = route
         this.subKey = sub
@@ -888,7 +888,7 @@ object RouteEditMode {
         // Label
         val r = route
         val sub = subKey
-        val label = if (r != null && sub != null) "${r.name}  ›  ${sub.label}" else "Edit Route"
+        val label = if (r != null && sub != null) "${r.name}  â€º  ${sub.label}" else "Edit Route"
         NVGRenderer.text(label, hudX + 14f, hudY + 10f, 11f, theme.textSecondary)
 
         // Point count
@@ -913,7 +913,7 @@ object RouteEditMode {
             }
         } else {
             // INSERT_RECORDING label
-            val iLabel = "Inserting after point $insertAfterIndex  — right-click block"
+            val iLabel = "Inserting after point $insertAfterIndex  â€” right-click block"
             NVGRenderer.text(iLabel, hudX + 14f, hudY + 30f, 11f, theme.accent)
         }
 
@@ -1000,7 +1000,7 @@ object RouteEditMode {
         NVGRenderer.hollowRect(overlayX, overlayY, overlayW, overlayH, 1f, theme.controlBorder, 10f)
 
         val r = route; val sub = subKey
-        val title = if (r != null && sub != null) "Insert into: ${r.name}  ›  ${sub.label}" else "Insert Point"
+        val title = if (r != null && sub != null) "Insert into: ${r.name}  â€º  ${sub.label}" else "Insert Point"
         NVGRenderer.text(title, overlayX + 14f, overlayY + 14f, 12f, theme.accent)
 
         // Done button (top right)
@@ -1032,7 +1032,7 @@ object RouteEditMode {
             val gapBorder = if (gapSelected || hov) theme.accent else theme.controlBorder
             NVGRenderer.rect(rowX, cy, rowW, slotH, gapBg, 3f)
             NVGRenderer.hollowRect(rowX, cy, rowW, slotH, 1f, gapBorder, 3f)
-            val gapLabel = if (gapSelected) "✓ insert after ${idx + 1}" else "← insert after ${idx + 1}"
+            val gapLabel = if (gapSelected) "âœ“ insert after ${idx + 1}" else "â† insert after ${idx + 1}"
             NVGRenderer.text(gapLabel, rowX + 8f, cy + 3f, 10f, if (gapSelected) theme.accent else theme.textSecondary)
             cy += slotH + rowGap
         }
@@ -1046,7 +1046,7 @@ object RouteEditMode {
             val hov = isHoveringOver(rowX, cy, rowW, slotH)
             NVGRenderer.rect(rowX, cy, rowW, slotH, if (hov) theme.overlay else theme.controlBg, 3f)
             NVGRenderer.hollowRect(rowX, cy, rowW, slotH, 1f, if (hov) theme.accent else theme.controlBorder, 3f)
-            NVGRenderer.text("← insert first point", rowX + 8f, cy + 3f, 10f, theme.textSecondary)
+            NVGRenderer.text("â† insert first point", rowX + 8f, cy + 3f, 10f, theme.textSecondary)
         }
 
         NVGRenderer.endFrame()
@@ -1106,38 +1106,38 @@ Expected: `BUILD SUCCESSFUL`
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/routes/RouteEditMode.kt
+git add src/main/kotlin/org/phantom/internal/routes/RouteEditMode.kt
 git commit -m "feat: add RouteEditMode with sticky HUD recording, insert mode, and in-world rendering"
 ```
 
 ---
 
-## Task 5: UIRoutesPanel — Expandable Card List
+## Task 5: UIRoutesPanel â€” Expandable Card List
 
 **Files:**
-- Create: `src/main/kotlin/org/cobalt/internal/ui/panel/panels/UIRoutesPanel.kt`
+- Create: `src/main/kotlin/org/phantom/internal/ui/panel/panels/UIRoutesPanel.kt`
 
-Panel dimensions: 400×600. Top bar: search + type filter tabs + "+ New". Card list scrollable below.
+Panel dimensions: 400Ã—600. Top bar: search + type filter tabs + "+ New". Card list scrollable below.
 
 - [ ] **Step 1: Create UIRoutesPanel.kt**
 
 ```kotlin
-package org.cobalt.internal.ui.panel.panels
+package org.phantom.internal.ui.panel.panels
 
 import net.minecraft.client.Minecraft
-import org.cobalt.api.ui.theme.ThemeManager
-import org.cobalt.api.util.ui.NVGRenderer
-import org.cobalt.internal.routes.RouteEditMode
-import org.cobalt.internal.routes.RoutePointTypePopup
-import org.cobalt.internal.routes.RouteStore
-import org.cobalt.internal.routes.RouteType
-import org.cobalt.internal.routes.SavedRoute
-import org.cobalt.internal.routes.subRoutesFor
-import org.cobalt.internal.ui.panel.UIPanel
-import org.cobalt.internal.ui.screen.UIConfig
-import org.cobalt.internal.ui.util.ScrollHandler
-import org.cobalt.internal.ui.util.isHoveringOver
-import org.cobalt.internal.ui.util.TextInputHandler
+import org.phantom.api.ui.theme.ThemeManager
+import org.phantom.api.util.ui.NVGRenderer
+import org.phantom.internal.routes.RouteEditMode
+import org.phantom.internal.routes.RoutePointTypePopup
+import org.phantom.internal.routes.RouteStore
+import org.phantom.internal.routes.RouteType
+import org.phantom.internal.routes.SavedRoute
+import org.phantom.internal.routes.subRoutesFor
+import org.phantom.internal.ui.panel.UIPanel
+import org.phantom.internal.ui.screen.UIConfig
+import org.phantom.internal.ui.util.ScrollHandler
+import org.phantom.internal.ui.util.isHoveringOver
+import org.phantom.internal.ui.util.TextInputHandler
 
 internal class UIRoutesPanel : UIPanel(
     x = 0f, y = 0f, width = 400f, height = 600f,
@@ -1262,17 +1262,17 @@ internal class UIRoutesPanel : UIPanel(
 
         // Expand chevron
         val chevX = bx + bw - 30f; val chevY = cy + 9f
-        NVGRenderer.text(if (isExpanded) "▲" else "▼", chevX, chevY, 11f, theme.textSecondary)
+        NVGRenderer.text(if (isExpanded) "â–²" else "â–¼", chevX, chevY, 11f, theme.textSecondary)
 
         // Load button
         val loadX = bx + bw - 100f; val loadY = cy + 6f
-        renderBtn("▶ Load", loadX, loadY, 58f, 22f)
+        renderBtn("â–¶ Load", loadX, loadY, 58f, 22f)
 
         // Delete (hover only)
         if (hov) {
             val delX = bx + bw - 18f; val delY = cy + 8f
             // X delete button is drawn last so it overlaps chevron area
-            NVGRenderer.text("✕", delX - 20f, delY + 1f, 11f, if (isHoveringOver(delX - 22f, delY - 2f, 18f, 18f)) theme.accent else theme.textSecondary)
+            NVGRenderer.text("âœ•", delX - 20f, delY + 1f, 11f, if (isHoveringOver(delX - 22f, delY - 2f, 18f, 18f)) theme.accent else theme.textSecondary)
         }
 
         // Sub-route rows
@@ -1282,7 +1282,7 @@ internal class UIRoutesPanel : UIPanel(
                 val pts = route.getSubRoute(sub)
                 NVGRenderer.rect(bx + 4f, sy, bw - 8f, SUB_ROW_H, theme.overlay, 5f)
                 NVGRenderer.text("${sub.icon}  ${sub.label}  (${pts.size} pts)", bx + 14f, sy + 7f, 11f, theme.text)
-                renderBtn("✏ Edit",   bx + bw - 100f, sy + 2f, 50f, 20f)
+                renderBtn("âœ Edit",   bx + bw - 100f, sy + 2f, 50f, 20f)
                 renderBtn("+ Insert", bx + bw - 44f,  sy + 2f, 36f, 20f)
                 sy += SUB_ROW_H + 4f
             }
@@ -1344,7 +1344,7 @@ internal class UIRoutesPanel : UIPanel(
                 val sub = subRoutesFor(route.type).first()
                 Minecraft.getInstance().setScreen(null)
                 RouteEditMode.enter(route, sub) {
-                    // After done editing: nothing — user can reopen
+                    // After done editing: nothing â€” user can reopen
                 }
             }))
             return true
@@ -1381,7 +1381,7 @@ internal class UIRoutesPanel : UIPanel(
                 return true
             }
 
-            // Expand/collapse — anywhere in header row except buttons
+            // Expand/collapse â€” anywhere in header row except buttons
             if (isHoveringOver(bx, cy, bw, CARD_H)) {
                 if (r.name in expanded) expanded.remove(r.name) else expanded.add(r.name)
                 return true
@@ -1445,30 +1445,30 @@ Expected: `BUILD SUCCESSFUL`
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/ui/panel/panels/UIRoutesPanel.kt
+git add src/main/kotlin/org/phantom/internal/ui/panel/panels/UIRoutesPanel.kt
 git commit -m "feat: add UIRoutesPanel with expandable cards, filter tabs, and Load/Edit/Insert/Delete"
 ```
 
 ---
 
-## Task 6: UINewRouteModal — Type Picker + Name Input
+## Task 6: UINewRouteModal â€” Type Picker + Name Input
 
 **Files:**
-- Create: `src/main/kotlin/org/cobalt/internal/ui/panel/panels/UINewRouteModal.kt`
+- Create: `src/main/kotlin/org/phantom/internal/ui/panel/panels/UINewRouteModal.kt`
 
 - [ ] **Step 1: Create UINewRouteModal.kt**
 
 ```kotlin
-package org.cobalt.internal.ui.panel.panels
+package org.phantom.internal.ui.panel.panels
 
-import org.cobalt.api.ui.theme.ThemeManager
-import org.cobalt.api.util.ui.NVGRenderer
-import org.cobalt.internal.routes.RouteStore
-import org.cobalt.internal.routes.RouteType
-import org.cobalt.internal.routes.SavedRoute
-import org.cobalt.internal.ui.panel.UIPanel
-import org.cobalt.internal.ui.util.TextInputHandler
-import org.cobalt.internal.ui.util.isHoveringOver
+import org.phantom.api.ui.theme.ThemeManager
+import org.phantom.api.util.ui.NVGRenderer
+import org.phantom.internal.routes.RouteStore
+import org.phantom.internal.routes.RouteType
+import org.phantom.internal.routes.SavedRoute
+import org.phantom.internal.ui.panel.UIPanel
+import org.phantom.internal.ui.util.TextInputHandler
+import org.phantom.internal.ui.util.isHoveringOver
 
 /**
  * Modal for creating a new route: pick a type, enter a name, click Create.
@@ -1494,7 +1494,7 @@ internal class UINewRouteModal(
         NVGRenderer.text("New Route", x + PAD, y + 18f, 14f, theme.text)
         NVGRenderer.text("Choose a type to get started.", x + PAD, y + 36f, 10f, theme.textSecondary)
 
-        // 2×2 grid + Tunnel full width
+        // 2Ã—2 grid + Tunnel full width
         val gridX = x + PAD
         val gridY = y + 54f
         val types = RouteType.entries
@@ -1529,7 +1529,7 @@ internal class UINewRouteModal(
 
         // Buttons
         val btnY = iY + iH + 22f
-        renderBtn("Create →", x + PAD, btnY, 90f, 28f, accent = true)
+        renderBtn("Create â†’", x + PAD, btnY, 90f, 28f, accent = true)
         renderBtn("Cancel",   x + PAD + 98f, btnY, 72f, 28f, accent = false)
     }
 
@@ -1559,7 +1559,7 @@ internal class UINewRouteModal(
         RouteType.COMMISSION -> "Walk/warp from /warpforge to vein"
         RouteType.PATROL     -> "Travel to area, patrol kill zones"
         RouteType.GEMSTONE   -> "Warp-and-mine loop"
-        RouteType.TUNNEL     -> "/warpcamp → mine anchors → repeat"
+        RouteType.TUNNEL     -> "/warpcamp â†’ mine anchors â†’ repeat"
     }
 
     private fun renderBtn(label: String, bx: Float, by: Float, bw: Float, bh: Float, accent: Boolean) {
@@ -1611,7 +1611,7 @@ internal class UINewRouteModal(
         }
         // Cancel
         if (isHoveringOver(x + PAD + 98f, btnY, 72f, 28f)) {
-            org.cobalt.internal.ui.screen.UIConfig.swapBodyPanel(UIRoutesPanel())
+            org.phantom.internal.ui.screen.UIConfig.swapBodyPanel(UIRoutesPanel())
             return true
         }
 
@@ -1663,32 +1663,32 @@ Expected: `BUILD SUCCESSFUL`
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/ui/panel/panels/UINewRouteModal.kt
+git add src/main/kotlin/org/phantom/internal/ui/panel/panels/UINewRouteModal.kt
 git commit -m "feat: add UINewRouteModal with 5-type picker and route name creation"
 ```
 
 ---
 
-## Task 7: Wire Sidebar, Register Systems in Cobalt.kt
+## Task 7: Wire Sidebar, Register Systems in Phantom.kt
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/ui/panel/panels/UISidebar.kt`
-- Modify: `src/main/kotlin/org/cobalt/Cobalt.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/ui/panel/panels/UISidebar.kt`
+- Modify: `src/main/kotlin/org/phantom/Phantom.kt`
 
 - [ ] **Step 1: Update UISidebar.kt routes button**
 
 In `UISidebar.kt`, find the routes button:
 
 ```kotlin
-  private val routesButton = UIButton("/assets/cobalt/textures/ui/routes.svg", "Routes") {
-    openQuickModules("cobalt-quick-routes", "Routes", listOf(RoutesModule))
+  private val routesButton = UIButton("/assets/phantom/textures/ui/routes.svg", "Routes") {
+    openQuickModules("phantom-quick-routes", "Routes", listOf(RoutesModule))
   }
 ```
 
 Replace with:
 
 ```kotlin
-  private val routesButton = UIButton("/assets/cobalt/textures/ui/routes.svg", "Routes") {
+  private val routesButton = UIButton("/assets/phantom/textures/ui/routes.svg", "Routes") {
     UIConfig.swapBodyPanel(UIRoutesPanel())
   }
 ```
@@ -1696,17 +1696,17 @@ Replace with:
 Add the import at the top of `UISidebar.kt` (alongside existing imports):
 
 ```kotlin
-import org.cobalt.internal.ui.panel.panels.UIRoutesPanel
+import org.phantom.internal.ui.panel.panels.UIRoutesPanel
 ```
 
 Remove the now-unused import (if present):
 ```kotlin
-import org.cobalt.internal.mining.RoutesModule
+import org.phantom.internal.mining.RoutesModule
 ```
 
-- [ ] **Step 2: Register RouteStore.init(), RouteEditMode, RoutePointTypePopup in Cobalt.kt**
+- [ ] **Step 2: Register RouteStore.init(), RouteEditMode, RoutePointTypePopup in Phantom.kt**
 
-In `Cobalt.kt`, find:
+In `Phantom.kt`, find:
 ```kotlin
     PatrolWaypointStore.load()
 ```
@@ -1731,16 +1731,16 @@ Change to:
     ).forEach { EventBus.register(it) }
 ```
 
-Add imports to `Cobalt.kt`:
+Add imports to `Phantom.kt`:
 ```kotlin
-import org.cobalt.internal.routes.RouteEditMode
-import org.cobalt.internal.routes.RoutePointTypePopup
-import org.cobalt.internal.routes.RouteStore
+import org.phantom.internal.routes.RouteEditMode
+import org.phantom.internal.routes.RoutePointTypePopup
+import org.phantom.internal.routes.RouteStore
 ```
 
 Remove the now-unused import:
 ```kotlin
-import org.cobalt.internal.pathfinding.PatrolWaypointStore
+import org.phantom.internal.pathfinding.PatrolWaypointStore
 ```
 
 - [ ] **Step 3: Build**
@@ -1752,53 +1752,53 @@ Expected: `BUILD SUCCESSFUL`
 
 - [ ] **Step 4: In-game smoke test**
 
-Run `./gradlew runClient`. Open the Cobalt UI (default keybind). Click **Routes** in the sidebar. Verify:
-- UIRoutesPanel opens (shows "No routes found" if `config/cobalt/routes2/` is empty)
+Run `./gradlew runClient`. Open the Phantom UI (default keybind). Click **Routes** in the sidebar. Verify:
+- UIRoutesPanel opens (shows "No routes found" if `config/phantom/routes2/` is empty)
 - `+ New` opens UINewRouteModal
-- Create a test route (type = Ore Miner, name = `test_route`) → verify it appears in the card list
-- Click `▼` on the card → sub-route rows appear (Travel Route, Loop Route)
-- Click `✏ Edit` on Loop Route → game returns to first-person, sticky HUD appears at bottom
-- Right-click a block → point recorded, count increments
-- Shift+right-click → RoutePointTypePopup appears
-- Click `Undo` → last point removed
-- Click `Done` → HUD disappears
+- Create a test route (type = Ore Miner, name = `test_route`) â†’ verify it appears in the card list
+- Click `â–¼` on the card â†’ sub-route rows appear (Travel Route, Loop Route)
+- Click `âœ Edit` on Loop Route â†’ game returns to first-person, sticky HUD appears at bottom
+- Right-click a block â†’ point recorded, count increments
+- Shift+right-click â†’ RoutePointTypePopup appears
+- Click `Undo` â†’ last point removed
+- Click `Done` â†’ HUD disappears
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/ui/panel/panels/UISidebar.kt \
-        src/main/kotlin/org/cobalt/Cobalt.kt
+git add src/main/kotlin/org/phantom/internal/ui/panel/panels/UISidebar.kt \
+        src/main/kotlin/org/phantom/Phantom.kt
 git commit -m "feat: wire sidebar routes button to UIRoutesPanel, register RouteEditMode and RoutePointTypePopup"
 ```
 
 ---
 
-## Task 8: Macro Integration — Route Selection via RouteStore
+## Task 8: Macro Integration â€” Route Selection via RouteStore
 
 Connect the Load button to macros and make existing macros read armed routes from RouteStore.
 
-**Context:** `RouteStore.arm(type, name)` is already implemented. The `▶ Load` button in `UIRoutesPanel.mouseClicked` already calls it. What remains is making macros read the armed route and removing the old zone-panel approach for CommissionMacroModule.
+**Context:** `RouteStore.arm(type, name)` is already implemented. The `â–¶ Load` button in `UIRoutesPanel.mouseClicked` already calls it. What remains is making macros read the armed route and removing the old zone-panel approach for CommissionMacroModule.
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/mining/CommissionMacroModule.kt`
-- Modify: `src/main/kotlin/org/cobalt/internal/mining/MiningMacroModule.kt`
-- Modify: `src/main/kotlin/org/cobalt/internal/combat/CombatMacroModule.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/mining/CommissionMacroModule.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/mining/MiningMacroModule.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/combat/CombatMacroModule.kt`
 
-- [ ] **Step 1: CommissionMacroModule — read route list from RouteStore**
+- [ ] **Step 1: CommissionMacroModule â€” read route list from RouteStore**
 
 Find the method `getAvailableRouteInfos()` in `CommissionMacroModule.kt`. It currently calls into `RoutesModule`. Replace its body so it reads from RouteStore:
 
 ```kotlin
-fun getAvailableRouteInfos(): List<org.cobalt.internal.mining.RoutesModule.SavedRouteInfo> {
-    return org.cobalt.internal.routes.RouteStore.list(org.cobalt.internal.routes.RouteType.COMMISSION)
+fun getAvailableRouteInfos(): List<org.phantom.internal.mining.RoutesModule.SavedRouteInfo> {
+    return org.phantom.internal.routes.RouteStore.list(org.phantom.internal.routes.RouteType.COMMISSION)
         .map { r ->
             val pts = r.points
             RoutesModule.SavedRouteInfo(
                 name          = r.name,
-                mineTypes     = pts.filter { it.type == org.cobalt.internal.routes.RoutePointType.MINE }
+                mineTypes     = pts.filter { it.type == org.phantom.internal.routes.RoutePointType.MINE }
                                    .mapNotNull { it.blockId }.distinct(),
-                hasMinePoints = pts.any { it.type == org.cobalt.internal.routes.RoutePointType.MINE },
-                hasWarpPoints = pts.any { it.type == org.cobalt.internal.routes.RoutePointType.WARP },
+                hasMinePoints = pts.any { it.type == org.phantom.internal.routes.RoutePointType.MINE },
+                hasWarpPoints = pts.any { it.type == org.phantom.internal.routes.RoutePointType.WARP },
                 pointCount    = pts.size,
             )
         }
@@ -1807,105 +1807,105 @@ fun getAvailableRouteInfos(): List<org.cobalt.internal.mining.RoutesModule.Saved
 
 Add import at top of `CommissionMacroModule.kt`:
 ```kotlin
-import org.cobalt.internal.routes.RouteStore
-import org.cobalt.internal.routes.RouteType
-import org.cobalt.internal.routes.RoutePointType
+import org.phantom.internal.routes.RouteStore
+import org.phantom.internal.routes.RouteType
+import org.phantom.internal.routes.RoutePointType
 ```
 
-- [ ] **Step 2: MiningMacroModule — expose armed ORE_MINER route**
+- [ ] **Step 2: MiningMacroModule â€” expose armed ORE_MINER route**
 
 Find or create in `MiningMacroModule.kt` any method that reads the active route name. Add:
 
 ```kotlin
-fun getArmedRoute(): String? = org.cobalt.internal.routes.RouteStore.getArmed(
-    org.cobalt.internal.routes.RouteType.ORE_MINER
+fun getArmedRoute(): String? = org.phantom.internal.routes.RouteStore.getArmed(
+    org.phantom.internal.routes.RouteType.ORE_MINER
 )
 ```
 
 Add the imports:
 ```kotlin
-import org.cobalt.internal.routes.RouteStore
-import org.cobalt.internal.routes.RouteType
+import org.phantom.internal.routes.RouteStore
+import org.phantom.internal.routes.RouteType
 ```
 
-- [ ] **Step 3: CombatMacroModule — expose armed PATROL route, remove WalkbackBridge**
+- [ ] **Step 3: CombatMacroModule â€” expose armed PATROL route, remove WalkbackBridge**
 
 Find references to `WalkbackBridge` in `CombatMacroModule.kt`. The bridge provides `startWalkback(name, fromEnd, reverse)`, `stopWalkback()`, `isRunning()`, and `getRouteEndPos(name)`.
 
 Locate every call to `WalkbackBridge.startWalkback(...)` in `CombatMacroModule.kt` and replace it with a call to the existing `RoutesModule.startWalkback(...)` directly (or whatever RoutesModule exposes), since WalkbackBridge was a decoupling shim. Then add a method to read the armed route:
 
 ```kotlin
-fun getArmedPatrolRoute(): String? = org.cobalt.internal.routes.RouteStore.getArmed(
-    org.cobalt.internal.routes.RouteType.PATROL
+fun getArmedPatrolRoute(): String? = org.phantom.internal.routes.RouteStore.getArmed(
+    org.phantom.internal.routes.RouteType.PATROL
 )
 ```
 
 Add imports:
 ```kotlin
-import org.cobalt.internal.routes.RouteStore
-import org.cobalt.internal.routes.RouteType
+import org.phantom.internal.routes.RouteStore
+import org.phantom.internal.routes.RouteType
 ```
 
-Remove the `import org.cobalt.internal.helper.WalkbackBridge` import from `CombatMacroModule.kt` and replace all `WalkbackBridge.*` calls with direct `RoutesModule.*` calls (since they are now in the same compilation unit — both are `internal`).
+Remove the `import org.phantom.internal.helper.WalkbackBridge` import from `CombatMacroModule.kt` and replace all `WalkbackBridge.*` calls with direct `RoutesModule.*` calls (since they are now in the same compilation unit â€” both are `internal`).
 
-> **Note:** WalkbackBridge is a thin shim — it only holds function references registered by RoutesModule at startup. The actual implementation is in RoutesModule. Replacing `WalkbackBridge.startWalkback(name, fromEnd, reverse)` with `RoutesModule.startWalkback(name, fromEnd, reverse)` is safe as long as RoutesModule exports that method with the same signature.
+> **Note:** WalkbackBridge is a thin shim â€” it only holds function references registered by RoutesModule at startup. The actual implementation is in RoutesModule. Replacing `WalkbackBridge.startWalkback(name, fromEnd, reverse)` with `RoutesModule.startWalkback(name, fromEnd, reverse)` is safe as long as RoutesModule exports that method with the same signature.
 
-Verify in RoutesModule that `startWalkback`, `stopWalkback`, `isRunning`, and `getRouteEndPos` are package-accessible (they are `object` members — they are accessible as `RoutesModule.startWalkback(...)`).
+Verify in RoutesModule that `startWalkback`, `stopWalkback`, `isRunning`, and `getRouteEndPos` are package-accessible (they are `object` members â€” they are accessible as `RoutesModule.startWalkback(...)`).
 
 - [ ] **Step 4: Build**
 
 ```
 ./gradlew build
 ```
-Expected: `BUILD SUCCESSFUL` — if CombatMacroModule has compilation errors around WalkbackBridge, check that you replaced all `WalkbackBridge.foo?.invoke(...)` call sites with `RoutesModule.foo(...)` or the equivalent RoutesModule method.
+Expected: `BUILD SUCCESSFUL` â€” if CombatMacroModule has compilation errors around WalkbackBridge, check that you replaced all `WalkbackBridge.foo?.invoke(...)` call sites with `RoutesModule.foo(...)` or the equivalent RoutesModule method.
 
-- [ ] **Step 5: In-game test — arm and verify**
+- [ ] **Step 5: In-game test â€” arm and verify**
 
-Run `./gradlew runClient`. Open Routes panel. Create a COMMISSION route named `test_commission`. Click `▶ Load`. Open CommissionMacroModule settings — the route picker should now show routes from `routes2/`. For MiningMacro, confirm `getArmedRoute()` returns `null` until a route is Loaded.
+Run `./gradlew runClient`. Open Routes panel. Create a COMMISSION route named `test_commission`. Click `â–¶ Load`. Open CommissionMacroModule settings â€” the route picker should now show routes from `routes2/`. For MiningMacro, confirm `getArmedRoute()` returns `null` until a route is Loaded.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/mining/CommissionMacroModule.kt \
-        src/main/kotlin/org/cobalt/internal/mining/MiningMacroModule.kt \
-        src/main/kotlin/org/cobalt/internal/combat/CombatMacroModule.kt
+git add src/main/kotlin/org/phantom/internal/mining/CommissionMacroModule.kt \
+        src/main/kotlin/org/phantom/internal/mining/MiningMacroModule.kt \
+        src/main/kotlin/org/phantom/internal/combat/CombatMacroModule.kt
 git commit -m "feat: connect macros to RouteStore for route selection; remove WalkbackBridge dependency"
 ```
 
 ---
 
-## Task 9: Cleanup — Delete Old Files
+## Task 9: Cleanup â€” Delete Old Files
 
 Remove files that are now superseded and fix the compilation errors they leave behind.
 
 **Files to delete:**
-1. `src/main/kotlin/org/cobalt/internal/ui/panel/panels/UICommissionRoutesPanel.kt`
-2. `src/main/kotlin/org/cobalt/internal/ui/panel/panels/UICombatWalkbackRoutesPanel.kt`
-3. `src/main/kotlin/org/cobalt/internal/ui/panel/panels/UIRoutePointPicker.kt`
-4. `src/main/kotlin/org/cobalt/internal/ui/hud/RoutePointPopup.kt`
-5. `src/main/kotlin/org/cobalt/internal/ui/hud/PatrolPointPopup.kt`
-6. `src/main/kotlin/org/cobalt/internal/ui/hud/WalkbackRoutePickerPopup.kt`
-7. `src/main/kotlin/org/cobalt/internal/pathfinding/PatrolWaypointStore.kt`
-8. `src/main/kotlin/org/cobalt/internal/helper/WalkbackBridge.kt`
+1. `src/main/kotlin/org/phantom/internal/ui/panel/panels/UICommissionRoutesPanel.kt`
+2. `src/main/kotlin/org/phantom/internal/ui/panel/panels/UICombatWalkbackRoutesPanel.kt`
+3. `src/main/kotlin/org/phantom/internal/ui/panel/panels/UIRoutePointPicker.kt`
+4. `src/main/kotlin/org/phantom/internal/ui/hud/RoutePointPopup.kt`
+5. `src/main/kotlin/org/phantom/internal/ui/hud/PatrolPointPopup.kt`
+6. `src/main/kotlin/org/phantom/internal/ui/hud/WalkbackRoutePickerPopup.kt`
+7. `src/main/kotlin/org/phantom/internal/pathfinding/PatrolWaypointStore.kt`
+8. `src/main/kotlin/org/phantom/internal/helper/WalkbackBridge.kt`
 
 - [ ] **Step 1: Find all references to the deleted files**
 
 ```bash
-cd "C:/Users/aeare/Desktop/duskv2/Cobalt/src/main/kotlin"
+cd "C:/Users/aeare/Desktop/duskv2/Phantom/src/main/kotlin"
 grep -rl "UICommissionRoutesPanel\|UICombatWalkbackRoutesPanel\|UIRoutePointPicker\|RoutePointPopup\|PatrolPointPopup\|WalkbackRoutePickerPopup\|PatrolWaypointStore\|WalkbackBridge" . \
-  | grep -v "^./org/cobalt/internal/ui/panel/panels/UICommissionRoutesPanel\|^./org/cobalt/internal/ui/panel/panels/UICombatWalkbackRoutesPanel\|^./org/cobalt/internal/ui/panel/panels/UIRoutePointPicker\|^./org/cobalt/internal/ui/hud/RoutePointPopup\|^./org/cobalt/internal/ui/hud/PatrolPointPopup\|^./org/cobalt/internal/ui/hud/WalkbackRoutePickerPopup\|^./org/cobalt/internal/pathfinding/PatrolWaypointStore\|^./org/cobalt/internal/helper/WalkbackBridge"
+  | grep -v "^./org/phantom/internal/ui/panel/panels/UICommissionRoutesPanel\|^./org/phantom/internal/ui/panel/panels/UICombatWalkbackRoutesPanel\|^./org/phantom/internal/ui/panel/panels/UIRoutePointPicker\|^./org/phantom/internal/ui/hud/RoutePointPopup\|^./org/phantom/internal/ui/hud/PatrolPointPopup\|^./org/phantom/internal/ui/hud/WalkbackRoutePickerPopup\|^./org/phantom/internal/pathfinding/PatrolWaypointStore\|^./org/phantom/internal/helper/WalkbackBridge"
 ```
 
 For each file listed, remove the import and any call sites that reference the deleted class.
 
 - [ ] **Step 2: Remove RoutePointPopup registration (if present)**
 
-Check if `RoutePointPopup` is registered with EventBus anywhere in `Cobalt.kt` or `RoutesModule.kt`. If so, remove that registration.
+Check if `RoutePointPopup` is registered with EventBus anywhere in `Phantom.kt` or `RoutesModule.kt`. If so, remove that registration.
 
 Search:
 ```bash
 grep -rn "RoutePointPopup\|PatrolPointPopup\|WalkbackRoutePickerPopup" \
-  "C:/Users/aeare/Desktop/duskv2/Cobalt/src/main/kotlin/org/cobalt"
+  "C:/Users/aeare/Desktop/duskv2/Phantom/src/main/kotlin/org/phantom"
 ```
 
 Remove any `EventBus.register(RoutePointPopup)` lines found.
@@ -1915,7 +1915,7 @@ Remove any `EventBus.register(RoutePointPopup)` lines found.
 Search for where `UICommissionRoutesPanel()` is instantiated or opened:
 ```bash
 grep -rn "UICommissionRoutesPanel\|UICombatWalkbackRoutesPanel\|UIRoutePointPicker" \
-  "C:/Users/aeare/Desktop/duskv2/Cobalt/src/main/kotlin/org/cobalt"
+  "C:/Users/aeare/Desktop/duskv2/Phantom/src/main/kotlin/org/phantom"
 ```
 
 Replace any `UIConfig.swapBodyPanel(UICommissionRoutesPanel())` with `UIConfig.swapBodyPanel(UIRoutesPanel())`. Replace `UIConfig.swapBodyPanel(UICombatWalkbackRoutesPanel())` similarly. Remove any `ActionSetting` buttons that launched the old panels.
@@ -1923,15 +1923,15 @@ Replace any `UIConfig.swapBodyPanel(UICommissionRoutesPanel())` with `UIConfig.s
 - [ ] **Step 4: Delete the files**
 
 ```bash
-cd "C:/Users/aeare/Desktop/duskv2/Cobalt"
-git rm src/main/kotlin/org/cobalt/internal/ui/panel/panels/UICommissionRoutesPanel.kt
-git rm src/main/kotlin/org/cobalt/internal/ui/panel/panels/UICombatWalkbackRoutesPanel.kt
-git rm src/main/kotlin/org/cobalt/internal/ui/panel/panels/UIRoutePointPicker.kt
-git rm src/main/kotlin/org/cobalt/internal/ui/hud/RoutePointPopup.kt
-git rm src/main/kotlin/org/cobalt/internal/ui/hud/PatrolPointPopup.kt
-git rm src/main/kotlin/org/cobalt/internal/ui/hud/WalkbackRoutePickerPopup.kt
-git rm src/main/kotlin/org/cobalt/internal/pathfinding/PatrolWaypointStore.kt
-git rm src/main/kotlin/org/cobalt/internal/helper/WalkbackBridge.kt
+cd "C:/Users/aeare/Desktop/duskv2/Phantom"
+git rm src/main/kotlin/org/phantom/internal/ui/panel/panels/UICommissionRoutesPanel.kt
+git rm src/main/kotlin/org/phantom/internal/ui/panel/panels/UICombatWalkbackRoutesPanel.kt
+git rm src/main/kotlin/org/phantom/internal/ui/panel/panels/UIRoutePointPicker.kt
+git rm src/main/kotlin/org/phantom/internal/ui/hud/RoutePointPopup.kt
+git rm src/main/kotlin/org/phantom/internal/ui/hud/PatrolPointPopup.kt
+git rm src/main/kotlin/org/phantom/internal/ui/hud/WalkbackRoutePickerPopup.kt
+git rm src/main/kotlin/org/phantom/internal/pathfinding/PatrolWaypointStore.kt
+git rm src/main/kotlin/org/phantom/internal/helper/WalkbackBridge.kt
 ```
 
 - [ ] **Step 5: Build**
@@ -1944,14 +1944,14 @@ Expected: `BUILD SUCCESSFUL`. If there are unresolved reference errors, use the 
 - [ ] **Step 6: Full in-game verification**
 
 Run `./gradlew runClient`. Verify:
-- Cobalt UI opens cleanly
-- Routes sidebar button → UIRoutesPanel
-- + New → UINewRouteModal → create a route
-- Edit → sticky HUD, recording works
-- Insert mode → gap picker, point inserted at correct index
-- Load button → `RouteStore.getArmed()` returns the route name
+- Phantom UI opens cleanly
+- Routes sidebar button â†’ UIRoutesPanel
+- + New â†’ UINewRouteModal â†’ create a route
+- Edit â†’ sticky HUD, recording works
+- Insert mode â†’ gap picker, point inserted at correct index
+- Load button â†’ `RouteStore.getArmed()` returns the route name
 - Old panels (commission routes, walkback panel) do NOT appear anywhere in the UI
-- Migration: place a `.json` file in `config/cobalt/routes/` with old format and relaunch → it should appear as an ORE_MINER route in the new panel
+- Migration: place a `.json` file in `config/phantom/routes/` with old format and relaunch â†’ it should appear as an ORE_MINER route in the new panel
 
 - [ ] **Step 7: Commit**
 
@@ -1967,31 +1967,31 @@ git commit -m "feat: remove legacy route panels, popups, PatrolWaypointStore, an
 
 | Spec Section | Covered |
 |---|---|
-| 1.1 RouteType enum (5 types) | ✓ Task 1 |
-| 1.2 RoutePointType enum (WALK/WARP/MINE/KILL) + allowed-types table | ✓ Task 1 |
-| 1.3 File format (dual vs single sub-route JSON) | ✓ Task 2 (RouteStore.save + SavedRoute.toJson) |
-| 1.4 Migration from routes/ → routes2/ | ✓ Task 2 (RouteStore.migrateFile) |
-| 2.1 Routes screen layout (expandable cards, filter tabs, Load/Edit/Insert/Delete/+New) | ✓ Task 5 |
-| 2.2 Load arms route, Edit enters edit mode, +Insert enters insert mode, +New opens modal, ✕ deletes | ✓ Tasks 5, 6 |
-| 2.3 New route creation flow (type picker → name → Create → edit mode) | ✓ Task 6 |
-| 2.4 Remove old panels | ✓ Task 9 |
-| 3.1 Entering edit mode (panel closes, first-person + overlay) | ✓ Task 4 |
-| 3.2 Sticky HUD (route label, mode buttons, point count, Undo, Done) | ✓ Task 4 |
-| 3.3 Recording (right-click = sticky type, Shift+right-click = popup) | ✓ Tasks 3, 4 |
-| 3.4 In-world rendering (boxes + lines per point) | ✓ Task 4 |
-| 3.5 Insert mode (gap overlay → INSERT_RECORDING → popup always → renumber) | ✓ Task 4 |
-| 3.6 Undo (single-level, removes last point, saves) | ✓ Task 4 |
-| 4.1 Route assignment UI (macros read from RouteStore, Load button arms) | ✓ Task 8 |
-| 4.2–4.6 Macro execution rewrites | ⚠ Out of scope — follow-up plan |
-| 5. Files added/removed | ✓ Tasks 1–9 |
+| 1.1 RouteType enum (5 types) | âœ“ Task 1 |
+| 1.2 RoutePointType enum (WALK/WARP/MINE/KILL) + allowed-types table | âœ“ Task 1 |
+| 1.3 File format (dual vs single sub-route JSON) | âœ“ Task 2 (RouteStore.save + SavedRoute.toJson) |
+| 1.4 Migration from routes/ â†’ routes2/ | âœ“ Task 2 (RouteStore.migrateFile) |
+| 2.1 Routes screen layout (expandable cards, filter tabs, Load/Edit/Insert/Delete/+New) | âœ“ Task 5 |
+| 2.2 Load arms route, Edit enters edit mode, +Insert enters insert mode, +New opens modal, âœ• deletes | âœ“ Tasks 5, 6 |
+| 2.3 New route creation flow (type picker â†’ name â†’ Create â†’ edit mode) | âœ“ Task 6 |
+| 2.4 Remove old panels | âœ“ Task 9 |
+| 3.1 Entering edit mode (panel closes, first-person + overlay) | âœ“ Task 4 |
+| 3.2 Sticky HUD (route label, mode buttons, point count, Undo, Done) | âœ“ Task 4 |
+| 3.3 Recording (right-click = sticky type, Shift+right-click = popup) | âœ“ Tasks 3, 4 |
+| 3.4 In-world rendering (boxes + lines per point) | âœ“ Task 4 |
+| 3.5 Insert mode (gap overlay â†’ INSERT_RECORDING â†’ popup always â†’ renumber) | âœ“ Task 4 |
+| 3.6 Undo (single-level, removes last point, saves) | âœ“ Task 4 |
+| 4.1 Route assignment UI (macros read from RouteStore, Load button arms) | âœ“ Task 8 |
+| 4.2â€“4.6 Macro execution rewrites | âš  Out of scope â€” follow-up plan |
+| 5. Files added/removed | âœ“ Tasks 1â€“9 |
 
 **Placeholder scan:** No TBD, TODO, or "similar to Task N" shortcuts found. All code blocks are complete.
 
 **Type consistency:**
-- `RoutePointType.fromId` used in `SavedRoute.parsePoints` ✓
-- `allowedPointTypes(type, sub)` used in `RouteEditMode.enter` ✓
-- `subRoutesFor(type)` used in `UIRoutesPanel.renderCard` ✓
-- `SavedRoute.withSubRoute` used in `RouteEditMode.savePoints` ✓
-- `RouteStore.arm` / `getArmed` used in `UIRoutesPanel.mouseClicked` (Load) and macro modules ✓
-- `RouteEditMode.enter` / `enterInsertMode` called from `UIRoutesPanel.mouseClicked` ✓
-- `RoutePointTypePopup.open(types, pos, callback)` called from `RouteEditMode.onRightClick` ✓
+- `RoutePointType.fromId` used in `SavedRoute.parsePoints` âœ“
+- `allowedPointTypes(type, sub)` used in `RouteEditMode.enter` âœ“
+- `subRoutesFor(type)` used in `UIRoutesPanel.renderCard` âœ“
+- `SavedRoute.withSubRoute` used in `RouteEditMode.savePoints` âœ“
+- `RouteStore.arm` / `getArmed` used in `UIRoutesPanel.mouseClicked` (Load) and macro modules âœ“
+- `RouteEditMode.enter` / `enterInsertMode` called from `UIRoutesPanel.mouseClicked` âœ“
+- `RoutePointTypePopup.open(types, pos, callback)` called from `RouteEditMode.onRightClick` âœ“

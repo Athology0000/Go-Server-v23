@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the vanilla Hypixel SkyBlock wardrobe screen with a custom NVG overlay that renders 3D player previews, supports 3 configurable custom pages (TextSettings), and auto-labels sets by reforge (Mossy→Farming, Mantid→Pest, Jaded→Mining).
+**Goal:** Replace the vanilla Hypixel SkyBlock wardrobe screen with a custom NVG overlay that renders 3D player previews, supports 3 configurable custom pages (TextSettings), and auto-labels sets by reforge (Mossyâ†’Farming, Mantidâ†’Pest, Jadedâ†’Mining).
 
 **Architecture:** A `WardrobeModule` (Kotlin object) intercepts the wardrobe `AbstractContainerScreen` via a Mixin that cancels vanilla rendering, parses all 27 sets from inventory packets (auto-scanning all 3 vanilla pages on open), then renders a full custom overlay using NVG for panels/text and `InventoryScreen.renderEntityInInventory()` for 3D player previews.
 
-**Tech Stack:** Kotlin, NanoVG (NVGRenderer), Minecraft 1.21.11 GuiGraphics, Fabric Mixin, Cobalt event system (PacketEvent, GuiRenderEvent, MouseEvent).
+**Tech Stack:** Kotlin, NanoVG (NVGRenderer), Minecraft 1.21.11 GuiGraphics, Fabric Mixin, Phantom event system (PacketEvent, GuiRenderEvent, MouseEvent).
 
 ---
 
@@ -14,32 +14,32 @@
 
 | File | Action | Purpose |
 |---|---|---|
-| `src/main/kotlin/org/cobalt/internal/wardrobe/WardrobeState.kt` | Create | Data model: WardrobeSet, WardrobeState singleton, auto-naming |
-| `src/main/kotlin/org/cobalt/internal/wardrobe/WardrobePageConfig.kt` | Create | Parse TextSetting CSV → custom page assignments |
-| `src/main/kotlin/org/cobalt/internal/wardrobe/WardrobeFakePlayer.kt` | Create | Fake AbstractClientPlayer for entity rendering |
-| `src/main/kotlin/org/cobalt/internal/wardrobe/WardrobeRenderer.kt` | Create | All NVG + GuiGraphics drawing logic, builds hitbox lists |
-| `src/main/kotlin/org/cobalt/internal/wardrobe/WardrobeModule.kt` | Create | Module, settings, packet parsing, click handling |
-| `src/main/java/org/cobalt/mixin/client/WardrobeScreenMixin.java` | Create | Cancel vanilla AbstractContainerScreen render when overlay active |
-| `src/main/kotlin/org/cobalt/Cobalt.kt` | Modify | Register WardrobeModule in ModuleManager |
+| `src/main/kotlin/org/phantom/internal/wardrobe/WardrobeState.kt` | Create | Data model: WardrobeSet, WardrobeState singleton, auto-naming |
+| `src/main/kotlin/org/phantom/internal/wardrobe/WardrobePageConfig.kt` | Create | Parse TextSetting CSV â†’ custom page assignments |
+| `src/main/kotlin/org/phantom/internal/wardrobe/WardrobeFakePlayer.kt` | Create | Fake AbstractClientPlayer for entity rendering |
+| `src/main/kotlin/org/phantom/internal/wardrobe/WardrobeRenderer.kt` | Create | All NVG + GuiGraphics drawing logic, builds hitbox lists |
+| `src/main/kotlin/org/phantom/internal/wardrobe/WardrobeModule.kt` | Create | Module, settings, packet parsing, click handling |
+| `src/main/java/org/phantom/mixin/client/WardrobeScreenMixin.java` | Create | Cancel vanilla AbstractContainerScreen render when overlay active |
+| `src/main/kotlin/org/phantom/Phantom.kt` | Modify | Register WardrobeModule in ModuleManager |
 
 ---
 
-### Task 1: Data model — WardrobeState
+### Task 1: Data model â€” WardrobeState
 
 **Files:**
-- Create: `src/main/kotlin/org/cobalt/internal/wardrobe/WardrobeState.kt`
+- Create: `src/main/kotlin/org/phantom/internal/wardrobe/WardrobeState.kt`
 
 - [ ] **Step 1: Create WardrobeState.kt**
 
 ```kotlin
-package org.cobalt.internal.wardrobe
+package org.phantom.internal.wardrobe
 
 import net.minecraft.world.item.ItemStack
 
 data class WardrobeSet(
-    val id: Int,                        // 1–27 (global slot id across all 3 vanilla pages)
-    val vanillaPage: Int,               // 1–3
-    val inventorySlot: Int,             // slot index (36–44) in the open container to click for equip
+    val id: Int,                        // 1â€“27 (global slot id across all 3 vanilla pages)
+    val vanillaPage: Int,               // 1â€“3
+    val inventorySlot: Int,             // slot index (36â€“44) in the open container to click for equip
     val armor: List<ItemStack?>,        // [helmet, chestplate, leggings, boots], null = empty slot
     val locked: Boolean,
 ) {
@@ -88,7 +88,7 @@ object WardrobeState {
     }
 }
 
-// Auto-naming: first non-null armor piece's reforge prefix → friendly label
+// Auto-naming: first non-null armor piece's reforge prefix â†’ friendly label
 private val REFORGE_LABELS = mapOf("Mossy" to "Farming", "Mantid" to "Pest", "Jaded" to "Mining")
 
 fun WardrobeSet.displayName(): String {
@@ -105,12 +105,12 @@ fun WardrobeSet.displayName(): String {
 ```bash
 ./gradlew build
 ```
-Expected: BUILD SUCCESSFUL (or only pre-existing errors — none from the new file).
+Expected: BUILD SUCCESSFUL (or only pre-existing errors â€” none from the new file).
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/wardrobe/WardrobeState.kt
+git add src/main/kotlin/org/phantom/internal/wardrobe/WardrobeState.kt
 git commit -m "feat: add WardrobeState data model and auto-naming"
 ```
 
@@ -119,16 +119,16 @@ git commit -m "feat: add WardrobeState data model and auto-naming"
 ### Task 2: Page config parser
 
 **Files:**
-- Create: `src/main/kotlin/org/cobalt/internal/wardrobe/WardrobePageConfig.kt`
+- Create: `src/main/kotlin/org/phantom/internal/wardrobe/WardrobePageConfig.kt`
 
 - [ ] **Step 1: Create WardrobePageConfig.kt**
 
 ```kotlin
-package org.cobalt.internal.wardrobe
+package org.phantom.internal.wardrobe
 
 object WardrobePageConfig {
 
-    /** Parse a CSV string of slot IDs (1–27) into a set of valid IDs. */
+    /** Parse a CSV string of slot IDs (1â€“27) into a set of valid IDs. */
     fun parseSlots(text: String): Set<Int> =
         text.split(",")
             .mapNotNull { it.trim().toIntOrNull() }
@@ -136,7 +136,7 @@ object WardrobePageConfig {
             .toSet()
 
     /**
-     * Returns a map of setId (1–27) → custom page number (1, 2, or 3).
+     * Returns a map of setId (1â€“27) â†’ custom page number (1, 2, or 3).
      * Sets not claimed by page 1 or 2 auto-assign to page 3.
      */
     fun resolvePages(page1Text: String, page2Text: String): Map<Int, Int> {
@@ -162,7 +162,7 @@ object WardrobePageConfig {
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/wardrobe/WardrobePageConfig.kt
+git add src/main/kotlin/org/phantom/internal/wardrobe/WardrobePageConfig.kt
 git commit -m "feat: add WardrobePageConfig CSV parser"
 ```
 
@@ -171,12 +171,12 @@ git commit -m "feat: add WardrobePageConfig CSV parser"
 ### Task 3: Fake player for 3D renders
 
 **Files:**
-- Create: `src/main/kotlin/org/cobalt/internal/wardrobe/WardrobeFakePlayer.kt`
+- Create: `src/main/kotlin/org/phantom/internal/wardrobe/WardrobeFakePlayer.kt`
 
 - [ ] **Step 1: Create WardrobeFakePlayer.kt**
 
 ```kotlin
-package org.cobalt.internal.wardrobe
+package org.phantom.internal.wardrobe
 
 import com.mojang.authlib.GameProfile
 import net.minecraft.client.multiplayer.ClientLevel
@@ -187,7 +187,7 @@ import java.util.UUID
 
 /**
  * A fake AbstractClientPlayer used only for InventoryScreen.renderEntityInInventory().
- * Never added to the world — purely for rendering armor previews.
+ * Never added to the world â€” purely for rendering armor previews.
  */
 class WardrobeFakePlayer(level: ClientLevel) : AbstractClientPlayer(
     level,
@@ -233,28 +233,28 @@ If `AbstractClientPlayer` has compilation issues (e.g. abstract members requirin
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/wardrobe/WardrobeFakePlayer.kt
+git add src/main/kotlin/org/phantom/internal/wardrobe/WardrobeFakePlayer.kt
 git commit -m "feat: add WardrobeFakePlayer and cache for armor previews"
 ```
 
 ---
 
-### Task 4: Mixin — suppress vanilla container render
+### Task 4: Mixin â€” suppress vanilla container render
 
 **Files:**
-- Create: `src/main/java/org/cobalt/mixin/client/WardrobeScreenMixin.java`
+- Create: `src/main/java/org/phantom/mixin/client/WardrobeScreenMixin.java`
 
-No mixin JSON edit needed — `MixinAutoDiscover` scans the `org.cobalt.mixin` package automatically.
+No mixin JSON edit needed â€” `MixinAutoDiscover` scans the `org.phantom.mixin` package automatically.
 
 - [ ] **Step 1: Create WardrobeScreenMixin.java**
 
 ```java
-package org.cobalt.mixin.client;
+package org.phantom.mixin.client;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import org.cobalt.internal.wardrobe.WardrobeModule;
+import org.phantom.internal.wardrobe.WardrobeModule;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -264,7 +264,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class WardrobeScreenMixin<T extends AbstractContainerMenu> {
 
     @Inject(method = "render", at = @At("HEAD"), cancellable = true)
-    private void cobalt$suppressWardrobeRender(
+    private void phantom$suppressWardrobeRender(
             GuiGraphics graphics, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
         if (WardrobeModule.INSTANCE.shouldSuppressVanillaRender()) {
             ci.cancel();
@@ -282,7 +282,7 @@ public abstract class WardrobeScreenMixin<T extends AbstractContainerMenu> {
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/java/org/cobalt/mixin/client/WardrobeScreenMixin.java
+git add src/main/java/org/phantom/mixin/client/WardrobeScreenMixin.java
 git commit -m "feat: add WardrobeScreenMixin to suppress vanilla wardrobe render"
 ```
 
@@ -291,26 +291,26 @@ git commit -m "feat: add WardrobeScreenMixin to suppress vanilla wardrobe render
 ### Task 5: WardrobeRenderer
 
 **Files:**
-- Create: `src/main/kotlin/org/cobalt/internal/wardrobe/WardrobeRenderer.kt`
+- Create: `src/main/kotlin/org/phantom/internal/wardrobe/WardrobeRenderer.kt`
 
 The renderer uses **three passes** to interleave NVG and GuiGraphics:
-1. NVG pass — panel background, slot card backgrounds, page tabs, buttons
-2. GuiGraphics pass — `InventoryScreen.renderEntityInInventory()` for each slot
-3. NVG pass — text overlays (set names, equipped badge, favorite heart)
-4. GuiGraphics pass — armor tooltip on hover
+1. NVG pass â€” panel background, slot card backgrounds, page tabs, buttons
+2. GuiGraphics pass â€” `InventoryScreen.renderEntityInInventory()` for each slot
+3. NVG pass â€” text overlays (set names, equipped badge, favorite heart)
+4. GuiGraphics pass â€” armor tooltip on hover
 
 All layout is in **screen pixels** (matching `NVGRenderer.beginFrame`). Convert to GUI coords (`/ guiScale`) when calling GuiGraphics APIs.
 
 - [ ] **Step 1: Create WardrobeRenderer.kt**
 
 ```kotlin
-package org.cobalt.internal.wardrobe
+package org.phantom.internal.wardrobe
 
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiGraphics
 import net.minecraft.client.gui.screens.inventory.InventoryScreen
-import org.cobalt.api.ui.theme.ThemeManager
-import org.cobalt.api.util.ui.NVGRenderer
+import org.phantom.api.ui.theme.ThemeManager
+import org.phantom.api.util.ui.NVGRenderer
 import org.joml.Quaternionf
 import org.joml.Vector3f
 import kotlin.math.atan
@@ -371,7 +371,7 @@ object WardrobeRenderer {
 
         val hoveredId = slotRects.entries.firstOrNull { (_, r) -> r.contains(mx, my) }?.key
 
-        // ── Pass 1: NVG backgrounds ───────────────────────────────────────────
+        // â”€â”€ Pass 1: NVG backgrounds â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         NVGRenderer.beginFrame(sw, sh)
         val theme = ThemeManager.currentTheme
 
@@ -421,11 +421,11 @@ object WardrobeRenderer {
         val btnX = ox + PADDING
         NVGRenderer.rect(btnX, btnY, BTN_W, BTN_H, theme.controlBg, 6f)
         NVGRenderer.hollowRect(btnX, btnY, BTN_W, BTN_H, 1f, theme.controlBorder, 6f)
-        NVGRenderer.text("◀ Back", btnX + BTN_W / 2f, btnY + BTN_H / 2f - 5f, 11f, theme.text)
+        NVGRenderer.text("â—€ Back", btnX + BTN_W / 2f, btnY + BTN_H / 2f - 5f, 11f, theme.text)
         val closeBtnX = btnX + BTN_W + BTN_GAP
         NVGRenderer.rect(closeBtnX, btnY, BTN_W, BTN_H, theme.controlBg, 6f)
         NVGRenderer.hollowRect(closeBtnX, btnY, BTN_W, BTN_H, 1f, theme.controlBorder, 6f)
-        NVGRenderer.text("✕ Close", closeBtnX + BTN_W / 2f, btnY + BTN_H / 2f - 5f, 11f, 0xFFFF6666.toInt())
+        NVGRenderer.text("âœ• Close", closeBtnX + BTN_W / 2f, btnY + BTN_H / 2f - 5f, 11f, 0xFFFF6666.toInt())
         module.buttonHitboxes = listOf(
             WardrobeModule.ButtonHitbox(WardrobeModule.ButtonType.BACK,  btnX,      btnY, BTN_W, BTN_H),
             WardrobeModule.ButtonHitbox(WardrobeModule.ButtonType.CLOSE, closeBtnX, btnY, BTN_W, BTN_H),
@@ -433,7 +433,7 @@ object WardrobeRenderer {
 
         NVGRenderer.endFrame()
 
-        // ── Pass 2: GuiGraphics — fake player renders ─────────────────────────
+        // â”€â”€ Pass 2: GuiGraphics â€” fake player renders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         slotRects.forEach { (id, r) ->
             val set = WardrobeState.sets[id - 1]
             if (set.isEmpty()) return@forEach
@@ -470,7 +470,7 @@ object WardrobeRenderer {
             }
         }
 
-        // ── Pass 3: NVG text overlays ─────────────────────────────────────────
+        // â”€â”€ Pass 3: NVG text overlays â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         NVGRenderer.beginFrame(sw, sh)
         slotRects.forEach { (id, r) ->
             val set = WardrobeState.sets[id - 1]
@@ -492,7 +492,7 @@ object WardrobeRenderer {
 
             // Favorite heart
             val heartColor = if (WardrobeState.favorites.contains(id)) 0xFFFF4444.toInt() else 0xFF555555.toInt()
-            NVGRenderer.text("♥", r.x + r.w - 14f, r.y + 6f, 13f, heartColor)
+            NVGRenderer.text("â™¥", r.x + r.w - 14f, r.y + 6f, 13f, heartColor)
         }
 
         // If empty page, show hint
@@ -506,7 +506,7 @@ object WardrobeRenderer {
 
         NVGRenderer.endFrame()
 
-        // ── Pass 4: armor tooltip on hover ───────────────────────────────────
+        // â”€â”€ Pass 4: armor tooltip on hover â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         hoveredId?.let { id ->
             val set = WardrobeState.sets[id - 1]
             val rect = slotRects[id] ?: return@let
@@ -526,33 +526,33 @@ object WardrobeRenderer {
 }
 ```
 
-> **Note on `InventoryScreen.renderEntityInInventory` signature:** The method signature changed in MC 1.21.x. Verify the exact overload in your IDE. The 5-argument bounding-box overload `(GuiGraphics, float, float, float, float, int, Vector3f, LivingEntity)` or the center-point overload `(GuiGraphics, int, int, int, Vector3f, Quaternionf, Quaternionf?, LivingEntity)` may apply — use whichever compiles. Adjust parameters accordingly.
+> **Note on `InventoryScreen.renderEntityInInventory` signature:** The method signature changed in MC 1.21.x. Verify the exact overload in your IDE. The 5-argument bounding-box overload `(GuiGraphics, float, float, float, float, int, Vector3f, LivingEntity)` or the center-point overload `(GuiGraphics, int, int, int, Vector3f, Quaternionf, Quaternionf?, LivingEntity)` may apply â€” use whichever compiles. Adjust parameters accordingly.
 
 - [ ] **Step 2: Verify build**
 
 ```bash
 ./gradlew build
 ```
-Fix any compilation errors (likely around the `InventoryScreen.renderEntityInInventory` signature — check in IDE for the exact 1.21.11 overload and adjust the call).
+Fix any compilation errors (likely around the `InventoryScreen.renderEntityInInventory` signature â€” check in IDE for the exact 1.21.11 overload and adjust the call).
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/wardrobe/WardrobeRenderer.kt
+git add src/main/kotlin/org/phantom/internal/wardrobe/WardrobeRenderer.kt
 git commit -m "feat: add WardrobeRenderer with NVG panel and fake player renders"
 ```
 
 ---
 
-### Task 6: WardrobeModule — screen detection, packet parsing, click handling
+### Task 6: WardrobeModule â€” screen detection, packet parsing, click handling
 
 **Files:**
-- Create: `src/main/kotlin/org/cobalt/internal/wardrobe/WardrobeModule.kt`
+- Create: `src/main/kotlin/org/phantom/internal/wardrobe/WardrobeModule.kt`
 
 - [ ] **Step 1: Create WardrobeModule.kt**
 
 ```kotlin
-package org.cobalt.internal.wardrobe
+package org.phantom.internal.wardrobe
 
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
@@ -560,24 +560,24 @@ import net.minecraft.network.protocol.game.ClientboundContainerSetContentPacket
 import net.minecraft.network.protocol.game.ClientboundOpenScreenPacket
 import net.minecraft.world.inventory.ClickType
 import net.minecraft.world.item.Items
-import org.cobalt.api.event.EventBus
-import org.cobalt.api.event.annotation.SubscribeEvent
-import org.cobalt.api.event.impl.client.MouseEvent
-import org.cobalt.api.event.impl.client.PacketEvent
-import org.cobalt.api.event.impl.render.GuiRenderEvent
-import org.cobalt.api.module.Module
-import org.cobalt.api.module.setting.impl.CheckboxSetting
-import org.cobalt.api.module.setting.impl.TextSetting
-import org.cobalt.internal.helper.Config
+import org.phantom.api.event.EventBus
+import org.phantom.api.event.annotation.SubscribeEvent
+import org.phantom.api.event.impl.client.MouseEvent
+import org.phantom.api.event.impl.client.PacketEvent
+import org.phantom.api.event.impl.render.GuiRenderEvent
+import org.phantom.api.module.Module
+import org.phantom.api.module.setting.impl.CheckboxSetting
+import org.phantom.api.module.setting.impl.TextSetting
+import org.phantom.internal.helper.Config
 
 object WardrobeModule : Module("Wardrobe GUI") {
 
     private val mc = Minecraft.getInstance()
 
     val enabled    by CheckboxSetting("Enabled",     "Replace vanilla wardrobe with custom GUI", true)
-    val page1Slots by TextSetting("Page 1 Slots", "Comma-separated set numbers (1–27) for page 1", "1")
-    val page2Slots by TextSetting("Page 2 Slots", "Comma-separated set numbers (1–27) for page 2", "")
-    // Hidden setting — persists favorites as comma-separated IDs. Never shown in UI.
+    val page1Slots by TextSetting("Page 1 Slots", "Comma-separated set numbers (1â€“27) for page 1", "1")
+    val page2Slots by TextSetting("Page 2 Slots", "Comma-separated set numbers (1â€“27) for page 2", "")
+    // Hidden setting â€” persists favorites as comma-separated IDs. Never shown in UI.
     // Keep a direct reference so we can write back to .value when favorites change.
     private val _favSetting = TextSetting("Favorites Data", "", "").inGroup("__side__")
     @Suppress("unused") private val favoritesData by _favSetting
@@ -605,7 +605,7 @@ object WardrobeModule : Module("Wardrobe GUI") {
         EventBus.register(this)
     }
 
-    /** Call this from Cobalt.kt after Config.loadModulesConfig() to hydrate WardrobeState.favorites. */
+    /** Call this from Phantom.kt after Config.loadModulesConfig() to hydrate WardrobeState.favorites. */
     fun loadFavorites() {
         WardrobeState.favorites.clear()
         _favSetting.value.split(",").mapNotNull { it.trim().toIntOrNull() }
@@ -623,7 +623,7 @@ object WardrobeModule : Module("Wardrobe GUI") {
             .filter { pageMap[it.id] == currentCustomPage }
     }
 
-    // ── Packet handling ───────────────────────────────────────────────────────
+    // â”€â”€ Packet handling â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     @SubscribeEvent
     fun onPacket(event: PacketEvent.Incoming) {
@@ -662,8 +662,8 @@ object WardrobeModule : Module("Wardrobe GUI") {
         val items = pkt.items
 
         // Inventory layout for each vanilla page:
-        //   0–8   helmets, 9–17 chestplates, 18–26 leggings, 27–35 boots  (for sets on this page)
-        //   36–44 set selector slots (click to equip; name contains "Equipped" if active;
+        //   0â€“8   helmets, 9â€“17 chestplates, 18â€“26 leggings, 27â€“35 boots  (for sets on this page)
+        //   36â€“44 set selector slots (click to equip; name contains "Equipped" if active;
         //          red stained glass pane if locked)
         val armorBySetId = mutableMapOf<Int, List<net.minecraft.world.item.ItemStack?>>()
         var equippedId: Int? = null
@@ -718,7 +718,7 @@ object WardrobeModule : Module("Wardrobe GUI") {
         }
     }
 
-    // ── Rendering ─────────────────────────────────────────────────────────────
+    // â”€â”€ Rendering â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     @SubscribeEvent
     fun onGuiRender(event: GuiRenderEvent) {
@@ -726,7 +726,7 @@ object WardrobeModule : Module("Wardrobe GUI") {
         WardrobeRenderer.render(event.graphics, this)
     }
 
-    // ── Click handling ────────────────────────────────────────────────────────
+    // â”€â”€ Click handling â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     @SubscribeEvent
     fun onLeftClick(event: MouseEvent.LeftClick) {
@@ -739,9 +739,9 @@ object WardrobeModule : Module("Wardrobe GUI") {
         fun inBounds(x: Float, y: Float, w: Float, h: Float) =
             mx >= x && mx <= x + w && my >= y && my <= y + h
 
-        // Slot clicks (includes favorite heart region — handled by area proximity)
+        // Slot clicks (includes favorite heart region â€” handled by area proximity)
         slotHitboxes.firstOrNull { inBounds(it.x, it.y, it.w, it.h) }?.let { hit ->
-            // Detect if click is on the heart (top-right 20×20 of the card)
+            // Detect if click is on the heart (top-right 20Ã—20 of the card)
             val heartX = hit.x + hit.w - 20f
             val heartY = hit.y
             if (inBounds(heartX, heartY, 20f, 20f)) {
@@ -768,7 +768,7 @@ object WardrobeModule : Module("Wardrobe GUI") {
         }
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     private fun clickSet(setId: Int) {
         val set = WardrobeState.sets.getOrNull(setId - 1) ?: return
@@ -820,22 +820,22 @@ object WardrobeModule : Module("Wardrobe GUI") {
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/wardrobe/WardrobeModule.kt
+git add src/main/kotlin/org/phantom/internal/wardrobe/WardrobeModule.kt
 git commit -m "feat: add WardrobeModule with packet parsing and click handling"
 ```
 
 ---
 
-### Task 7: Register WardrobeModule in Cobalt.kt
+### Task 7: Register WardrobeModule in Phantom.kt
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/Cobalt.kt`
+- Modify: `src/main/kotlin/org/phantom/Phantom.kt`
 
 - [ ] **Step 1: Add import**
 
-Add to the import block in `Cobalt.kt`:
+Add to the import block in `Phantom.kt`:
 ```kotlin
-import org.cobalt.internal.wardrobe.WardrobeModule
+import org.phantom.internal.wardrobe.WardrobeModule
 ```
 
 - [ ] **Step 2: Register the module**
@@ -866,7 +866,7 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/Cobalt.kt
+git add src/main/kotlin/org/phantom/Phantom.kt
 git commit -m "feat: register WardrobeModule and load persisted favorites"
 ```
 
@@ -875,7 +875,7 @@ git commit -m "feat: register WardrobeModule and load persisted favorites"
 ### Task 8: Manual verification checklist
 
 - [ ] Run client: `./gradlew runClient`
-- [ ] `/wardrobe` command in Hypixel SkyBlock Garden or lobby → vanilla wardrobe opens → custom overlay replaces it
+- [ ] `/wardrobe` command in Hypixel SkyBlock Garden or lobby â†’ vanilla wardrobe opens â†’ custom overlay replaces it
 - [ ] All 3 custom page tabs visible; clicking tabs switches displayed sets
 - [ ] 3D player renders show correct armor per set
 - [ ] Equipped set has accent border and "Equipped" badge
@@ -884,6 +884,6 @@ git commit -m "feat: register WardrobeModule and load persisted favorites"
 - [ ] Favorite heart toggles gold border
 - [ ] Back and Close buttons work
 - [ ] Set auto-named "Farming" when all pieces start with "Mossy", "Pest" for "Mantid", "Mining" for "Jaded"
-- [ ] Setting Page 1 Slots to `"1,4,5"` → sets 1, 4, 5 appear on page 1; rest on page 3
+- [ ] Setting Page 1 Slots to `"1,4,5"` â†’ sets 1, 4, 5 appear on page 1; rest on page 3
 
 ---

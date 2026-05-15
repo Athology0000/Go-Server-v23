@@ -1,4 +1,4 @@
-# Route System Rewrite — Design Spec
+# Route System Rewrite â€” Design Spec
 **Date:** 2026-04-15
 
 ---
@@ -19,7 +19,7 @@ enum class RouteType {
     COMMISSION,  // single route, starts from /warpforge
     PATROL,      // travel route + patrol area
     GEMSTONE,    // single warp-and-mine loop
-    TUNNEL,      // /warpcamp → mine anchors → /warpcamp
+    TUNNEL,      // /warpcamp â†’ mine anchors â†’ /warpcamp
 }
 ```
 
@@ -38,17 +38,17 @@ Available point types per sub-route:
 
 | Sub-route | WALK | WARP | MINE | KILL |
 |---|:---:|:---:|:---:|:---:|
-| Ore Miner — Travel | ✓ | ✓ | | |
-| Ore Miner — Loop | | ✓ | ✓ | |
-| Commission | ✓ | ✓ | ✓ | |
-| Patrol — Travel | ✓ | ✓ | | |
-| Patrol — Area | ✓ | ✓ | | ✓ |
-| Gemstone | | ✓ | ✓ | |
-| Tunnel | ✓ | ✓ | ✓ | |
+| Ore Miner â€” Travel | âœ“ | âœ“ | | |
+| Ore Miner â€” Loop | | âœ“ | âœ“ | |
+| Commission | âœ“ | âœ“ | âœ“ | |
+| Patrol â€” Travel | âœ“ | âœ“ | | |
+| Patrol â€” Area | âœ“ | âœ“ | | âœ“ |
+| Gemstone | | âœ“ | âœ“ | |
+| Tunnel | âœ“ | âœ“ | âœ“ | |
 
 ### 1.3 File Format
 
-**Location:** `config/cobalt/routes2/<name>.json`
+**Location:** `config/phantom/routes2/<name>.json`
 
 Dual-sub-route types (Ore Miner, Patrol):
 ```json
@@ -78,17 +78,17 @@ Single-sub-route types (Commission, Gemstone, Tunnel):
 }
 ```
 
-Both sub-route arrays are unbounded — no point count limit.
+Both sub-route arrays are unbounded â€” no point count limit.
 
 ### 1.4 Migration
 
-On first launch after the update, the system scans `config/cobalt/routes/*.json`. Each file is converted to the new format:
-- `type` → `ORE_MINER`
-- Points mapped: `NORMAL → WALK`, `WARP → WARP`, `MINE → MINE` (mineEnd and blockId preserved)
+On first launch after the update, the system scans `config/phantom/routes/*.json`. Each file is converted to the new format:
+- `type` â†’ `ORE_MINER`
+- Points mapped: `NORMAL â†’ WALK`, `WARP â†’ WARP`, `MINE â†’ MINE` (mineEnd and blockId preserved)
 - Points go into `loopRoute`; `travelRoute` is left as an empty array
-- Saved to `config/cobalt/routes2/<name>.json`
+- Saved to `config/phantom/routes2/<name>.json`
 
-Old files in `config/cobalt/routes/` are left untouched.
+Old files in `config/phantom/routes/` are left untouched.
 
 ---
 
@@ -96,58 +96,58 @@ Old files in `config/cobalt/routes/` are left untouched.
 
 ### 2.1 Layout
 
-Replaces all existing route-related panels. Opened from the main Cobalt UI.
+Replaces all existing route-related panels. Opened from the main Phantom UI.
 
 **Top bar:**
 - Search input (filters by name)
 - Type filter tabs: All | Ore Miner | Commission | Patrol | Gemstone | Tunnel
 - **+ New Route** button (top right)
 
-**Route list — expandable cards:**
+**Route list â€” expandable cards:**
 
 Collapsed state (one row per route):
 ```
-[TYPE BADGE]  route-name               [▶ Load]  [▼]   (✕ on hover)
+[TYPE BADGE]  route-name               [â–¶ Load]  [â–¼]   (âœ• on hover)
 ```
 
-Expanded state — dual sub-route types (Ore Miner, Patrol):
+Expanded state â€” dual sub-route types (Ore Miner, Patrol):
 ```
-[TYPE BADGE]  route-name               [▶ Load]  [▲]
-  ┌─────────────────────────────────────────────────────┐
-  │ 🚶 Travel Route    (8 pts)    [✏ Edit]  [+ Insert]  │
-  │ 🔄 Loop Route     (16 pts)    [✏ Edit]  [+ Insert]  │
-  └─────────────────────────────────────────────────────┘
+[TYPE BADGE]  route-name               [â–¶ Load]  [â–²]
+  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+  â”‚ ðŸš¶ Travel Route    (8 pts)    [âœ Edit]  [+ Insert]  â”‚
+  â”‚ ðŸ”„ Loop Route     (16 pts)    [âœ Edit]  [+ Insert]  â”‚
+  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 ```
 
-Expanded state — single sub-route types (Commission, Gemstone, Tunnel):
+Expanded state â€” single sub-route types (Commission, Gemstone, Tunnel):
 ```
-[TYPE BADGE]  route-name               [▶ Load]  [▲]
-  ┌─────────────────────────────────────────────────────┐
-  │ Route Points       (12 pts)   [✏ Edit]  [+ Insert]  │
-  └─────────────────────────────────────────────────────┘
+[TYPE BADGE]  route-name               [â–¶ Load]  [â–²]
+  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+  â”‚ Route Points       (12 pts)   [âœ Edit]  [+ Insert]  â”‚
+  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 ```
 
 ### 2.2 Actions
 
-- **▶ Load** — arms the route for its macro type. Does not start the macro; the macro picks it up when it next runs.
-- **✏ Edit** — closes the panel, activates in-world edit mode for that specific sub-route.
-- **+ Insert** — opens the insert overlay on top of the routes screen.
-- **+ New Route** — opens the type picker modal.
-- **✕ Delete** (hover) — removes the route file after confirmation.
+- **â–¶ Load** â€” arms the route for its macro type. Does not start the macro; the macro picks it up when it next runs.
+- **âœ Edit** â€” closes the panel, activates in-world edit mode for that specific sub-route.
+- **+ Insert** â€” opens the insert overlay on top of the routes screen.
+- **+ New Route** â€” opens the type picker modal.
+- **âœ• Delete** (hover) â€” removes the route file after confirmation.
 
 ### 2.3 New Route Creation Flow
 
-1. Click **+ New Route** → type picker modal appears (5 cards: Ore Miner, Commission, Patrol, Gemstone, Tunnel with descriptions and color badges).
-2. Click a type → name input field appears below the cards.
-3. Click **Create** → route file created with empty sub-routes → immediately enters Edit mode for the first sub-route (Travel Route for dual types, Points for single types).
+1. Click **+ New Route** â†’ type picker modal appears (5 cards: Ore Miner, Commission, Patrol, Gemstone, Tunnel with descriptions and color badges).
+2. Click a type â†’ name input field appears below the cards.
+3. Click **Create** â†’ route file created with empty sub-routes â†’ immediately enters Edit mode for the first sub-route (Travel Route for dual types, Points for single types).
 
 ### 2.4 Removed Panels
 
 The following existing panels are removed:
-- `UICommissionRoutesPanel` — commission zone assignment moves to a dropdown in commission macro settings
-- `UICombatWalkbackRoutesPanel` — slayer route assignment moves to dropdowns in combat macro settings
-- `UIRoutePointPicker` — replaced by the unified edit mode
-- `PatrolPointPopup` — replaced by the unified sticky mode HUD
+- `UICommissionRoutesPanel` â€” commission zone assignment moves to a dropdown in commission macro settings
+- `UICombatWalkbackRoutesPanel` â€” slayer route assignment moves to dropdowns in combat macro settings
+- `UIRoutePointPicker` â€” replaced by the unified edit mode
+- `PatrolPointPopup` â€” replaced by the unified sticky mode HUD
 
 ---
 
@@ -155,28 +155,28 @@ The following existing panels are removed:
 
 ### 3.1 Entering Edit Mode
 
-Triggered by clicking ✏ Edit on any sub-route. The panel closes and the game returns to first person with the edit overlay active.
+Triggered by clicking âœ Edit on any sub-route. The panel closes and the game returns to first person with the edit overlay active.
 
 ### 3.2 Sticky Mode HUD
 
 Rendered via NVG, positioned bottom-center of screen.
 
 Contents:
-- Route and sub-route label: `iron_veins_v2 › Loop Route`
-- Mode buttons for the available point types of this sub-route — current mode highlighted, click to switch
+- Route and sub-route label: `iron_veins_v2 â€º Loop Route`
+- Mode buttons for the available point types of this sub-route â€” current mode highlighted, click to switch
 - Live point count
-- **Undo** button — removes the last recorded point, saves immediately
-- **Done** button — saves and exits edit mode, returns to routes screen
+- **Undo** button â€” removes the last recorded point, saves immediately
+- **Done** button â€” saves and exits edit mode, returns to routes screen
 
 ### 3.3 Recording Points
 
-- **Right-click any block** → records a point of the current mode instantly (no popup)
-- **Shift + right-click** → type popup appears for that one point only (shows only the types valid for this sub-route)
+- **Right-click any block** â†’ records a point of the current mode instantly (no popup)
+- **Shift + right-click** â†’ type popup appears for that one point only (shows only the types valid for this sub-route)
 - Points are written to disk immediately on each addition
 
 ### 3.4 In-World Rendering During Edit
 
-- Small labeled box at each point position — number, type badge, coordinate
+- Small labeled box at each point position â€” number, type badge, coordinate
 - Lines connecting points in order
 - Most recently added point pulses briefly to confirm placement
 
@@ -185,9 +185,9 @@ Contents:
 Triggered by **+ Insert** on the routes screen.
 
 Flow:
-1. Overlay panel lists current points with clickable gap slots between each one (e.g., `← insert between 2 and 3`)
-2. Click a gap slot → overlay closes → sticky HUD shows `Inserting after point N`
-3. Right-click a block in-world → type popup always appears (no sticky mode for inserts — deliberate one-off)
+1. Overlay panel lists current points with clickable gap slots between each one (e.g., `â† insert between 2 and 3`)
+2. Click a gap slot â†’ overlay closes â†’ sticky HUD shows `Inserting after point N`
+3. Right-click a block in-world â†’ type popup always appears (no sticky mode for inserts â€” deliberate one-off)
 4. Point is inserted at that index; all subsequent points renumber
 5. Saved to disk immediately
 6. Overlay reopens to allow further insertions
@@ -205,11 +205,11 @@ Single-level undo in the sticky HUD. One press removes the last added point and 
 
 Each macro's settings panel gets a dropdown (or autocomplete text field) populated from saved routes of the matching type. Replaces all current text-field + separate-picker-panel patterns.
 
-- Commission macro: one dropdown per zone (Royal, Cliffside, Lava, Ramp, Upper) — shows only `COMMISSION` routes
-- Combat macro: one dropdown per slayer type (Zombie, Wolf, Spider, Enderman, Vampire, Blaze) — shows only `PATROL` routes
-- Mining macro: dropdown for active ore miner route — shows only `ORE_MINER` routes
-- Gemstone macro: dropdown — shows only `GEMSTONE` routes
-- Tunnel macro: dropdown — shows only `TUNNEL` routes
+- Commission macro: one dropdown per zone (Royal, Cliffside, Lava, Ramp, Upper) â€” shows only `COMMISSION` routes
+- Combat macro: one dropdown per slayer type (Zombie, Wolf, Spider, Enderman, Vampire, Blaze) â€” shows only `PATROL` routes
+- Mining macro: dropdown for active ore miner route â€” shows only `ORE_MINER` routes
+- Gemstone macro: dropdown â€” shows only `GEMSTONE` routes
+- Tunnel macro: dropdown â€” shows only `TUNNEL` routes
 
 ### 4.2 Ore Miner Execution
 
@@ -244,17 +244,17 @@ Each macro's settings panel gets a dropdown (or autocomplete text field) populat
 ## 5. Files Added / Removed
 
 **New files:**
-- `internal/routes/RouteStore.kt` — load, save, list, migrate routes
-- `internal/routes/RouteType.kt` — enum + point type availability per sub-route
-- `internal/routes/SavedRoute.kt` — data classes (SavedRoute, RoutePoint, RoutePointType)
-- `internal/routes/RouteEditMode.kt` — in-world edit mode controller (sticky HUD, recording, insert, undo)
-- `internal/ui/panel/panels/UIRoutesPanel.kt` — unified routes screen
-- `internal/ui/panel/panels/UINewRouteModal.kt` — type picker + name modal
+- `internal/routes/RouteStore.kt` â€” load, save, list, migrate routes
+- `internal/routes/RouteType.kt` â€” enum + point type availability per sub-route
+- `internal/routes/SavedRoute.kt` â€” data classes (SavedRoute, RoutePoint, RoutePointType)
+- `internal/routes/RouteEditMode.kt` â€” in-world edit mode controller (sticky HUD, recording, insert, undo)
+- `internal/ui/panel/panels/UIRoutesPanel.kt` â€” unified routes screen
+- `internal/ui/panel/panels/UINewRouteModal.kt` â€” type picker + name modal
 
 **Removed / replaced:**
-- `internal/mining/RoutesModule.kt` — execution logic moves to macro modules; storage moves to RouteStore
-- `internal/pathfinding/PatrolWaypointStore.kt` — replaced by PATROL routes
-- `internal/helper/WalkbackBridge.kt` — replaced by PATROL route assignment dropdowns
+- `internal/mining/RoutesModule.kt` â€” execution logic moves to macro modules; storage moves to RouteStore
+- `internal/pathfinding/PatrolWaypointStore.kt` â€” replaced by PATROL routes
+- `internal/helper/WalkbackBridge.kt` â€” replaced by PATROL route assignment dropdowns
 - `internal/ui/panel/panels/UICommissionRoutesPanel.kt`
 - `internal/ui/panel/panels/UICombatWalkbackRoutesPanel.kt`
 - `internal/ui/panel/panels/UIRoutePointPicker.kt`

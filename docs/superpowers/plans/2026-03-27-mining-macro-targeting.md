@@ -6,7 +6,7 @@
 
 **Architecture:** All three changes are isolated edits inside `MiningMacroModule.kt`. Fix 1 replaces the `canClick` mining gate with a per-tick crosshair check against all vein blocks. Fix 2 refactors the `bestInRange` selection loop to use the actual visible-face point angle. Fix 3 adds a `hitResult.location` fallback in `resolveMiningAimPoint` so the precision rotation scale fires from the first tick the crosshair lands on a block.
 
-**Tech Stack:** Kotlin, Fabric Minecraft mod (MC 1.21.1), Mojang mappings. Build: `./gradlew build`. No unit test framework — compile success + in-game verification.
+**Tech Stack:** Kotlin, Fabric Minecraft mod (MC 1.21.1), Mojang mappings. Build: `./gradlew build`. No unit test framework â€” compile success + in-game verification.
 
 ---
 
@@ -14,14 +14,14 @@
 
 | File | What changes |
 |------|-------------|
-| `src/main/kotlin/org/cobalt/internal/mining/MiningMacroModule.kt` | All three fixes — ~25 lines changed/added |
+| `src/main/kotlin/org/phantom/internal/mining/MiningMacroModule.kt` | All three fixes â€” ~25 lines changed/added |
 
 ---
 
 ### Task 1: Add `angularDistanceTo(Player, Vec3)` overload
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/mining/MiningMacroModule.kt:1755`
+- Modify: `src/main/kotlin/org/phantom/internal/mining/MiningMacroModule.kt:1755`
 
 The existing `angularDistanceTo(player, BlockPos)` is at line 1745 and hard-codes `+ 0.5` to get block center. Add an overload that takes an arbitrary `Vec3` so Fix 2 can pass the actual visible face point.
 
@@ -52,7 +52,7 @@ Expected: `BUILD SUCCESSFUL`
 - [ ] **Commit:**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/mining/MiningMacroModule.kt
+git add src/main/kotlin/org/phantom/internal/mining/MiningMacroModule.kt
 git commit -m "feat: add angularDistanceTo(Vec3) overload for face-point angle computation"
 ```
 
@@ -61,11 +61,11 @@ git commit -m "feat: add angularDistanceTo(Vec3) overload for face-point angle c
 ### Task 2: Fix `selectMineTarget` to use visible-face angle (Fix 2)
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/mining/MiningMacroModule.kt:965-978`
+- Modify: `src/main/kotlin/org/phantom/internal/mining/MiningMacroModule.kt:965-978`
 
-The `bestInRange` loop currently calls `hasLineOfSight` (which internally calls `findVisibleAimPoint` and discards the result) then calls `angularDistanceTo` to the block center — two issues: redundant work, and wrong angle. Replace with a single `findVisibleAimPoint` call whose result is both the LOS gate and the aim point for angle computation.
+The `bestInRange` loop currently calls `hasLineOfSight` (which internally calls `findVisibleAimPoint` and discards the result) then calls `angularDistanceTo` to the block center â€” two issues: redundant work, and wrong angle. Replace with a single `findVisibleAimPoint` call whose result is both the LOS gate and the aim point for angle computation.
 
-- [ ] **Replace lines 965–978 with:**
+- [ ] **Replace lines 965â€“978 with:**
 
 ```kotlin
     val rangeSq = mineRange.value * mineRange.value
@@ -89,7 +89,7 @@ The `bestInRange` loop currently calls `hasLineOfSight` (which internally calls 
     if (bestInRange != null) return bestInRange
 ```
 
-Note: the `val eye = player.eyePosition` line must be added — it doesn't exist in this scope yet. `Vec3` is already imported at the top of the file.
+Note: the `val eye = player.eyePosition` line must be added â€” it doesn't exist in this scope yet. `Vec3` is already imported at the top of the file.
 
 - [ ] **Build:**
 
@@ -102,7 +102,7 @@ Expected: `BUILD SUCCESSFUL`
 - [ ] **Commit:**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/mining/MiningMacroModule.kt
+git add src/main/kotlin/org/phantom/internal/mining/MiningMacroModule.kt
 git commit -m "fix: use visible face angle in bestInRange target selection, not block center"
 ```
 
@@ -111,11 +111,11 @@ git commit -m "fix: use visible face angle in bestInRange target selection, not 
 ### Task 3: Crosshair-first mining gate (Fix 1)
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/mining/MiningMacroModule.kt:580-612`
+- Modify: `src/main/kotlin/org/phantom/internal/mining/MiningMacroModule.kt:580-612`
 
 Replace the `if (inRange)` block's `canClick = hasLos || isCrosshairOnTarget(target)` logic. The new logic: check if `mc.hitResult` is on **any** in-range vein block each tick. If yes, mine that block (pivoting `currentTarget`). If no, release attack and keep rotating. This means the camera sweeps naturally and mines whatever mithril it lands on rather than firing dig packets at bedrock.
 
-- [ ] **Replace the entire `if (inRange) { ... }` block (lines 580–612) with:**
+- [ ] **Replace the entire `if (inRange) { ... }` block (lines 580â€“612) with:**
 
 ```kotlin
     if (inRange) {
@@ -141,7 +141,7 @@ Replace the `if (inRange)` block's `canClick = hasLos || isCrosshairOnTarget(tar
         MovementManager.clearForcedMovement()
         startMining(player, crosshairVeinBlock)
       } else {
-        // Not on a vein block yet — release attack and keep rotating toward selected target.
+        // Not on a vein block yet â€” release attack and keep rotating toward selected target.
         if (miningActive) {
           mc.options.keyAttack?.setDown(false)
           miningActive = false
@@ -172,8 +172,8 @@ Expected: `BUILD SUCCESSFUL`
 - [ ] **Commit:**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/mining/MiningMacroModule.kt
-git commit -m "fix: crosshair-first mining — only attack when crosshair is on a vein block"
+git add src/main/kotlin/org/phantom/internal/mining/MiningMacroModule.kt
+git commit -m "fix: crosshair-first mining â€” only attack when crosshair is on a vein block"
 ```
 
 ---
@@ -181,11 +181,11 @@ git commit -m "fix: crosshair-first mining — only attack when crosshair is on 
 ### Task 4: Hit-result fallback in `resolveMiningAimPoint` (Fix 3)
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/mining/MiningMacroModule.kt:1929-1945`
+- Modify: `src/main/kotlin/org/phantom/internal/mining/MiningMacroModule.kt:1929-1945`
 
 When `precisionActive` is true but the tracker has no samples yet (confidence < 2), `resolveMiningAimPoint` currently falls straight through to the generic `findVisibleAimPoint`. Add a fallback between the tracker check and the generic fallback: if the crosshair is currently on the target block, use `hitResult.location` (the exact sub-block face coordinate) as the precision aim point. This fires immediately on tick 1 of mining so `precisionRotScale` and `frameRotSnapThreshold = 2.4f` apply from the start.
 
-- [ ] **Replace `resolveMiningAimPoint` (lines 1929–1945) with:**
+- [ ] **Replace `resolveMiningAimPoint` (lines 1929â€“1945) with:**
 
 ```kotlin
   private fun resolveMiningAimPoint(player: Player, target: BlockPos, checkPrecisionChance: Boolean = false): AimTarget {
@@ -199,7 +199,7 @@ When `precisionActive` is true but the tracker has no samples yet (confidence < 
           return AimTarget(point, true)
         }
       }
-      // Tracker has no data yet — use the exact face hit point from the crosshair raycast.
+      // Tracker has no data yet â€” use the exact face hit point from the crosshair raycast.
       // This fires immediately when the crosshair lands on the block so the precision
       // rotation scale applies from the very first tick of mining.
       val hit = mc.hitResult
@@ -228,7 +228,7 @@ Expected: `BUILD SUCCESSFUL`
 - [ ] **Commit:**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/mining/MiningMacroModule.kt
+git add src/main/kotlin/org/phantom/internal/mining/MiningMacroModule.kt
 git commit -m "fix: use hitResult.location as precision aim fallback before tracker accumulates samples"
 ```
 

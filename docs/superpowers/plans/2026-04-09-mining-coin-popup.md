@@ -4,7 +4,7 @@
 
 **Goal:** Show a floating `+X coins` screen-space text effect each time the mining macro breaks an ore block, using live Hypixel bazaar prices fetched on client start.
 
-**Architecture:** `MiningProfitTracker` gains a `getPriceForKey()` accessor and a startup bazaar fetch. A new `MiningCoinPopupModule` listens to `BlockChangeEvent` to spawn popup data, then renders and advances them each `NvgEvent` frame using NanoVG. Registered in `Cobalt.kt` alongside other mining modules.
+**Architecture:** `MiningProfitTracker` gains a `getPriceForKey()` accessor and a startup bazaar fetch. A new `MiningCoinPopupModule` listens to `BlockChangeEvent` to spawn popup data, then renders and advances them each `NvgEvent` frame using NanoVG. Registered in `Phantom.kt` alongside other mining modules.
 
 **Tech Stack:** Kotlin, Fabric MC 1.21.1, NanoVG via `NVGRenderer`, `EventBus` / `@SubscribeEvent`, `BlockChangeEvent`, `NvgEvent`
 
@@ -14,16 +14,16 @@
 
 | File | Action |
 |------|--------|
-| `src/main/kotlin/org/cobalt/internal/mining/MiningProfitTracker.kt` | Modify — startup fetch + price accessor |
-| `src/main/kotlin/org/cobalt/internal/mining/MiningCoinPopupModule.kt` | Create — popup spawn + render |
-| `src/main/kotlin/org/cobalt/Cobalt.kt` | Modify — register module |
+| `src/main/kotlin/org/phantom/internal/mining/MiningProfitTracker.kt` | Modify â€” startup fetch + price accessor |
+| `src/main/kotlin/org/phantom/internal/mining/MiningCoinPopupModule.kt` | Create â€” popup spawn + render |
+| `src/main/kotlin/org/phantom/Phantom.kt` | Modify â€” register module |
 
 ---
 
 ## Task 1: Add startup bazaar fetch and `getPriceForKey` to `MiningProfitTracker`
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/mining/MiningProfitTracker.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/mining/MiningProfitTracker.kt`
 
 - [ ] **Step 1: Add `getPriceForKey` accessor**
 
@@ -65,7 +65,7 @@ Expected: `BUILD SUCCESSFUL`
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/mining/MiningProfitTracker.kt
+git add src/main/kotlin/org/phantom/internal/mining/MiningProfitTracker.kt
 git commit -m "feat: fetch bazaar prices on client start, expose getPriceForKey"
 ```
 
@@ -74,26 +74,26 @@ git commit -m "feat: fetch bazaar prices on client start, expose getPriceForKey"
 ## Task 2: Create `MiningCoinPopupModule`
 
 **Files:**
-- Create: `src/main/kotlin/org/cobalt/internal/mining/MiningCoinPopupModule.kt`
+- Create: `src/main/kotlin/org/phantom/internal/mining/MiningCoinPopupModule.kt`
 
 - [ ] **Step 1: Create the file**
 
-Create `src/main/kotlin/org/cobalt/internal/mining/MiningCoinPopupModule.kt` with this exact content:
+Create `src/main/kotlin/org/phantom/internal/mining/MiningCoinPopupModule.kt` with this exact content:
 
 ```kotlin
-package org.cobalt.internal.mining
+package org.phantom.internal.mining
 
 import kotlin.random.Random
 import net.minecraft.client.Minecraft
 import net.minecraft.core.registries.BuiltInRegistries
-import org.cobalt.api.event.EventBus
-import org.cobalt.api.event.annotation.SubscribeEvent
-import org.cobalt.api.event.impl.client.BlockChangeEvent
-import org.cobalt.api.event.impl.render.NvgEvent
-import org.cobalt.api.module.Module
-import org.cobalt.api.module.setting.impl.CheckboxSetting
-import org.cobalt.api.module.setting.impl.SliderSetting
-import org.cobalt.api.util.ui.NVGRenderer
+import org.phantom.api.event.EventBus
+import org.phantom.api.event.annotation.SubscribeEvent
+import org.phantom.api.event.impl.client.BlockChangeEvent
+import org.phantom.api.event.impl.render.NvgEvent
+import org.phantom.api.module.Module
+import org.phantom.api.module.setting.impl.CheckboxSetting
+import org.phantom.api.module.setting.impl.SliderSetting
+import org.phantom.api.util.ui.NVGRenderer
 
 object MiningCoinPopupModule : Module("Mining Coin Popups") {
 
@@ -199,27 +199,27 @@ Expected: `BUILD SUCCESSFUL`
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/mining/MiningCoinPopupModule.kt
+git add src/main/kotlin/org/phantom/internal/mining/MiningCoinPopupModule.kt
 git commit -m "feat: add MiningCoinPopupModule with floating coin text effect"
 ```
 
 ---
 
-## Task 3: Register `MiningCoinPopupModule` in `Cobalt.kt`
+## Task 3: Register `MiningCoinPopupModule` in `Phantom.kt`
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/Cobalt.kt`
+- Modify: `src/main/kotlin/org/phantom/Phantom.kt`
 
 - [ ] **Step 1: Add the import**
 
-Find the existing mining module imports at the top of `Cobalt.kt`. They include lines like:
+Find the existing mining module imports at the top of `Phantom.kt`. They include lines like:
 ```kotlin
-import org.cobalt.internal.mining.MiningMacroModule
-import org.cobalt.internal.mining.MiningHudModule
+import org.phantom.internal.mining.MiningMacroModule
+import org.phantom.internal.mining.MiningHudModule
 ```
 Add the new import alongside them:
 ```kotlin
-import org.cobalt.internal.mining.MiningCoinPopupModule
+import org.phantom.internal.mining.MiningCoinPopupModule
 ```
 
 - [ ] **Step 2: Register the module**
@@ -240,6 +240,6 @@ Expected: `BUILD SUCCESSFUL`
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/Cobalt.kt
+git add src/main/kotlin/org/phantom/Phantom.kt
 git commit -m "feat: register MiningCoinPopupModule"
 ```

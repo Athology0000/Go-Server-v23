@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build `YearOfTheSealModule` — a standalone Cobalt module that detects the Year of the Seal beach ball, predicts its landing position using 3-model polynomial regression (ported from SkyHanni), and pathfinds to the landing spot automatically.
+**Goal:** Build `YearOfTheSealModule` â€” a standalone Phantom module that detects the Year of the Seal beach ball, predicts its landing position using 3-model polynomial regression (ported from SkyHanni), and pathfinds to the landing spot automatically.
 
 **Architecture:** One file (`YearOfTheSealModule.kt`) containing the module object and an inner `BallPredictor` class that owns all tracking/prediction state per ball entity. Three polynomial model objects (SmallPoly, AveragePoly, SpreadPoly) live as sealed subclasses inside `BallPredictor`. The module scans for invisible 1024-HP slime entities each tick, delegates to predictors, and feeds the stable landing position to `NativePathfinder`.
 
-**Tech Stack:** Kotlin, Fabric 1.21.1, Mojang mappings, Cobalt module/event system, `NativePathfinder` JNI bridge, `net.minecraft.world.entity.monster.Slime`, `net.minecraft.world.phys.Vec3`
+**Tech Stack:** Kotlin, Fabric 1.21.1, Mojang mappings, Phantom module/event system, `NativePathfinder` JNI bridge, `net.minecraft.world.entity.monster.Slime`, `net.minecraft.world.phys.Vec3`
 
 ---
 
@@ -14,36 +14,36 @@
 
 | Action | Path |
 |--------|------|
-| Create | `src/main/kotlin/org/cobalt/internal/seal/YearOfTheSealModule.kt` |
-| Modify | `src/main/kotlin/org/cobalt/Cobalt.kt` |
+| Create | `src/main/kotlin/org/phantom/internal/seal/YearOfTheSealModule.kt` |
+| Modify | `src/main/kotlin/org/phantom/Phantom.kt` |
 
 ---
 
 ### Task 1: Module skeleton, settings, and registration
 
 **Files:**
-- Create: `src/main/kotlin/org/cobalt/internal/seal/YearOfTheSealModule.kt`
-- Modify: `src/main/kotlin/org/cobalt/Cobalt.kt`
+- Create: `src/main/kotlin/org/phantom/internal/seal/YearOfTheSealModule.kt`
+- Modify: `src/main/kotlin/org/phantom/Phantom.kt`
 
 - [x] **Step 1: Create the module file**
 
-Create `src/main/kotlin/org/cobalt/internal/seal/YearOfTheSealModule.kt` with this content:
+Create `src/main/kotlin/org/phantom/internal/seal/YearOfTheSealModule.kt` with this content:
 
 ```kotlin
-package org.cobalt.internal.seal
+package org.phantom.internal.seal
 
 import net.minecraft.client.Minecraft
 import net.minecraft.world.phys.Vec3
-import org.cobalt.api.event.EventBus
-import org.cobalt.api.event.annotation.SubscribeEvent
-import org.cobalt.api.event.impl.client.TickEvent
-import org.cobalt.api.module.Module
-import org.cobalt.api.module.setting.impl.CheckboxSetting
-import org.cobalt.api.module.setting.impl.KeyBindSetting
-import org.cobalt.api.module.setting.impl.SliderSetting
-import org.cobalt.api.pathfinder.jni.NativePathfinder
-import org.cobalt.api.pathfinder.jni.PathStatus
-import org.cobalt.api.util.player.MovementManager
+import org.phantom.api.event.EventBus
+import org.phantom.api.event.annotation.SubscribeEvent
+import org.phantom.api.event.impl.client.TickEvent
+import org.phantom.api.module.Module
+import org.phantom.api.module.setting.impl.CheckboxSetting
+import org.phantom.api.module.setting.impl.KeyBindSetting
+import org.phantom.api.module.setting.impl.SliderSetting
+import org.phantom.api.pathfinder.jni.NativePathfinder
+import org.phantom.api.pathfinder.jni.PathStatus
+import org.phantom.api.util.player.MovementManager
 import net.minecraft.world.entity.monster.Slime
 
 object YearOfTheSealModule : Module("Year of the Seal") {
@@ -83,16 +83,16 @@ object YearOfTheSealModule : Module("Year of the Seal") {
         if (toggleKeybind.value.isPressed()) {
             enabledSetting.value = !enabledSetting.value
         }
-        // stub — detection and pathfinding added in later tasks
+        // stub â€” detection and pathfinding added in later tasks
     }
 }
 ```
 
-- [x] **Step 2: Register the module in `Cobalt.kt`**
+- [x] **Step 2: Register the module in `Phantom.kt`**
 
-Open `src/main/kotlin/org/cobalt/Cobalt.kt`. Add the import:
+Open `src/main/kotlin/org/phantom/Phantom.kt`. Add the import:
 ```kotlin
-import org.cobalt.internal.seal.YearOfTheSealModule
+import org.phantom.internal.seal.YearOfTheSealModule
 ```
 
 Inside `ModuleManager.addModules(listOf(...))`, add `YearOfTheSealModule` after `FishingMacroModule`:
@@ -112,8 +112,8 @@ Expected: `BUILD SUCCESSFUL`. Fix any compile errors before continuing.
 - [x] **Step 4: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/seal/YearOfTheSealModule.kt \
-        src/main/kotlin/org/cobalt/Cobalt.kt
+git add src/main/kotlin/org/phantom/internal/seal/YearOfTheSealModule.kt \
+        src/main/kotlin/org/phantom/Phantom.kt
 git commit -m "feat(seal): module skeleton with settings and registration"
 ```
 
@@ -122,7 +122,7 @@ git commit -m "feat(seal): module skeleton with settings and registration"
 ### Task 2: Ball entity detection
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/seal/YearOfTheSealModule.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/seal/YearOfTheSealModule.kt`
 
 - [x] **Step 1: Add the `BallPredictor` stub class**
 
@@ -183,7 +183,7 @@ fun onTick(@Suppress("UNUSED_PARAMETER") event: TickEvent.Start) {
         predictor.update(Vec3(entity.x, entity.y, entity.z))
     }
 
-    // Pathfinding — implemented in Task 5
+    // Pathfinding â€” implemented in Task 5
 }
 
 private fun stopAll() {
@@ -204,7 +204,7 @@ Expected: `BUILD SUCCESSFUL`.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/seal/YearOfTheSealModule.kt
+git add src/main/kotlin/org/phantom/internal/seal/YearOfTheSealModule.kt
 git commit -m "feat(seal): ball entity detection and predictor lifecycle"
 ```
 
@@ -213,7 +213,7 @@ git commit -m "feat(seal): ball entity detection and predictor lifecycle"
 ### Task 3: Position tracking and bounce detection
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/seal/YearOfTheSealModule.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/seal/YearOfTheSealModule.kt`
 
 - [x] **Step 1: Replace the `BallPredictor.update` stub with full implementation**
 
@@ -224,16 +224,16 @@ fun update(pos: Vec3) {
     data.add(pos)
     if (pos.y < minY) minY = pos.y
 
-    // Skip bounce logic on first tick — lastPos is uninitialized
+    // Skip bounce logic on first tick â€” lastPos is uninitialized
     if (data.size == 1) { lastPos = pos; return }
 
-    // Bounce detection — skip if movement too small or debounce active
+    // Bounce detection â€” skip if movement too small or debounce active
     val dist = pos.distanceTo(lastPos)
     if (dist >= 0.3) {
         val dy = pos.y - lastPos.y
         val nowMs = System.currentTimeMillis()
         if (dy > 0.0 && !positiveYDelta && (nowMs - lastBounceMs) > 800L) {
-            // Ball just started going up — it bounced
+            // Ball just started going up â€” it bounced
             bounceCounter++
             lastBounceMs = nowMs
             startIndex = data.lastIndex   // reset prediction slice to this bounce
@@ -266,7 +266,7 @@ Expected: `BUILD SUCCESSFUL`.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/seal/YearOfTheSealModule.kt
+git add src/main/kotlin/org/phantom/internal/seal/YearOfTheSealModule.kt
 git commit -m "feat(seal): position tracking and bounce detection"
 ```
 
@@ -275,7 +275,7 @@ git commit -m "feat(seal): position tracking and bounce detection"
 ### Task 4: Polynomial regression models and landing prediction
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/seal/YearOfTheSealModule.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/seal/YearOfTheSealModule.kt`
 
 - [x] **Step 1: Add the shared quadratic solver and model base**
 
@@ -411,7 +411,7 @@ Expected: `BUILD SUCCESSFUL`.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/seal/YearOfTheSealModule.kt
+git add src/main/kotlin/org/phantom/internal/seal/YearOfTheSealModule.kt
 git commit -m "feat(seal): 3-model polynomial regression landing prediction"
 ```
 
@@ -420,7 +420,7 @@ git commit -m "feat(seal): 3-model polynomial regression landing prediction"
 ### Task 5: Pathfinding integration and cleanup
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/seal/YearOfTheSealModule.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/seal/YearOfTheSealModule.kt`
 
 - [x] **Step 1: Wire pathfinding into `onTick`**
 
@@ -433,7 +433,7 @@ val target = predictors.values
     ?.landingPos
 
 if (target == null) {
-    // No valid prediction yet — release pathfinder if we held it
+    // No valid prediction yet â€” release pathfinder if we held it
     if (lastIssuedTarget != null) {
         NativePathfinder.stop()
         MovementManager.clearForcedMovement()
@@ -479,7 +479,7 @@ Add this event handler inside `YearOfTheSealModule`:
 
 ```kotlin
 @SubscribeEvent
-fun onRespawn(event: org.cobalt.api.event.impl.client.PacketEvent.Incoming) {
+fun onRespawn(event: org.phantom.api.event.impl.client.PacketEvent.Incoming) {
     if (event.packet is net.minecraft.network.protocol.game.ClientboundRespawnPacket) {
         stopAll()
     }
@@ -501,7 +501,7 @@ Run:
 ```
 
 With the module enabled, enter a SkyBlock hub during the Year of the Seal event. Verify:
-- Module appears in the Cobalt module list under "Year of the Seal"
+- Module appears in the Phantom module list under "Year of the Seal"
 - Toggle keybind enables/disables without crash
 - While a beach ball is rolling, check that after 2+ bounces the player starts walking toward the landing spot
 - Player stops moving when the ball despawns or module is toggled off
@@ -509,6 +509,6 @@ With the module enabled, enter a SkyBlock hub during the Year of the Seal event.
 - [ ] **Step 6: Final commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/seal/YearOfTheSealModule.kt
+git add src/main/kotlin/org/phantom/internal/seal/YearOfTheSealModule.kt
 git commit -m "feat(seal): pathfinding integration and cleanup on disable/respawn"
 ```

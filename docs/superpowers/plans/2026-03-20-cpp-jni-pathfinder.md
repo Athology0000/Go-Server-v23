@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace all per-macro pathfinding with a single C++ JNI engine (`cobalt_pathfinder.dll`) that handles A*, movement, stuck detection, and human-like rotation for all macros (routes, mining, garden, farming, pig, combat/slayer).
+**Goal:** Replace all per-macro pathfinding with a single C++ JNI engine (`phantom_pathfinder.dll`) that handles A*, movement, stuck detection, and human-like rotation for all macros (routes, mining, garden, farming, pig, combat/slayer).
 
-**Architecture:** C++ engine owns the full state machine — planning, execution, recovery, rotation. Kotlin calls `NativePathfinder.tick()` once per `TickEvent.Start` and receives `PathCommand` (keys + rotation). All macros replace their own pathfinding with 2 lines: `setRoute(...)` + `tick()?.applyToPlayer()`.
+**Architecture:** C++ engine owns the full state machine â€” planning, execution, recovery, rotation. Kotlin calls `NativePathfinder.tick()` once per `TickEvent.Start` and receives `PathCommand` (keys + rotation). All macros replace their own pathfinding with 2 lines: `setRoute(...)` + `tick()?.applyToPlayer()`.
 
 **Tech Stack:** C++17 / MSVC / CMake (Windows only), JNI, Kotlin, Fabric Minecraft 1.21.11
 
@@ -12,53 +12,53 @@
 
 ## File Map
 
-**New — C++ (natives/)**
-- `natives/CMakeLists.txt` — build definition
-- `natives/include/Types.h` — all shared structs/enums (Vec3i, PathNode, PathCommand, PathStatus, ActionType, MovementProfile)
-- `natives/src/engine/WorldAccessor.h/.cpp` — hybrid buffer + JNI callback block query
-- `natives/src/engine/MovementExpander.h/.cpp` — A* neighbor/edge generation for all action types
-- `natives/src/engine/AStarPlanner.h/.cpp` — async A* on `std::thread`
-- `natives/src/engine/StuckDetector.h/.cpp` — position history, stuck detection + recovery trigger
-- `natives/src/engine/RotationController.h/.cpp` — bezier curves, GCD correction, micro-noise
-- `natives/src/engine/PathExecutor.h/.cpp` — IDLE/PLANNING/EXECUTING/RECOVERING/REPLANNING/ARRIVED state machine
-- `natives/src/engine/PathfinderEngine.h/.cpp` — top-level object; owns all subsystems
-- `natives/src/pathfinder_jni.cpp` — JNI entry points
+**New â€” C++ (natives/)**
+- `natives/CMakeLists.txt` â€” build definition
+- `natives/include/Types.h` â€” all shared structs/enums (Vec3i, PathNode, PathCommand, PathStatus, ActionType, MovementProfile)
+- `natives/src/engine/WorldAccessor.h/.cpp` â€” hybrid buffer + JNI callback block query
+- `natives/src/engine/MovementExpander.h/.cpp` â€” A* neighbor/edge generation for all action types
+- `natives/src/engine/AStarPlanner.h/.cpp` â€” async A* on `std::thread`
+- `natives/src/engine/StuckDetector.h/.cpp` â€” position history, stuck detection + recovery trigger
+- `natives/src/engine/RotationController.h/.cpp` â€” bezier curves, GCD correction, micro-noise
+- `natives/src/engine/PathExecutor.h/.cpp` â€” IDLE/PLANNING/EXECUTING/RECOVERING/REPLANNING/ARRIVED state machine
+- `natives/src/engine/PathfinderEngine.h/.cpp` â€” top-level object; owns all subsystems
+- `natives/src/pathfinder_jni.cpp` â€” JNI entry points
 
-**New — Java**
-- `src/main/java/org/cobalt/pathfinder/NativePathfinderBridge.java` — `native` method declarations + DLL loading
-- `src/main/java/org/cobalt/pathfinder/NativeLoader.java` — extracts DLL from JAR to `%TEMP%\cobalt\`
+**New â€” Java**
+- `src/main/java/org/phantom/pathfinder/NativePathfinderBridge.java` â€” `native` method declarations + DLL loading
+- `src/main/java/org/phantom/pathfinder/NativeLoader.java` â€” extracts DLL from JAR to `%TEMP%\phantom\`
 
-**New — Kotlin** (package `org.cobalt.api.pathfinder.jni` — `native` is a Kotlin keyword)
-- `src/main/kotlin/org/cobalt/api/pathfinder/jni/PathStatus.kt`
-- `src/main/kotlin/org/cobalt/api/pathfinder/jni/ActionType.kt`
-- `src/main/kotlin/org/cobalt/api/pathfinder/jni/MovementProfile.kt`
-- `src/main/kotlin/org/cobalt/api/pathfinder/jni/PathCommand.kt`
-- `src/main/kotlin/org/cobalt/api/pathfinder/jni/PathfinderRotationStrategy.kt` — pass-through strategy (C++ already smoothed)
-- `src/main/kotlin/org/cobalt/api/pathfinder/jni/NativePathfinder.kt` — singleton all macros call
-- `src/main/kotlin/org/cobalt/api/pathfinder/jni/WorldBufferSerializer.kt` — serializes nearby MC blocks to `byte[]`
+**New â€” Kotlin** (package `org.phantom.api.pathfinder.jni` â€” `native` is a Kotlin keyword)
+- `src/main/kotlin/org/phantom/api/pathfinder/jni/PathStatus.kt`
+- `src/main/kotlin/org/phantom/api/pathfinder/jni/ActionType.kt`
+- `src/main/kotlin/org/phantom/api/pathfinder/jni/MovementProfile.kt`
+- `src/main/kotlin/org/phantom/api/pathfinder/jni/PathCommand.kt`
+- `src/main/kotlin/org/phantom/api/pathfinder/jni/PathfinderRotationStrategy.kt` â€” pass-through strategy (C++ already smoothed)
+- `src/main/kotlin/org/phantom/api/pathfinder/jni/NativePathfinder.kt` â€” singleton all macros call
+- `src/main/kotlin/org/phantom/api/pathfinder/jni/WorldBufferSerializer.kt` â€” serializes nearby MC blocks to `byte[]`
 
 **Modified**
-- `build.gradle.kts` — add `buildNative` task, `processResources` depends on it
-- `src/main/kotlin/org/cobalt/internal/mining/RoutesModule.kt`
-- `src/main/kotlin/org/cobalt/internal/mining/MiningMacroModule.kt`
-- `src/main/kotlin/org/cobalt/internal/mining/CommissionMacroModule.kt`
-- `src/main/kotlin/org/cobalt/internal/garden/GardenMacroModule.kt`
-- `src/main/kotlin/org/cobalt/internal/farming/FarmingMacroModule.kt`
-- `src/main/kotlin/org/cobalt/internal/pig/PigMacroModule.kt`
-- `src/main/kotlin/org/cobalt/internal/combat/CombatMacroModule.kt`
+- `build.gradle.kts` â€” add `buildNative` task, `processResources` depends on it
+- `src/main/kotlin/org/phantom/internal/mining/RoutesModule.kt`
+- `src/main/kotlin/org/phantom/internal/mining/MiningMacroModule.kt`
+- `src/main/kotlin/org/phantom/internal/mining/CommissionMacroModule.kt`
+- `src/main/kotlin/org/phantom/internal/garden/GardenMacroModule.kt`
+- `src/main/kotlin/org/phantom/internal/farming/FarmingMacroModule.kt`
+- `src/main/kotlin/org/phantom/internal/pig/PigMacroModule.kt`
+- `src/main/kotlin/org/phantom/internal/combat/CombatMacroModule.kt`
 
 **Deleted (Phase 7)**
-- `src/main/kotlin/org/cobalt/internal/pathfinding/DuskPathfinder.kt`
-- `src/main/kotlin/org/cobalt/internal/pathfinding/PathOverlayRenderer.kt` (dead code after migration)
-- `src/main/kotlin/org/cobalt/api/pathfinder/PathExecutor.kt`
-- `src/main/kotlin/org/cobalt/internal/pathfinding/PathPlanProfiles.kt`
-- `src/main/kotlin/org/cobalt/internal/pathfinding/PathPlanProfile.kt`
+- `src/main/kotlin/org/phantom/internal/pathfinding/DuskPathfinder.kt`
+- `src/main/kotlin/org/phantom/internal/pathfinding/PathOverlayRenderer.kt` (dead code after migration)
+- `src/main/kotlin/org/phantom/api/pathfinder/PathExecutor.kt`
+- `src/main/kotlin/org/phantom/internal/pathfinding/PathPlanProfiles.kt`
+- `src/main/kotlin/org/phantom/internal/pathfinding/PathPlanProfile.kt`
 
 ---
 
 ## World Buffer Format
 
-A region of blocks is serialized into a flat `byte[]` of size `64 × 32 × 64 = 131072`.
+A region of blocks is serialized into a flat `byte[]` of size `64 Ã— 32 Ã— 64 = 131072`.
 - Origin: `(bufOriginX, bufOriginY, bufOriginZ)` = player block pos minus `(32, 16, 32)`
 - Index: `(x - bx) + (z - bz) * 64 + (y - by) * 64 * 64`
 - Values: `0` = air/passable, `1` = solid, `2` = water, `3` = lava, `4` = ladder
@@ -68,11 +68,11 @@ A region of blocks is serialized into a flat `byte[]` of size `64 × 32 × 64 = 
 `update()` returns `int[10]`:
 ```
 [0] forward  [1] back  [2] jump  [3] sneak  [4] sprint
-[5] targetYaw          (Float.intBitsToFloat — raw, no GCD)
-[6] targetPitch        (Float.intBitsToFloat — raw, no GCD)
+[5] targetYaw          (Float.intBitsToFloat â€” raw, no GCD)
+[6] targetPitch        (Float.intBitsToFloat â€” raw, no GCD)
 [7] PathStatus ordinal
 [8] ActionType ordinal
-[9] distanceToTarget   (Float.intBitsToFloat — horizontal dist to current waypoint)
+[9] distanceToTarget   (Float.intBitsToFloat â€” horizontal dist to current waypoint)
 ```
 
 **GCD note:** C++ outputs raw angles. `RotationExecutor` on the Kotlin side applies GCD correction once. C++ must NOT apply GCD itself.
@@ -111,7 +111,7 @@ struct Vec3i { int x, y, z; };
 
 struct PathCommand {
     bool forward, back, jump, sneak, sprint;
-    float targetYaw, targetPitch;   // raw angles — no GCD applied
+    float targetYaw, targetPitch;   // raw angles â€” no GCD applied
     PathStatus status;
     ActionType activeAction;
     float distanceToTarget;         // horizontal dist to current waypoint target
@@ -135,7 +135,7 @@ static constexpr uint8_t BT_LADDER = 4;
 
 ```cmake
 cmake_minimum_required(VERSION 3.20)
-project(cobalt_pathfinder LANGUAGES CXX)
+project(phantom_pathfinder LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -153,25 +153,25 @@ set(SOURCES
     src/engine/StuckDetector.cpp
 )
 
-add_library(cobalt_pathfinder SHARED ${SOURCES})
+add_library(phantom_pathfinder SHARED ${SOURCES})
 
-target_include_directories(cobalt_pathfinder PRIVATE
+target_include_directories(phantom_pathfinder PRIVATE
     include
     ${JNI_INCLUDE_DIRS}
 )
 
-target_link_libraries(cobalt_pathfinder PRIVATE ${JNI_LIBRARIES})
+target_link_libraries(phantom_pathfinder PRIVATE ${JNI_LIBRARIES})
 
 if(MSVC)
-    target_compile_options(cobalt_pathfinder PRIVATE /O2 /W3)
-    set_target_properties(cobalt_pathfinder PROPERTIES
+    target_compile_options(phantom_pathfinder PRIVATE /O2 /W3)
+    set_target_properties(phantom_pathfinder PROPERTIES
         WINDOWS_EXPORT_ALL_SYMBOLS OFF)
 endif()
 ```
 
 - [ ] **Step 3: Create empty stub `.h` + `.cpp` for each engine file**
 
-For each of: `WorldAccessor`, `MovementExpander`, `AStarPlanner`, `StuckDetector`, `RotationController`, `PathExecutor`, `PathfinderEngine` — create a header with an empty class and a `.cpp` that includes it. Also create an empty `pathfinder_jni.cpp`.
+For each of: `WorldAccessor`, `MovementExpander`, `AStarPlanner`, `StuckDetector`, `RotationController`, `PathExecutor`, `PathfinderEngine` â€” create a header with an empty class and a `.cpp` that includes it. Also create an empty `pathfinder_jni.cpp`.
 
 Example `natives/src/engine/WorldAccessor.h`:
 ```cpp
@@ -206,7 +206,7 @@ Expected: CMake configures without errors, finds JNI headers from the JDK.
 ```bash
 cmake --build build --config Release
 ```
-Expected: `cobalt_pathfinder.dll` appears in `natives/build/Release/`.
+Expected: `phantom_pathfinder.dll` appears in `natives/build/Release/`.
 
 - [ ] **Step 6: Commit**
 
@@ -280,13 +280,13 @@ bool WorldAccessor::inBuffer(int x, int y, int z) const {
 }
 
 uint8_t WorldAccessor::bufferAt(int x, int y, int z) const {
-    // Use named strides — do not inline BUF_W*BUF_D directly (W==D is not guaranteed)
+    // Use named strides â€” do not inline BUF_W*BUF_D directly (W==D is not guaranteed)
     int idx = (x - bx_) + (z - bz_) * BUF_STRIDE_Z + (y - by_) * BUF_STRIDE_Y;
     return buffer_[idx];
 }
 
 uint8_t WorldAccessor::callbackBlock(int, int, int) const {
-    // JNI callbacks from background threads require AttachCurrentThread — not implemented.
+    // JNI callbacks from background threads require AttachCurrentThread â€” not implemented.
     // Buffer is sized to cover all Skyblock pathfinding; treat out-of-range as SOLID.
     return BT_SOLID;
 }
@@ -429,7 +429,7 @@ void MovementExpander::addJumps(const Vec3i& from,
         if (!clearanceOk(nx, ny, nz)) continue;
         out.push_back({{nx, ny, nz}, ActionType::JUMP, costs_.jump + adjacentCost({nx, ny, nz})});
     }
-    // Sprint-jump gap (1–4 blocks)
+    // Sprint-jump gap (1â€“4 blocks)
     for (int i = 0; i < 4; i++) {
         for (int dist = 2; dist <= 4; dist++) {
             int nx = from.x + DX4[i] * dist, nz = from.z + DZ4[i] * dist;
@@ -576,7 +576,7 @@ class AStarPlanner {
 public:
     ~AStarPlanner();
 
-    // Snapshots the world buffer into the thread closure — no shared reference to WorldAccessor.
+    // Snapshots the world buffer into the thread closure â€” no shared reference to WorldAccessor.
     // Safe to call while WorldAccessor is being updated on the main thread.
     void startAsync(Vec3i start, Vec3i goal,
                     const WorldAccessor& world,   // snapshot taken immediately, not stored
@@ -674,7 +674,7 @@ void AStarPlanner::startAsync(Vec3i start, Vec3i goal,
     thread_ = std::thread([this, start, goal, costs,
                            bufSnapshot = std::move(bufSnapshot),
                            snapBx, snapBy, snapBz]() mutable {
-        // Thread-local WorldAccessor — no shared state with main thread
+        // Thread-local WorldAccessor â€” no shared state with main thread
         WorldAccessor localWorld;
         localWorld.setBuffer(bufSnapshot.data(), snapBx, snapBy, snapBz);
         MovementExpander expander(localWorld, costs);
@@ -904,7 +904,7 @@ float RotationController::angleDiff(float a, float b) const {
     return d;
 }
 
-// No GCD in C++ — RotationExecutor (Kotlin) handles GCD once on output.
+// No GCD in C++ â€” RotationExecutor (Kotlin) handles GCD once on output.
 
 float RotationController::lookAheadYaw(double px, double py, double pz) const {
     // Look toward node currentIdx+2 for smoother turns
@@ -971,7 +971,7 @@ git commit -m "feat: implement RotationController (bezier + GCD + micro-noise)"
 - Modify: `natives/src/engine/PathExecutor.h`
 - Modify: `natives/src/engine/PathExecutor.cpp`
 
-Owns the IDLE → PLANNING → EXECUTING → RECOVERING/REPLANNING → ARRIVED state machine. Called once per tick by `PathfinderEngine`.
+Owns the IDLE â†’ PLANNING â†’ EXECUTING â†’ RECOVERING/REPLANNING â†’ ARRIVED state machine. Called once per tick by `PathfinderEngine`.
 
 - [ ] **Step 1: Implement `PathExecutor.h`**
 
@@ -1223,7 +1223,7 @@ PathStatus PathfinderEngine::getStatus() const { return executor_.getStatus(); }
 
 - [ ] **Step 3: Implement `pathfinder_jni.cpp`**
 
-JNI function naming: `Java_org_cobalt_pathfinder_NativePathfinderBridge_<method>`.
+JNI function naming: `Java_org_phantom_pathfinder_NativePathfinderBridge_<method>`.
 
 ```cpp
 #include <jni.h>
@@ -1234,17 +1234,17 @@ JNI function naming: `Java_org_cobalt_pathfinder_NativePathfinderBridge_<method>
 extern "C" {
 
 JNIEXPORT jlong JNICALL
-Java_org_cobalt_pathfinder_NativePathfinderBridge_createEngine(JNIEnv*, jclass) {
+Java_org_phantom_pathfinder_NativePathfinderBridge_createEngine(JNIEnv*, jclass) {
     return (jlong)(new PathfinderEngine());
 }
 
 JNIEXPORT void JNICALL
-Java_org_cobalt_pathfinder_NativePathfinderBridge_destroyEngine(JNIEnv*, jclass, jlong handle) {
+Java_org_phantom_pathfinder_NativePathfinderBridge_destroyEngine(JNIEnv*, jclass, jlong handle) {
     delete (PathfinderEngine*)handle;
 }
 
 JNIEXPORT void JNICALL
-Java_org_cobalt_pathfinder_NativePathfinderBridge_setRoute(JNIEnv* env, jclass,
+Java_org_phantom_pathfinder_NativePathfinderBridge_setRoute(JNIEnv* env, jclass,
         jlong handle, jdoubleArray waypoints, jboolean loop, jint profile) {
     jsize len = env->GetArrayLength(waypoints);
     jdouble* data = env->GetDoubleArrayElements(waypoints, nullptr);
@@ -1253,13 +1253,13 @@ Java_org_cobalt_pathfinder_NativePathfinderBridge_setRoute(JNIEnv* env, jclass,
 }
 
 JNIEXPORT void JNICALL
-Java_org_cobalt_pathfinder_NativePathfinderBridge_setTarget(JNIEnv*, jclass,
+Java_org_phantom_pathfinder_NativePathfinderBridge_setTarget(JNIEnv*, jclass,
         jlong handle, jdouble x, jdouble y, jdouble z) {
     ((PathfinderEngine*)handle)->setTarget(x, y, z);
 }
 
 JNIEXPORT jintArray JNICALL
-Java_org_cobalt_pathfinder_NativePathfinderBridge_update(JNIEnv* env, jclass,
+Java_org_phantom_pathfinder_NativePathfinderBridge_update(JNIEnv* env, jclass,
         jlong handle, jbyteArray worldBuf, jint bx, jint by, jint bz,
         jdouble px, jdouble py, jdouble pz,
         jfloat yaw, jfloat pitch, jboolean onGround) {
@@ -1286,12 +1286,12 @@ Java_org_cobalt_pathfinder_NativePathfinderBridge_update(JNIEnv* env, jclass,
 }
 
 JNIEXPORT void JNICALL
-Java_org_cobalt_pathfinder_NativePathfinderBridge_stop(JNIEnv*, jclass, jlong handle) {
+Java_org_phantom_pathfinder_NativePathfinderBridge_stop(JNIEnv*, jclass, jlong handle) {
     ((PathfinderEngine*)handle)->stop();
 }
 
 JNIEXPORT jint JNICALL
-Java_org_cobalt_pathfinder_NativePathfinderBridge_getStatus(JNIEnv*, jclass, jlong handle) {
+Java_org_phantom_pathfinder_NativePathfinderBridge_getStatus(JNIEnv*, jclass, jlong handle) {
     return (jint)((PathfinderEngine*)handle)->getStatus();
 }
 
@@ -1302,7 +1302,7 @@ Java_org_cobalt_pathfinder_NativePathfinderBridge_getStatus(JNIEnv*, jclass, jlo
 ```bash
 cmake --build natives/build --config Release
 ```
-Expected: `cobalt_pathfinder.dll` in `natives/build/Release/` with no linker errors.
+Expected: `phantom_pathfinder.dll` in `natives/build/Release/` with no linker errors.
 
 - [ ] **Step 5: Commit**
 ```bash
@@ -1315,13 +1315,13 @@ git commit -m "feat: implement PathfinderEngine and JNI entry points"
 ## Task 9: Java Bridge + NativeLoader
 
 **Files:**
-- Create: `src/main/java/org/cobalt/pathfinder/NativeLoader.java`
-- Create: `src/main/java/org/cobalt/pathfinder/NativePathfinderBridge.java`
+- Create: `src/main/java/org/phantom/pathfinder/NativeLoader.java`
+- Create: `src/main/java/org/phantom/pathfinder/NativePathfinderBridge.java`
 
 - [ ] **Step 1: Create `NativeLoader.java`**
 
 ```java
-package org.cobalt.pathfinder;
+package org.phantom.pathfinder;
 
 import java.io.*;
 import java.nio.*;
@@ -1330,7 +1330,7 @@ import java.nio.file.*;
 
 public class NativeLoader {
     public static String extract(String resourcePath) throws IOException {
-        Path tempDir = Path.of(System.getProperty("java.io.tmpdir"), "cobalt");
+        Path tempDir = Path.of(System.getProperty("java.io.tmpdir"), "phantom");
         Files.createDirectories(tempDir);
         String fname = Path.of(resourcePath).getFileName().toString();
         Path dest    = tempDir.resolve(fname);
@@ -1344,7 +1344,7 @@ public class NativeLoader {
             try (InputStream in = NativeLoader.class.getResourceAsStream("/" + resourcePath)) {
                 if (in == null) throw new IOException("Native resource not found: " + resourcePath);
                 byte[] bytes = in.readAllBytes();
-                // CRC32 comparison — size alone is insufficient across recompilations of same-size DLLs
+                // CRC32 comparison â€” size alone is insufficient across recompilations of same-size DLLs
                 if (Files.exists(dest) && crc32(Files.readAllBytes(dest)) == crc32(bytes)) {
                     return dest.toAbsolutePath().toString();
                 }
@@ -1366,15 +1366,15 @@ public class NativeLoader {
 - [ ] **Step 2: Create `NativePathfinderBridge.java`**
 
 ```java
-package org.cobalt.pathfinder;
+package org.phantom.pathfinder;
 
 public class NativePathfinderBridge {
     static {
         try {
-            String path = NativeLoader.extract("natives/windows/cobalt_pathfinder.dll");
+            String path = NativeLoader.extract("natives/windows/phantom_pathfinder.dll");
             System.load(path);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to load cobalt_pathfinder.dll", e);
+            throw new RuntimeException("Failed to load phantom_pathfinder.dll", e);
         }
     }
 
@@ -1393,7 +1393,7 @@ public class NativePathfinderBridge {
 
 - [ ] **Step 3: Commit**
 ```bash
-git add src/main/java/org/cobalt/pathfinder/
+git add src/main/java/org/phantom/pathfinder/
 git commit -m "feat: add NativePathfinderBridge and NativeLoader (Java JNI bridge)"
 ```
 
@@ -1402,56 +1402,56 @@ git commit -m "feat: add NativePathfinderBridge and NativeLoader (Java JNI bridg
 ## Task 10: Kotlin API
 
 **Files:**
-- Create: `src/main/kotlin/org/cobalt/api/pathfinder/jni/PathStatus.kt`
-- Create: `src/main/kotlin/org/cobalt/api/pathfinder/jni/ActionType.kt`
-- Create: `src/main/kotlin/org/cobalt/api/pathfinder/jni/MovementProfile.kt`
-- Create: `src/main/kotlin/org/cobalt/api/pathfinder/jni/PathCommand.kt`
-- Create: `src/main/kotlin/org/cobalt/api/pathfinder/jni/WorldBufferSerializer.kt`
-- Create: `src/main/kotlin/org/cobalt/api/pathfinder/jni/NativePathfinder.kt`
+- Create: `src/main/kotlin/org/phantom/api/pathfinder/jni/PathStatus.kt`
+- Create: `src/main/kotlin/org/phantom/api/pathfinder/jni/ActionType.kt`
+- Create: `src/main/kotlin/org/phantom/api/pathfinder/jni/MovementProfile.kt`
+- Create: `src/main/kotlin/org/phantom/api/pathfinder/jni/PathCommand.kt`
+- Create: `src/main/kotlin/org/phantom/api/pathfinder/jni/WorldBufferSerializer.kt`
+- Create: `src/main/kotlin/org/phantom/api/pathfinder/jni/NativePathfinder.kt`
 
 - [ ] **Step 1: Create enum files**
 
 `PathStatus.kt`:
 ```kotlin
-package org.cobalt.api.pathfinder.jni
+package org.phantom.api.pathfinder.jni
 enum class PathStatus { IDLE, PLANNING, EXECUTING, RECOVERING, REPLANNING, ARRIVED, FAILED }
 ```
 
 `ActionType.kt`:
 ```kotlin
-package org.cobalt.api.pathfinder.jni
+package org.phantom.api.pathfinder.jni
 enum class ActionType { WALK, SPRINT, JUMP, SPRINT_JUMP, FALL, LADDER, WATER_SWIM, AOTV, ETHERWARP }
 ```
 
 `MovementProfile.kt`:
 ```kotlin
-package org.cobalt.api.pathfinder.jni
+package org.phantom.api.pathfinder.jni
 enum class MovementProfile { DEFAULT, MINING, COMBAT, GROUND_ONLY }
 ```
 
-`PathfinderRotationStrategy.kt` — pass-through: C++ already smoothed the angle, just let RotationExecutor apply GCD:
+`PathfinderRotationStrategy.kt` â€” pass-through: C++ already smoothed the angle, just let RotationExecutor apply GCD:
 ```kotlin
-package org.cobalt.api.pathfinder.jni
+package org.phantom.api.pathfinder.jni
 
 import net.minecraft.client.player.LocalPlayer
-import org.cobalt.api.rotation.IRotationStrategy
-import org.cobalt.api.util.helper.Rotation
+import org.phantom.api.rotation.IRotationStrategy
+import org.phantom.api.util.helper.Rotation
 
 object PathfinderRotationStrategy : IRotationStrategy {
     override fun onRotate(player: LocalPlayer, targetYaw: Float, targetPitch: Float): Rotation =
-        Rotation(targetYaw, targetPitch)  // return exact target — RotationExecutor applies GCD once
+        Rotation(targetYaw, targetPitch)  // return exact target â€” RotationExecutor applies GCD once
 }
 ```
 
 - [ ] **Step 2: Create `PathCommand.kt`**
 
 ```kotlin
-package org.cobalt.api.pathfinder.jni
+package org.phantom.api.pathfinder.jni
 
 import net.minecraft.client.Minecraft
-import org.cobalt.api.rotation.RotationExecutor
-import org.cobalt.api.util.helper.Rotation
-import org.cobalt.api.util.player.MovementManager
+import org.phantom.api.rotation.RotationExecutor
+import org.phantom.api.util.helper.Rotation
+import org.phantom.api.util.player.MovementManager
 
 data class PathCommand(
     val forward: Boolean,
@@ -1459,11 +1459,11 @@ data class PathCommand(
     val jump: Boolean,
     val sneak: Boolean,
     val sprint: Boolean,
-    val targetYaw: Float,          // raw — RotationExecutor applies GCD
+    val targetYaw: Float,          // raw â€” RotationExecutor applies GCD
     val targetPitch: Float,        // raw
     val status: PathStatus,
     val activeAction: ActionType,
-    val distanceToTarget: Float,   // horizontal dist to current waypoint — use for interaction range checks
+    val distanceToTarget: Float,   // horizontal dist to current waypoint â€” use for interaction range checks
 ) {
     fun applyToPlayer() {
         // Movement: use setMovementLock + setForcedMovement so Mixin gates work correctly
@@ -1473,7 +1473,7 @@ data class PathCommand(
             left = false, right = false,
             jump, sneak, sprint
         )
-        // Rotation: feed raw angles to RotationExecutor — it applies GCD once via PathfinderRotationStrategy
+        // Rotation: feed raw angles to RotationExecutor â€” it applies GCD once via PathfinderRotationStrategy
         RotationExecutor.rotateTo(Rotation(targetYaw, targetPitch), PathfinderRotationStrategy)
     }
 }
@@ -1481,10 +1481,10 @@ data class PathCommand(
 
 - [ ] **Step 3: Create `WorldBufferSerializer.kt`**
 
-Serializes a 64×32×64 region of MC blocks centered on the player.
+Serializes a 64Ã—32Ã—64 region of MC blocks centered on the player.
 
 ```kotlin
-package org.cobalt.api.pathfinder.jni
+package org.phantom.api.pathfinder.jni
 
 import net.minecraft.client.Minecraft
 import net.minecraft.core.BlockPos
@@ -1528,11 +1528,11 @@ object WorldBufferSerializer {
 - [ ] **Step 4: Create `NativePathfinder.kt`**
 
 ```kotlin
-package org.cobalt.api.pathfinder.jni
+package org.phantom.api.pathfinder.jni
 
 import net.minecraft.client.Minecraft
 import net.minecraft.world.phys.Vec3
-import org.cobalt.pathfinder.NativePathfinderBridge
+import org.phantom.pathfinder.NativePathfinderBridge
 import java.lang.Float.floatToRawIntBits
 
 object NativePathfinder {
@@ -1583,7 +1583,7 @@ object NativePathfinder {
 
 - [ ] **Step 5: Commit**
 ```bash
-git add src/main/kotlin/org/cobalt/api/pathfinder/jni/
+git add src/main/kotlin/org/phantom/api/pathfinder/jni/
 git commit -m "feat: add NativePathfinder Kotlin API and WorldBufferSerializer"
 ```
 
@@ -1602,12 +1602,12 @@ Add before the closing `tasks {` block:
 ```kotlin
 tasks.register<Exec>("buildNative") {
     group = "build"
-    description = "Builds cobalt_pathfinder.dll and copies it into resources"
+    description = "Builds phantom_pathfinder.dll and copies it into resources"
     workingDir(project.projectDir.resolve("natives"))
     commandLine("cmake", "--build", "build", "--config", "Release")
     doLast {
         copy {
-            from(project.projectDir.resolve("natives/build/Release/cobalt_pathfinder.dll"))
+            from(project.projectDir.resolve("natives/build/Release/phantom_pathfinder.dll"))
             into(project.projectDir.resolve("src/main/resources/natives/windows/"))
         }
     }
@@ -1627,9 +1627,9 @@ touch src/main/resources/natives/windows/.gitkeep
 - [ ] **Step 3: Run full build to confirm DLL is embedded in JAR**
 ```bash
 ./gradlew build
-jar tf build/libs/*.jar | grep cobalt_pathfinder
+jar tf build/libs/*.jar | grep phantom_pathfinder
 ```
-Expected: `natives/windows/cobalt_pathfinder.dll` appears in JAR listing.
+Expected: `natives/windows/phantom_pathfinder.dll` appears in JAR listing.
 
 - [ ] **Step 4: Commit**
 ```bash
@@ -1642,13 +1642,13 @@ git commit -m "feat: integrate C++ build into Gradle, embed DLL in JAR"
 ## Task 12: Migrate RoutesModule
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/mining/RoutesModule.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/mining/RoutesModule.kt`
 
 Read the file first to understand current DuskPathfinder usage, then replace with `NativePathfinder`.
 
 - [ ] **Step 1: Read current RoutesModule**
 ```
-Read: src/main/kotlin/org/cobalt/internal/mining/RoutesModule.kt
+Read: src/main/kotlin/org/phantom/internal/mining/RoutesModule.kt
 ```
 
 - [ ] **Step 2: Replace pathfinding calls**
@@ -1673,7 +1673,7 @@ NativePathfinder.tick()?.applyToPlayer()
 
 - [ ] **Step 4: Commit**
 ```bash
-git add src/main/kotlin/org/cobalt/internal/mining/RoutesModule.kt
+git add src/main/kotlin/org/phantom/internal/mining/RoutesModule.kt
 git commit -m "feat: migrate RoutesModule to NativePathfinder"
 ```
 
@@ -1682,15 +1682,15 @@ git commit -m "feat: migrate RoutesModule to NativePathfinder"
 ## Task 13: Migrate Mining Macros
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/mining/MiningMacroModule.kt`
-- Modify: `src/main/kotlin/org/cobalt/internal/mining/CommissionMacroModule.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/mining/MiningMacroModule.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/mining/CommissionMacroModule.kt`
 
 Same pattern as Task 12. Use `MovementProfile.MINING`.
 
 - [ ] **Read both files, replace DuskPathfinder calls, build, commit**
 ```bash
-git add src/main/kotlin/org/cobalt/internal/mining/MiningMacroModule.kt
-git add src/main/kotlin/org/cobalt/internal/mining/CommissionMacroModule.kt
+git add src/main/kotlin/org/phantom/internal/mining/MiningMacroModule.kt
+git add src/main/kotlin/org/phantom/internal/mining/CommissionMacroModule.kt
 git commit -m "feat: migrate mining macros to NativePathfinder"
 ```
 
@@ -1699,13 +1699,13 @@ git commit -m "feat: migrate mining macros to NativePathfinder"
 ## Task 14: Migrate Pig Macro
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/pig/PigMacroModule.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/pig/PigMacroModule.kt`
 
-Garden and farming macros do NOT use DuskPathfinder — skip them. Pig macro needs dynamic target updates (pig moves constantly). Use `NativePathfinder.setTarget(pigPos, arrivalRadius)` each tick instead of `setRoute`. Use `cmd.distanceToTarget` to replace manual distance checks for interaction range and deploy range.
+Garden and farming macros do NOT use DuskPathfinder â€” skip them. Pig macro needs dynamic target updates (pig moves constantly). Use `NativePathfinder.setTarget(pigPos, arrivalRadius)` each tick instead of `setRoute`. Use `cmd.distanceToTarget` to replace manual distance checks for interaction range and deploy range.
 
 - [ ] **Read PigMacroModule:**
 ```
-Read: src/main/kotlin/org/cobalt/internal/pig/PigMacroModule.kt
+Read: src/main/kotlin/org/phantom/internal/pig/PigMacroModule.kt
 ```
 
 - [ ] **Replace SPRINT_TO_PIG / WALK_PRESSURE DuskPathfinder usage:**
@@ -1720,13 +1720,13 @@ cmd.applyToPlayer()
 
 // Replace manual distance checks:
 if (cmd.distanceToTarget <= deployRangeSetting.value) {
-    // within range — proceed to deploy
+    // within range â€” proceed to deploy
 }
 ```
 
 - [ ] **Build + Commit**
 ```bash
-git add src/main/kotlin/org/cobalt/internal/pig/PigMacroModule.kt
+git add src/main/kotlin/org/phantom/internal/pig/PigMacroModule.kt
 git commit -m "feat: migrate pig macro to NativePathfinder"
 ```
 
@@ -1735,13 +1735,13 @@ git commit -m "feat: migrate pig macro to NativePathfinder"
 ## Task 15: Migrate Combat Macro
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/combat/CombatMacroModule.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/combat/CombatMacroModule.kt`
 
-Use `MovementProfile.COMBAT`. Call `setTarget(mob.pos)` every tick — the look-ahead rotation naturally leads the moving mob.
+Use `MovementProfile.COMBAT`. Call `setTarget(mob.pos)` every tick â€” the look-ahead rotation naturally leads the moving mob.
 
 - [ ] **Read CombatMacroModule, replace, build, commit**
 ```bash
-git add src/main/kotlin/org/cobalt/internal/combat/CombatMacroModule.kt
+git add src/main/kotlin/org/phantom/internal/combat/CombatMacroModule.kt
 git commit -m "feat: migrate combat macro to NativePathfinder"
 ```
 
@@ -1753,10 +1753,10 @@ Only run after all macros are confirmed working in-game.
 
 - [ ] **Delete old files:**
 ```bash
-git rm src/main/kotlin/org/cobalt/internal/pathfinding/DuskPathfinder.kt
-git rm src/main/kotlin/org/cobalt/api/pathfinder/PathExecutor.kt
-git rm src/main/kotlin/org/cobalt/internal/pathfinding/PathPlanProfiles.kt
-git rm src/main/kotlin/org/cobalt/internal/pathfinding/PathPlanProfile.kt
+git rm src/main/kotlin/org/phantom/internal/pathfinding/DuskPathfinder.kt
+git rm src/main/kotlin/org/phantom/api/pathfinder/PathExecutor.kt
+git rm src/main/kotlin/org/phantom/internal/pathfinding/PathPlanProfiles.kt
+git rm src/main/kotlin/org/phantom/internal/pathfinding/PathPlanProfile.kt
 ```
 
 - [ ] **Remove imports referencing deleted files in any remaining code, build:**

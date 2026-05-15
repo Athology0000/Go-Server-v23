@@ -4,16 +4,16 @@
 
 **Goal:** Make the pathfinder get stuck far less often by using per-node terrain flags to drive jump/sprint/strafe decisions, and recover much faster when a stall does occur.
 
-**Architecture:** All changes are in `NativePathfinder.kt`. The C++ side already computes per-node flags (`FLAG_STEP_UP_NEXT`, `FLAG_LOW_HEADROOM`, `FLAG_TIGHT_CORRIDOR`) and stores them in `cachedKeyNodeFlags`. Task 1 wires these into movement decisions. Tasks 2–3 tighten stuck detection and add avoid penalties so replanned paths route around recently-stuck positions.
+**Architecture:** All changes are in `NativePathfinder.kt`. The C++ side already computes per-node flags (`FLAG_STEP_UP_NEXT`, `FLAG_LOW_HEADROOM`, `FLAG_TIGHT_CORRIDOR`) and stores them in `cachedKeyNodeFlags`. Task 1 wires these into movement decisions. Tasks 2â€“3 tighten stuck detection and add avoid penalties so replanned paths route around recently-stuck positions.
 
-**Tech Stack:** Kotlin, Fabric Minecraft mod (MC 1.21.11). No unit tests in this project — verify by running `./gradlew build` and observing behaviour in-game.
+**Tech Stack:** Kotlin, Fabric Minecraft mod (MC 1.21.11). No unit tests in this project â€” verify by running `./gradlew build` and observing behaviour in-game.
 
 ---
 
 ### Task 1: Flag-aware action selection and PathCommand construction
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/api/pathfinder/jni/NativePathfinder.kt`
+- Modify: `src/main/kotlin/org/phantom/api/pathfinder/jni/NativePathfinder.kt`
 
 - [ ] **Step 1: Add flag bit constants**
 
@@ -29,11 +29,11 @@
 
 - [ ] **Step 2: Update `computeActiveAction` to accept node flags and return SPRINT_JUMP**
 
-  Replace the existing `computeActiveAction` function (lines 467–476):
+  Replace the existing `computeActiveAction` function (lines 467â€“476):
 
   ```kotlin
   private fun computeActiveAction(nodes: List<Vec3>, cursor: Int, aotvAvailable: Boolean, nodeFlags: Int): ActionType {
-      // AOTV takes priority — long straight leg between key nodes
+      // AOTV takes priority â€” long straight leg between key nodes
       if (aotvAvailable && nodes.size >= 2) {
           val current = nodes.getOrNull(cursor)
           val next = nodes.getOrNull(cursor + 1)
@@ -49,7 +49,7 @@
   }
   ```
 
-- [ ] **Step 3: Wire flags into `tick()` — read flags, update `computeActiveAction` call and PathCommand construction**
+- [ ] **Step 3: Wire flags into `tick()` â€” read flags, update `computeActiveAction` call and PathCommand construction**
 
   In `tick()`, find the block starting at:
   ```kotlin
@@ -95,7 +95,7 @@
 - [ ] **Step 5: Commit**
 
   ```bash
-  git add src/main/kotlin/org/cobalt/api/pathfinder/jni/NativePathfinder.kt
+  git add src/main/kotlin/org/phantom/api/pathfinder/jni/NativePathfinder.kt
   git commit -m "feat(pathfinder): use per-node flags for jump/sprint/strafe decisions"
   ```
 
@@ -104,7 +104,7 @@
 ### Task 2: Faster stuck detection and vertical stall detection
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/api/pathfinder/jni/NativePathfinder.kt`
+- Modify: `src/main/kotlin/org/phantom/api/pathfinder/jni/NativePathfinder.kt`
 
 - [ ] **Step 1: Reduce coarse stuck interval and add vertical stall state**
 
@@ -154,13 +154,13 @@
   lastVerticalCheckPos = Vec3.ZERO
   ```
 
-  Do the same in `onLevelChange()` — same location pattern.
+  Do the same in `onLevelChange()` â€” same location pattern.
 
 - [ ] **Step 4: Add vertical stall check in `tick()`**
 
   In `tick()`, find the coarse stuck detection block:
   ```kotlin
-  // Stuck detection — only trigger new replan when EXECUTING (not already REPLANNING)
+  // Stuck detection â€” only trigger new replan when EXECUTING (not already REPLANNING)
   stuckTicks++
   if (stuckTicks >= STUCK_CHECK_INTERVAL && state == PathStatus.EXECUTING) {
   ```
@@ -168,7 +168,7 @@
   Insert the following block **immediately before** that comment:
 
   ```kotlin
-  // Vertical stall — if the upcoming node is a step-up but Y hasn't risen, replan
+  // Vertical stall â€” if the upcoming node is a step-up but Y hasn't risen, replan
   if (state == PathStatus.EXECUTING) {
       val upcomingFlags = cachedKeyNodeFlags.getOrElse(pathNodeCursor) { 0 }
       if (upcomingFlags and FLAG_STEP_UP_NEXT != 0) {
@@ -200,7 +200,7 @@
 - [ ] **Step 6: Commit**
 
   ```bash
-  git add src/main/kotlin/org/cobalt/api/pathfinder/jni/NativePathfinder.kt
+  git add src/main/kotlin/org/phantom/api/pathfinder/jni/NativePathfinder.kt
   git commit -m "feat(pathfinder): reduce stuck interval to 20t, add vertical stall detector"
   ```
 
@@ -209,7 +209,7 @@
 ### Task 3: Transient avoid penalties on replan
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/api/pathfinder/jni/NativePathfinder.kt`
+- Modify: `src/main/kotlin/org/phantom/api/pathfinder/jni/NativePathfinder.kt`
 
 - [ ] **Step 1: Add avoid-penalty constants and state**
 
@@ -232,7 +232,7 @@
   ```kotlin
   import net.minecraft.core.BlockPos
   ```
-  (It is already imported — check the import block to confirm before adding.)
+  (It is already imported â€” check the import block to confirm before adding.)
 
 - [ ] **Step 2: Reset new state in `stop()` and `onLevelChange()`**
 
@@ -244,7 +244,7 @@
 
   Do the same in `onLevelChange()`.
 
-  Also add a clear in `startSearch()` — new navigation target means old stuck positions are irrelevant. Find:
+  Also add a clear in `startSearch()` â€” new navigation target means old stuck positions are irrelevant. Find:
   ```kotlin
   private fun startSearch() {
       cancelSearch()
@@ -374,6 +374,6 @@
 - [ ] **Step 7: Commit**
 
   ```bash
-  git add src/main/kotlin/org/cobalt/api/pathfinder/jni/NativePathfinder.kt
+  git add src/main/kotlin/org/phantom/api/pathfinder/jni/NativePathfinder.kt
   git commit -m "feat(pathfinder): add transient avoid penalties on replan to route around stuck positions"
   ```

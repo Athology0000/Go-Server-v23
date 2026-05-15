@@ -18,19 +18,19 @@ There are no unit tests in this project.
 
 ## Project Overview
 
-Cobalt is a Fabric Minecraft mod (MC 1.21.11, Java 21, Kotlin) that provides a modular automation framework. It uses official Mojang mappings via Fabric Loom. The entry point is `org.cobalt.Cobalt` (client) and `org.cobalt.PreLaunch` (pre-launch).
+Phantom is a Fabric Minecraft mod (MC 1.21.11, Java 21, Kotlin) that provides a modular automation framework. It uses official Mojang mappings via Fabric Loom. The entry point is `org.phantom.Phantom` (client) and `org.phantom.PreLaunch` (pre-launch).
 
 ## Source Layout
 
 ```
 src/main/
-  java/org/cobalt/
+  java/org/phantom/
     bridge/module/     # Java interfaces for Mixin injection targets
     init/              # MixinAutoDiscover (pre-launch mixin registration)
     mixin/             # All Mixin classes (client/, render/, network/, rsa/)
     render/            # Java-side renderers (DarkModeRenderer, etc.)
-  kotlin/org/cobalt/
-    api/               # Public API — everything addons can use
+  kotlin/org/phantom/
+    api/               # Public API â€” everything addons can use
       addon/           # Addon base class and metadata
       command/         # Command base class, CommandManager, annotations
       event/           # EventBus, Event base, all event types
@@ -50,21 +50,21 @@ src/main/
       garden/          # GardenMacroModule, GardenConfig, ScriptBridge, managers/
       grotto/          # GrottoModule, route scanning, Crystal Hollows utilities
       helper/          # Config (save/load), WalkbackBridge
-      loader/          # AddonLoader — discovers and loads addon JARs
+      loader/          # AddonLoader â€” discovers and loads addon JARs
       mining/          # MiningModule, MiningMacroModule, RoutesModule, etc.
       pathfinding/     # DuskPathfinder, HeadRotationModule, path profiles
       pig/             # PigMacroModule
       qol/             # QolModule
       rotation/        # RotationsModule
       spotify/         # SpotifyModule
-      ui/              # All NanoVG UI — panels, components, HUD editor, themes
+      ui/              # All NanoVG UI â€” panels, components, HUD editor, themes
       visual/          # FullBright, DarkMode, BlockOverlay, Freecam, etc.
 ```
 
 ## Core Systems
 
 ### Module System
-All features are `Module` subclasses. Modules are registered in `Cobalt.onInitializeClient()`. Settings use Kotlin property delegation:
+All features are `Module` subclasses. Modules are registered in `Phantom.onInitializeClient()`. Settings use Kotlin property delegation:
 ```kotlin
 class MyModule : Module("My Module") {
   val speed by SliderSetting("Speed", "Speed multiplier", 1.0, 0.1, 5.0)
@@ -102,10 +102,10 @@ val myHud = hudElement("my-hud", "My HUD") {
 Commands extend `Command(name, aliases)`. Methods annotated with `@DefaultHandler` handle the base command; `@SubCommand("name")` handles subcommands. Register via `CommandManager.register(...)`.
 
 ### Addon System
-External addons are JARs placed in `config/cobalt/addons/`. Each JAR must contain `cobalt.addon.json` specifying `id`, `name`, `version`, `entrypoints` (classes implementing `Addon`), and optional `mixins`. In development mode, Fabric entrypoints named `"cobalt"` are also discovered. Implement `Addon.onLoad()`, `onUnload()`, and override `getModules()` to register modules.
+External addons are JARs placed in `config/phantom/addons/`. Each JAR must contain `phantom.addon.json` specifying `id`, `name`, `version`, `entrypoints` (classes implementing `Addon`), and optional `mixins`. In development mode, Fabric entrypoints named `"phantom"` are also discovered. Implement `Addon.onLoad()`, `onUnload()`, and override `getModules()` to register modules.
 
 ### Config Persistence
-Settings and HUD positions are serialized automatically to `config/cobalt/addons.json`. Themes save to `config/cobalt/themes.json`. `Config.loadModulesConfig()` is called at startup; `Config.saveModulesConfig()` must be called explicitly to persist changes (triggered by the UI).
+Settings and HUD positions are serialized automatically to `config/phantom/addons.json`. Themes save to `config/phantom/themes.json`. `Config.loadModulesConfig()` is called at startup; `Config.saveModulesConfig()` must be called explicitly to persist changes (triggered by the UI).
 
 ### Rotation System
 `RotationExecutor` applies GCD-aware rotation smoothing each render frame (`WorldRenderEvent.Last`). Call `RotationExecutor.rotateTo(endRot, strategy)` with an `IRotationStrategy`. Built-in strategies: `BezierTrackingRotationStrategy`, `TimedEaseStrategy`, `TrackingRotationStrategy`, `HeadRotationStrategy`.

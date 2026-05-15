@@ -1,13 +1,13 @@
-# Year of the Seal Macro — Design Spec
+# Year of the Seal Macro â€” Design Spec
 
 **Date:** 2026-04-22
-**Feature:** `YearOfTheSealModule` — automatically pathfinds to the predicted beach ball landing position during the Year of the Seal SkyBlock event.
+**Feature:** `YearOfTheSealModule` â€” automatically pathfinds to the predicted beach ball landing position during the Year of the Seal SkyBlock event.
 
 ---
 
 ## Overview
 
-A standalone Cobalt module (`object : Module("Year of the Seal")`) that:
+A standalone Phantom module (`object : Module("Year of the Seal")`) that:
 1. Detects the beach ball entity each tick
 2. Tracks its position history and detects bounces
 3. Runs SkyHanni's 3-model polynomial regression to predict the landing position
@@ -20,27 +20,27 @@ The prediction logic is a Kotlin port of SkyHanni's `BeachBallCatchHelper.kt` (P
 ## File Layout
 
 ```
-src/main/kotlin/org/cobalt/internal/seal/
+src/main/kotlin/org/phantom/internal/seal/
   YearOfTheSealModule.kt   # module + BallPredictor + polynomial model classes
 ```
 
-Registered in `Cobalt.onInitializeClient()` alongside other modules.
+Registered in `Phantom.onInitializeClient()` alongside other modules.
 
 ---
 
 ## Ball Entity Detection
 
 The beach ball is represented by two entities at the same XZ position:
-- **Invisible Slime** — physics entity, `maxHealth == 1024f`, `isInvisible == true`
-- **Invisible Armor Stand** — visual skull display (ignored by this module)
+- **Invisible Slime** â€” physics entity, `maxHealth == 1024f`, `isInvisible == true`
+- **Invisible Armor Stand** â€” visual skull display (ignored by this module)
 
 Each `TickEvent.Start`, scan `mc.level?.entitiesForRendering()` for:
 ```
 entity is Slime && entity.isInvisible && entity.maxHealth == 1024f
 ```
 
-- New matches → add `BallPredictor(entityId)` to `predictors: MutableMap<Int, BallPredictor>`
-- Entries whose entity is removed or no longer present → remove and call `NativePathfinder.stop()` if it was the active target
+- New matches â†’ add `BallPredictor(entityId)` to `predictors: MutableMap<Int, BallPredictor>`
+- Entries whose entity is removed or no longer present â†’ remove and call `NativePathfinder.stop()` if it was the active target
 
 ---
 
@@ -60,7 +60,7 @@ One instance per tracked ball entity. Owns all position history, bounce detectio
 | `positive` | `Boolean` | Whether Y-delta was positive last update |
 | `lastPosition` | `Vec3` | Previous position for delta calculation |
 | `landingPos` | `Vec3?` | Current best landing prediction (null if insufficient data) |
-| `predictionTick` | `Int` | Counter mod 3 — prediction updates every 3 ticks |
+| `predictionTick` | `Int` | Counter mod 3 â€” prediction updates every 3 ticks |
 
 ### `update(pos: Vec3)`
 
@@ -76,8 +76,8 @@ Called every tick with the slime's current position.
    - Skip if `lastPosition.distance(pos) < 0.3` (entity hasn't moved meaningfully)
 4. **Prediction refresh** (every 3 ticks):
    - Run all 3 models against `data.subList(startIndex, data.lastIndex)`
-   - Collect valid model outputs (those with enough data, landing within ±1 block of `minY`)
-   - Average X and Z of valid outputs → set `landingPos`
+   - Collect valid model outputs (those with enough data, landing within Â±1 block of `minY`)
+   - Average X and Z of valid outputs â†’ set `landingPos`
 
 ---
 
@@ -96,9 +96,9 @@ abstract class PolyModel {
 `predict()` shared logic:
 1. Pull three sample indices `(t1, t2, t3)` from the subclass
 2. Extract Y values `(y1, y2, y3)` at those indices
-3. Fit quadratic: solve for `a, b, c` in `y = a·t² + b·t + c`
+3. Fit quadratic: solve for `a, b, c` in `y = aÂ·tÂ² + bÂ·t + c`
 4. Compute average X and Z drift per tick across the slice
-5. Extrapolate forward (up to 300 ticks) until `poly(t) ≤ minY`
+5. Extrapolate forward (up to 300 ticks) until `poly(t) â‰¤ minY`
 6. Return the extrapolated `Vec3` at landing, or `null` if the ball never reaches `minY` within the window
 
 ### SmallPoly
@@ -107,7 +107,7 @@ abstract class PolyModel {
 
 ### AveragePoly
 - `minPoints = 7`
-- Samples: average of pairs at `(t-1, t-2)`, `(t-3, t-4)`, `(t-5, t-6)` → 3 smoothed Y values
+- Samples: average of pairs at `(t-1, t-2)`, `(t-3, t-4)`, `(t-5, t-6)` â†’ 3 smoothed Y values
 - Reduces noise on noisy motion data
 
 ### SpreadPoly
@@ -120,7 +120,7 @@ abstract class PolyModel {
 ## Pathfinding Integration
 
 In `onTick`:
-1. If `!enabled` or `predictors.isEmpty()` → return
+1. If `!enabled` or `predictors.isEmpty()` â†’ return
 2. Pick the first predictor with `bounceCounter >= minBounces.value && landingPos != null`
 3. If the landing position has shifted more than **0.5 blocks** from the last issued target:
    - Call `NativePathfinder.setTarget(landingPos.x, minY, landingPos.z)`
@@ -148,7 +148,7 @@ On disable / island change / all balls removed: `NativePathfinder.stop()`, `Move
 | `TickEvent.Start` | Scan for new ball entities, update predictors, pathfind |
 | `WorldRenderEvent.Last` | (optional future) render landing spot overlay |
 
-No `BlockChangeEvent` or `PacketEvent` subscriptions needed — position polling each tick is sufficient.
+No `BlockChangeEvent` or `PacketEvent` subscriptions needed â€” position polling each tick is sufficient.
 
 ---
 

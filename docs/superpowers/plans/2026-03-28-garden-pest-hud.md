@@ -6,7 +6,7 @@
 
 **Architecture:** A new `GardenHudModule` (Kotlin object) polls `PestTabListParser` on every `TickEvent.Start`, maintaining a local `cooldownDeadline` (epoch ms) so the cooldown counts down smoothly between ticks. Rendering is a `hudElement()` that draws labelled rows with `NVGRenderer`. Only renders when the Garden scoreboard/tab text is detected.
 
-**Tech Stack:** Kotlin, Cobalt hudElement DSL, NVGRenderer, existing `PestTabListParser` + `PestManager`.
+**Tech Stack:** Kotlin, Phantom hudElement DSL, NVGRenderer, existing `PestTabListParser` + `PestManager`.
 
 ---
 
@@ -14,39 +14,39 @@
 
 | File | Action | Purpose |
 |---|---|---|
-| `src/main/kotlin/org/cobalt/internal/garden/GardenHudModule.kt` | Create | Module + hudElement with tick-driven state |
-| `src/main/kotlin/org/cobalt/Cobalt.kt` | Modify | Register GardenHudModule |
+| `src/main/kotlin/org/phantom/internal/garden/GardenHudModule.kt` | Create | Module + hudElement with tick-driven state |
+| `src/main/kotlin/org/phantom/Phantom.kt` | Modify | Register GardenHudModule |
 
 ---
 
 ### Task 1: GardenHudModule
 
 **Files:**
-- Create: `src/main/kotlin/org/cobalt/internal/garden/GardenHudModule.kt`
+- Create: `src/main/kotlin/org/phantom/internal/garden/GardenHudModule.kt`
 
 - [ ] **Step 1: Create GardenHudModule.kt**
 
 ```kotlin
-package org.cobalt.internal.garden
+package org.phantom.internal.garden
 
 import net.minecraft.client.Minecraft
-import org.cobalt.api.event.EventBus
-import org.cobalt.api.event.annotation.SubscribeEvent
-import org.cobalt.api.event.impl.client.TickEvent
-import org.cobalt.api.hud.HudAnchor
-import org.cobalt.api.hud.hudElement
-import org.cobalt.api.module.Module
-import org.cobalt.api.module.setting.impl.CheckboxSetting
-import org.cobalt.api.util.ui.NVGRenderer
-import org.cobalt.internal.garden.managers.PestManager
-import org.cobalt.internal.garden.managers.PestTabListParser
-import org.cobalt.mixin.client.TabOverlayAccessor
+import org.phantom.api.event.EventBus
+import org.phantom.api.event.annotation.SubscribeEvent
+import org.phantom.api.event.impl.client.TickEvent
+import org.phantom.api.hud.HudAnchor
+import org.phantom.api.hud.hudElement
+import org.phantom.api.module.Module
+import org.phantom.api.module.setting.impl.CheckboxSetting
+import org.phantom.api.util.ui.NVGRenderer
+import org.phantom.internal.garden.managers.PestManager
+import org.phantom.internal.garden.managers.PestTabListParser
+import org.phantom.mixin.client.TabOverlayAccessor
 
 object GardenHudModule : Module("Garden HUD") {
 
     private val mc = Minecraft.getInstance()
 
-    // ── State updated every tick ──────────────────────────────────────────────
+    // â”€â”€ State updated every tick â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     private var alivePests       = 0
     private var infestedPlots    = emptyList<String>()
     private var bonusActive      = false
@@ -54,7 +54,7 @@ object GardenHudModule : Module("Garden HUD") {
     private var lastSpawnedAt    = 0L   // epoch ms of last pest spawn
     private var prevAliveCount   = 0
 
-    // ── Layout constants ──────────────────────────────────────────────────────
+    // â”€â”€ Layout constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     private const val ROW_H   = 15f
     private const val FONT_SZ = 10f
     private const val PAD     = 8f
@@ -64,7 +64,7 @@ object GardenHudModule : Module("Garden HUD") {
         EventBus.register(this)
     }
 
-    // ── hudElement ────────────────────────────────────────────────────────────
+    // â”€â”€ hudElement â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     val pestHud = hudElement("garden-pest-hud", "Garden Pest HUD", "Shows pest cooldown and status in the Garden") {
         anchor = HudAnchor.TOP_LEFT
@@ -85,7 +85,7 @@ object GardenHudModule : Module("Garden HUD") {
             var rowY = y + PAD
 
             fun row(label: String, value: String, valueColor: Int) {
-                val theme = org.cobalt.api.ui.theme.ThemeManager.currentTheme
+                val theme = org.phantom.api.ui.theme.ThemeManager.currentTheme
                 NVGRenderer.text(label, x + PAD, rowY, FONT_SZ, theme.text)
                 NVGRenderer.text(value, x + PAD + 110f, rowY, FONT_SZ, valueColor)
                 rowY += ROW_H
@@ -122,7 +122,7 @@ object GardenHudModule : Module("Garden HUD") {
         }
     }
 
-    // ── Tick-driven state update ──────────────────────────────────────────────
+    // â”€â”€ Tick-driven state update â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     @SubscribeEvent
     fun onTick(event: TickEvent.Start) {
@@ -150,7 +150,7 @@ object GardenHudModule : Module("Garden HUD") {
         }
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     private fun isInGarden(): Boolean {
         val gui = mc.gui
@@ -182,21 +182,21 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/garden/GardenHudModule.kt
+git add src/main/kotlin/org/phantom/internal/garden/GardenHudModule.kt
 git commit -m "feat: add GardenHudModule with pest cooldown HUD"
 ```
 
 ---
 
-### Task 2: Register GardenHudModule in Cobalt.kt
+### Task 2: Register GardenHudModule in Phantom.kt
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/Cobalt.kt`
+- Modify: `src/main/kotlin/org/phantom/Phantom.kt`
 
 - [ ] **Step 1: Add import**
 
 ```kotlin
-import org.cobalt.internal.garden.GardenHudModule
+import org.phantom.internal.garden.GardenHudModule
 ```
 
 - [ ] **Step 2: Register the module**
@@ -218,7 +218,7 @@ Expected: BUILD SUCCESSFUL.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/Cobalt.kt
+git add src/main/kotlin/org/phantom/Phantom.kt
 git commit -m "feat: register GardenHudModule"
 ```
 
@@ -235,7 +235,7 @@ git commit -m "feat: register GardenHudModule"
 - [ ] "Farming Bonus" shows green "Active" when bonus is active
 - [ ] "Internal CD" row appears and counts down after pest cleaning finishes
 - [ ] HUD does not appear on other islands (e.g. Hub)
-- [ ] HUD position is draggable via Cobalt HUD editor
-- [ ] Module toggles off via Cobalt settings panel
+- [ ] HUD position is draggable via Phantom HUD editor
+- [ ] Module toggles off via Phantom settings panel
 
 ---

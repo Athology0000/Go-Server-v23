@@ -6,7 +6,7 @@
 
 **Architecture:** `ActionSetting` gains an optional dynamic label provider. A new `WalkbackRoutePickerPopup` object (modeled on `UICommissionRoutesPanel`) renders a full-screen modal route list and writes the selection into a per-type `TextSetting`. `CombatMacroModule` is updated with 6 backing settings + 6 action buttons, a helper to look up the current-type setting, and extended area-tracking logic.
 
-**Tech Stack:** Kotlin, NanoVG (`NVGRenderer`), Cobalt event bus (`@SubscribeEvent`), `RoutesModule.getSavedRouteInfos()`, `ScrollHandler`, `ThemeManager`
+**Tech Stack:** Kotlin, NanoVG (`NVGRenderer`), Phantom event bus (`@SubscribeEvent`), `RoutesModule.getSavedRouteInfos()`, `ScrollHandler`, `ThemeManager`
 
 ---
 
@@ -14,27 +14,27 @@
 
 | File | Action |
 |------|--------|
-| `src/main/kotlin/org/cobalt/api/module/setting/impl/ActionSetting.kt` | Modify — add optional `buttonLabelProvider` |
-| `src/main/kotlin/org/cobalt/internal/ui/hud/WalkbackRoutePickerPopup.kt` | **Create** — modal route picker popup |
-| `src/main/kotlin/org/cobalt/internal/combat/CombatMacroModule.kt` | Modify — replace shared setting, add per-type settings/buttons, behavior fixes |
+| `src/main/kotlin/org/phantom/api/module/setting/impl/ActionSetting.kt` | Modify â€” add optional `buttonLabelProvider` |
+| `src/main/kotlin/org/phantom/internal/ui/hud/WalkbackRoutePickerPopup.kt` | **Create** â€” modal route picker popup |
+| `src/main/kotlin/org/phantom/internal/combat/CombatMacroModule.kt` | Modify â€” replace shared setting, add per-type settings/buttons, behavior fixes |
 
 ---
 
 ## Task 1: Extend ActionSetting with dynamic button label
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/api/module/setting/impl/ActionSetting.kt`
+- Modify: `src/main/kotlin/org/phantom/api/module/setting/impl/ActionSetting.kt`
 
 - [ ] **Step 1: Replace file contents**
 
 Replace the entire file with:
 
 ```kotlin
-package org.cobalt.api.module.setting.impl
+package org.phantom.api.module.setting.impl
 
 import com.google.gson.JsonElement
 import com.google.gson.JsonPrimitive
-import org.cobalt.api.module.setting.Setting
+import org.phantom.api.module.setting.Setting
 
 /**
  * Action button setting. Not persisted; used to trigger an action from the UI.
@@ -75,7 +75,7 @@ Expected: `BUILD SUCCESSFUL` (all existing `ActionSetting(...)` callers use posi
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/api/module/setting/impl/ActionSetting.kt
+git add src/main/kotlin/org/phantom/api/module/setting/impl/ActionSetting.kt
 git commit -m "feat: add optional dynamic buttonLabelProvider to ActionSetting"
 ```
 
@@ -84,27 +84,27 @@ git commit -m "feat: add optional dynamic buttonLabelProvider to ActionSetting"
 ## Task 2: Create WalkbackRoutePickerPopup
 
 **Files:**
-- Create: `src/main/kotlin/org/cobalt/internal/ui/hud/WalkbackRoutePickerPopup.kt`
+- Create: `src/main/kotlin/org/phantom/internal/ui/hud/WalkbackRoutePickerPopup.kt`
 
 - [ ] **Step 1: Create the file**
 
 ```kotlin
-package org.cobalt.internal.ui.hud
+package org.phantom.internal.ui.hud
 
 import java.awt.Color
 import net.minecraft.client.Minecraft
-import org.cobalt.api.event.annotation.SubscribeEvent
-import org.cobalt.api.event.impl.client.MouseEvent
-import org.cobalt.api.event.impl.render.NvgEvent
-import org.cobalt.api.module.setting.impl.TextSetting
-import org.cobalt.api.ui.theme.ThemeManager
-import org.cobalt.api.util.ui.NVGRenderer
-import org.cobalt.internal.mining.RoutesModule
-import org.cobalt.internal.ui.components.settings.UICheckboxSetting
-import org.cobalt.internal.ui.util.ScrollHandler
-import org.cobalt.internal.ui.util.isHoveringOver
-import org.cobalt.internal.ui.util.mouseX
-import org.cobalt.internal.ui.util.mouseY
+import org.phantom.api.event.annotation.SubscribeEvent
+import org.phantom.api.event.impl.client.MouseEvent
+import org.phantom.api.event.impl.render.NvgEvent
+import org.phantom.api.module.setting.impl.TextSetting
+import org.phantom.api.ui.theme.ThemeManager
+import org.phantom.api.util.ui.NVGRenderer
+import org.phantom.internal.mining.RoutesModule
+import org.phantom.internal.ui.components.settings.UICheckboxSetting
+import org.phantom.internal.ui.util.ScrollHandler
+import org.phantom.internal.ui.util.isHoveringOver
+import org.phantom.internal.ui.util.mouseX
+import org.phantom.internal.ui.util.mouseY
 
 internal object WalkbackRoutePickerPopup {
 
@@ -163,7 +163,7 @@ internal object WalkbackRoutePickerPopup {
     NVGRenderer.hollowRect(panelX, panelY, PANEL_W, PANEL_H, 1f, theme.controlBorder, 10f)
 
     // Title
-    NVGRenderer.text("Walkback Route — $slayerTypeName", panelX + PAD, panelY + 22f, 13f, theme.text)
+    NVGRenderer.text("Walkback Route â€” $slayerTypeName", panelX + PAD, panelY + 22f, 13f, theme.text)
 
     // Subtitle
     NVGRenderer.text(
@@ -373,7 +373,7 @@ internal object WalkbackRoutePickerPopup {
 
 - [ ] **Step 2: Check MouseEvent.Scroll exists**
 
-Run: `grep -r "class Scroll\|object Scroll" src/main/kotlin/org/cobalt/api/event/`
+Run: `grep -r "class Scroll\|object Scroll" src/main/kotlin/org/phantom/api/event/`
 
 If `MouseEvent.Scroll` does not exist, replace the `onMouseScroll` handler with scroll handling inside `onMouseLeft` (no-op: scroll event will be added later). If it does exist, proceed.
 
@@ -385,7 +385,7 @@ Expected: `BUILD SUCCESSFUL`
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/ui/hud/WalkbackRoutePickerPopup.kt
+git add src/main/kotlin/org/phantom/internal/ui/hud/WalkbackRoutePickerPopup.kt
 git commit -m "feat: add WalkbackRoutePickerPopup styled like commission routes panel"
 ```
 
@@ -394,7 +394,7 @@ git commit -m "feat: add WalkbackRoutePickerPopup styled like commission routes 
 ## Task 3: Add per-slayer route settings and action buttons in CombatMacroModule
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/combat/CombatMacroModule.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/combat/CombatMacroModule.kt`
 
 - [ ] **Step 1: Add 6 backing TextSettings after the existing slayerWalkbackRoute declaration (line ~374)**
 
@@ -409,7 +409,7 @@ Find:
 
 Replace with:
 ```kotlin
-  // Per-type walkback route backing settings (persisted; not rendered directly — shown via action buttons below)
+  // Per-type walkback route backing settings (persisted; not rendered directly â€” shown via action buttons below)
   private val zombieWalkbackRoute   = TextSetting("Zombie Walkback Route",   "", "")
   private val wolfWalkbackRoute     = TextSetting("Wolf Walkback Route",     "", "")
   private val spiderWalkbackRoute   = TextSetting("Spider Walkback Route",   "", "")
@@ -465,7 +465,7 @@ Replace with:
 
 In the imports section near the top of `CombatMacroModule.kt`, add:
 ```kotlin
-import org.cobalt.internal.ui.hud.WalkbackRoutePickerPopup
+import org.phantom.internal.ui.hud.WalkbackRoutePickerPopup
 ```
 
 - [ ] **Step 3: Update `addSetting(...)` in the `init` block**
@@ -508,7 +508,7 @@ Replace with:
   }
 ```
 
-- [ ] **Step 5: Update `assignSettingGroups()` — remove old group line, add new ones**
+- [ ] **Step 5: Update `assignSettingGroups()` â€” remove old group line, add new ones**
 
 Find:
 ```kotlin
@@ -523,7 +523,7 @@ Replace with:
     slayerSwordKeepDistance.inGroup(TAB_SLAYER_GROUP)
 ```
 
-- [ ] **Step 6: Add per-type action buttons to `assignSettingGroups()` — each after its separator**
+- [ ] **Step 6: Add per-type action buttons to `assignSettingGroups()` â€” each after its separator**
 
 Find:
 ```kotlin
@@ -611,7 +611,7 @@ Expected: `BUILD SUCCESSFUL`
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/combat/CombatMacroModule.kt
+git add src/main/kotlin/org/phantom/internal/combat/CombatMacroModule.kt
 git commit -m "feat: add per-slayer walkback route settings and picker action buttons"
 ```
 
@@ -620,7 +620,7 @@ git commit -m "feat: add per-slayer walkback route settings and picker action bu
 ## Task 4: Update all slayerWalkbackRoute.value references to use walkbackRouteForCurrentType()
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/combat/CombatMacroModule.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/combat/CombatMacroModule.kt`
 
 - [ ] **Step 1: Update `triggerWalkToFarmArea()`**
 
@@ -672,7 +672,7 @@ Replace with:
 
 - [ ] **Step 4: Verify no remaining references to slayerWalkbackRoute**
 
-Run: `grep -n "slayerWalkbackRoute" src/main/kotlin/org/cobalt/internal/combat/CombatMacroModule.kt`
+Run: `grep -n "slayerWalkbackRoute" src/main/kotlin/org/phantom/internal/combat/CombatMacroModule.kt`
 Expected: no output (zero matches)
 
 - [ ] **Step 5: Verify compilation**
@@ -683,7 +683,7 @@ Expected: `BUILD SUCCESSFUL`
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/combat/CombatMacroModule.kt
+git add src/main/kotlin/org/phantom/internal/combat/CombatMacroModule.kt
 git commit -m "feat: use per-type walkback route settings in all route lookups"
 ```
 
@@ -692,7 +692,7 @@ git commit -m "feat: use per-type walkback route settings in all route lookups"
 ## Task 5: Fix death-triggered walkback to work for all slayer types
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/combat/CombatMacroModule.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/combat/CombatMacroModule.kt`
 
 - [ ] **Step 1: Remove the `cryptZombieSlayer.value` guard on death handling**
 
@@ -720,7 +720,7 @@ Expected: `BUILD SUCCESSFUL`
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/combat/CombatMacroModule.kt
+git add src/main/kotlin/org/phantom/internal/combat/CombatMacroModule.kt
 git commit -m "fix: trigger walkback on death for all slayer types, not just zombie crypt"
 ```
 
@@ -729,7 +729,7 @@ git commit -m "fix: trigger walkback on death for all slayer types, not just zom
 ## Task 6: Add farming area entry/exit tracking for all slayer types
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/combat/CombatMacroModule.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/combat/CombatMacroModule.kt`
 
 - [ ] **Step 1: Add `enteredFarmingArea` flag near the other slayer state vars (~line 896)**
 
@@ -837,7 +837,7 @@ Expected: `BUILD SUCCESSFUL`
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/combat/CombatMacroModule.kt
+git add src/main/kotlin/org/phantom/internal/combat/CombatMacroModule.kt
 git commit -m "feat: add farming area entry/exit tracking to trigger walkback when teleported away"
 ```
 
@@ -846,7 +846,7 @@ git commit -m "feat: add farming area entry/exit tracking to trigger walkback wh
 ## Task 7: Fix world/server change to queue walkback instead of just stopping
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/combat/CombatMacroModule.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/combat/CombatMacroModule.kt`
 
 - [ ] **Step 1: Update the server-switch detection block (~line 1083)**
 
@@ -892,7 +892,7 @@ Expected: `BUILD SUCCESSFUL`
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/combat/CombatMacroModule.kt
+git add src/main/kotlin/org/phantom/internal/combat/CombatMacroModule.kt
 git commit -m "fix: queue walkback on server change instead of just stopping macro"
 ```
 
@@ -901,13 +901,13 @@ git commit -m "fix: queue walkback on server change instead of just stopping mac
 ## Task 8: Verify MouseEvent.Scroll and fix if absent
 
 **Files:**
-- Possibly modify: `src/main/kotlin/org/cobalt/internal/ui/hud/WalkbackRoutePickerPopup.kt`
+- Possibly modify: `src/main/kotlin/org/phantom/internal/ui/hud/WalkbackRoutePickerPopup.kt`
 
 - [ ] **Step 1: Check if MouseEvent.Scroll exists**
 
-Run: `grep -rn "class Scroll\|object Scroll\|Scroll(" src/main/kotlin/org/cobalt/api/event/`
+Run: `grep -rn "class Scroll\|object Scroll\|Scroll(" src/main/kotlin/org/phantom/api/event/`
 
-- [ ] **Step 2a: If Scroll exists**, verify the popup scroll handler is correct — no action needed, proceed to Step 3.
+- [ ] **Step 2a: If Scroll exists**, verify the popup scroll handler is correct â€” no action needed, proceed to Step 3.
 
 - [ ] **Step 2b: If Scroll does NOT exist**, remove the `onMouseScroll` handler from `WalkbackRoutePickerPopup.kt`:
 
@@ -922,7 +922,7 @@ Find and delete the entire block:
   }
 ```
 
-Run: `./gradlew compileKotlin` → Expected: `BUILD SUCCESSFUL`
+Run: `./gradlew compileKotlin` â†’ Expected: `BUILD SUCCESSFUL`
 
 - [ ] **Step 3: Full build**
 
@@ -932,7 +932,7 @@ Expected: `BUILD SUCCESSFUL`
 - [ ] **Step 4: Commit if any changes were made in this task**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/ui/hud/WalkbackRoutePickerPopup.kt
+git add src/main/kotlin/org/phantom/internal/ui/hud/WalkbackRoutePickerPopup.kt
 git commit -m "fix: remove missing MouseEvent.Scroll handler from WalkbackRoutePickerPopup"
 ```
 
@@ -942,13 +942,13 @@ git commit -m "fix: remove missing MouseEvent.Scroll handler from WalkbackRouteP
 
 After a successful `./gradlew build`, load the mod in-game and verify:
 
-1. **Route picker opens** — Open the Combat Macro settings panel → Slayer Weapons tab → click the "Walkback Route" action button under any slayer separator. The popup should appear centered on screen with a dark overlay.
-2. **Route list populates** — Any routes saved in the Routes module appear as rows with checkmarks, name, and details.
-3. **Selection persists** — Click a route row. The popup closes. Re-open the same picker — the selected route has a filled checkmark and accent border. The action button label shows the route name.
-4. **Clear works** — Click Clear. The popup closes. Button label reverts to "None".
-5. **Refresh works** — Click Refresh. Route list reloads. Popup stays open.
-6. **Close on outside click** — Click outside the panel. Popup closes without changing selection.
-7. **Per-type isolation** — Set a different route for Zombie vs Enderman. Confirm they are saved independently.
-8. **Walkback fires on death** (all types) — Enable slayer macro for any type other than Zombie Crypt. Die in-game. After respawn, the walkback route should start.
-9. **Walkback fires on area exit** — Enable slayer macro, walk near a patrol point (entry confirmed), then teleport away. Macro should detect exit and start walkback.
-10. **Server change queues walkback** — Change servers while macro is active. On reconnect, walkback starts automatically.
+1. **Route picker opens** â€” Open the Combat Macro settings panel â†’ Slayer Weapons tab â†’ click the "Walkback Route" action button under any slayer separator. The popup should appear centered on screen with a dark overlay.
+2. **Route list populates** â€” Any routes saved in the Routes module appear as rows with checkmarks, name, and details.
+3. **Selection persists** â€” Click a route row. The popup closes. Re-open the same picker â€” the selected route has a filled checkmark and accent border. The action button label shows the route name.
+4. **Clear works** â€” Click Clear. The popup closes. Button label reverts to "None".
+5. **Refresh works** â€” Click Refresh. Route list reloads. Popup stays open.
+6. **Close on outside click** â€” Click outside the panel. Popup closes without changing selection.
+7. **Per-type isolation** â€” Set a different route for Zombie vs Enderman. Confirm they are saved independently.
+8. **Walkback fires on death** (all types) â€” Enable slayer macro for any type other than Zombie Crypt. Die in-game. After respawn, the walkback route should start.
+9. **Walkback fires on area exit** â€” Enable slayer macro, walk near a patrol point (entry confirmed), then teleport away. Macro should detect exit and start walkback.
+10. **Server change queues walkback** â€” Change servers while macro is active. On reconnect, walkback starts automatically.

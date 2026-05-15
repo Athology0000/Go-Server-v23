@@ -1,0 +1,7 @@
+package org.phantom.internal.combat.slayer
+
+internal object VampireSlayerMacroModule : SlayerMacroModule("Vampire Slayer Macro", 4, "Vampire") {
+  init {
+    addSetting(*VampireSlayerSettings.pageSettings)
+  }
+}

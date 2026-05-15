@@ -1,4 +1,4 @@
-# Garden Macro — Design Spec
+# Garden Macro â€” Design Spec
 **Date:** 2026-03-18
 **Status:** Approved
 
@@ -6,9 +6,9 @@
 
 ## Overview
 
-Port all 22 feature managers from ihanuat into Cobalt as a single `GardenMacroModule`, using Cobalt's existing UI systems (NanoVG, Module/Setting DSL, hudElement() DSL). External script commands (ez-macrostart, etc.) are used for now via a thin `ScriptBridge` abstraction — designed so swapping to standalone only requires changes to `ScriptBridge`, not individual managers.
+Port all 22 feature managers from ihanuat into Phantom as a single `GardenMacroModule`, using Phantom's existing UI systems (NanoVG, Module/Setting DSL, hudElement() DSL). External script commands (ez-macrostart, etc.) are used for now via a thin `ScriptBridge` abstraction â€” designed so swapping to standalone only requires changes to `ScriptBridge`, not individual managers.
 
-**Excluded from port:** ihanuat's `RotationManager` — Cobalt's existing `RotationExecutor` covers this entirely.
+**Excluded from port:** ihanuat's `RotationManager` â€” Phantom's existing `RotationExecutor` covers this entirely.
 
 ---
 
@@ -16,7 +16,7 @@ Port all 22 feature managers from ihanuat into Cobalt as a single `GardenMacroMo
 
 ### Pattern: Module + Manager
 
-`GardenMacroModule` is a Cobalt `object` extending `Module("Garden Macro")`. It owns:
+`GardenMacroModule` is a Phantom `object` extending `Module("Garden Macro")`. It owns:
 - All settings (organized with `InfoSetting` section headers)
 - The state machine (`GardenState`)
 - The combined HUD element (inline `hudElement()` block, rendering delegated to `GardenHud`)
@@ -29,7 +29,7 @@ Each ihanuat manager becomes a Kotlin `object` singleton in `internal/garden/man
 ## File Structure
 
 ```
-src/main/kotlin/org/cobalt/internal/garden/
+src/main/kotlin/org/phantom/internal/garden/
   GardenMacroModule.kt     # Central module, settings, state machine, event routing
   GardenState.kt           # State enum
   GardenWorkerThread.kt    # Serial async task queue
@@ -59,18 +59,18 @@ src/main/kotlin/org/cobalt/internal/garden/
     RecoveryManager.kt
     RestartManager.kt
 
-src/main/java/org/cobalt/mixin/client/
+src/main/java/org/phantom/mixin/client/
   GardenInventoryAccessor.java       # @Accessor for inventory slots
   GardenTabOverlayAccessor.java      # @Accessor for tab list entries
 ```
 
-**Mixin registration:** All classes placed under `org.cobalt.mixin` are auto-discovered by `MixinAutoDiscover`. No manual edits to `cobalt.mixins.json`.
+**Mixin registration:** All classes placed under `org.phantom.mixin` are auto-discovered by `MixinAutoDiscover`. No manual edits to `phantom.mixins.json`.
 
 **Mouse suppression:** No new mixin needed. Set `MovementManager.isLookLocked = true` from `GardenMacroModule` during rotation sequences. The existing `MouseHandlerMixin` already cancels `turnPlayer()` when this flag is true.
 
 **Disconnect detection:** No new mixin needed. `TickEvent.End` checks `mc.connection == null` when state is active. This is the sole mechanism.
 
-**Chat spam filtering:** No new mixin needed. `GardenMacroModule` handles `ChatEvent.Receive` (already fired by the existing `ConnectionMixin` for every incoming chat packet). When `hideFilteredChat.value` is true, matching messages are cancelled before display — no bytecode injection required.
+**Chat spam filtering:** No new mixin needed. `GardenMacroModule` handles `ChatEvent.Receive` (already fired by the existing `ConnectionMixin` for every incoming chat packet). When `hideFilteredChat.value` is true, matching messages are cancelled before display â€” no bytecode injection required.
 
 ---
 
@@ -78,15 +78,15 @@ src/main/java/org/cobalt/mixin/client/
 
 ```
 OFF
- └─► FARMING        (script running, tick loop active)
-      ├─► CLEANING     (pest threshold hit → stop script → gear swap → pest script → return)
-      ├─► VISITING     (visitor detected → visitor script → return)
-      ├─► AUTOSELLING  (George/book/junk trigger → sell/drop → return to FARMING)
-      ├─► RESTING      (rest timer expired → /setspawn → disconnect → reconnect after break)
-      └─► RECOVERING   (unexpected disconnect detected → warp garden → restart script)
+ â””â”€â–º FARMING        (script running, tick loop active)
+      â”œâ”€â–º CLEANING     (pest threshold hit â†’ stop script â†’ gear swap â†’ pest script â†’ return)
+      â”œâ”€â–º VISITING     (visitor detected â†’ visitor script â†’ return)
+      â”œâ”€â–º AUTOSELLING  (George/book/junk trigger â†’ sell/drop â†’ return to FARMING)
+      â”œâ”€â–º RESTING      (rest timer expired â†’ /setspawn â†’ disconnect â†’ reconnect after break)
+      â””â”€â–º RECOVERING   (unexpected disconnect detected â†’ warp garden â†’ restart script)
 ```
 
-**Start/stop:** The module uses a `CheckboxSetting("Enabled", ...)` (same pattern as `CombatMacroModule`). `TickEvent.End` checks `enabled.value` before running any logic. When `enabled` transitions false→true, all managers are reset and the farming sequence starts.
+**Start/stop:** The module uses a `CheckboxSetting("Enabled", ...)` (same pattern as `CombatMacroModule`). `TickEvent.End` checks `enabled.value` before running any logic. When `enabled` transitions falseâ†’true, all managers are reset and the farming sequence starts.
 
 **State transitions:** Managed exclusively by `GardenMacroModule.setState(GardenState)`. Since `GardenWorkerThread` tasks run off the main thread, `setState()` always posts via `Minecraft.getInstance().execute {}` before updating state.
 
@@ -98,7 +98,7 @@ OFF
 
 ## Settings
 
-Section headers use `InfoSetting("Section Name", "", InfoType.INFO)` — the same pattern used in `CombatMacroModule`. All settings are registered in `init {}` via `addSetting(...)`.
+Section headers use `InfoSetting("Section Name", "", InfoType.INFO)` â€” the same pattern used in `CombatMacroModule`. All settings are registered in `init {}` via `addSetting(...)`.
 
 | Section | Setting | Type | Default |
 |---|---|---|---|
@@ -144,16 +144,16 @@ Section headers use `InfoSetting("Section Name", "", InfoType.INFO)` — the sam
 Defined inline via `hudElement("garden-hud", "Garden HUD")` on `GardenMacroModule`. The render lambda calls `GardenHud.render(x, y, scale, ...)`, keeping the DSL block clean.
 
 ```
-┌─────────────────────────────┐
-│  GARDEN MACRO  [FARMING]    │  ← title + state badge (color-coded)
-│  Runtime: 02:34:17          │  ← session uptime
-│  Next Rest: 18:42  [====--] │  ← countdown + filled progress bar
-├─────────────────────────────┤
-│  Profit                     │
-│  Session:  +1,234,567g      │
-│  Daily:    +8,912,345g      │
-│  Lifetime: +42,000,000g     │
-└─────────────────────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚  GARDEN MACRO  [FARMING]    â”‚  â† title + state badge (color-coded)
+â”‚  Runtime: 02:34:17          â”‚  â† session uptime
+â”‚  Next Rest: 18:42  [====--] â”‚  â† countdown + filled progress bar
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚  Profit                     â”‚
+â”‚  Session:  +1,234,567g      â”‚
+â”‚  Daily:    +8,912,345g      â”‚
+â”‚  Lifetime: +42,000,000g     â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 ```
 
 **State badge colors:** FARMING=green, CLEANING=yellow, VISITING=cyan, AUTOSELLING=orange, RESTING=gray, RECOVERING=red, OFF=dark gray.
@@ -192,7 +192,7 @@ object GardenWorkerThread {
 }
 ```
 
-- `submit()` calls `ensureRunning()` before adding to queue — safe to call after re-enable.
+- `submit()` calls `ensureRunning()` before adding to queue â€” safe to call after re-enable.
 - `shutdown()` sets an interrupt flag, clears the queue, and joins the thread.
 - Blocking `Thread.sleep()` is permitted inside tasks.
 - Minecraft API calls inside tasks must use `Minecraft.getInstance().execute {}`.
@@ -222,25 +222,25 @@ object ScriptBridge {
 ## Mixin Specifications
 
 ### GardenInventoryAccessor.java
-**Location:** `org.cobalt.mixin.client`
+**Location:** `org.phantom.mixin.client`
 **Target:** `net.minecraft.world.entity.player.Inventory`
 **Type:** `@Mixin` + `@Accessor`
 **Exposes:** `getItems()` returning the `NonNullList<ItemStack>` items field (Mojang mapped: `items`).
 
 ### GardenTabOverlayAccessor.java
-**Location:** `org.cobalt.mixin.client`
+**Location:** `org.phantom.mixin.client`
 **Target:** `net.minecraft.client.gui.components.PlayerTabOverlay`
 **Type:** `@Mixin` + `@Accessor`
 **Exposes:**
-- `getHeader()` → `Component` (Mojang mapped field: `header`)
-- `getFooter()` → `Component` (Mojang mapped field: `footer`)
-- `getPlayerInfoMap()` → `Map<UUID, PlayerInfo>` (Mojang mapped field: `playerInfo`)
+- `getHeader()` â†’ `Component` (Mojang mapped field: `header`)
+- `getFooter()` â†’ `Component` (Mojang mapped field: `footer`)
+- `getPlayerInfoMap()` â†’ `Map<UUID, PlayerInfo>` (Mojang mapped field: `playerInfo`)
 
 `PestTabListParser` checks all three: Hypixel may embed pest counts in the footer text, header text, or player-row display names depending on the server version. The parser strips formatting codes and regex-matches for pest count patterns across all three sources.
 
 ---
 
-## ProfitManager — Bazaar HTTP
+## ProfitManager â€” Bazaar HTTP
 
 Network calls run inside `GardenWorkerThread` tasks (not on the main thread). The result is applied back via `Minecraft.getInstance().execute {}`:
 
@@ -252,13 +252,13 @@ GardenWorkerThread.submit("bazaar-refresh") {
 }
 ```
 
-No additional HTTP libraries needed — Kotlin's `URL.readText()` is sufficient.
+No additional HTTP libraries needed â€” Kotlin's `URL.readText()` is sufficient.
 
 ---
 
 ## Registration
 
-`GardenMacroModule` is added to `Cobalt.onInitializeClient()` alongside other internal modules. The four new mixin classes in `org.cobalt.mixin.client` are auto-discovered by `MixinAutoDiscover`.
+`GardenMacroModule` is added to `Phantom.onInitializeClient()` alongside other internal modules. The four new mixin classes in `org.phantom.mixin.client` are auto-discovered by `MixinAutoDiscover`.
 
 ---
 
@@ -270,7 +270,7 @@ Replace each `ScriptBridge` method body with internal pathfinding/automation log
 
 ## Out of Scope
 
-- Cloth Config UI — replaced by Cobalt's NVG settings panel
-- `ConfigScreenFactory` / `DynamicRestScreen` — replaced by Cobalt's existing UI + HUD
-- ihanuat's `RotationManager` — Cobalt's `RotationExecutor` handles this
-- `MacroConfig` persistence — handled by Cobalt's `Config.saveModulesConfig()`
+- Cloth Config UI â€” replaced by Phantom's NVG settings panel
+- `ConfigScreenFactory` / `DynamicRestScreen` â€” replaced by Phantom's existing UI + HUD
+- ihanuat's `RotationManager` â€” Phantom's `RotationExecutor` handles this
+- `MacroConfig` persistence â€” handled by Phantom's `Config.saveModulesConfig()`

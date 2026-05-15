@@ -1,7 +1,7 @@
-# C++ JNI Pathfinder — Design Spec
+# C++ JNI Pathfinder â€” Design Spec
 
 **Date:** 2026-03-20
-**Scope:** Full rewrite of all pathfinding in Cobalt using a shared C++ native library exposed via JNI
+**Scope:** Full rewrite of all pathfinding in Phantom using a shared C++ native library exposed via JNI
 **Platform:** Windows only (single `.dll`, embedded in JAR)
 
 ---
@@ -15,47 +15,47 @@ Replace all per-macro pathfinding logic with a single shared C++ pathfinding eng
 ## 2. Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                   Kotlin / JVM side                  │
-│                                                      │
-│  Macro (any)                                         │
-│    │  setRoute(waypoints, loop, profile)             │
-│    │  tick() → PathCommand?                          │
-│    ▼                                                 │
-│  NativePathfinder.kt  ◄──── all macros call this    │
-│    │                                                 │
-│  NativePathfinderBridge.java  (native declarations)  │
-└─────────────────┬───────────────────────────────────┘
-                  │  JNI
-┌─────────────────▼───────────────────────────────────┐
-│             cobalt_pathfinder.dll (C++)              │
-│                                                      │
-│  PathfinderEngine                                    │
-│    ├─ AStarPlanner       (graph search, async thread)│
-│    ├─ PathExecutor        (state machine, per-tick)  │
-│    ├─ MovementExpander    (all node/edge types)      │
-│    ├─ WorldAccessor       (buffer + callback hybrid) │
-│    ├─ RotationController  (smooth human-like yaw/pitch│
-│    └─ StuckDetector       (position history, recovery│
-└─────────────────────────────────────────────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚                   Kotlin / JVM side                  â”‚
+â”‚                                                      â”‚
+â”‚  Macro (any)                                         â”‚
+â”‚    â”‚  setRoute(waypoints, loop, profile)             â”‚
+â”‚    â”‚  tick() â†’ PathCommand?                          â”‚
+â”‚    â–¼                                                 â”‚
+â”‚  NativePathfinder.kt  â—„â”€â”€â”€â”€ all macros call this    â”‚
+â”‚    â”‚                                                 â”‚
+â”‚  NativePathfinderBridge.java  (native declarations)  â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+                  â”‚  JNI
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â–¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚             phantom_pathfinder.dll (C++)              â”‚
+â”‚                                                      â”‚
+â”‚  PathfinderEngine                                    â”‚
+â”‚    â”œâ”€ AStarPlanner       (graph search, async thread)â”‚
+â”‚    â”œâ”€ PathExecutor        (state machine, per-tick)  â”‚
+â”‚    â”œâ”€ MovementExpander    (all node/edge types)      â”‚
+â”‚    â”œâ”€ WorldAccessor       (buffer + callback hybrid) â”‚
+â”‚    â”œâ”€ RotationController  (smooth human-like yaw/pitchâ”‚
+â”‚    â””â”€ StuckDetector       (position history, recoveryâ”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 ```
 
 **Per-tick data flow:**
 1. Kotlin serializes nearby blocks into a `ByteBuffer` and packages player state (`pos, yaw, pitch, onGround, vel`)
 2. Calls `NativePathfinder.tick()` via JNI
 3. C++ `PathExecutor` advances the state machine, feeds new data to `WorldAccessor`
-4. `AStarPlanner` runs on its own thread — never blocks the tick
+4. `AStarPlanner` runs on its own thread â€” never blocks the tick
 5. Returns `PathCommand(forwardKey, jumpKey, sneakKey, sprint, targetYaw, targetPitch, status, activeAction)`
 6. Kotlin applies keys and feeds `targetYaw/pitch` to the existing `RotationExecutor`
 
 ---
 
-## 3. World Access — Buffer Snapshot
+## 3. World Access â€” Buffer Snapshot
 
-Java serializes a 64×32×64 region of blocks centred on the player into a `byte[]` every tick before calling `update()`. C++ reads exclusively from this snapshot — there are no JNI callbacks from the C++ side. This eliminates cross-thread JVM calls and Minecraft's non-thread-safe `ClientLevel` access from the async planner thread.
+Java serializes a 64Ã—32Ã—64 region of blocks centred on the player into a `byte[]` every tick before calling `update()`. C++ reads exclusively from this snapshot â€” there are no JNI callbacks from the C++ side. This eliminates cross-thread JVM calls and Minecraft's non-thread-safe `ClientLevel` access from the async planner thread.
 
 **Buffer layout:**
-- Size: 64 × 32 × 64 = 131,072 bytes
+- Size: 64 Ã— 32 Ã— 64 = 131,072 bytes
 - Origin: `(bx, by, bz)` = player block pos minus `(32, 16, 32)`
 - Index: `(x - bx) + (z - bz) * 64 + (y - by) * 64 * 64`
 - Byte values: `0` = air/passable, `1` = solid, `2` = water, `3` = lava, `4` = ladder
@@ -73,11 +73,11 @@ The A* graph treats each block position as a node. `MovementExpander` generates 
 | WALK | Adjacent block, same Y | 1.0 |
 | SPRINT | Adjacent block, same Y, open | 0.8 |
 | JUMP | Step up 1 block | 1.2 |
-| SPRINT_JUMP | Cross 1–4 block gap | distance + 0.5 |
-| FALL | Drop N blocks (safe height) | N × 0.9 |
+| SPRINT_JUMP | Cross 1â€“4 block gap | distance + 0.5 |
+| FALL | Drop N blocks (safe height) | N Ã— 0.9 |
 | LADDER | Ascend/descend ladder column | 1.1/block |
 | WATER_SWIM | Move through water | 2.0 |
-| AOTV | Teleport up to **11 blocks** toward open air | 5.0 + dist×0.05 |
+| AOTV | Teleport up to **11 blocks** toward open air | 5.0 + distÃ—0.05 |
 | ETHERWARP | Teleport to looked-at block within **51 blocks** | 4.0 |
 
 **Environment penalties:**
@@ -101,25 +101,25 @@ The A* graph treats each block position as a node. `MovementExpander` generates 
 
 ```
 IDLE
-  │  setRoute() called
-  ▼
-PLANNING ── AStarPlanner working async ──► PLANNING_FAILED → IDLE
-  │  path ready
-  ▼
+  â”‚  setRoute() called
+  â–¼
+PLANNING â”€â”€ AStarPlanner working async â”€â”€â–º PLANNING_FAILED â†’ IDLE
+  â”‚  path ready
+  â–¼
 EXECUTING
-  │  ├─ advance along path nodes, issue command each tick
-  │  ├─ StuckDetector watches position history (2s window)
-  │  │      stuck? → RECOVERING
-  │  ├─ block change in WorldAccessor? → REPLANNING
-  │  └─ final waypoint reached?
-  │        loop=true  → waypoint[0] → PLANNING
-  │        loop=false → ARRIVED → IDLE
-  ▼
+  â”‚  â”œâ”€ advance along path nodes, issue command each tick
+  â”‚  â”œâ”€ StuckDetector watches position history (2s window)
+  â”‚  â”‚      stuck? â†’ RECOVERING
+  â”‚  â”œâ”€ block change in WorldAccessor? â†’ REPLANNING
+  â”‚  â””â”€ final waypoint reached?
+  â”‚        loop=true  â†’ waypoint[0] â†’ PLANNING
+  â”‚        loop=false â†’ ARRIVED â†’ IDLE
+  â–¼
 RECOVERING
-  │  back up 1–2 blocks, try alternate edge, timeout=3s
-  │  resolved → EXECUTING  │  timeout → REPLANNING
-  ▼
-REPLANNING ── new async plan, keep moving on old path ──► EXECUTING
+  â”‚  back up 1â€“2 blocks, try alternate edge, timeout=3s
+  â”‚  resolved â†’ EXECUTING  â”‚  timeout â†’ REPLANNING
+  â–¼
+REPLANNING â”€â”€ new async plan, keep moving on old path â”€â”€â–º EXECUTING
 ```
 
 `PathStatus` enum exposed to Kotlin: `IDLE, PLANNING, EXECUTING, RECOVERING, ARRIVED, FAILED`
@@ -132,25 +132,25 @@ Macros react to `ARRIVED` (trigger interaction logic) and `FAILED` (retry or not
 
 Three layers applied every tick by `RotationController`:
 
-**Layer 1 — Path-aware look-ahead**
+**Layer 1 â€” Path-aware look-ahead**
 Controller targets node+2 or node+3 rather than the immediate next node. Head begins turning before the body arrives at a corner.
 
-**Layer 2 — Bezier curve**
-Rotation moves along a bezier curve (fast start, eased finish). C++ outputs raw target angles. GCD correction is applied once by the existing `RotationExecutor` on the Kotlin side — it must NOT be applied in C++ to avoid double-quantisation.
+**Layer 2 â€” Bezier curve**
+Rotation moves along a bezier curve (fast start, eased finish). C++ outputs raw target angles. GCD correction is applied once by the existing `RotationExecutor` on the Kotlin side â€” it must NOT be applied in C++ to avoid double-quantisation.
 
-**Layer 3 — Micro-variation**
-Every 8–15 ticks (randomised), ±0.08°–0.25° noise added to yaw and pitch. During `RECOVERING`, a short head-scan is performed (natural "looking around" behaviour).
+**Layer 3 â€” Micro-variation**
+Every 8â€“15 ticks (randomised), Â±0.08Â°â€“0.25Â° noise added to yaw and pitch. During `RECOVERING`, a short head-scan is performed (natural "looking around" behaviour).
 
 **COMBAT profile override:** Faster tracking curve. The macro calls `setTarget(mob.pos)` every tick with the mob's current position; the look-ahead targeting (node+2) naturally leads the mob rather than lagging behind. No mob velocity data is required in `PathCommand`.
 
-Output per tick: raw `targetYaw: Float, targetPitch: Float` — fed into the existing `RotationExecutor` which applies GCD correction before writing to the player.
+Output per tick: raw `targetYaw: Float, targetPitch: Float` â€” fed into the existing `RotationExecutor` which applies GCD correction before writing to the player.
 
 ---
 
 ## 7. Kotlin API
 
 ```kotlin
-// NativePathfinder.kt — singleton, all macros call this
+// NativePathfinder.kt â€” singleton, all macros call this
 object NativePathfinder {
     fun setRoute(waypoints: List<Vec3>, loop: Boolean = false,
                  profile: MovementProfile = MovementProfile.DEFAULT)
@@ -166,7 +166,7 @@ data class PathCommand(
     val jump: Boolean,
     val sneak: Boolean,
     val sprint: Boolean,
-    val targetYaw: Float,       // raw angle — RotationExecutor applies GCD
+    val targetYaw: Float,       // raw angle â€” RotationExecutor applies GCD
     val targetPitch: Float,     // raw angle
     val status: PathStatus,
     val activeAction: ActionType,
@@ -191,14 +191,14 @@ NativePathfinder.tick()?.applyToPlayer()
 
 ```java
 public class NativePathfinderBridge {
-    static { System.load(NativeLoader.extract("natives/windows/cobalt_pathfinder.dll")); }
+    static { System.load(NativeLoader.extract("natives/windows/phantom_pathfinder.dll")); }
 
     public static native long  createEngine();
     public static native void  destroyEngine(long handle);
     public static native void  setRoute(long handle, double[] waypoints,
                                          boolean loop, int profile);
     public static native void  setTarget(long handle, double x, double y, double z);
-    // Returns int[10] — see "Command Encoding" section
+    // Returns int[10] â€” see "Command Encoding" section
     public static native int[] update(long handle, byte[] worldBuffer,
                                        int bx, int by, int bz,
                                        double px, double py, double pz,
@@ -243,9 +243,9 @@ natives/
       MovementProfile.h
 ```
 
-**Gradle task** builds the DLL and copies it into `src/main/resources/natives/windows/`. `processResources` depends on `buildNative`. The DLL ships embedded in the JAR — single file, no separate install.
+**Gradle task** builds the DLL and copies it into `src/main/resources/natives/windows/`. `processResources` depends on `buildNative`. The DLL ships embedded in the JAR â€” single file, no separate install.
 
-**DLL extraction at runtime:** `NativeLoader.java` extracts `cobalt_pathfinder.dll` from the JAR to `%TEMP%\cobalt\` on first run. Re-extraction is skipped if the destination file size matches the JAR resource size. A `FileChannel` exclusive lock on a `.lock` file guards concurrent extraction (two game instances starting simultaneously).
+**DLL extraction at runtime:** `NativeLoader.java` extracts `phantom_pathfinder.dll` from the JAR to `%TEMP%\phantom\` on first run. Re-extraction is skipped if the destination file size matches the JAR resource size. A `FileChannel` exclusive lock on a `.lock` file guards concurrent extraction (two game instances starting simultaneously).
 
 ---
 
@@ -260,4 +260,4 @@ natives/
 | 5 | `CombatMacroModule.kt` | COMBAT profile, `setTarget(mob.pos)` each tick, AOTV/Etherwarp edges |
 | 6 | Delete `DuskPathfinder.kt`, `PathExecutor.kt` (API), `PathPlanProfiles.kt`, `PathPlanProfile.kt` | All macros validated |
 
-**Note:** `GardenMacroModule` and `FarmingMacroModule` do not call `DuskPathfinder` — they use Taunahi scripts and `MovementManager` key presses respectively. No migration needed for these; add `NativePathfinder.stop()` to their `onDisable()` for cleanliness only.
+**Note:** `GardenMacroModule` and `FarmingMacroModule` do not call `DuskPathfinder` â€” they use Taunahi scripts and `MovementManager` key presses respectively. No migration needed for these; add `NativePathfinder.stop()` to their `onDisable()` for cleanliness only.

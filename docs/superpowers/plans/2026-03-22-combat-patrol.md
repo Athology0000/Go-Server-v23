@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a `CombatPatrolModule` with Walk/Warp/Kill point types that integrates with `CombatMacroModule` — patrol routes when idle, fight stray mobs mid-transit, and clear kill zones at Kill points.
+**Goal:** Add a `CombatPatrolModule` with Walk/Warp/Kill point types that integrates with `CombatMacroModule` â€” patrol routes when idle, fight stray mobs mid-transit, and clear kill zones at Kill points.
 
 **Architecture:** A standalone Kotlin `object` module in `internal/combat/` that owns `NativePathfinder` during NAVIGATING/WARPING states and yields ownership to `CombatMacroModule` during COMBAT_INTERRUPT/AT_KILL_ZONE. Warp logic is copied from `RoutesModule`'s frame-driven state machine. `CombatMacroModule` is modified in four places to check patrol state.
 
-**Tech Stack:** Kotlin, Fabric Minecraft 1.21.11, `NativePathfinder` JNI bridge, `EventBus` / `@SubscribeEvent`, Cobalt module/setting API, Gson for persistence.
+**Tech Stack:** Kotlin, Fabric Minecraft 1.21.11, `NativePathfinder` JNI bridge, `EventBus` / `@SubscribeEvent`, Phantom module/setting API, Gson for persistence.
 
 **Spec:** `docs/superpowers/specs/2026-03-22-combat-patrol-design.md`
 
@@ -16,23 +16,23 @@
 
 | Action | File | Purpose |
 |--------|------|---------|
-| **Create** | `src/main/kotlin/org/cobalt/internal/combat/CombatPatrolModule.kt` | New module — all patrol logic |
-| **Modify** | `src/main/kotlin/org/cobalt/internal/combat/CombatMacroModule.kt` | 4 integration points |
-| **Modify** | `src/main/kotlin/org/cobalt/Cobalt.kt` | Register new module |
+| **Create** | `src/main/kotlin/org/phantom/internal/combat/CombatPatrolModule.kt` | New module â€” all patrol logic |
+| **Modify** | `src/main/kotlin/org/phantom/internal/combat/CombatMacroModule.kt` | 4 integration points |
+| **Modify** | `src/main/kotlin/org/phantom/Phantom.kt` | Register new module |
 
-No unit tests exist in this project — verification is by in-game behaviour and build success (`./gradlew build`).
+No unit tests exist in this project â€” verification is by in-game behaviour and build success (`./gradlew build`).
 
 ---
 
 ## Task 1: Data model + persistence
 
 **Files:**
-- Create: `src/main/kotlin/org/cobalt/internal/combat/CombatPatrolModule.kt` (skeleton only)
+- Create: `src/main/kotlin/org/phantom/internal/combat/CombatPatrolModule.kt` (skeleton only)
 
 - [ ] **Step 1: Create the file with data model, enum, and persistence helpers**
 
 ```kotlin
-package org.cobalt.internal.combat
+package org.phantom.internal.combat
 
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonArray
@@ -40,13 +40,13 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import java.io.File
 import net.minecraft.client.Minecraft
-import org.cobalt.api.module.Module
-import org.cobalt.api.module.setting.impl.*
-import org.cobalt.api.util.ChatUtils
+import org.phantom.api.module.Module
+import org.phantom.api.module.setting.impl.*
+import org.phantom.api.util.ChatUtils
 
-// ──────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Data model
-// ──────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 enum class CombatPatrolPointType(val id: String) {
     WALK("walk"), WARP("warp"), KILL("kill");
@@ -57,22 +57,22 @@ enum class CombatPatrolPointType(val id: String) {
 
 data class CombatPatrolPoint(val x: Int, val y: Int, val z: Int, val type: CombatPatrolPointType)
 
-// ──────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Module skeleton
-// ──────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 object CombatPatrolModule : Module("Combat Patrol") {
 
     private val mc: Minecraft = Minecraft.getInstance()
     private val gson = GsonBuilder().setPrettyPrinting().create()
     private val patrolDir: File by lazy {
-        File(mc.gameDirectory, "config/cobalt/combat_patrol")
+        File(mc.gameDirectory, "config/phantom/combat_patrol")
     }
 
-    // ── route data ────────────────────────────────────────────────────────────
+    // â”€â”€ route data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     internal val patrolPoints = mutableListOf<CombatPatrolPoint>()
 
-    // ── settings ──────────────────────────────────────────────────────────────
+    // â”€â”€ settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     private val routeName = TextSetting("Route Name", "Name used for save/load.", "default")
     private val pointsInfo = InfoSetting("Points", "Number of recorded points.", InfoType.INFO)
     private val statusInfo = InfoSetting("Status", "Current patrol state.", InfoType.INFO)
@@ -82,7 +82,7 @@ object CombatPatrolModule : Module("Combat Patrol") {
     val pointType = ModeSetting("Point Type", "Type used when adding points.", 0, arrayOf("Walk", "Warp", "Kill"))
     val killZoneRadius = SliderSetting("Kill Zone Radius", "Mob search radius around a Kill point (blocks).", 16.0, 4.0, 64.0)
     val killZoneDwellTicks = SliderSetting("Kill Zone Dwell Ticks", "Zero-mob ticks required before advancing past a Kill point.", 60.0, 10.0, 200.0, step = 1.0)
-    val aotvSlot = ModeSetting("AOTV Slot", "Hotbar slot (1–9) holding your AOTV item.", 0, arrayOf("1","2","3","4","5","6","7","8","9"))
+    val aotvSlot = ModeSetting("AOTV Slot", "Hotbar slot (1â€“9) holding your AOTV item.", 0, arrayOf("1","2","3","4","5","6","7","8","9"))
 
     private val addPointAction = ActionSetting("Add Point", "Record your current position.", "Add") { addPointFromPlayer() }
     private val removeLastAction = ActionSetting("Remove Last", "Remove the last recorded point.", "Remove") {
@@ -107,7 +107,7 @@ object CombatPatrolModule : Module("Combat Patrol") {
         )
     }
 
-    // ── helpers ───────────────────────────────────────────────────────────────
+    // â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     private fun currentPointType() = when (pointType.value) {
         1 -> CombatPatrolPointType.WARP
         2 -> CombatPatrolPointType.KILL
@@ -196,33 +196,33 @@ Expected: BUILD SUCCESSFUL (no errors in `CombatPatrolModule.kt`)
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/combat/CombatPatrolModule.kt
+git add src/main/kotlin/org/phantom/internal/combat/CombatPatrolModule.kt
 git commit -m "feat(combat-patrol): data model, settings skeleton, persistence"
 ```
 
 ---
 
-## Task 2: Patrol state machine (Walk points only — no Warp, no Kill yet)
+## Task 2: Patrol state machine (Walk points only â€” no Warp, no Kill yet)
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/combat/CombatPatrolModule.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/combat/CombatPatrolModule.kt`
 
-This task adds the core IDLE → NAVIGATING → ARRIVED → advance loop for WALK points, plus the public API (`patrolOwnsPathfinder`, `onCombatInterrupt`, `onCombatResume`, `onKillZoneCleared`).
+This task adds the core IDLE â†’ NAVIGATING â†’ ARRIVED â†’ advance loop for WALK points, plus the public API (`patrolOwnsPathfinder`, `onCombatInterrupt`, `onCombatResume`, `onKillZoneCleared`).
 
 - [ ] **Step 1: Add state machine variables and EventBus imports at the top of the object**
 
-After the `// ── route data ───` block, add:
+After the `// â”€â”€ route data â”€â”€â”€` block, add:
 
 ```kotlin
-import org.cobalt.api.event.EventBus
-import org.cobalt.api.event.annotation.SubscribeEvent
-import org.cobalt.api.event.impl.client.MouseEvent
-import org.cobalt.api.event.impl.client.TickEvent
-import org.cobalt.api.event.impl.render.WorldRenderEvent
-import org.cobalt.api.pathfinder.jni.NativePathfinder
-import org.cobalt.api.pathfinder.jni.PathStatus
-import org.cobalt.api.pathfinder.minecraft.MinecraftPathingRules
-import org.cobalt.internal.pathfinding.PathfindingModule
+import org.phantom.api.event.EventBus
+import org.phantom.api.event.annotation.SubscribeEvent
+import org.phantom.api.event.impl.client.MouseEvent
+import org.phantom.api.event.impl.client.TickEvent
+import org.phantom.api.event.impl.render.WorldRenderEvent
+import org.phantom.api.pathfinder.jni.NativePathfinder
+import org.phantom.api.pathfinder.jni.PathStatus
+import org.phantom.api.pathfinder.minecraft.MinecraftPathingRules
+import org.phantom.internal.pathfinding.PathfindingModule
 import net.minecraft.core.BlockPos
 import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.BlockHitResult
@@ -373,7 +373,7 @@ private fun findNearestIndex(): Int {
 /** Called by CombatMacroModule when a stray mob is found while patrol is navigating. */
 fun onCombatInterrupt() {
     if (patrolState != PatrolState.NAVIGATING && patrolState != PatrolState.WARPING) return
-    NativePathfinder.stop()          // synchronous stop — prevents one-tick overrun
+    NativePathfinder.stop()          // synchronous stop â€” prevents one-tick overrun
     patrolOwnsPathfinder = false
     patrolState = PatrolState.COMBAT_INTERRUPT
 }
@@ -448,7 +448,7 @@ Expected: BUILD SUCCESSFUL
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/combat/CombatPatrolModule.kt
+git add src/main/kotlin/org/phantom/internal/combat/CombatPatrolModule.kt
 git commit -m "feat(combat-patrol): WALK/KILL state machine, public API, right-click recording"
 ```
 
@@ -457,14 +457,14 @@ git commit -m "feat(combat-patrol): WALK/KILL state machine, public API, right-c
 ## Task 3: CombatMacroModule integration (4 touch points)
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/combat/CombatMacroModule.kt` (lines ~587, ~793, ~834, ~2026)
+- Modify: `src/main/kotlin/org/phantom/internal/combat/CombatMacroModule.kt` (lines ~587, ~793, ~834, ~2026)
 
 - [ ] **Step 1: Add import at top of CombatMacroModule**
 
 Find the imports block (around line 48 where `PatrolWaypointStore` is imported) and add:
 
 ```kotlin
-import org.cobalt.internal.combat.CombatPatrolModule
+import org.phantom.internal.combat.CombatPatrolModule
 ```
 
 - [ ] **Step 2: Guard the top-of-tick `NativePathfinder.tick()` call (line ~587)**
@@ -482,7 +482,7 @@ if (startedPath && nativeActive() && !CombatPatrolModule.patrolOwnsPathfinder) {
 }
 ```
 
-- [ ] **Step 3: Replace the "no target" idle block (lines ~793–800)**
+- [ ] **Step 3: Replace the "no target" idle block (lines ~793â€“800)**
 
 Find this block (it is the last `return` inside the `if (target == null)` path for non-slayer / general combat):
 ```kotlin
@@ -502,7 +502,7 @@ Replace with:
         when (CombatPatrolModule.patrolState) {
           CombatPatrolModule.PatrolState.COMBAT_INTERRUPT -> CombatPatrolModule.onCombatResume()
           CombatPatrolModule.PatrolState.AT_KILL_ZONE     -> CombatPatrolModule.onKillZoneCleared()
-          else -> { /* NAVIGATING/WARPING — patrol owns movement */ }
+          else -> { /* NAVIGATING/WARPING â€” patrol owns movement */ }
         }
         if (startedPath && nativeActive()) nativeStop()
         startedPath = false; lastTargetPos = null; currentTargetId = null
@@ -520,10 +520,10 @@ Replace with:
 
 - [ ] **Step 4: Interrupt patrol when target found (line ~834)**
 
-Find the `else` branch that handles chasing a target (after `// Target spotted — stop kill patrol...`):
+Find the `else` branch that handles chasing a target (after `// Target spotted â€” stop kill patrol...`):
 ```kotlin
     } else {
-      // Target spotted — stop kill patrol so combat macro can take over pathfinding.
+      // Target spotted â€” stop kill patrol so combat macro can take over pathfinding.
       if (PathfindingModule.isPatrolActive) PathfindingModule.stopPatrol()
 ```
 After that line, add:
@@ -573,7 +573,7 @@ Find the top of `resolveTarget` and add a kill-zone fast path **before** the exi
       return best
     }
 
-    // Normal combat search (existing code unchanged below) …
+    // Normal combat search (existing code unchanged below) â€¦
 ```
 
 - [ ] **Step 7: Build**
@@ -586,21 +586,21 @@ Expected: BUILD SUCCESSFUL
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/combat/CombatMacroModule.kt
+git add src/main/kotlin/org/phantom/internal/combat/CombatMacroModule.kt
 git commit -m "feat(combat-patrol): integrate CombatPatrolModule into CombatMacroModule"
 ```
 
 ---
 
-## Task 4: Register module in Cobalt.kt
+## Task 4: Register module in Phantom.kt
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/Cobalt.kt`
+- Modify: `src/main/kotlin/org/phantom/Phantom.kt`
 
 - [ ] **Step 1: Add import**
 
 ```kotlin
-import org.cobalt.internal.combat.CombatPatrolModule
+import org.phantom.internal.combat.CombatPatrolModule
 ```
 
 - [ ] **Step 2: Register module**
@@ -620,7 +620,7 @@ Expected: BUILD SUCCESSFUL
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/Cobalt.kt
+git add src/main/kotlin/org/phantom/Phantom.kt
 git commit -m "feat(combat-patrol): register CombatPatrolModule"
 ```
 
@@ -629,9 +629,9 @@ git commit -m "feat(combat-patrol): register CombatPatrolModule"
 ## Task 5: Warp point type
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/combat/CombatPatrolModule.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/combat/CombatPatrolModule.kt`
 
-The warp sub-machine is copied from `RoutesModule`. Read `RoutesModule.kt` lines 102–108 (warp state vars), 437–445 (`onFrame` driving `handleWarp`), 1779–1808 (`startWarp`), 1810–1900 (`handleWarp` full body) and the constants at lines 2185–2193 before starting this task.
+The warp sub-machine is copied from `RoutesModule`. Read `RoutesModule.kt` lines 102â€“108 (warp state vars), 437â€“445 (`onFrame` driving `handleWarp`), 1779â€“1808 (`startWarp`), 1810â€“1900 (`handleWarp` full body) and the constants at lines 2185â€“2193 before starting this task.
 
 - [ ] **Step 1: Add warp imports and state variables**
 
@@ -640,13 +640,13 @@ Add these imports to the top of the file alongside the existing imports from Tas
 ```kotlin
 import net.minecraft.client.player.LocalPlayer
 import net.minecraft.client.multiplayer.ClientLevel
-import org.cobalt.api.util.AngleUtils
+import org.phantom.api.util.AngleUtils
 ```
 
 Add state variables and constants inside the object:
 
 ```kotlin
-// ── warp sub-machine state ─────────────────────────────────────────────────
+// â”€â”€ warp sub-machine state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 private var warpStage = 0
 private var warpTargetPoint: CombatPatrolPoint? = null
 private var warpStageElapsedMs = 0.0
@@ -687,7 +687,7 @@ Replace the placeholder comment in `onTick` WARPING case:
 PatrolState.WARPING -> {
     // elapsed time is updated in handleWarp (onRender). Check total timeout here.
     if (warpStageElapsedMs > WARP_TOTAL_TIMEOUT_MS) {
-        ChatUtils.sendMessage("Warp timed out at point ${routeIndex + 1} — skipping.")
+        ChatUtils.sendMessage("Warp timed out at point ${routeIndex + 1} â€” skipping.")
         cancelWarp()
         advanceAndNavigate()
     }
@@ -696,7 +696,7 @@ PatrolState.WARPING -> {
 
 - [ ] **Step 4: Implement `startWarpPoint`, `cancelWarp`, `handleWarp`**
 
-Copy the logic from `RoutesModule` — the only difference is targets are `CombatPatrolPoint` not `BlockPos` and we use `aotvSlot.value` for the hotbar slot. Key reference: `RoutesModule.startWarp`, `RoutesModule.handleWarp`, `RoutesModule.resetWarp`.
+Copy the logic from `RoutesModule` â€” the only difference is targets are `CombatPatrolPoint` not `BlockPos` and we use `aotvSlot.value` for the hotbar slot. Key reference: `RoutesModule.startWarp`, `RoutesModule.handleWarp`, `RoutesModule.resetWarp`.
 
 ```kotlin
 private fun startWarpPoint(point: CombatPatrolPoint): Boolean {
@@ -705,7 +705,7 @@ private fun startWarpPoint(point: CombatPatrolPoint): Boolean {
     val inv = mc.player?.inventory ?: return false
     val item = inv.getItem(slot)
     if (item.isEmpty) {
-        ChatUtils.sendMessage("No item in AOTV slot ${slot + 1} — skipping warp point.")
+        ChatUtils.sendMessage("No item in AOTV slot ${slot + 1} â€” skipping warp point.")
         return false
     }
     warpTargetPoint = point
@@ -755,8 +755,8 @@ private fun handleWarp(
     when (warpStage) {
         0 -> {
             // Stage 0: align head toward target
-            val rot = org.cobalt.api.util.AngleUtils.getRotation(aimPos, player)
-            val yawErr = kotlin.math.abs(org.cobalt.api.util.AngleUtils.getRotationDelta(player.yRot, rot.yaw))
+            val rot = org.phantom.api.util.AngleUtils.getRotation(aimPos, player)
+            val yawErr = kotlin.math.abs(org.phantom.api.util.AngleUtils.getRotationDelta(player.yRot, rot.yaw))
             val pitchErr = kotlin.math.abs(rot.pitch - player.xRot)
             applyWarpLook(player, aimPos)
             if (yawErr <= WARP_AIM_TOLERANCE && pitchErr <= WARP_AIM_TOLERANCE
@@ -789,7 +789,7 @@ private fun handleWarp(
             }
         }
         2 -> {
-            // Stage 2: post-warp — hold briefly then complete
+            // Stage 2: post-warp â€” hold briefly then complete
             mc.options.keyShift?.setDown(true)
             if (warpStageElapsedMs >= WARP_POST_MS) {
                 mc.options.keyUse?.setDown(false)
@@ -819,10 +819,10 @@ private fun applyWarpLook(
     else ((now - warpLookLastNs) / 1_000_000_000.0).coerceIn(1.0 / 240.0, 0.08)
     warpLookLastNs = now
 
-    val target = org.cobalt.api.util.AngleUtils.getRotation(aimPos, player)
+    val target = org.phantom.api.util.AngleUtils.getRotation(aimPos, player)
     val maxYaw = WARP_LOOK_YAW_SPEED_DPS * dtSec
     val maxPitch = WARP_LOOK_PITCH_SPEED_DPS * dtSec
-    val yawDelta = org.cobalt.api.util.AngleUtils.getRotationDelta(player.yRot, target.yaw).toDouble()
+    val yawDelta = org.phantom.api.util.AngleUtils.getRotationDelta(player.yRot, target.yaw).toDouble()
     val pitchDelta = (target.pitch - player.xRot).toDouble()
     player.yRot += yawDelta.coerceIn(-maxYaw, maxYaw).toFloat()
     player.xRot += pitchDelta.coerceIn(-maxPitch, maxPitch).toFloat()
@@ -835,7 +835,7 @@ Replace the WARP fallback in `navigateTo`:
 ```kotlin
 CombatPatrolPointType.WARP -> {
     if (!startWarpPoint(point)) {
-        // AOTV not found — fall back to walking
+        // AOTV not found â€” fall back to walking
         NativePathfinder.setTarget(point.x + 0.5, point.y.toDouble(), point.z + 0.5)
         patrolOwnsPathfinder = true
         patrolState = PatrolState.NAVIGATING
@@ -853,8 +853,8 @@ Expected: BUILD SUCCESSFUL
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/combat/CombatPatrolModule.kt
-git commit -m "feat(combat-patrol): WARP point type — etherwarp state machine"
+git add src/main/kotlin/org/phantom/internal/combat/CombatPatrolModule.kt
+git commit -m "feat(combat-patrol): WARP point type â€” etherwarp state machine"
 ```
 
 ---
@@ -870,27 +870,27 @@ Expected: BUILD SUCCESSFUL, JAR in `build/libs/`
 
 - [ ] **Step 2: Verify module appears in client**
 
-Run `./gradlew runClient`, open Cobalt UI — confirm "Combat Patrol" module is present with all settings visible.
+Run `./gradlew runClient`, open Phantom UI â€” confirm "Combat Patrol" module is present with all settings visible.
 
 - [ ] **Step 3: Smoke test Walk points**
 
 1. Enable Combat Patrol, enable Combat Macro
-2. Add 3–4 Walk points in a patrol area
-3. Start Patrol — confirm player walks from point to point in order
+2. Add 3â€“4 Walk points in a patrol area
+3. Start Patrol â€” confirm player walks from point to point in order
 4. Confirm when a mob appears the patrol pauses and combat macro attacks
 5. Confirm after kill patrol resumes from the same waypoint
 
 - [ ] **Step 4: Smoke test Kill zone**
 
 1. Add a Kill point in a mob-dense area
-2. Start Patrol — confirm player arrives at Kill point, enters AT_KILL_ZONE, fights mobs in zone
+2. Start Patrol â€” confirm player arrives at Kill point, enters AT_KILL_ZONE, fights mobs in zone
 3. After mobs die, confirm `killZoneDwellTicks` worth of ticks pass then patrol moves to next point
 
 - [ ] **Step 5: Final commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/combat/CombatPatrolModule.kt \
-        src/main/kotlin/org/cobalt/internal/combat/CombatMacroModule.kt \
-        src/main/kotlin/org/cobalt/Cobalt.kt
-git commit -m "feat(combat-patrol): complete implementation — Walk, Warp, Kill patrol routes"
+git add src/main/kotlin/org/phantom/internal/combat/CombatPatrolModule.kt \
+        src/main/kotlin/org/phantom/internal/combat/CombatMacroModule.kt \
+        src/main/kotlin/org/phantom/Phantom.kt
+git commit -m "feat(combat-patrol): complete implementation â€” Walk, Warp, Kill patrol routes"
 ```

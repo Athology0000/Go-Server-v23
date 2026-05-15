@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Port ihanuat's 22 garden farming managers into Cobalt as `GardenMacroModule` — one Module with subcategorized settings, a combined NVG HUD, and a serial worker thread — using Cobalt's Module/Setting/Event/NVG systems throughout.
+**Goal:** Port ihanuat's 22 garden farming managers into Phantom as `GardenMacroModule` â€” one Module with subcategorized settings, a combined NVG HUD, and a serial worker thread â€” using Phantom's Module/Setting/Event/NVG systems throughout.
 
 **Architecture:** `GardenMacroModule` (object Module) owns all settings, the state machine, and HUD. 22 manager objects handle individual concerns (pest, visitor, gear, economy, session). `GardenWorkerThread` serializes async tasks. `ScriptBridge` wraps all external script commands. Two mixin accessors expose inventory and tab list fields. No unit tests (project has none).
 
@@ -14,49 +14,49 @@
 
 | Action | File |
 |---|---|
-| Create | `src/main/kotlin/org/cobalt/internal/garden/GardenState.kt` |
-| Create | `src/main/kotlin/org/cobalt/internal/garden/GardenWorkerThread.kt` |
-| Create | `src/main/kotlin/org/cobalt/internal/garden/ScriptBridge.kt` |
-| Create | `src/main/java/org/cobalt/mixin/client/GardenInventoryAccessor.java` |
-| Create | `src/main/kotlin/org/cobalt/internal/garden/managers/PestTabListParser.kt` |
-| Create | `src/main/kotlin/org/cobalt/internal/garden/managers/PestManager.kt` |
-| Create | `src/main/kotlin/org/cobalt/internal/garden/managers/PestCleaningSequencer.kt` |
-| Create | `src/main/kotlin/org/cobalt/internal/garden/managers/PestAotvManager.kt` |
-| Create | `src/main/kotlin/org/cobalt/internal/garden/managers/PestPrepSwapManager.kt` |
-| Create | `src/main/kotlin/org/cobalt/internal/garden/managers/PestReturnManager.kt` |
-| Create | `src/main/kotlin/org/cobalt/internal/garden/managers/PestBonusManager.kt` |
-| Create | `src/main/kotlin/org/cobalt/internal/garden/managers/CropFeverManager.kt` |
-| Create | `src/main/kotlin/org/cobalt/internal/garden/managers/VisitorManager.kt` |
-| Create | `src/main/kotlin/org/cobalt/internal/garden/managers/WardrobeManager.kt` |
-| Create | `src/main/kotlin/org/cobalt/internal/garden/managers/EquipmentManager.kt` |
-| Create | `src/main/kotlin/org/cobalt/internal/garden/managers/GearManager.kt` |
-| Create | `src/main/kotlin/org/cobalt/internal/garden/managers/RodManager.kt` |
-| Create | `src/main/kotlin/org/cobalt/internal/garden/managers/GeorgeManager.kt` |
-| Create | `src/main/kotlin/org/cobalt/internal/garden/managers/BookCombineManager.kt` |
-| Create | `src/main/kotlin/org/cobalt/internal/garden/managers/JunkManager.kt` |
-| Create | `src/main/kotlin/org/cobalt/internal/garden/managers/BoosterCookieManager.kt` |
-| Create | `src/main/kotlin/org/cobalt/internal/garden/managers/ProfitManager.kt` |
-| Create | `src/main/kotlin/org/cobalt/internal/garden/managers/PetXpTracker.kt` |
-| Create | `src/main/kotlin/org/cobalt/internal/garden/managers/DynamicRestManager.kt` |
-| Create | `src/main/kotlin/org/cobalt/internal/garden/managers/RecoveryManager.kt` |
-| Create | `src/main/kotlin/org/cobalt/internal/garden/managers/RestartManager.kt` |
-| Create | `src/main/kotlin/org/cobalt/internal/garden/GardenHud.kt` |
-| Create | `src/main/kotlin/org/cobalt/internal/garden/GardenMacroModule.kt` |
-| Modify | `src/main/kotlin/org/cobalt/Cobalt.kt` |
+| Create | `src/main/kotlin/org/phantom/internal/garden/GardenState.kt` |
+| Create | `src/main/kotlin/org/phantom/internal/garden/GardenWorkerThread.kt` |
+| Create | `src/main/kotlin/org/phantom/internal/garden/ScriptBridge.kt` |
+| Create | `src/main/java/org/phantom/mixin/client/GardenInventoryAccessor.java` |
+| Create | `src/main/kotlin/org/phantom/internal/garden/managers/PestTabListParser.kt` |
+| Create | `src/main/kotlin/org/phantom/internal/garden/managers/PestManager.kt` |
+| Create | `src/main/kotlin/org/phantom/internal/garden/managers/PestCleaningSequencer.kt` |
+| Create | `src/main/kotlin/org/phantom/internal/garden/managers/PestAotvManager.kt` |
+| Create | `src/main/kotlin/org/phantom/internal/garden/managers/PestPrepSwapManager.kt` |
+| Create | `src/main/kotlin/org/phantom/internal/garden/managers/PestReturnManager.kt` |
+| Create | `src/main/kotlin/org/phantom/internal/garden/managers/PestBonusManager.kt` |
+| Create | `src/main/kotlin/org/phantom/internal/garden/managers/CropFeverManager.kt` |
+| Create | `src/main/kotlin/org/phantom/internal/garden/managers/VisitorManager.kt` |
+| Create | `src/main/kotlin/org/phantom/internal/garden/managers/WardrobeManager.kt` |
+| Create | `src/main/kotlin/org/phantom/internal/garden/managers/EquipmentManager.kt` |
+| Create | `src/main/kotlin/org/phantom/internal/garden/managers/GearManager.kt` |
+| Create | `src/main/kotlin/org/phantom/internal/garden/managers/RodManager.kt` |
+| Create | `src/main/kotlin/org/phantom/internal/garden/managers/GeorgeManager.kt` |
+| Create | `src/main/kotlin/org/phantom/internal/garden/managers/BookCombineManager.kt` |
+| Create | `src/main/kotlin/org/phantom/internal/garden/managers/JunkManager.kt` |
+| Create | `src/main/kotlin/org/phantom/internal/garden/managers/BoosterCookieManager.kt` |
+| Create | `src/main/kotlin/org/phantom/internal/garden/managers/ProfitManager.kt` |
+| Create | `src/main/kotlin/org/phantom/internal/garden/managers/PetXpTracker.kt` |
+| Create | `src/main/kotlin/org/phantom/internal/garden/managers/DynamicRestManager.kt` |
+| Create | `src/main/kotlin/org/phantom/internal/garden/managers/RecoveryManager.kt` |
+| Create | `src/main/kotlin/org/phantom/internal/garden/managers/RestartManager.kt` |
+| Create | `src/main/kotlin/org/phantom/internal/garden/GardenHud.kt` |
+| Create | `src/main/kotlin/org/phantom/internal/garden/GardenMacroModule.kt` |
+| Modify | `src/main/kotlin/org/phantom/Phantom.kt` |
 
 ---
 
-## Task 1: Foundation — GardenState, GardenWorkerThread, ScriptBridge
+## Task 1: Foundation â€” GardenState, GardenWorkerThread, ScriptBridge
 
 **Files:**
-- Create: `src/main/kotlin/org/cobalt/internal/garden/GardenState.kt`
-- Create: `src/main/kotlin/org/cobalt/internal/garden/GardenWorkerThread.kt`
-- Create: `src/main/kotlin/org/cobalt/internal/garden/ScriptBridge.kt`
+- Create: `src/main/kotlin/org/phantom/internal/garden/GardenState.kt`
+- Create: `src/main/kotlin/org/phantom/internal/garden/GardenWorkerThread.kt`
+- Create: `src/main/kotlin/org/phantom/internal/garden/ScriptBridge.kt`
 
 - [ ] **Step 1: Create GardenState.kt**
 
 ```kotlin
-package org.cobalt.internal.garden
+package org.phantom.internal.garden
 
 enum class GardenState {
     OFF, FARMING, CLEANING, VISITING, AUTOSELLING, RESTING, RECOVERING
@@ -66,7 +66,7 @@ enum class GardenState {
 - [ ] **Step 2: Create GardenWorkerThread.kt**
 
 ```kotlin
-package org.cobalt.internal.garden
+package org.phantom.internal.garden
 
 import java.util.concurrent.LinkedBlockingDeque
 
@@ -110,7 +110,7 @@ object GardenWorkerThread {
 - [ ] **Step 3: Create ScriptBridge.kt**
 
 ```kotlin
-package org.cobalt.internal.garden
+package org.phantom.internal.garden
 
 import net.minecraft.client.Minecraft
 
@@ -142,7 +142,7 @@ Expected: `BUILD SUCCESSFUL`
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/garden/
+git add src/main/kotlin/org/phantom/internal/garden/
 git commit -m "feat: add GardenState, GardenWorkerThread, ScriptBridge"
 ```
 
@@ -151,12 +151,12 @@ git commit -m "feat: add GardenState, GardenWorkerThread, ScriptBridge"
 ## Task 2: GardenInventoryAccessor mixin
 
 **Files:**
-- Create: `src/main/java/org/cobalt/mixin/client/GardenInventoryAccessor.java`
+- Create: `src/main/java/org/phantom/mixin/client/GardenInventoryAccessor.java`
 
 - [ ] **Step 1: Create accessor**
 
 ```java
-package org.cobalt.mixin.client;
+package org.phantom.mixin.client;
 
 import net.minecraft.core.NonNullList;
 import net.minecraft.world.entity.player.Inventory;
@@ -180,7 +180,7 @@ public interface GardenInventoryAccessor {
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/java/org/cobalt/mixin/client/GardenInventoryAccessor.java
+git add src/main/java/org/phantom/mixin/client/GardenInventoryAccessor.java
 git commit -m "feat: add GardenInventoryAccessor mixin"
 ```
 
@@ -189,17 +189,17 @@ git commit -m "feat: add GardenInventoryAccessor mixin"
 ## Task 3: PestTabListParser
 
 **Files:**
-- Create: `src/main/kotlin/org/cobalt/internal/garden/managers/PestTabListParser.kt`
+- Create: `src/main/kotlin/org/phantom/internal/garden/managers/PestTabListParser.kt`
 
-Uses `TabOverlayAccessor` (created in Pet Display HUD plan Task 1 — if Pet Display was not implemented first, create `TabOverlayAccessor.java` now per that plan's Task 1).
+Uses `TabOverlayAccessor` (created in Pet Display HUD plan Task 1 â€” if Pet Display was not implemented first, create `TabOverlayAccessor.java` now per that plan's Task 1).
 
 - [ ] **Step 1: Create PestTabListParser.kt**
 
 ```kotlin
-package org.cobalt.internal.garden.managers
+package org.phantom.internal.garden.managers
 
 import net.minecraft.client.Minecraft
-import org.cobalt.mixin.client.TabOverlayAccessor
+import org.phantom.mixin.client.TabOverlayAccessor
 
 data class TabListData(
     val alivePests: Int,
@@ -239,17 +239,17 @@ object PestTabListParser {
         return TabListData(alive, cooldown, plots, bonus)
     }
 
-    private fun strip(text: String) = text.replace(Regex("§[0-9a-fk-or]"), "")
+    private fun strip(text: String) = text.replace(Regex("Â§[0-9a-fk-or]"), "")
     private fun empty() = TabListData(0, 0, emptyList(), false)
 }
 ```
 
-- [ ] **Step 2: Build check** → `./gradlew build 2>&1 | tail -20`
+- [ ] **Step 2: Build check** â†’ `./gradlew build 2>&1 | tail -20`
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/garden/managers/PestTabListParser.kt
+git add src/main/kotlin/org/phantom/internal/garden/managers/PestTabListParser.kt
 git commit -m "feat: add PestTabListParser"
 ```
 
@@ -266,12 +266,12 @@ git commit -m "feat: add PestTabListParser"
 - Create: `managers/PestBonusManager.kt`
 - Create: `managers/CropFeverManager.kt`
 
-All paths under `src/main/kotlin/org/cobalt/internal/garden/managers/`.
+All paths under `src/main/kotlin/org/phantom/internal/garden/managers/`.
 
 - [ ] **Step 1: Create PestManager.kt**
 
 ```kotlin
-package org.cobalt.internal.garden.managers
+package org.phantom.internal.garden.managers
 
 import net.minecraft.client.Minecraft
 
@@ -306,13 +306,13 @@ object PestManager {
 - [ ] **Step 2: Create PestCleaningSequencer.kt**
 
 ```kotlin
-package org.cobalt.internal.garden.managers
+package org.phantom.internal.garden.managers
 
 import net.minecraft.client.Minecraft
-import org.cobalt.internal.garden.GardenMacroModule
-import org.cobalt.internal.garden.GardenState
-import org.cobalt.internal.garden.GardenWorkerThread
-import org.cobalt.internal.garden.ScriptBridge
+import org.phantom.internal.garden.GardenMacroModule
+import org.phantom.internal.garden.GardenState
+import org.phantom.internal.garden.GardenWorkerThread
+import org.phantom.internal.garden.ScriptBridge
 
 object PestCleaningSequencer {
 
@@ -363,11 +363,11 @@ object PestCleaningSequencer {
 - [ ] **Step 3: Create PestAotvManager.kt**
 
 ```kotlin
-package org.cobalt.internal.garden.managers
+package org.phantom.internal.garden.managers
 
 import net.minecraft.client.Minecraft
-import org.cobalt.api.rotation.RotationExecutor
-import org.cobalt.api.rotation.strategy.TimedEaseStrategy
+import org.phantom.api.rotation.RotationExecutor
+import org.phantom.api.rotation.strategy.TimedEaseStrategy
 
 object PestAotvManager {
 
@@ -389,7 +389,7 @@ object PestAotvManager {
             }
             Thread.sleep(500)
 
-            // Right-click AOTV (item in offhand or hotbar — find by name)
+            // Right-click AOTV (item in offhand or hotbar â€” find by name)
             mc.execute {
                 val player = mc.player ?: return@execute
                 val aotv = (0..8).firstOrNull { slot ->
@@ -398,7 +398,7 @@ object PestAotvManager {
                 if (aotv != null) {
                     player.inventory.selected = aotv
                 }
-                (mc as? org.cobalt.mixin.client.MinecraftAccessor)?.rightClick()
+                (mc as? org.phantom.mixin.client.MinecraftAccessor)?.rightClick()
             }
             Thread.sleep(800)
         } finally {
@@ -411,7 +411,7 @@ object PestAotvManager {
 - [ ] **Step 4: Create PestPrepSwapManager.kt**
 
 ```kotlin
-package org.cobalt.internal.garden.managers
+package org.phantom.internal.garden.managers
 
 object PestPrepSwapManager {
 
@@ -432,13 +432,13 @@ object PestPrepSwapManager {
 - [ ] **Step 5: Create PestReturnManager.kt**
 
 ```kotlin
-package org.cobalt.internal.garden.managers
+package org.phantom.internal.garden.managers
 
 import net.minecraft.client.Minecraft
-import org.cobalt.internal.garden.GardenMacroModule
-import org.cobalt.internal.garden.GardenState
-import org.cobalt.internal.garden.GardenWorkerThread
-import org.cobalt.internal.garden.ScriptBridge
+import org.phantom.internal.garden.GardenMacroModule
+import org.phantom.internal.garden.GardenState
+import org.phantom.internal.garden.GardenWorkerThread
+import org.phantom.internal.garden.ScriptBridge
 
 object PestReturnManager {
 
@@ -468,7 +468,7 @@ object PestReturnManager {
 - [ ] **Step 6: Create PestBonusManager.kt**
 
 ```kotlin
-package org.cobalt.internal.garden.managers
+package org.phantom.internal.garden.managers
 
 object PestBonusManager {
 
@@ -493,7 +493,7 @@ object PestBonusManager {
 - [ ] **Step 7: Create CropFeverManager.kt**
 
 ```kotlin
-package org.cobalt.internal.garden.managers
+package org.phantom.internal.garden.managers
 
 import net.minecraft.client.Minecraft
 
@@ -526,12 +526,12 @@ object CropFeverManager {
 }
 ```
 
-- [ ] **Step 8: Build check** → `./gradlew build 2>&1 | tail -20`
+- [ ] **Step 8: Build check** â†’ `./gradlew build 2>&1 | tail -20`
 
 - [ ] **Step 9: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/garden/managers/
+git add src/main/kotlin/org/phantom/internal/garden/managers/
 git commit -m "feat: add pest managers (PestManager, PestCleaningSequencer, PestAotv, PestPrepSwap, PestReturn, PestBonus, CropFever)"
 ```
 
@@ -540,18 +540,18 @@ git commit -m "feat: add pest managers (PestManager, PestCleaningSequencer, Pest
 ## Task 5: VisitorManager
 
 **Files:**
-- Create: `src/main/kotlin/org/cobalt/internal/garden/managers/VisitorManager.kt`
+- Create: `src/main/kotlin/org/phantom/internal/garden/managers/VisitorManager.kt`
 
 - [ ] **Step 1: Create VisitorManager.kt**
 
 ```kotlin
-package org.cobalt.internal.garden.managers
+package org.phantom.internal.garden.managers
 
 import net.minecraft.client.Minecraft
-import org.cobalt.internal.garden.GardenMacroModule
-import org.cobalt.internal.garden.GardenState
-import org.cobalt.internal.garden.GardenWorkerThread
-import org.cobalt.internal.garden.ScriptBridge
+import org.phantom.internal.garden.GardenMacroModule
+import org.phantom.internal.garden.GardenState
+import org.phantom.internal.garden.GardenWorkerThread
+import org.phantom.internal.garden.ScriptBridge
 
 object VisitorManager {
 
@@ -570,11 +570,11 @@ object VisitorManager {
         if (isHandlingVisitor) return false
         if (System.currentTimeMillis() < visitorCooldownUntil) return false
         val data = PestTabListParser.parse()
-        // Detect visitor presence from tab list — Hypixel shows visitor count
+        // Detect visitor presence from tab list â€” Hypixel shows visitor count
         // Check tab list footer for "Visitor" text
         val gui = Minecraft.getInstance().gui ?: return false
-        val overlay = gui.tabList as? org.cobalt.mixin.client.TabOverlayAccessor ?: return false
-        val footer = overlay.footer?.string?.replace(Regex("§[0-9a-fk-or]"), "") ?: return false
+        val overlay = gui.tabList as? org.phantom.mixin.client.TabOverlayAccessor ?: return false
+        val footer = overlay.footer?.string?.replace(Regex("Â§[0-9a-fk-or]"), "") ?: return false
         return footer.contains("visitor", ignoreCase = true) && !footer.contains("visitors: 0", ignoreCase = true)
     }
 
@@ -607,18 +607,18 @@ object VisitorManager {
 
     fun onChatMessage(message: String) {
         if (message.contains("offer accepted", ignoreCase = true)) {
-            // ROI tracking hook — ProfitManager listens to this
+            // ROI tracking hook â€” ProfitManager listens to this
         }
     }
 }
 ```
 
-- [ ] **Step 2: Build check** → `./gradlew build 2>&1 | tail -20`
+- [ ] **Step 2: Build check** â†’ `./gradlew build 2>&1 | tail -20`
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/garden/managers/VisitorManager.kt
+git add src/main/kotlin/org/phantom/internal/garden/managers/VisitorManager.kt
 git commit -m "feat: add VisitorManager"
 ```
 
@@ -635,12 +635,12 @@ git commit -m "feat: add VisitorManager"
 - [ ] **Step 1: Create WardrobeManager.kt**
 
 ```kotlin
-package org.cobalt.internal.garden.managers
+package org.phantom.internal.garden.managers
 
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 import net.minecraft.world.item.DyeColor
-import org.cobalt.internal.garden.GardenWorkerThread
+import org.phantom.internal.garden.GardenWorkerThread
 
 object WardrobeManager {
 
@@ -694,11 +694,11 @@ object WardrobeManager {
 - [ ] **Step 2: Create EquipmentManager.kt**
 
 ```kotlin
-package org.cobalt.internal.garden.managers
+package org.phantom.internal.garden.managers
 
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
-import org.cobalt.internal.garden.GardenWorkerThread
+import org.phantom.internal.garden.GardenWorkerThread
 
 object EquipmentManager {
 
@@ -741,7 +741,7 @@ object EquipmentManager {
 - [ ] **Step 3: Create GearManager.kt**
 
 ```kotlin
-package org.cobalt.internal.garden.managers
+package org.phantom.internal.garden.managers
 
 object GearManager {
 
@@ -796,7 +796,7 @@ object GearManager {
 - [ ] **Step 4: Create RodManager.kt**
 
 ```kotlin
-package org.cobalt.internal.garden.managers
+package org.phantom.internal.garden.managers
 
 import net.minecraft.client.Minecraft
 
@@ -825,22 +825,22 @@ object RodManager {
 
         val prev = player.inventory.selected
         player.inventory.selected = rodSlot
-        (mc as? org.cobalt.mixin.client.MinecraftAccessor)?.rightClick()
+        (mc as? org.phantom.mixin.client.MinecraftAccessor)?.rightClick()
         player.inventory.selected = prev
         lastCastTime = now
     }
 }
 ```
 
-- [ ] **Step 5: Build check** → `./gradlew build 2>&1 | tail -20`
+- [ ] **Step 5: Build check** â†’ `./gradlew build 2>&1 | tail -20`
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/garden/managers/WardrobeManager.kt \
-        src/main/kotlin/org/cobalt/internal/garden/managers/EquipmentManager.kt \
-        src/main/kotlin/org/cobalt/internal/garden/managers/GearManager.kt \
-        src/main/kotlin/org/cobalt/internal/garden/managers/RodManager.kt
+git add src/main/kotlin/org/phantom/internal/garden/managers/WardrobeManager.kt \
+        src/main/kotlin/org/phantom/internal/garden/managers/EquipmentManager.kt \
+        src/main/kotlin/org/phantom/internal/garden/managers/GearManager.kt \
+        src/main/kotlin/org/phantom/internal/garden/managers/RodManager.kt
 git commit -m "feat: add gear managers (Wardrobe, Equipment, Gear, Rod)"
 ```
 
@@ -857,15 +857,15 @@ git commit -m "feat: add gear managers (Wardrobe, Equipment, Gear, Rod)"
 - [ ] **Step 1: Create GeorgeManager.kt**
 
 ```kotlin
-package org.cobalt.internal.garden.managers
+package org.phantom.internal.garden.managers
 
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 import net.minecraft.world.item.ItemStack
-import org.cobalt.internal.garden.GardenMacroModule
-import org.cobalt.internal.garden.GardenState
-import org.cobalt.internal.garden.GardenWorkerThread
-import org.cobalt.mixin.client.GardenInventoryAccessor
+import org.phantom.internal.garden.GardenMacroModule
+import org.phantom.internal.garden.GardenState
+import org.phantom.internal.garden.GardenWorkerThread
+import org.phantom.mixin.client.GardenInventoryAccessor
 
 object GeorgeManager {
 
@@ -938,14 +938,14 @@ object GeorgeManager {
 - [ ] **Step 2: Create BookCombineManager.kt**
 
 ```kotlin
-package org.cobalt.internal.garden.managers
+package org.phantom.internal.garden.managers
 
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
-import org.cobalt.internal.garden.GardenMacroModule
-import org.cobalt.internal.garden.GardenState
-import org.cobalt.internal.garden.GardenWorkerThread
-import org.cobalt.mixin.client.GardenInventoryAccessor
+import org.phantom.internal.garden.GardenMacroModule
+import org.phantom.internal.garden.GardenState
+import org.phantom.internal.garden.GardenWorkerThread
+import org.phantom.mixin.client.GardenInventoryAccessor
 
 object BookCombineManager {
 
@@ -972,7 +972,7 @@ object BookCombineManager {
             try {
                 mc.execute { mc.player?.connection?.sendCommand("anvil") }
                 Thread.sleep(1200)
-                // Place books into anvil slots — slot 0 and 1 are input
+                // Place books into anvil slots â€” slot 0 and 1 are input
                 mc.execute {
                     val screen = mc.screen as? AbstractContainerScreen<*> ?: return@execute
                     val inv = (mc.player?.inventory as? GardenInventoryAccessor)?.items ?: return@execute
@@ -1007,13 +1007,13 @@ object BookCombineManager {
 - [ ] **Step 3: Create JunkManager.kt**
 
 ```kotlin
-package org.cobalt.internal.garden.managers
+package org.phantom.internal.garden.managers
 
 import net.minecraft.client.Minecraft
-import org.cobalt.internal.garden.GardenMacroModule
-import org.cobalt.internal.garden.GardenState
-import org.cobalt.internal.garden.GardenWorkerThread
-import org.cobalt.mixin.client.GardenInventoryAccessor
+import org.phantom.internal.garden.GardenMacroModule
+import org.phantom.internal.garden.GardenState
+import org.phantom.internal.garden.GardenWorkerThread
+import org.phantom.mixin.client.GardenInventoryAccessor
 
 object JunkManager {
 
@@ -1061,12 +1061,12 @@ object JunkManager {
 - [ ] **Step 4: Create BoosterCookieManager.kt**
 
 ```kotlin
-package org.cobalt.internal.garden.managers
+package org.phantom.internal.garden.managers
 
 import net.minecraft.client.Minecraft
-import org.cobalt.internal.garden.GardenMacroModule
-import org.cobalt.internal.garden.GardenWorkerThread
-import org.cobalt.mixin.client.GardenInventoryAccessor
+import org.phantom.internal.garden.GardenMacroModule
+import org.phantom.internal.garden.GardenWorkerThread
+import org.phantom.mixin.client.GardenInventoryAccessor
 
 object BoosterCookieManager {
 
@@ -1094,7 +1094,7 @@ object BoosterCookieManager {
                 mc.execute {
                     val player = mc.player ?: return@execute
                     player.inventory.selected = slot
-                    (mc as? org.cobalt.mixin.client.MinecraftAccessor)?.rightClick()
+                    (mc as? org.phantom.mixin.client.MinecraftAccessor)?.rightClick()
                 }
                 Thread.sleep(500)
                 lastUseTime = System.currentTimeMillis()
@@ -1115,15 +1115,15 @@ object BoosterCookieManager {
 }
 ```
 
-- [ ] **Step 5: Build check** → `./gradlew build 2>&1 | tail -20`
+- [ ] **Step 5: Build check** â†’ `./gradlew build 2>&1 | tail -20`
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/garden/managers/GeorgeManager.kt \
-        src/main/kotlin/org/cobalt/internal/garden/managers/BookCombineManager.kt \
-        src/main/kotlin/org/cobalt/internal/garden/managers/JunkManager.kt \
-        src/main/kotlin/org/cobalt/internal/garden/managers/BoosterCookieManager.kt
+git add src/main/kotlin/org/phantom/internal/garden/managers/GeorgeManager.kt \
+        src/main/kotlin/org/phantom/internal/garden/managers/BookCombineManager.kt \
+        src/main/kotlin/org/phantom/internal/garden/managers/JunkManager.kt \
+        src/main/kotlin/org/phantom/internal/garden/managers/BoosterCookieManager.kt
 git commit -m "feat: add economy managers (George, BookCombine, Junk, BoosterCookie)"
 ```
 
@@ -1138,12 +1138,12 @@ git commit -m "feat: add economy managers (George, BookCombine, Junk, BoosterCoo
 - [ ] **Step 1: Create ProfitManager.kt**
 
 ```kotlin
-package org.cobalt.internal.garden.managers
+package org.phantom.internal.garden.managers
 
 import com.google.gson.JsonParser
 import net.minecraft.client.Minecraft
-import org.cobalt.internal.garden.GardenMacroModule
-import org.cobalt.internal.garden.GardenWorkerThread
+import org.phantom.internal.garden.GardenMacroModule
+import org.phantom.internal.garden.GardenWorkerThread
 import java.net.URL
 
 object ProfitManager {
@@ -1155,7 +1155,7 @@ object ProfitManager {
     private val bazaarPrices = mutableMapOf<String, Double>()
     private var sessionStart = System.currentTimeMillis()
 
-    // Simple item price table (expandable) — key = item name (lowercase)
+    // Simple item price table (expandable) â€” key = item name (lowercase)
     private val hardcodedPrices = mapOf(
         "enchanted carrot" to 1_000.0,
         "enchanted potato" to 1_200.0,
@@ -1183,7 +1183,7 @@ object ProfitManager {
     }
 
     fun onChatMessage(message: String) {
-        // Parse dropped items from chat — e.g. "+ 1x Enchanted Carrot"
+        // Parse dropped items from chat â€” e.g. "+ 1x Enchanted Carrot"
         val dropMatch = Regex("""\+\s*(\d+)x?\s+(.+)""").find(message) ?: return
         val count = dropMatch.groupValues[1].toLongOrNull() ?: return
         val item  = dropMatch.groupValues[2].trim().lowercase()
@@ -1211,7 +1211,7 @@ object ProfitManager {
                     bazaarPrices.clear()
                     bazaarPrices.putAll(newPrices)
                 }
-            } catch (_: Exception) { /* network failure — use cached prices */ }
+            } catch (_: Exception) { /* network failure â€” use cached prices */ }
         }
     }
 }
@@ -1220,10 +1220,10 @@ object ProfitManager {
 - [ ] **Step 2: Create PetXpTracker.kt**
 
 ```kotlin
-package org.cobalt.internal.garden.managers
+package org.phantom.internal.garden.managers
 
 import net.minecraft.client.Minecraft
-import org.cobalt.mixin.client.TabOverlayAccessor
+import org.phantom.mixin.client.TabOverlayAccessor
 
 object PetXpTracker {
 
@@ -1243,8 +1243,8 @@ object PetXpTracker {
         val mc = Minecraft.getInstance()
         val overlay = mc.gui?.tabList as? TabOverlayAccessor ?: return
         val text = buildString {
-            overlay.header?.let { append(it.string.replace(Regex("§[0-9a-fk-or]"), "")) }
-            overlay.footer?.let { append(it.string.replace(Regex("§[0-9a-fk-or]"), "")) }
+            overlay.header?.let { append(it.string.replace(Regex("Â§[0-9a-fk-or]"), "")) }
+            overlay.footer?.let { append(it.string.replace(Regex("Â§[0-9a-fk-or]"), "")) }
         }
         XP_REGEX.find(text)?.let { m ->
             val newXp = m.groupValues[1].replace(",", "").toLongOrNull() ?: return
@@ -1258,13 +1258,13 @@ object PetXpTracker {
 }
 ```
 
-- [ ] **Step 3: Build check** → `./gradlew build 2>&1 | tail -20`
+- [ ] **Step 3: Build check** â†’ `./gradlew build 2>&1 | tail -20`
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/garden/managers/ProfitManager.kt \
-        src/main/kotlin/org/cobalt/internal/garden/managers/PetXpTracker.kt
+git add src/main/kotlin/org/phantom/internal/garden/managers/ProfitManager.kt \
+        src/main/kotlin/org/phantom/internal/garden/managers/PetXpTracker.kt
 git commit -m "feat: add ProfitManager and PetXpTracker"
 ```
 
@@ -1280,13 +1280,13 @@ git commit -m "feat: add ProfitManager and PetXpTracker"
 - [ ] **Step 1: Create DynamicRestManager.kt**
 
 ```kotlin
-package org.cobalt.internal.garden.managers
+package org.phantom.internal.garden.managers
 
 import net.minecraft.client.Minecraft
-import org.cobalt.internal.garden.GardenMacroModule
-import org.cobalt.internal.garden.GardenState
-import org.cobalt.internal.garden.GardenWorkerThread
-import org.cobalt.internal.garden.ScriptBridge
+import org.phantom.internal.garden.GardenMacroModule
+import org.phantom.internal.garden.GardenState
+import org.phantom.internal.garden.GardenWorkerThread
+import org.phantom.internal.garden.ScriptBridge
 import kotlin.random.Random
 
 object DynamicRestManager {
@@ -1363,13 +1363,13 @@ object DynamicRestManager {
 - [ ] **Step 2: Create RecoveryManager.kt**
 
 ```kotlin
-package org.cobalt.internal.garden.managers
+package org.phantom.internal.garden.managers
 
 import net.minecraft.client.Minecraft
-import org.cobalt.internal.garden.GardenMacroModule
-import org.cobalt.internal.garden.GardenState
-import org.cobalt.internal.garden.GardenWorkerThread
-import org.cobalt.internal.garden.ScriptBridge
+import org.phantom.internal.garden.GardenMacroModule
+import org.phantom.internal.garden.GardenState
+import org.phantom.internal.garden.GardenWorkerThread
+import org.phantom.internal.garden.ScriptBridge
 import kotlin.random.Random
 
 object RecoveryManager {
@@ -1434,13 +1434,13 @@ object RecoveryManager {
 - [ ] **Step 3: Create RestartManager.kt**
 
 ```kotlin
-package org.cobalt.internal.garden.managers
+package org.phantom.internal.garden.managers
 
 import net.minecraft.client.Minecraft
-import org.cobalt.internal.garden.GardenMacroModule
-import org.cobalt.internal.garden.GardenState
-import org.cobalt.internal.garden.GardenWorkerThread
-import org.cobalt.internal.garden.ScriptBridge
+import org.phantom.internal.garden.GardenMacroModule
+import org.phantom.internal.garden.GardenState
+import org.phantom.internal.garden.GardenWorkerThread
+import org.phantom.internal.garden.ScriptBridge
 
 object RestartManager {
 
@@ -1466,7 +1466,7 @@ object RestartManager {
             abortAt = System.currentTimeMillis() + 30_000 // 30s grace period
         }
         if (lower.contains("jacob's farming contest") && lower.contains("over")) {
-            // Jacob's contest ended — safe to abort now
+            // Jacob's contest ended â€” safe to abort now
             if (restartDetected) triggerAbort()
         }
     }
@@ -1489,14 +1489,14 @@ object RestartManager {
 }
 ```
 
-- [ ] **Step 4: Build check** → `./gradlew build 2>&1 | tail -20`
+- [ ] **Step 4: Build check** â†’ `./gradlew build 2>&1 | tail -20`
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/garden/managers/DynamicRestManager.kt \
-        src/main/kotlin/org/cobalt/internal/garden/managers/RecoveryManager.kt \
-        src/main/kotlin/org/cobalt/internal/garden/managers/RestartManager.kt
+git add src/main/kotlin/org/phantom/internal/garden/managers/DynamicRestManager.kt \
+        src/main/kotlin/org/phantom/internal/garden/managers/RecoveryManager.kt \
+        src/main/kotlin/org/phantom/internal/garden/managers/RestartManager.kt
 git commit -m "feat: add session managers (DynamicRest, Recovery, Restart)"
 ```
 
@@ -1505,18 +1505,18 @@ git commit -m "feat: add session managers (DynamicRest, Recovery, Restart)"
 ## Task 10: GardenHud
 
 **Files:**
-- Create: `src/main/kotlin/org/cobalt/internal/garden/GardenHud.kt`
+- Create: `src/main/kotlin/org/phantom/internal/garden/GardenHud.kt`
 
 - [ ] **Step 1: Create GardenHud.kt**
 
 ```kotlin
-package org.cobalt.internal.garden
+package org.phantom.internal.garden
 
 import kotlin.math.cos
-import org.cobalt.api.util.ui.NVGRenderer
-import org.cobalt.api.util.ui.helper.Gradient
-import org.cobalt.internal.garden.managers.DynamicRestManager
-import org.cobalt.internal.garden.managers.ProfitManager
+import org.phantom.api.util.ui.NVGRenderer
+import org.phantom.api.util.ui.helper.Gradient
+import org.phantom.internal.garden.managers.DynamicRestManager
+import org.phantom.internal.garden.managers.ProfitManager
 import java.util.concurrent.TimeUnit
 
 object GardenHud {
@@ -1532,10 +1532,10 @@ object GardenHud {
         val textColor = 0xFFFFFFFF.toInt()
         val dimColor  = 0xBBAFCFFF.toInt()
 
-        // ── Background ─────────────────────────────────────────────────────────
+        // â”€â”€ Background â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         NVGRenderer.rect(x, y, w, h, 0xEE0D1530.toInt(), radius)
 
-        // ── Animated border ────────────────────────────────────────────────────
+        // â”€â”€ Animated border â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         val angle  = (System.currentTimeMillis() % 10000L).toFloat() / 10000f * (Math.PI.toFloat() * 2f)
         val shiftX = cos(angle) * (w * 0.4f)
         NVGRenderer.hollowGradientRectShifted(
@@ -1546,7 +1546,7 @@ object GardenHud {
 
         var cy = y + 14f
 
-        // ── Title + state badge ────────────────────────────────────────────────
+        // â”€â”€ Title + state badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         NVGRenderer.text("GARDEN MACRO", x + pad, cy, 11f, 0xFF6AB8FF.toInt())
         val stateStr = state.name
         val stateColor = when (state) {
@@ -1564,12 +1564,12 @@ object GardenHud {
 
         cy += 14f
 
-        // ── Runtime ────────────────────────────────────────────────────────────
+        // â”€â”€ Runtime â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         val runtime = formatDuration(System.currentTimeMillis() - GardenMacroModule.sessionStartTime)
         NVGRenderer.text("Runtime: $runtime", x + pad, cy, 10f, dimColor)
         cy += 14f
 
-        // ── Rest countdown ─────────────────────────────────────────────────────
+        // â”€â”€ Rest countdown â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if (showRest && state == GardenState.FARMING) {
             val restMs = DynamicRestManager.timeUntilRestMs()
             val restStr = "Next Rest: ${formatDuration(restMs)}"
@@ -1589,7 +1589,7 @@ object GardenHud {
             cy += 12f
         }
 
-        // ── Divider ────────────────────────────────────────────────────────────
+        // â”€â”€ Divider â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if (showProfit) {
             NVGRenderer.rect(x + pad, cy, w - pad * 2f, 1f, 0x331A3070.toInt(), 0f)
             cy += 8f
@@ -1633,12 +1633,12 @@ object GardenHud {
 }
 ```
 
-- [ ] **Step 2: Build check** → `./gradlew build 2>&1 | tail -20`
+- [ ] **Step 2: Build check** â†’ `./gradlew build 2>&1 | tail -20`
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/garden/GardenHud.kt
+git add src/main/kotlin/org/phantom/internal/garden/GardenHud.kt
 git commit -m "feat: add GardenHud NVG renderer"
 ```
 
@@ -1647,36 +1647,36 @@ git commit -m "feat: add GardenHud NVG renderer"
 ## Task 11: GardenMacroModule
 
 **Files:**
-- Create: `src/main/kotlin/org/cobalt/internal/garden/GardenMacroModule.kt`
+- Create: `src/main/kotlin/org/phantom/internal/garden/GardenMacroModule.kt`
 
 This is the central module. It owns all settings, the state machine, HUD, and routes events to managers.
 
 - [ ] **Step 1: Create GardenMacroModule.kt**
 
 ```kotlin
-package org.cobalt.internal.garden
+package org.phantom.internal.garden
 
 import net.minecraft.client.Minecraft
-import org.cobalt.api.event.EventBus
-import org.cobalt.api.event.annotation.SubscribeEvent
-import org.cobalt.api.event.impl.client.ChatEvent
-import org.cobalt.api.event.impl.client.TickEvent
-import org.cobalt.api.hud.HudAnchor
-import org.cobalt.api.hud.hudElement
-import org.cobalt.api.module.Module
-import org.cobalt.api.module.setting.impl.CheckboxSetting
-import org.cobalt.api.module.setting.impl.InfoSetting
-import org.cobalt.api.module.setting.impl.InfoType
-import org.cobalt.api.module.setting.impl.SliderSetting
-import org.cobalt.api.module.setting.impl.TextSetting
-import org.cobalt.api.module.setting.inGroup
-import org.cobalt.internal.garden.managers.*
+import org.phantom.api.event.EventBus
+import org.phantom.api.event.annotation.SubscribeEvent
+import org.phantom.api.event.impl.client.ChatEvent
+import org.phantom.api.event.impl.client.TickEvent
+import org.phantom.api.hud.HudAnchor
+import org.phantom.api.hud.hudElement
+import org.phantom.api.module.Module
+import org.phantom.api.module.setting.impl.CheckboxSetting
+import org.phantom.api.module.setting.impl.InfoSetting
+import org.phantom.api.module.setting.impl.InfoType
+import org.phantom.api.module.setting.impl.SliderSetting
+import org.phantom.api.module.setting.impl.TextSetting
+import org.phantom.api.module.setting.inGroup
+import org.phantom.internal.garden.managers.*
 
 object GardenMacroModule : Module("Garden Macro") {
 
     private val mc = Minecraft.getInstance()
 
-    // ── State ─────────────────────────────────────────────────────────────────
+    // â”€â”€ State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     @Volatile var state = GardenState.OFF
         private set
     @Volatile var sessionStartTime = System.currentTimeMillis()
@@ -1687,7 +1687,7 @@ object GardenMacroModule : Module("Garden Macro") {
         mc.execute { state = newState }
     }
 
-    // ── Settings ──────────────────────────────────────────────────────────────
+    // â”€â”€ Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     // General
     private val enabledSetting = CheckboxSetting("Enabled", "Run the garden macro.", false)
@@ -1748,7 +1748,7 @@ object GardenMacroModule : Module("Garden Macro") {
     private val reconnectMinSetting     = SliderSetting("Reconnect Min", "Min seconds before reconnecting.", 30.0, 5.0, 120.0)
     private val reconnectMaxSetting     = SliderSetting("Reconnect Max", "Max seconds before reconnecting.", 60.0, 5.0, 120.0)
 
-    // ── Convenience accessors ─────────────────────────────────────────────────
+    // â”€â”€ Convenience accessors â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     val farmScript        get() = farmScriptSetting.value
     val pestScript        get() = pestScriptSetting.value
     val returnScript      get() = returnScriptSetting.value
@@ -1778,7 +1778,7 @@ object GardenMacroModule : Module("Garden Macro") {
     val reconnectDelayMin get() = reconnectMinSetting.value
     val reconnectDelayMax get() = reconnectMaxSetting.value
 
-    // ── HUD ───────────────────────────────────────────────────────────────────
+    // â”€â”€ HUD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     private val hudWidth  = 200f
     private val hudHeight = 155f
 
@@ -1807,7 +1807,7 @@ object GardenMacroModule : Module("Garden Macro") {
         }
     }
 
-    // ── init ──────────────────────────────────────────────────────────────────
+    // â”€â”€ init â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     init {
         // Register settings with groups
         listOf(enabledSetting).forEach { it.inGroup("General") }
@@ -1835,7 +1835,7 @@ object GardenMacroModule : Module("Garden Macro") {
         EventBus.register(this)
     }
 
-    // ── Events ────────────────────────────────────────────────────────────────
+    // â”€â”€ Events â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     @SubscribeEvent
     fun onTick(event: TickEvent.End) {
@@ -1879,7 +1879,7 @@ object GardenMacroModule : Module("Garden Macro") {
 
     @SubscribeEvent
     fun onChat(event: ChatEvent.Receive) {
-        val msg = event.message?.replace(Regex("§[0-9a-fk-or]"), "") ?: return
+        val msg = event.message?.replace(Regex("Â§[0-9a-fk-or]"), "") ?: return
 
         // Chat spam filter
         if (hideFilteredChatSetting.value) {
@@ -1911,7 +1911,7 @@ object GardenMacroModule : Module("Garden Macro") {
             return
         }
 
-        // AUTOSELLING — priority: George > BookCombine > Junk
+        // AUTOSELLING â€” priority: George > BookCombine > Junk
         if (autosellingManager == null) {
             if (GeorgeManager.shouldSell()) {
                 autosellingManager = "george"
@@ -1975,29 +1975,29 @@ object GardenMacroModule : Module("Garden Macro") {
 }
 ```
 
-- [ ] **Step 2: Build check** → `./gradlew build 2>&1 | tail -20`
+- [ ] **Step 2: Build check** â†’ `./gradlew build 2>&1 | tail -20`
 
 Fix any compilation errors before proceeding.
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/garden/GardenMacroModule.kt
-git commit -m "feat: add GardenMacroModule — central module with state machine, settings, HUD"
+git add src/main/kotlin/org/phantom/internal/garden/GardenMacroModule.kt
+git commit -m "feat: add GardenMacroModule â€” central module with state machine, settings, HUD"
 ```
 
 ---
 
-## Task 12: Register in Cobalt.kt
+## Task 12: Register in Phantom.kt
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/Cobalt.kt`
+- Modify: `src/main/kotlin/org/phantom/Phantom.kt`
 
 - [ ] **Step 1: Add import and register**
 
 Add import:
 ```kotlin
-import org.cobalt.internal.garden.GardenMacroModule
+import org.phantom.internal.garden.GardenMacroModule
 ```
 
 Add to `ModuleManager.addModules(listOf(...))`:
@@ -2015,16 +2015,16 @@ Expected: `BUILD SUCCESSFUL`
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/Cobalt.kt
-git commit -m "feat: register GardenMacroModule in Cobalt"
+git add src/main/kotlin/org/phantom/Phantom.kt
+git commit -m "feat: register GardenMacroModule in Phantom"
 ```
 
 ---
 
 ## Known Caveats
 
-- **Wardrobe/Equipment GUI click logic** may need tuning to match the actual Hypixel slot indices — test in-game and adjust slot offsets.
-- **PestTabListParser regex** may need updating once actual Hypixel tab list format is observed — the patterns are reasonable defaults.
-- **RecoveryManager reconnect** uses `ConnectScreen` API — verify the constructor signature against MC 1.21.11 and adjust if needed.
-- **AotvManager right-click** assumes AOTV is in the hotbar — extend to check offhand if needed.
-- **SliderSetting.value** returns `Double` — use `.toInt()`, `.toFloat()`, `.toLong()` as needed throughout.
+- **Wardrobe/Equipment GUI click logic** may need tuning to match the actual Hypixel slot indices â€” test in-game and adjust slot offsets.
+- **PestTabListParser regex** may need updating once actual Hypixel tab list format is observed â€” the patterns are reasonable defaults.
+- **RecoveryManager reconnect** uses `ConnectScreen` API â€” verify the constructor signature against MC 1.21.11 and adjust if needed.
+- **AotvManager right-click** assumes AOTV is in the hotbar â€” extend to check offhand if needed.
+- **SliderSetting.value** returns `Double` â€” use `.toInt()`, `.toFloat()`, `.toLong()` as needed throughout.

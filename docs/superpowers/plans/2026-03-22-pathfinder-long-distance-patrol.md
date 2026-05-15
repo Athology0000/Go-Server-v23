@@ -1,10 +1,10 @@
-# Pathfinder Long-Distance & Kill-Waypoint Patrol — Implementation Plan
+# Pathfinder Long-Distance & Kill-Waypoint Patrol â€” Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Enable pathfinding over hundreds of blocks through complex terrain via progressive frontier A*, and add a slayer-macro patrol system that randomly visits designated kill spots along a recorded tunnel route.
 
-**Architecture:** C++ side gains frontier-tracking in `AStarPlanner` — when a goal is outside the world buffer it returns a partial path to the best reachable node and lets `PathExecutor`'s existing REPLANNING loop re-plan from there. Kotlin side gains a `PatrolWaypointStore` for persistence and patrol state-machine logic inside `PathfindingModule`.
+**Architecture:** C++ side gains frontier-tracking in `AStarPlanner` â€” when a goal is outside the world buffer it returns a partial path to the best reachable node and lets `PathExecutor`'s existing REPLANNING loop re-plan from there. Kotlin side gains a `PatrolWaypointStore` for persistence and patrol state-machine logic inside `PathfindingModule`.
 
 **Tech Stack:** C++17 (MSVC/CMake), Kotlin, Fabric Minecraft 1.21.11, Gson for JSON persistence.
 
@@ -20,8 +20,8 @@
 | `natives/src/engine/AStarPlanner.cpp` | Modify | Frontier tracking, partial return, MAX_ITER 150k |
 | `natives/src/engine/WorldAccessor.h` | Modify | Make `inBuffer` public |
 | `natives/src/engine/PathExecutor.cpp` | Modify | Guard both PLANNING/REPLANNING FAILED transitions against isPartial |
-| `src/main/kotlin/org/cobalt/internal/pathfinding/PatrolWaypointStore.kt` | Create | Serialize/deserialize routeWaypoints + killWaypoints to separate JSON file |
-| `src/main/kotlin/org/cobalt/internal/pathfinding/PathfindingModule.kt` | Modify | Patrol state machine, route/kill waypoint lists, settings, buildSubRoute, right-click handler |
+| `src/main/kotlin/org/phantom/internal/pathfinding/PatrolWaypointStore.kt` | Create | Serialize/deserialize routeWaypoints + killWaypoints to separate JSON file |
+| `src/main/kotlin/org/phantom/internal/pathfinding/PathfindingModule.kt` | Modify | Patrol state machine, route/kill waypoint lists, settings, buildSubRoute, right-click handler |
 
 ---
 
@@ -53,7 +53,7 @@ public:
 private:
     const uint8_t* buffer_ = nullptr;
     int bx_ = 0, by_ = 0, bz_ = 0;
-    bool inBuffer(int x, int y, int z) const;   // ← move this line up
+    bool inBuffer(int x, int y, int z) const;   // â† move this line up
     uint8_t bufferAt(int x, int y, int z) const;
     uint8_t callbackBlock(int x, int y, int z) const;
 ```
@@ -63,7 +63,7 @@ Move the `inBuffer` declaration into the `public:` section (add it after `isLava
 public:
     // ... existing public methods ...
     bool isLava(int x, int y, int z) const;
-    bool inBuffer(int x, int y, int z) const;   // ← now public
+    bool inBuffer(int x, int y, int z) const;   // â† now public
 
 private:
     const uint8_t* buffer_ = nullptr;
@@ -77,7 +77,7 @@ private:
 ```bash
 cmake --build natives/build --config Release 2>&1 | tail -10
 ```
-Expected: no errors, `cobalt_pathfinder.dll` rebuilt.
+Expected: no errors, `phantom_pathfinder.dll` rebuilt.
 
 - [ ] **Step 3: Commit**
 
@@ -90,7 +90,7 @@ git commit -m "feat: make WorldAccessor::inBuffer public for frontier A*"
 
 ## Task 2: Add `isPartial` to `AStarResult`
 
-> **Note:** The spec's Files Touched table incorrectly lists `natives/include/Types.h` for this change. `AStarResult` is actually defined in `natives/src/engine/AStarPlanner.h` (lines 10–13). Edit only `AStarPlanner.h`.
+> **Note:** The spec's Files Touched table incorrectly lists `natives/include/Types.h` for this change. `AStarResult` is actually defined in `natives/src/engine/AStarPlanner.h` (lines 10â€“13). Edit only `AStarPlanner.h`.
 
 **Files:**
 - Modify: `natives/src/engine/AStarPlanner.h`
@@ -139,7 +139,7 @@ This is the core C++ change. When the goal is outside the world buffer, A* track
 
 - [ ] **Step 1: Raise MAX_ITER and add goalInBuffer check before thread launch**
 
-In `AStarPlanner::startAsync`, `MAX_ITER` is declared inside the thread lambda (line 92 of `AStarPlanner.cpp`). Change its value in place — do not move it:
+In `AStarPlanner::startAsync`, `MAX_ITER` is declared inside the thread lambda (line 92 of `AStarPlanner.cpp`). Change its value in place â€” do not move it:
 ```cpp
 const int MAX_ITER = 150000;
 ```
@@ -194,7 +194,7 @@ if (!res.found && !goalInBuffer && frontierAdvanced) {
         res.isPartial = true;
         res.nodes     = std::move(path);
     }
-    // If path reconstruction failed (no parent chain), leave res.found=false, isPartial=false → FAILED
+    // If path reconstruction failed (no parent chain), leave res.found=false, isPartial=false â†’ FAILED
 }
 ```
 
@@ -209,14 +209,14 @@ Expected: no errors, DLL rebuilt.
 
 ```bash
 git add natives/src/engine/AStarPlanner.cpp
-git commit -m "feat: frontier A* — partial path to best reachable node when goal outside buffer"
+git commit -m "feat: frontier A* â€” partial path to best reachable node when goal outside buffer"
 ```
 
 ---
 
 ## Task 4: Update `PathExecutor` FAILED guards to respect `isPartial`
 
-Both the `PLANNING` and `REPLANNING` handlers in `PathExecutor::tick` currently unconditionally transition to FAILED when `!res.found`. A partial result must not trigger FAILED — the partial path should be executed and REPLANNING will re-plan from the frontier.
+Both the `PLANNING` and `REPLANNING` handlers in `PathExecutor::tick` currently unconditionally transition to FAILED when `!res.found`. A partial result must not trigger FAILED â€” the partial path should be executed and REPLANNING will re-plan from the frontier.
 
 **Files:**
 - Modify: `natives/src/engine/PathExecutor.cpp`
@@ -253,14 +253,14 @@ Expected: no errors.
 - [ ] **Step 4: Copy DLL to resources**
 
 ```bash
-copy /Y natives\build\Release\cobalt_pathfinder.dll src\main\resources\natives\windows\
+copy /Y natives\build\Release\phantom_pathfinder.dll src\main\resources\natives\windows\
 ```
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add natives/src/engine/PathExecutor.cpp src/main/resources/natives/windows/cobalt_pathfinder.dll
-git commit -m "feat: treat isPartial A* result as valid — enables progressive re-planning for long paths"
+git add natives/src/engine/PathExecutor.cpp src/main/resources/natives/windows/phantom_pathfinder.dll
+git commit -m "feat: treat isPartial A* result as valid â€” enables progressive re-planning for long paths"
 ```
 
 ---
@@ -270,12 +270,12 @@ git commit -m "feat: treat isPartial A* result as valid — enables progressive 
 The Config system only serializes `Setting` values. Route waypoints and kill waypoints are `List<data class>` and need a separate JSON file. This class owns that file.
 
 **Files:**
-- Create: `src/main/kotlin/org/cobalt/internal/pathfinding/PatrolWaypointStore.kt`
+- Create: `src/main/kotlin/org/phantom/internal/pathfinding/PatrolWaypointStore.kt`
 
 - [ ] **Step 1: Create the file**
 
 ```kotlin
-package org.cobalt.internal.pathfinding
+package org.phantom.internal.pathfinding
 
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonArray
@@ -290,14 +290,14 @@ internal object PatrolWaypointStore {
 
     private val gson = GsonBuilder().setPrettyPrinting().create()
     private val file: File by lazy {
-        File(Minecraft.getInstance().gameDirectory, "config/cobalt/patrol_waypoints.json")
+        File(Minecraft.getInstance().gameDirectory, "config/phantom/patrol_waypoints.json")
     }
 
     var routeWaypoints: MutableList<RouteWaypoint> = mutableListOf()
     var killWaypoints:  MutableList<KillWaypoint>  = mutableListOf()
 
     fun load() {
-        routeWaypoints.clear()   // idempotent — prevent double-append on reload
+        routeWaypoints.clear()   // idempotent â€” prevent double-append on reload
         killWaypoints.clear()
         if (!file.exists()) return
         val text = file.bufferedReader().use { it.readText() }
@@ -346,9 +346,9 @@ internal object PatrolWaypointStore {
 }
 ```
 
-- [ ] **Step 2: Call `load()` from `Cobalt.onInitializeClient()`**
+- [ ] **Step 2: Call `load()` from `Phantom.onInitializeClient()`**
 
-Open `src/main/kotlin/org/cobalt/Cobalt.kt`. Find the section that calls `Config.loadModulesConfig()` (or equivalent startup). Add after it:
+Open `src/main/kotlin/org/phantom/Phantom.kt`. Find the section that calls `Config.loadModulesConfig()` (or equivalent startup). Add after it:
 ```kotlin
 PatrolWaypointStore.load()
 ```
@@ -363,27 +363,27 @@ Expected: `BUILD SUCCESSFUL`.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/pathfinding/PatrolWaypointStore.kt src/main/kotlin/org/cobalt/Cobalt.kt
-git commit -m "feat: PatrolWaypointStore — persist route and kill waypoints to patrol_waypoints.json"
+git add src/main/kotlin/org/phantom/internal/pathfinding/PatrolWaypointStore.kt src/main/kotlin/org/phantom/Phantom.kt
+git commit -m "feat: PatrolWaypointStore â€” persist route and kill waypoints to patrol_waypoints.json"
 ```
 
 ---
 
 ## Task 6: Add patrol state machine and settings to `PathfindingModule`
 
-This is the largest Kotlin change. Read the full current file before editing (`src/main/kotlin/org/cobalt/internal/pathfinding/PathfindingModule.kt`).
+This is the largest Kotlin change. Read the full current file before editing (`src/main/kotlin/org/phantom/internal/pathfinding/PathfindingModule.kt`).
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/pathfinding/PathfindingModule.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/pathfinding/PathfindingModule.kt`
 
 - [ ] **Step 1: Add imports and patrol state enum at top of file**
 
 Add these imports alongside the existing ones:
 ```kotlin
-import org.cobalt.internal.pathfinding.PatrolWaypointStore
-import org.cobalt.internal.pathfinding.RouteWaypoint
-import org.cobalt.internal.pathfinding.KillWaypoint
-import org.cobalt.api.pathfinder.jni.MovementProfile
+import org.phantom.internal.pathfinding.PatrolWaypointStore
+import org.phantom.internal.pathfinding.RouteWaypoint
+import org.phantom.internal.pathfinding.KillWaypoint
+import org.phantom.api.pathfinder.jni.MovementProfile
 import kotlin.math.sqrt
 ```
 
@@ -400,7 +400,7 @@ private var patrolState: PatrolState = PatrolState.IDLE
 private var currentKillWp: KillWaypoint? = null
 private var dwellTicksRemaining: Int = 0
 ```
-(No `recordingKillMode` field — that is now the `CheckboxSetting` named `recordingKillPoints`.)
+(No `recordingKillMode` field â€” that is now the `CheckboxSetting` named `recordingKillPoints`.)
 
 - [ ] **Step 3: Add patrol settings**
 
@@ -482,7 +482,7 @@ private fun buildSubRoute(
 ): DoubleArray {
     val route = PatrolWaypointStore.routeWaypoints
     if (route.isEmpty()) {
-        // No route — navigate directly (player position + kill target)
+        // No route â€” navigate directly (player position + kill target)
         return doubleArrayOf(fromX, fromY, fromZ, killWp.x, killWp.y, killWp.z)
     }
 
@@ -555,13 +555,13 @@ The current `onTick` has an early-return guard `if (!enabled.value || !moduleOwn
 ```kotlin
 @SubscribeEvent
 fun onTick(@Suppress("UNUSED_PARAMETER") event: TickEvent.Start) {
-    org.cobalt.internal.pathfinding.DebugLog.debugFileEnabled = debugFileLogging.value
+    org.phantom.internal.pathfinding.DebugLog.debugFileEnabled = debugFileLogging.value
 
     // Update live info settings
     routeCountInfo.value = "${PatrolWaypointStore.routeWaypoints.size} points"
     killCountInfo.value  = "${PatrolWaypointStore.killWaypoints.size} points"
 
-    // Patrol state machine — runs independently of moduleOwnsPath
+    // Patrol state machine â€” runs independently of moduleOwnsPath
     if (patrolModeEnabled.value && patrolState != PatrolState.IDLE) {
         when (patrolState) {
             PatrolState.NAVIGATING -> {
@@ -662,8 +662,8 @@ Expected: `BUILD SUCCESSFUL`. Fix any compilation errors before proceeding.
 - [ ] **Step 10: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/pathfinding/PathfindingModule.kt
-git commit -m "feat: kill-waypoint patrol — route-guided random patrol with right-click kill point recording"
+git add src/main/kotlin/org/phantom/internal/pathfinding/PathfindingModule.kt
+git commit -m "feat: kill-waypoint patrol â€” route-guided random patrol with right-click kill point recording"
 ```
 
 ---
@@ -675,14 +675,14 @@ git commit -m "feat: kill-waypoint patrol — route-guided random patrol with ri
 ```bash
 ./gradlew deployMod 2>&1 | tail -5
 ```
-Expected: `BUILD SUCCESSFUL`, `cobalt-1.0.1.jar` copied to Prism mods folder.
+Expected: `BUILD SUCCESSFUL`, `phantom-1.0.1.jar` copied to Prism mods folder.
 
 - [ ] **Step 2: In-game verification checklist**
 
 Launch the game and verify:
 
 **Long-distance pathfinding:**
-1. Use `/cobalt setpos` to set a target 100+ blocks away.
+1. Use `/phantom setpos` to set a target 100+ blocks away.
 2. Click Start in the Pathfinding module.
 3. Observe: bot begins moving toward target, re-plans every ~25 blocks, navigates around obstacles. Path spline updates each re-plan.
 4. Confirm arrival or near-arrival (within `arrivalRadius`).
@@ -696,13 +696,13 @@ Launch the game and verify:
 1. Click "Record Kill Points" to enter recording mode (chat confirms).
 2. Right-click mob spawn blocks in the tunnel.
 3. Verify kill count InfoSetting increments.
-4. `/cobalt setpos` not needed — kill points are recorded separately.
+4. `/phantom setpos` not needed â€” kill points are recorded separately.
 
 **Patrol:**
-1. Ensure ≥ 2 kill waypoints and route waypoints are recorded.
+1. Ensure â‰¥ 2 kill waypoints and route waypoints are recorded.
 2. Enable Patrol Mode and click "Start Patrol".
 3. Observe: bot navigates through the tunnel route to a random kill spot, dwells, then moves to a different kill spot. Never takes the same route two consecutive times (usually).
-4. Click "Stop Patrol" — bot stops and movement unlocks.
+4. Click "Stop Patrol" â€” bot stops and movement unlocks.
 
 - [ ] **Step 3: Final commit (if any last-minute fixes)**
 
@@ -715,10 +715,10 @@ git commit -m "fix: <describe any in-game fix>"
 
 ## Notes
 
-- **No unit tests** — this project has none. Verification is in-game only.
-- **Patrol auto-save** — `PatrolWaypointStore.save()` is called inline from each `ActionSetting` lambda (record/clear). Waypoints are saved immediately on each action rather than waiting for the UI save button. This is intentional.
-- **Disabling Patrol Mode mid-navigation** — unchecking `Patrol Mode` while `patrolState == NAVIGATING` stops the patrol from advancing but lets the current leg finish (bot walks to the frontier and stops). Use "Stop Patrol" button for an immediate clean stop.
-- **Config system** — route/kill waypoints use a separate file (`config/cobalt/patrol_waypoints.json`), not `addons.json`, because the Config system only serializes `Setting` values.
-- **InfoSetting.value** — if `InfoSetting` does not have a mutable `value` property, use a different approach to display counts (e.g., a read-only label in the UI that you update via a different mechanism, or just omit the live count and add it later).
-- **`MovementProfile` import** — verify the correct package path: `org.cobalt.api.pathfinder.jni.MovementProfile`.
-- **`NativePathfinder.setRoute` signature** — takes `DoubleArray`, `Boolean`, `MovementProfile`. Confirm at `src/main/kotlin/org/cobalt/api/pathfinder/jni/NativePathfinder.kt:54`.
+- **No unit tests** â€” this project has none. Verification is in-game only.
+- **Patrol auto-save** â€” `PatrolWaypointStore.save()` is called inline from each `ActionSetting` lambda (record/clear). Waypoints are saved immediately on each action rather than waiting for the UI save button. This is intentional.
+- **Disabling Patrol Mode mid-navigation** â€” unchecking `Patrol Mode` while `patrolState == NAVIGATING` stops the patrol from advancing but lets the current leg finish (bot walks to the frontier and stops). Use "Stop Patrol" button for an immediate clean stop.
+- **Config system** â€” route/kill waypoints use a separate file (`config/phantom/patrol_waypoints.json`), not `addons.json`, because the Config system only serializes `Setting` values.
+- **InfoSetting.value** â€” if `InfoSetting` does not have a mutable `value` property, use a different approach to display counts (e.g., a read-only label in the UI that you update via a different mechanism, or just omit the live count and add it later).
+- **`MovementProfile` import** â€” verify the correct package path: `org.phantom.api.pathfinder.jni.MovementProfile`.
+- **`NativePathfinder.setRoute` signature** â€” takes `DoubleArray`, `Boolean`, `MovementProfile`. Confirm at `src/main/kotlin/org/phantom/api/pathfinder/jni/NativePathfinder.kt:54`.

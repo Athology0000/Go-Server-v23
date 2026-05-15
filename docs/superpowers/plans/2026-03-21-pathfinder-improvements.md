@@ -4,7 +4,7 @@
 
 **Goal:** Add tunnel-centering, smooth spline path rendering, head-direction ray, and AOTV auto-fire to the native C++ pathfinder.
 
-**Architecture:** Five targeted changes — (1) clearance cost in C++ MovementExpander, (2) path node exposure through the JNI bridge, (3) Catmull-Rom spline renderer in Kotlin, (4) head-direction ray per frame, (5) AOTV auto-fire (hotbar swap + right-click) when the engine returns an AOTV action.
+**Architecture:** Five targeted changes â€” (1) clearance cost in C++ MovementExpander, (2) path node exposure through the JNI bridge, (3) Catmull-Rom spline renderer in Kotlin, (4) head-direction ray per frame, (5) AOTV auto-fire (hotbar swap + right-click) when the engine returns an AOTV action.
 
 **Tech Stack:** C++17, JNI, Java 21, Kotlin, Fabric MC 1.21.11, Minecraft Gizmos API via OverlayRenderEngine
 
@@ -19,10 +19,10 @@
 | `natives/src/engine/PathfinderEngine.h` | Add `getPathNodes(out)` declaration |
 | `natives/src/engine/PathfinderEngine.cpp` | Implement `getPathNodes()` |
 | `natives/src/pathfinder_jni.cpp` | Add `Java_..._getPathNodes` JNI function |
-| `src/main/java/org/cobalt/pathfinder/NativePathfinderBridge.java` | Declare `getPathNodes(long handle): FloatArray` |
-| `src/main/kotlin/org/cobalt/api/pathfinder/jni/NativePathfinder.kt` | Cache path nodes after tick; expose `cachedPathNodes` |
-| `src/main/kotlin/org/cobalt/internal/pathfinding/PathSplineRenderer.kt` | **New** — Catmull-Rom interpolation + AOTV segment detection |
-| `src/main/kotlin/org/cobalt/internal/pathfinding/PathfindingModule.kt` | Add `aotvSlot` setting; wire AOTV fire + spline/head-ray rendering |
+| `src/main/java/org/phantom/pathfinder/NativePathfinderBridge.java` | Declare `getPathNodes(long handle): FloatArray` |
+| `src/main/kotlin/org/phantom/api/pathfinder/jni/NativePathfinder.kt` | Cache path nodes after tick; expose `cachedPathNodes` |
+| `src/main/kotlin/org/phantom/internal/pathfinding/PathSplineRenderer.kt` | **New** â€” Catmull-Rom interpolation + AOTV segment detection |
+| `src/main/kotlin/org/phantom/internal/pathfinding/PathfindingModule.kt` | Add `aotvSlot` setting; wire AOTV fire + spline/head-ray rendering |
 
 ---
 
@@ -87,9 +87,9 @@ git commit -m "feat: add tunnel clearance cost to C++ pathfinder (Task 1)"
 - Modify: `natives/src/engine/PathfinderEngine.h`
 - Modify: `natives/src/engine/PathfinderEngine.cpp`
 - Modify: `natives/src/pathfinder_jni.cpp`
-- Modify: `src/main/java/org/cobalt/pathfinder/NativePathfinderBridge.java`
+- Modify: `src/main/java/org/phantom/pathfinder/NativePathfinderBridge.java`
 
-**Context:** `activePath_` in `PathExecutor` is a `std::vector<Vec3i>`. It is only ever written on the game thread (inside `tick()` → `update()` → JNI). `getPathNodes()` is also called from the game tick thread (at the end of `NativePathfinder.tick()`), so there is no race condition — no mutex needed. The C++ packer adds `+0.5` to X and Z (block-center) but not Y (feet level). Return type is `jfloatArray` — float precision is sufficient for integer coordinates.
+**Context:** `activePath_` in `PathExecutor` is a `std::vector<Vec3i>`. It is only ever written on the game thread (inside `tick()` â†’ `update()` â†’ JNI). `getPathNodes()` is also called from the game tick thread (at the end of `NativePathfinder.tick()`), so there is no race condition â€” no mutex needed. The C++ packer adds `+0.5` to X and Z (block-center) but not Y (feet level). Return type is `jfloatArray` â€” float precision is sufficient for integer coordinates.
 
 - [ ] **Step 1: Add `getActivePath()` accessor to `PathExecutor.h`**
 
@@ -119,7 +119,7 @@ void PathfinderEngine::getPathNodes(std::vector<Vec3i>& out) const {
 Add before the closing `} // extern "C"` brace:
 ```cpp
 JNIEXPORT jfloatArray JNICALL
-Java_org_cobalt_pathfinder_NativePathfinderBridge_getPathNodes(JNIEnv* env, jclass, jlong handle) {
+Java_org_phantom_pathfinder_NativePathfinderBridge_getPathNodes(JNIEnv* env, jclass, jlong handle) {
     std::vector<Vec3i> nodes;
     ((PathfinderEngine*)handle)->getPathNodes(nodes);
     jfloatArray arr = env->NewFloatArray((jsize)(nodes.size() * 3));
@@ -154,7 +154,7 @@ Expected: BUILD SUCCESSFUL
 - [ ] **Step 7: Commit**
 
 ```bash
-git add natives/src/engine/PathExecutor.h natives/src/engine/PathfinderEngine.h natives/src/engine/PathfinderEngine.cpp natives/src/pathfinder_jni.cpp src/main/java/org/cobalt/pathfinder/NativePathfinderBridge.java src/main/resources/natives/
+git add natives/src/engine/PathExecutor.h natives/src/engine/PathfinderEngine.h natives/src/engine/PathfinderEngine.cpp natives/src/pathfinder_jni.cpp src/main/java/org/phantom/pathfinder/NativePathfinderBridge.java src/main/resources/natives/
 git commit -m "feat: expose path nodes via JNI getPathNodes() (Task 2)"
 ```
 
@@ -163,9 +163,9 @@ git commit -m "feat: expose path nodes via JNI getPathNodes() (Task 2)"
 ## Task 3: Cache Path Nodes in NativePathfinder.kt
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/api/pathfinder/jni/NativePathfinder.kt`
+- Modify: `src/main/kotlin/org/phantom/api/pathfinder/jni/NativePathfinder.kt`
 
-Cache `cachedPathNodes` whenever the engine transitions into `EXECUTING`. On `REPLANNING`, intentionally keep the old cached nodes (the engine continues walking the old path — the new path arrives on the next `EXECUTING` transition, which triggers a refresh then). On `PLANNING`, neither refresh nor clear (no path exists yet). On `IDLE`/`ARRIVED`/`FAILED`, clear the cache.
+Cache `cachedPathNodes` whenever the engine transitions into `EXECUTING`. On `REPLANNING`, intentionally keep the old cached nodes (the engine continues walking the old path â€” the new path arrives on the next `EXECUTING` transition, which triggers a refresh then). On `PLANNING`, neither refresh nor clear (no path exists yet). On `IDLE`/`ARRIVED`/`FAILED`, clear the cache.
 
 - [ ] **Step 1: Add cache fields and `cachedPathNodes` property**
 
@@ -219,29 +219,29 @@ Expected: BUILD SUCCESSFUL
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/api/pathfinder/jni/NativePathfinder.kt
+git add src/main/kotlin/org/phantom/api/pathfinder/jni/NativePathfinder.kt
 git commit -m "feat: cache path nodes in NativePathfinder on EXECUTING transition (Task 3)"
 ```
 
 ---
 
-## Task 4: PathSplineRenderer — Catmull-Rom + AOTV Detection
+## Task 4: PathSplineRenderer â€” Catmull-Rom + AOTV Detection
 
 **Files:**
-- Create: `src/main/kotlin/org/cobalt/internal/pathfinding/PathSplineRenderer.kt`
+- Create: `src/main/kotlin/org/phantom/internal/pathfinding/PathSplineRenderer.kt`
 
 This object takes a list of `Vec3` path nodes and produces:
 1. A `List<Vec3>` of smooth interpolated spline points (Catmull-Rom, 10 steps per segment)
 2. A `BooleanArray` of the same length indicating which points are on AOTV segments (XZ distance between source nodes > 2.0 blocks)
 
-AOTV detection: for each pair of consecutive source nodes, if their XZ distance > 2.0 and they share the same Y, the segment is AOTV. This matches the C++ `addAOTV` range (3–11 blocks).
+AOTV detection: for each pair of consecutive source nodes, if their XZ distance > 2.0 and they share the same Y, the segment is AOTV. This matches the C++ `addAOTV` range (3â€“11 blocks).
 
 Catmull-Rom phantom endpoints: duplicate first node as P[-1] and last node as P[N].
 
 - [ ] **Step 1: Create `PathSplineRenderer.kt`**
 
 ```kotlin
-package org.cobalt.internal.pathfinding
+package org.phantom.internal.pathfinding
 
 import net.minecraft.world.phys.Vec3
 
@@ -309,7 +309,7 @@ Expected: BUILD SUCCESSFUL
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/pathfinding/PathSplineRenderer.kt
+git add src/main/kotlin/org/phantom/internal/pathfinding/PathSplineRenderer.kt
 git commit -m "feat: add PathSplineRenderer with Catmull-Rom spline and AOTV detection (Task 4)"
 ```
 
@@ -318,7 +318,7 @@ git commit -m "feat: add PathSplineRenderer with Catmull-Rom spline and AOTV det
 ## Task 5: AOTV Auto-Fire in PathfindingModule
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/pathfinding/PathfindingModule.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/pathfinding/PathfindingModule.kt`
 
 When `cmd.activeAction == ActionType.AOTV`:
 1. Save current held slot
@@ -326,16 +326,16 @@ When `cmd.activeAction == ActionType.AOTV`:
 3. Call `mc.gameMode?.useItem(player, InteractionHand.MAIN_HAND)` to right-click
 4. Swap back to previous slot immediately (AOTV teleports instantly)
 
-Add a `ModeSetting` for the AOTV slot (options "1"–"9", value is 0–8 matching `player.inventory.selected`).
+Add a `ModeSetting` for the AOTV slot (options "1"â€“"9", value is 0â€“8 matching `player.inventory.selected`).
 
 - [ ] **Step 1: Add imports to PathfindingModule.kt**
 
 Add these imports at the top with the existing imports:
 ```kotlin
 import net.minecraft.world.InteractionHand
-import org.cobalt.api.module.setting.impl.ModeSetting
-import org.cobalt.api.pathfinder.jni.ActionType
-import org.cobalt.api.pathfinder.jni.NativePathfinder
+import org.phantom.api.module.setting.impl.ModeSetting
+import org.phantom.api.pathfinder.jni.ActionType
+import org.phantom.api.pathfinder.jni.NativePathfinder
 ```
 
 - [ ] **Step 2: Add `aotvSlot` setting after `debugFileLogging`**
@@ -385,7 +385,7 @@ Expected: BUILD SUCCESSFUL
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/pathfinding/PathfindingModule.kt
+git add src/main/kotlin/org/phantom/internal/pathfinding/PathfindingModule.kt
 git commit -m "feat: AOTV auto-fire with hotbar swap in PathfindingModule (Task 5)"
 ```
 
@@ -394,22 +394,22 @@ git commit -m "feat: AOTV auto-fire with hotbar swap in PathfindingModule (Task 
 ## Task 6: Spline + Head-Ray Rendering in PathfindingModule
 
 **Files:**
-- Modify: `src/main/kotlin/org/cobalt/internal/pathfinding/PathfindingModule.kt`
+- Modify: `src/main/kotlin/org/phantom/internal/pathfinding/PathfindingModule.kt`
 
 Add two render features to `onRender(WorldRenderEvent.Last)`:
 
-**A. Spline rendering** — on each render frame, rebuild the spline from cached nodes if they changed (track previous list identity). Clear tag `"path-spline"` then add one `addLine()` call per consecutive spline point pair. Normal segments cyan→blue; AOTV segments orange.
+**A. Spline rendering** â€” on each render frame, rebuild the spline from cached nodes if they changed (track previous list identity). Clear tag `"path-spline"` then add one `addLine()` call per consecutive spline point pair. Normal segments cyanâ†’blue; AOTV segments orange.
 
-**B. Head-direction ray** — each frame, get `player.getLookAngle()` (unit Vec3 in look direction), get `player.getEyePosition(event.partialTick)`, draw a 5-block line from eye in look direction using tag `"head-ray"` with durationTicks=1.
+**B. Head-direction ray** â€” each frame, get `player.getLookAngle()` (unit Vec3 in look direction), get `player.getEyePosition(event.partialTick)`, draw a 5-block line from eye in look direction using tag `"head-ray"` with durationTicks=1.
 
-The spline is pre-computed from `NativePathfinder.cachedPathNodes` only when the reference changes — not every frame.
+The spline is pre-computed from `NativePathfinder.cachedPathNodes` only when the reference changes â€” not every frame.
 
 - [ ] **Step 1: Add import for PathSplineRenderer and Vec3**
 
 Add to imports:
 ```kotlin
 import net.minecraft.world.phys.Vec3
-import org.cobalt.internal.pathfinding.PathSplineRenderer
+import org.phantom.internal.pathfinding.PathSplineRenderer
 ```
 
 - [ ] **Step 2: Add spline cache fields to PathfindingModule**
@@ -474,7 +474,7 @@ fun onRender(event: WorldRenderEvent.Last) {
 }
 ```
 
-**Note:** `WorldRenderEvent.Last` only carries a `WorldRenderContext` — no `partialTick` field. Use `player.getEyePosition()` (no partial tick) for the eye origin, which is accurate enough for a 1-tick-expiry line.
+**Note:** `WorldRenderEvent.Last` only carries a `WorldRenderContext` â€” no `partialTick` field. Use `player.getEyePosition()` (no partial tick) for the eye origin, which is accurate enough for a 1-tick-expiry line.
 
 - [ ] **Step 5: Clear spline cache when path stops**
 
@@ -495,7 +495,7 @@ Expected: BUILD SUCCESSFUL
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/main/kotlin/org/cobalt/internal/pathfinding/PathfindingModule.kt
+git add src/main/kotlin/org/phantom/internal/pathfinding/PathfindingModule.kt
 git commit -m "feat: spline path rendering and head-direction ray in PathfindingModule (Task 6)"
 ```
 
@@ -514,11 +514,11 @@ Expected: BUILD SUCCESSFUL, no errors
 
 Launch with `./gradlew runClient` and verify:
 
-1. Set a target 30+ blocks away in a flat area — path line renders as smooth cyan spline at feet height
+1. Set a target 30+ blocks away in a flat area â€” path line renders as smooth cyan spline at feet height
 2. Head-direction white ray appears from eye position along crosshair at all times
-3. Walk through a 1-block-wide tunnel — path threads through center, not hugging the wall
-4. Set a target with a long straight section — AOTV segments render orange; AOTV item fires (hotbar swaps to slot, right-click, swaps back)
-5. Stop the path (`Stop` button) — spline clears immediately
+3. Walk through a 1-block-wide tunnel â€” path threads through center, not hugging the wall
+4. Set a target with a long straight section â€” AOTV segments render orange; AOTV item fires (hotbar swaps to slot, right-click, swaps back)
+5. Stop the path (`Stop` button) â€” spline clears immediately
 
 - [ ] **Step 3: Final commit if any fixups were needed**
 
