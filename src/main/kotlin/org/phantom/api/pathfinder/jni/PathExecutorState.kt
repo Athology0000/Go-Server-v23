@@ -179,6 +179,12 @@ object PathExecutorState {
     private const val PRECISION_CURVATURE = 0.34
     private const val DROP_SCAN_DISTANCE = 3.5
     private const val DROP_HEIGHT_THRESHOLD = 0.45
+    // A walkable staircase descends at most ~1 block down per 1 block forward.
+    // A ledge/cliff drops far more vertically than it travels horizontally.
+    // Only a descent steeper than this slope, or a single sudden vertical
+    // step bigger than one stair, counts as a real "drop" needing precision.
+    private const val STAIR_MAX_SLOPE = 1.5
+    private const val STAIR_STEP_MAX_DROP = 1.25
     private const val EDGE_SCAN_DISTANCE = 4.25
     private const val EDGE_SCAN_STEP = 0.7
     private const val FOOTPRINT_RADIUS = 0.38
@@ -1472,9 +1478,23 @@ object PathExecutorState {
     private fun hasDropAhead(spline: SplinePath, distance: Double, threshold: Double): Boolean {
         val base = spline.sample(currentSplineDistance)
         var step = 0.75
+        var prev = base
         while (step <= distance) {
             val ahead = spline.sample(minOf(spline.totalLength, currentSplineDistance + step))
-            if (base.y - ahead.y >= threshold) return true
+            val totalDrop = base.y - ahead.y
+            if (totalDrop >= threshold) {
+                // Walkable staircase vs. true fall: a stair run descends at a
+                // shallow slope and never drops more than ~1 block between two
+                // close samples. A ledge plunges far more vertically than it
+                // travels forward. Only the latter should force precision/sneak.
+                val dx = ahead.x - base.x
+                val dz = ahead.z - base.z
+                val horiz = sqrt(dx * dx + dz * dz)
+                val slope = if (horiz > 1.0e-3) totalDrop / horiz else Double.MAX_VALUE
+                val suddenStep = (prev.y - ahead.y) >= STAIR_STEP_MAX_DROP
+                if (slope > STAIR_MAX_SLOPE || suddenStep) return true
+            }
+            prev = ahead
             step += 0.75
         }
         return false
