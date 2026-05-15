@@ -172,9 +172,15 @@ data class PathCommand(
         // lookahead distance gives the rotation room to anticipate turns instead.
         // Curvature contribution is gentle â€” only enough to keep the camera
         // honest through sharp corners, not enough to feel mechanical.
+        // Single-smoother model: PathExecutorState now passes the aim through
+        // un-eased, so this exp-smoother is the ONLY rotation easing for pathing.
+        // Base bumped 4.5 -> 10.0 (was double-smoothed before, hence the old low
+        // value). ~10 = 100 ms time constant: smooth/human on straights, and the
+        // curvature boost (up to +6 -> 16, ~60 ms) tracks turns tight without
+        // undershooting.
         val curvature = PathExecutorState.pathCurvature
         val curvatureBoost = (curvature * 5.0).coerceIn(0.0, 6.0)
-        controller.smoothingRate = 4.5 + curvatureBoost
+        controller.smoothingRate = 10.0 + curvatureBoost
 
         controller.setDirectTarget(aim.yaw, aim.pitch)
 

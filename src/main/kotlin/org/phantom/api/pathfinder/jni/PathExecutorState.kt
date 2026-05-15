@@ -655,7 +655,6 @@ object PathExecutorState {
             targetPitch = r.pitch,
             yawDeadzone = dynamicYawDeadzone,
             pitchDeadzone = (PITCH_DEADZONE * finishFactor).toFloat(),
-            finishFactor = finishFactor.toFloat()
         )
 
         val nearEnd3D = eye.distanceToSqr(spline.samples.last()) <= COMPLETION_RADIUS * COMPLETION_RADIUS &&
@@ -843,7 +842,6 @@ object PathExecutorState {
             targetPitch = targetPitch,
             yawDeadzone = dynamicYawDeadzone,
             pitchDeadzone = (PITCH_DEADZONE * finishFactor).toFloat(),
-            finishFactor = finishFactor.toFloat()
         )
 
         // â”€â”€ Completion â”€â”€
@@ -891,7 +889,6 @@ object PathExecutorState {
         targetPitch: Float,
         yawDeadzone: Float,
         pitchDeadzone: Float,
-        finishFactor: Float
     ) {
         if (!smoothedTargetInitialized) {
             rawTargetYaw = AngleUtils.normalizeAngle(targetYaw)
@@ -900,20 +897,19 @@ object PathExecutorState {
             return
         }
 
-        val finishDamping = (0.45f + 0.55f * finishFactor).coerceIn(0.25f, 1f)
+        // Single-smoother model: this layer is now a deadzone-gated passthrough.
+        // The only rotation easing for pathing happens in BlockRotationController's
+        // exp-smoother (driven by drivePathRotation). Blending here too produced
+        // double-lag (camera trailing, undershooting turns). The deadzone still
+        // swallows sub-threshold lookahead jitter so we don't feed noise downstream.
         val yawDelta = AngleUtils.getRotationDelta(rawTargetYaw, targetYaw)
-        val yawAbs = abs(yawDelta)
-        if (yawAbs > yawDeadzone) {
-            val alpha = nonlinearBlend(yawAbs.toDouble(), rotationRampScale) * finishDamping
-            rawTargetYaw = AngleUtils.normalizeAngle(rawTargetYaw + yawDelta * alpha)
+        if (abs(yawDelta) > yawDeadzone) {
+            rawTargetYaw = AngleUtils.normalizeAngle(targetYaw)
         }
 
         val pitchDelta = targetPitch - rawTargetPitch
-        val pitchAbs = abs(pitchDelta)
-        if (pitchAbs > pitchDeadzone) {
-            // Pitch responds slightly quicker than yaw (preserves the original 18/24 = 0.75 ratio).
-            val alpha = nonlinearBlend(pitchAbs.toDouble(), rotationRampScale * 0.75) * finishDamping
-            rawTargetPitch = (rawTargetPitch + pitchDelta * alpha).coerceIn(-89.9f, 89.9f)
+        if (abs(pitchDelta) > pitchDeadzone) {
+            rawTargetPitch = targetPitch.coerceIn(-89.9f, 89.9f)
         }
     }
 
