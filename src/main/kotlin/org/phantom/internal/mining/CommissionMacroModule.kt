@@ -113,6 +113,12 @@ object CommissionMacroModule : Module("Commission Macro") {
   private var completedCommissions = 0
   private var sessionStartMs = 0L
   private var lastCommissionName: String? = null
+  // V5 completed-commission debounce: avoids re-detecting / double-claiming a
+  // just-finished commission from stale tab data, and lets a GUI read override
+  // tab reads for a short window.
+  private var lastCompletedCommissionName: String? = null
+  private var ignoreTabUpdatesUntil = 0L
+  private var lastCommissionSyncSource: String? = null
   private var awaitingTabUpdate = false
   private var pendingUseRelease = false
   private var openAttempts = 0
@@ -265,7 +271,7 @@ object CommissionMacroModule : Module("Commission Macro") {
     if (screen != null) {
       val parsed = parseCommissionSelectionFromGui(screen)
       if (parsed.commissions.isNotEmpty()) {
-        updateCommissionsIfChanged(parsed.commissions)
+        updateCommissionsFromGui(parsed.commissions)
         mc.player?.closeContainer()
         detectorAttempts = 0
         setStatus("Detected commissions from GUI.")
@@ -294,13 +300,25 @@ object CommissionMacroModule : Module("Commission Macro") {
       return
     }
 
+    if (shouldWaitForLastCompleted()) return
+    if (awaitingTabUpdate) return
+
     val completed = findCompletedCommission()
-    if (completed != null && !awaitingTabUpdate) {
+    if (completed != null) {
+      val now = System.currentTimeMillis()
+      if (
+        lastCompletedCommissionName != null &&
+        completed.name == lastCompletedCommissionName &&
+        ignoreTabUpdatesUntil != 0L &&
+        now < ignoreTabUpdatesUntil
+      ) {
+        awaitingTabUpdate = true
+        return
+      }
       currentCommission = completed
       onCommissionComplete()
       return
     }
-    if (awaitingTabUpdate) return
 
     val active = getActiveCommissions()
     if (active.isEmpty()) {
@@ -392,10 +410,11 @@ object CommissionMacroModule : Module("Commission Macro") {
   }
 
   private fun handleSelling() {
-    // RDBT Phantom has a trades-selling state. Keep the state surface, but return to work if the
-    // local trade GUI path is unavailable.
-    setStatus("Selling items...")
-    setState(State.CHOOSING)
+    // Trades-selling isn't ported yet. Returning to CHOOSING here would re-mine
+    // with a full inventory and loop straight back into SELLING forever, so
+    // stop cleanly instead and let the user sell/empty manually.
+    ChatUtils.sendMessage("Commission Macro: inventory full and auto-selling isn't available yet, stopping.")
+    enabled.value = false
   }
 
   private fun handleRefueling() {
@@ -457,6 +476,11 @@ object CommissionMacroModule : Module("Commission Macro") {
       return
     }
 
+    // V5 only interacts when not pathing. Our rotation is an instant snap, so
+    // the meaningful port is killing the native pather first so it can't drag
+    // us off the NPC the same tick we face + right-click it.
+    NativePathfinder.stop()
+    MovementManager.clearForcedMovement()
     if (emissary != null) faceEntity(emissary) else faceBlock(target)
     rightClick()
     delay(10)
@@ -539,13 +563,14 @@ object CommissionMacroModule : Module("Commission Macro") {
     MiningMacroModule.stopForAutomation()
     CombatMacroModule.stopForAutomation()
     lastCommissionName = currentCommission?.name
+    lastCompletedCommissionName = currentCommission?.name
+    ignoreTabUpdatesUntil = System.currentTimeMillis() + 5_000L
     awaitingTabUpdate = true
     claimAttempts = 0
     setState(State.CLAIMING)
   }
 
   private fun onInventoryFull() {
-    ChatUtils.sendMessage("Commission Macro: inventory full, pausing mining.")
     MiningMacroModule.stopForAutomation()
     setState(State.SELLING)
   }
@@ -578,6 +603,9 @@ object CommissionMacroModule : Module("Commission Macro") {
     pathingAvoidanceBreachAt = 0L
     lastAvoidanceRepathAt = 0L
     awaitingTabUpdate = false
+    lastCompletedCommissionName = null
+    ignoreTabUpdatesUntil = 0L
+    lastCommissionSyncSource = null
     pendingUseRelease = false
     openAttempts = 0
     claimAttempts = 0
@@ -726,6 +754,7 @@ object CommissionMacroModule : Module("Commission Macro") {
       pathingAvoidanceBreachAt = 0L
       return
     }
+    updateCurrentWaypointFromPath()
     val waypoint = currentWaypoint ?: return
     val breached = getAvoidanceEntities().any { entity -> distance(entity.x, entity.y, entity.z, waypoint) < avoidanceRadius.value }
     if (!breached) {
@@ -746,6 +775,30 @@ object CommissionMacroModule : Module("Commission Macro") {
     lastAvoidanceRepathAt = now
     ChatUtils.sendMessage("Commission Macro: avoidance radius breached for 5s, repathing.")
     startPath(currentWaypoint ?: return, 2.5)
+  }
+
+  /**
+   * V5 updateCurrentPathWaypointFromResult: the avoidance check must watch the
+   * waypoint the pathfinder is actually heading to, not the one originally
+   * picked. Snap [currentWaypoint] to whichever candidate is closest to the
+   * native path's final node.
+   */
+  private fun updateCurrentWaypointFromPath() {
+    if (currentWaypoints.isEmpty()) return
+    val end = NativePathfinder.cachedPathNodes.lastOrNull() ?: return
+    var best = currentWaypoints.first()
+    var bestSq = Double.MAX_VALUE
+    for (wp in currentWaypoints) {
+      val dx = end.x - (wp.x + 0.5)
+      val dy = end.y - (wp.y + 1.0)
+      val dz = end.z - (wp.z + 0.5)
+      val sq = dx * dx + dy * dy + dz * dz
+      if (sq < bestSq) {
+        bestSq = sq
+        best = wp
+      }
+    }
+    currentWaypoint = best
   }
 
   private fun startPath(pos: BlockPos, radius: Double) {
@@ -820,14 +873,60 @@ object CommissionMacroModule : Module("Commission Macro") {
     return null
   }
 
+  private fun shouldWaitForLastCompleted(): Boolean {
+    val name = lastCompletedCommissionName ?: return false
+    val stale = commissions.firstOrNull { it.name == name && it.progress > 0.0 }
+    if (stale != null && stale.progress >= 1.0) return true
+    lastCompletedCommissionName = null
+    return false
+  }
+
+  /**
+   * GUI commission reads are authoritative: they win over tab reads for a 5s
+   * window so a stale tab list can't immediately undo what the GUI just told us.
+   */
+  private fun updateCommissionsFromGui(newCommissions: List<TabCommission>) {
+    if (newCommissions.isEmpty()) return
+    commissions = newCommissions
+    awaitingTabUpdate = false
+    lastCommissionSyncSource = "GUI"
+    ignoreTabUpdatesUntil = System.currentTimeMillis() + 5_000L
+    detectorAttempts = 0
+    val name = currentCommission?.name
+    val matching = if (name != null) commissions.firstOrNull { it.name == name } else null
+    if (matching == null || matching.progress >= 1.0) currentCommission = null
+  }
+
   private fun updateCommissionsIfChanged(newCommissions: List<TabCommission>) {
     if (commissions == newCommissions) return
-    if (newCommissions.isNotEmpty()) detectorAttempts = 0
-    if (awaitingTabUpdate && lastCommissionName != null) {
-      val stillCompleted = newCommissions.any { it.name == lastCommissionName && it.progress >= 1.0 }
-      if (!stillCompleted) awaitingTabUpdate = false
+
+    val now = System.currentTimeMillis()
+    if (ignoreTabUpdatesUntil != 0L && now < ignoreTabUpdatesUntil && lastCommissionSyncSource == "GUI") {
+      return
     }
+    if (ignoreTabUpdatesUntil != 0L && now < ignoreTabUpdatesUntil && lastCompletedCommissionName != null) {
+      val staleCompleted = newCommissions.any { it.name == lastCompletedCommissionName && it.progress >= 1.0 }
+      if (staleCompleted) return
+      ignoreTabUpdatesUntil = 0L
+    } else if (ignoreTabUpdatesUntil != 0L && now >= ignoreTabUpdatesUntil) {
+      ignoreTabUpdatesUntil = 0L
+    }
+
+    if (newCommissions.isNotEmpty()) detectorAttempts = 0
     commissions = newCommissions
+    lastCommissionSyncSource = "TAB"
+
+    if (awaitingTabUpdate) {
+      val stillCompleted = commissions.any { c ->
+        c.progress >= 1.0 && CommissionData.resolveTask(c.name) != null
+      }
+      if (!stillCompleted) {
+        awaitingTabUpdate = false
+      } else if (lastCompletedCommissionName != null) {
+        val same = commissions.firstOrNull { it.name == lastCompletedCommissionName }
+        if (same == null || same.progress < 1.0) awaitingTabUpdate = false
+      }
+    }
   }
 
   private fun parseProgress(line: String): Double {

@@ -63,12 +63,9 @@ internal fun MiningMacroModule.selectMineTarget(
   }
   currentTargetNoLosTicks = 0
 
-  if (useVeinDirection.value) {
-    val directional = selectDirectionalMineTarget(level, player, vein)
-    if (directional != null) {
-      return directional
-    }
-  }
+  // Vein flow (directional targeting) unwired: target selection is driven purely
+  // by the cost/distance scorer below. VeinDirectionModule remains but no longer
+  // influences which block is mined.
 
   val rangeSq = mineRange.value * mineRange.value
   val eye = player.eyePosition
@@ -80,6 +77,16 @@ internal fun MiningMacroModule.selectMineTarget(
   // (above) keeps the current pick stable across ticks, so the selector only
   // matters when the previous target is gone or invalid.
   val now = level.gameTime
+  // Cost-based selection (V5 port): when enabled, score = base + dist*distW
+  // - dot*lookBias + (1-visibilityStability)*visPen + behindPenalty. When
+  // disabled, falls back to the original strict closest-aim-point distance.
+  val costMode = costModelEnabled.value
+  val lookVec = if (costMode) player.getViewVector(1.0f) else null
+  val distW = costDistanceWeight.value
+  val lookBias = costLookBias.value
+  val visPen = costVisibilityPenalty.value
+  val behindPen = costBehindPenalty.value
+  val clusterBonus = costClusterBonus.value
   var bestInRange: net.minecraft.core.BlockPos? = null
   var bestScore = Double.POSITIVE_INFINITY
   for (pos in vein.blocks) {
@@ -94,7 +101,33 @@ internal fun MiningMacroModule.selectMineTarget(
     val dx = aimPoint.x - eye.x
     val dy = aimPoint.y - eye.y
     val dz = aimPoint.z - eye.z
-    val score = dx * dx + dy * dy + dz * dz
+    val score: Double
+    if (!costMode) {
+      score = dx * dx + dy * dy + dz * dz
+    } else {
+      val dist = sqrt(dx * dx + dy * dy + dz * dz)
+      val dot = if (dist > 1e-6 && lookVec != null)
+        (dx * lookVec.x + dy * lookVec.y + dz * lookVec.z) / dist
+      else 1.0
+      var s = baseCostFor(level, vein, pos) + dist * distW - dot * lookBias
+      if (behindPen > 0.0 && dot < MiningMacroModule.BEHIND_DOT_THRESHOLD) {
+        s += behindPen
+      }
+      // Cluster bonus: a block surrounded by more vein blocks is cheaper, so
+      // the macro commits to the dense clump instead of chasing a lone nearer
+      // block. Deterministic and non-positive, so `s` stays an admissible
+      // lower bound for the visibility prune below.
+      if (clusterBonus > 0.0) {
+        s -= clusterBonus * veinNeighborCount(vein, pos)
+      }
+      // Visibility-stability is the expensive term (5 raycasts). Its penalty is
+      // non-negative, so `s` here is an admissible lower bound: if it already
+      // can't beat the running best, skip the sampling entirely.
+      if (visPen > 0.0 && s < bestScore) {
+        s += (1.0 - visibilityStability(level, player, pos)) * visPen
+      }
+      score = s
+    }
     if (score < bestScore) {
       bestScore = score
       bestInRange = pos
@@ -102,14 +135,26 @@ internal fun MiningMacroModule.selectMineTarget(
   }
   if (bestInRange != null) return bestInRange
 
-  // No in-range block - find closest LOS block to walk/warp toward.
+  // No in-range block - find best LOS block to walk/warp toward. With the cost
+  // model on, rank by V5 approach cost (base + dist*distW, no look term) so the
+  // chosen block is the cheapest to travel to, not just the geometrically
+  // nearest; otherwise keep the original distance score.
   var best: net.minecraft.core.BlockPos? = null
   var bestDist = Double.POSITIVE_INFINITY
   for (pos in vein.blocks) {
     if (!isMineableTarget(level, player, pos, vein.targetIds)) continue
     if (!canStepToNearbyTarget(player, pos)) continue
     if (REQUIRE_MINE_LOS && !hasLineOfSight(level, player, pos)) continue
-    val distSq = miningTargetScore(player, pos)
+    val distSq = if (!costMode) {
+      miningTargetScore(player, pos)
+    } else {
+      val ddx = (pos.x + 0.5) - eye.x
+      val ddy = (pos.y + 0.5) - eye.y
+      val ddz = (pos.z + 0.5) - eye.z
+      val d = sqrt(ddx * ddx + ddy * ddy + ddz * ddz)
+      val belowPenalty = if (pos.y < player.blockY - 1) 16.0 else 0.0
+      baseCostFor(level, vein, pos) + d * distW + belowPenalty
+    }
     if (distSq < bestDist) {
       bestDist = distSq
       best = pos
@@ -130,7 +175,108 @@ internal fun MiningMacroModule.selectMineTarget(
       }
     }
   }
-  return best
+  if (best != null) return best
+
+  // Last resort: nothing in range is visible and the crosshair isn't on a vein
+  // block (the cold-start case where the macro must still rotate to face the
+  // vein). Returning null makes onTick stop rotating, so the player has to look
+  // manually. We must return something so the rotation controller acquires it,
+  // BUT preferring the geometrically nearest block lets it lock onto a buried
+  // block and stare. So prefer, in order: nearest with a visible aim point,
+  // then nearest with center LOS, then nearest overall. The crosshair-first
+  // gate in onTick still blocks any dig packet until a real face is hit.
+  return selectAcquisitionFallback(level, player, vein)
+}
+
+/**
+ * Cold-start / no-LOS acquisition target. Prefers a block the macro can
+ * actually mine soon (visible aim point > center LOS) over the merely-closest
+ * one, so it rotates toward a mineable block instead of a buried one.
+ */
+internal fun MiningMacroModule.selectAcquisitionFallback(
+  level: net.minecraft.world.level.Level,
+  player: Player,
+  vein: TargetVein,
+): net.minecraft.core.BlockPos? {
+  val eye = player.eyePosition
+  var visBest: net.minecraft.core.BlockPos? = null
+  var visScore = Double.POSITIVE_INFINITY
+  var losBest: net.minecraft.core.BlockPos? = null
+  var losScore = Double.POSITIVE_INFINITY
+  for (pos in vein.blocks) {
+    if (!isMineableTarget(level, player, pos, vein.targetIds)) continue
+    if (!canStepToNearbyTarget(player, pos)) continue
+    val score = miningTargetScore(player, pos)
+    if (findVisibleAimPoint(level, player, eye, pos) != null) {
+      if (score < visScore) { visScore = score; visBest = pos }
+    } else if (hasLineOfSight(level, player, pos)) {
+      if (score < losScore) { losScore = score; losBest = pos }
+    }
+  }
+  return visBest
+    ?: losBest
+    ?: selectNearestBlock(level, player, vein.blocks, vein.targetIds)
+}
+
+/**
+ * V5 visibility-stability: sample the eye position at small lateral offsets and
+ * return the fraction (0..1) of samples from which a visible aim point on
+ * [pos] still exists. Blocks that flicker out of line-of-sight under tiny head
+ * movement score low and get penalized by the cost scorer, which avoids
+ * picking targets that lose LOS mid-mine as the rotation smoother moves.
+ */
+private val VIS_STAB_OFFSETS = doubleArrayOf(
+  0.0, 0.0,
+  0.18, 0.0,
+  -0.18, 0.0,
+  0.0, 0.18,
+  0.0, -0.18,
+)
+
+/**
+ * Number of the 26 surrounding positions that are also blocks in this vein,
+ * capped at [CLUSTER_NEIGHBOR_CAP] so the bonus stays bounded. Pure set
+ * lookups (no world reads) so it's cheap to call per candidate.
+ */
+private const val CLUSTER_NEIGHBOR_CAP = 12
+
+internal fun MiningMacroModule.veinNeighborCount(
+  vein: TargetVein,
+  pos: net.minecraft.core.BlockPos,
+): Int {
+  val blocks = vein.blocks
+  var count = 0
+  for (dx in -1..1) for (dy in -1..1) for (dz in -1..1) {
+    if (dx == 0 && dy == 0 && dz == 0) continue
+    if (blocks.contains(pos.offset(dx, dy, dz))) {
+      count++
+      if (count >= CLUSTER_NEIGHBOR_CAP) return count
+    }
+  }
+  return count
+}
+
+/** Port-6 base cost for [pos]: the vein's per-id weight, or the default. */
+internal fun MiningMacroModule.baseCostFor(
+  level: net.minecraft.world.level.Level,
+  vein: TargetVein,
+  pos: net.minecraft.core.BlockPos,
+): Double = vein.weights[blockIdAt(level, pos)] ?: MiningMacroModule.DEFAULT_TARGET_BASE_COST
+
+internal fun MiningMacroModule.visibilityStability(
+  level: net.minecraft.world.level.Level,
+  player: Player,
+  pos: net.minecraft.core.BlockPos,
+): Double {
+  val eye = player.eyePosition
+  var visible = 0
+  var i = 0
+  while (i < VIS_STAB_OFFSETS.size) {
+    val sampleEye = Vec3(eye.x + VIS_STAB_OFFSETS[i], eye.y, eye.z + VIS_STAB_OFFSETS[i + 1])
+    if (findVisibleAimPoint(level, player, sampleEye, pos) != null) visible++
+    i += 2
+  }
+  return visible / (VIS_STAB_OFFSETS.size / 2.0)
 }
 
 internal fun MiningMacroModule.selectDirectionalMineTarget(
@@ -383,6 +529,9 @@ internal fun MiningMacroModule.startMining(player: Player, target: net.minecraft
   val precisionRotScale =
     if (aim.usesPrecisionPoint) (precisionPointRotationSpeed.value / 100.0).coerceAtLeast(0.1)
     else 1.0
+  // Actually turn onto the block. Without this the controller is never told to
+  // rotate for the mining target, so the macro swings without turning.
+  driveMiningRotation(player, target, aim.point, precisionRotScale)
   frameRotSnapThreshold = RotationsModule.bezierSnapThreshold.value.toFloat()
   frameRotTarget = aim.point
   setAimRenderTarget(target, aim.point)

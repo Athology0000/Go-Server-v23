@@ -209,6 +209,57 @@ object MiningMacroModule : Module("Mining Macro") {
     6.0
   )
 
+  internal val costModelEnabled = CheckboxSetting(
+    "Cost-Based Target Selection",
+    "Score in-range blocks by a V5-style cost (look direction + distance + visibility + cluster) instead of pure nearest-distance. Disable for the old strict-nearest behavior.",
+    true,
+  )
+
+  internal val costLookBias = SliderSetting(
+    "Look Direction Bias",
+    "Prefer blocks already near your crosshair (V5 dot*50). Higher = fewer/smaller rotations.",
+    50.0,
+    0.0,
+    100.0,
+    1.0,
+  )
+
+  internal val costDistanceWeight = SliderSetting(
+    "Distance Weight",
+    "Cost added per block of distance to the aim point (V5 dist*2).",
+    2.0,
+    0.0,
+    10.0,
+    0.1,
+  )
+
+  internal val costVisibilityPenalty = SliderSetting(
+    "Visibility Stability Penalty",
+    "Penalty for blocks that lose line-of-sight under small head movement. 0 disables the stability sampling.",
+    18.0,
+    0.0,
+    50.0,
+    1.0,
+  )
+
+  internal val costBehindPenalty = SliderSetting(
+    "Behind-Player Penalty",
+    "Extra cost for blocks behind you (avoids ~180 degree spins). 0 disables.",
+    0.0,
+    0.0,
+    200.0,
+    1.0,
+  )
+
+  internal val costClusterBonus = SliderSetting(
+    "Cluster Bonus",
+    "Cost reduction per neighbouring vein block. Higher = commit to the dense clump instead of chasing a lone nearer block. 0 disables.",
+    4.0,
+    0.0,
+    20.0,
+    0.5,
+  )
+
   private val highlightAimPoint = CheckboxSetting(
     "Highlight Aim Point",
     "Show the exact point on the block face the macro is rotating toward.",
@@ -272,6 +323,15 @@ object MiningMacroModule : Module("Mining Macro") {
     "Tick Gliding",
     "Start rotating to the next block during the ping-delay window.",
     false
+  )
+
+  internal val glideLagComp = SliderSetting(
+    "Glide Lag Compensation",
+    "Extra ticks before tick-glide begins (V5 ADDITIONAL_LAG_COMP). Raise if you glide off blocks before they break under lag. 0 = unchanged.",
+    0.0,
+    0.0,
+    5.0,
+    1.0,
   )
 
   private val etherwarpHeader = InfoSetting(
@@ -467,6 +527,12 @@ object MiningMacroModule : Module("Mining Macro") {
       highlightPossibleBlocks,
       highlightPossibleLimit,
       mineRange,
+      costModelEnabled,
+      costLookBias,
+      costDistanceWeight,
+      costVisibilityPenalty,
+      costBehindPenalty,
+      costClusterBonus,
       highlightAimPoint,
       highlightBedrock,
       highlightBedrockRadius,
@@ -476,6 +542,7 @@ object MiningMacroModule : Module("Mining Macro") {
       precisionPointRotationSpeed,
       precisionPointChance,
       tickGliding,
+      glideLagComp,
       etherwarpHeader,
       useInstantTransmission,
       warpMinDistance,
@@ -531,6 +598,13 @@ object MiningMacroModule : Module("Mining Macro") {
     useVeinDirection.uiGroup = routingGroup
 
     mineRange.uiGroup = miningGroup
+    val targetCostGroup = "Target Cost"
+    costModelEnabled.uiGroup = targetCostGroup
+    costLookBias.uiGroup = targetCostGroup
+    costDistanceWeight.uiGroup = targetCostGroup
+    costVisibilityPenalty.uiGroup = targetCostGroup
+    costBehindPenalty.uiGroup = targetCostGroup
+    costClusterBonus.uiGroup = targetCostGroup
     highlightAimPoint.uiGroup = miningGroup
     highlightBedrock.uiGroup = miningGroup
     highlightBedrockRadius.uiGroup = miningGroup
@@ -539,6 +613,7 @@ object MiningMacroModule : Module("Mining Macro") {
     precisionPointRotationSpeed.uiGroup = rotationGroup
     precisionPointChance.uiGroup = rotationGroup
     tickGliding.uiGroup = rotationGroup
+    glideLagComp.uiGroup = rotationGroup
 
     etherwarpHeader.uiGroup = etherwarpGroup
     useInstantTransmission.uiGroup = etherwarpGroup
@@ -571,6 +646,10 @@ object MiningMacroModule : Module("Mining Macro") {
   internal data class TypeSelection(
     val label: String,
     val ids: Set<String>,
+    // Per-block-id base cost override consumed by the cost-based target scorer
+    // (e.g. weight gray mithril vs light-blue, or prioritize titanium). Empty =
+    // every id uses DEFAULT_TARGET_BASE_COST. Plumbing for the Commission pass.
+    val weights: Map<String, Double> = emptyMap(),
   )
 
   internal data class Vein(
@@ -578,8 +657,14 @@ object MiningMacroModule : Module("Mining Macro") {
     val typeLabel: String,
     val targetIds: Set<String>,
     val blockId: String,
-    val bounds: AABB
+    val bounds: AABB,
+    val weights: Map<String, Double> = emptyMap(),
   )
+
+  /** Base cost for a block id with no explicit weight (V5 cost-table value). */
+  internal const val DEFAULT_TARGET_BASE_COST = 4.0
+  /** Normalized look-dot below which a block counts as "behind" (V5 -0.05). */
+  internal const val BEHIND_DOT_THRESHOLD = -0.05
 
   internal data class AimTarget(
     val point: Vec3,
@@ -1252,6 +1337,12 @@ object MiningMacroModule : Module("Mining Macro") {
         focusApproachTarget(player, target)
         return
       }
+        // V5 rotates toward the approach target while moving toward it. Drive
+        // the rotation controller for every movement arm (the pathfinding arms
+        // used to call only moveToward, so the camera never turned to the ore
+        // â€” "chooses blocks and doesn't turn"). frameRotPrevBlock-guarded
+        // inside focusApproachTarget, so re-calling it is cheap.
+        focusApproachTarget(player, target)
         when {
           blockingPlayer != null && usePathfinding.value && canShortStep -> {
             moveToward(
@@ -1271,13 +1362,19 @@ object MiningMacroModule : Module("Mining Macro") {
           }
           canShortStep -> {
             nudgeTowardApproach(level, player, target, blockingPlayer)
-            focusApproachTarget(player, target)
           }
         usePathfinding.value -> {
           moveToward(level, player, target, avoidPlayer = blockingPlayer)
         }
         else -> {
-          MovementManager.clearForcedMovement()
+          // V5 always walks toward out-of-range ore (handleVeinMovement). When
+          // neither the native pathfinder nor the short-step nudge is driving
+          // us, fall back to a direct approach nudge instead of standing still
+          // (the old clearForcedMovement no-op was the "won't walk to the ore"
+          // symptom). canStepToNearbyTarget already bounds the target to the
+          // vein anchor radius, so this can't wander off. (Rotation is driven
+          // by the hoisted focusApproachTarget above.)
+          nudgeTowardApproach(level, player, target, blockingPlayer)
         }
       }
     }
@@ -1592,6 +1689,44 @@ object MiningMacroModule : Module("Mining Macro") {
       frameRotLastNs = 0L
       frameRotPrevBlock = null
     }
+  }
+
+  /**
+   * Drive the rotation controller toward a freshly (re)selected mining target.
+   * startMining only set the legacy frameRotTarget, which no renderer consumes,
+   * so the crosshair-first path pressed attack but never turned onto the block
+   * ("swings but doesn't turn"). Mirrors the acquisition-path rotate request
+   * and is frameRotPrevBlock-gated so it isn't re-issued every mining tick.
+   */
+  internal fun driveMiningRotation(
+    player: Player,
+    target: BlockPos,
+    aimPoint: Vec3,
+    precisionRotScale: Double,
+  ) {
+    if (target == frameRotPrevBlock) return
+    val initRot = AngleUtils.getRotation(aimPoint)
+    val initYaw = abs(AngleUtils.getRotationDelta(player.yRot, initRot.yaw))
+    val initPitch = abs(initRot.pitch - player.xRot)
+    val initialDist = maxOf(initYaw, initPitch).coerceAtLeast(1f)
+    frameRotInitialDist = initialDist
+    val baseDuration = (initialDist / 30f * 3f).toInt().coerceIn(3, 12)
+    val scaledDuration = (baseDuration / precisionRotScale.coerceAtLeast(0.1))
+      .toInt().coerceIn(3, 18)
+    val fromBlock = frameRotPrevBlock ?: target
+    PhantomRotation.blockController.rotate(
+      BlockRotationRequest(
+        fromBlock = fromBlock,
+        toBlock = target,
+        durationTicks = scaledDuration,
+        useFromBlockAsStartRotation = false,
+        maxDegreesPerTick = 12f,
+        easing = RotationEasingType.EASE_IN_OUT_SINE,
+        toAimPoint = aimPoint,
+      )
+    )
+    frameRotPrevBlock = target
+    frameRotLastNs = 0L
   }
 
   @SubscribeEvent

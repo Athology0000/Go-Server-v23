@@ -335,7 +335,12 @@ internal fun MiningMacroModule.mergeSelections(selections: List<ScanTypeSelectio
   if (selections.size == 1) return selections[0]
   val ids = selections.flatMapTo(linkedSetOf()) { it.ids }
   val label = selections.joinToString(", ") { it.label }
-  return ScanTypeSelection(label, ids)
+  val weights = HashMap<String, Double>()
+  for (sel in selections) for ((id, w) in sel.weights) {
+    val existing = weights[id]
+    if (existing == null || w < existing) weights[id] = w
+  }
+  return ScanTypeSelection(label, ids, weights)
 }
 
 internal fun MiningMacroModule.buildOffsets(radius: Int, vertical: Int): List<ScanOffset> {
@@ -421,7 +426,7 @@ internal fun MiningMacroModule.buildVein(
     maxY + 1.0,
     maxZ + 1.0
   )
-  return ScanVein(blocks, selection.label, selection.ids, seedBlockId, bounds)
+  return ScanVein(blocks, selection.label, selection.ids, seedBlockId, bounds, selection.weights)
 }
 
 internal fun MiningMacroModule.pruneVein(

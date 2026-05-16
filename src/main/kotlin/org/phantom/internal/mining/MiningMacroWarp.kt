@@ -200,7 +200,8 @@ internal fun MiningMacroModule.resolveGlideAimTarget(
     return currentAim
   }
   val level = mc.level ?: return currentAim
-  val glideStartTicks = MiningModule.getCalculatedLookTicks(includePingDelay = false)
+  val glideStartTicks =
+    MiningModule.getCalculatedLookTicks(includePingDelay = false) + glideLagComp.value
   if (glideStartTicks <= 0.0 || miningLockedTicks.toDouble() < glideStartTicks) {
     return currentAim
   }
