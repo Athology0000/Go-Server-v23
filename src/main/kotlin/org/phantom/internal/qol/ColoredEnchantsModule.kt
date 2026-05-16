@@ -41,11 +41,11 @@ object ColoredEnchantsModule : Module("Colored Enchants") {
     InfoType.INFO,
   ).inGroup("General")
 
-  private val ultimateColor = ColorSetting("Ultimate Color", "", 0xFFCBA6F7.toInt()).inGroup("Colors")
-  private val maxColor = ColorSetting("Max Color", "", 0xFFFF5555.toInt()).inGroup("Colors")
-  private val highColor = ColorSetting("High Color", "", 0xFFFFAA00.toInt()).inGroup("Colors")
-  private val normalColor = ColorSetting("Normal Color", "", 0xFF55AAFF.toInt()).inGroup("Colors")
-  private val badColor = ColorSetting("Bad Color", "", 0xFFAAAAAA.toInt()).inGroup("Colors")
+  private val ultimateColor = enchantColorSetting("Ultimate Color", 0xFFCBA6F7.toInt())
+  private val maxColor = enchantColorSetting("Max Color", 0xFFFF5555.toInt())
+  private val highColor = enchantColorSetting("High Color", 0xFFFFAA00.toInt())
+  private val normalColor = enchantColorSetting("Normal Color", 0xFF55AAFF.toInt())
+  private val badColor = enchantColorSetting("Bad Color", 0xFFAAAAAA.toInt())
 
   @Volatile private var enchantData: Map<String, EnchantInfo> = fallbackEnchantData()
 
@@ -198,6 +198,16 @@ object ColoredEnchantsModule : Module("Colored Enchants") {
     NORMAL,
     STACKING,
     ULTIMATE,
+  }
+
+  private fun enchantColorSetting(name: String, defaultValue: Int): ColorSetting {
+    return ColorSetting(
+      name,
+      "",
+      defaultValue,
+      supportsGradient = false,
+      supportsAnimatedGradient = false,
+    ).inGroup("Colors")
   }
 
   private val ENCHANT_PATTERN = Regex("""(?<name>[A-Za-z][A-Za-z' -]*?) (?<level>[IVXLCDM]+)(?=,|$)""")

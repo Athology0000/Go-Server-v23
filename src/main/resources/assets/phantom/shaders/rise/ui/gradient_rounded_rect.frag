@@ -9,10 +9,20 @@ uniform vec4 u_edges;
 uniform int u_direction;
 out vec4 fragColor;
 
+float gradientAxis(vec2 uv) {
+    if (u_direction == 1) {
+        return uv.y;
+    }
+    if (u_direction == 2) {
+        return clamp((uv.x + uv.y) * 0.5, 0.0, 1.0);
+    }
+    return uv.x;
+}
+
 void main(void)
 {
     vec2 tex_coord = fragTexCoord;
-    vec4 color = mix(u_first_color, u_second_color, u_direction > 0 ? tex_coord.y : tex_coord.x);
+    vec4 color = mix(u_first_color, u_second_color, gradientAxis(tex_coord));
 
     if (tex_coord.x < 0.5 && tex_coord.y > 0.5 && u_edges.x == 0.0 ||
         tex_coord.x > 0.5 && tex_coord.y > 0.5 && u_edges.y == 0.0 ||

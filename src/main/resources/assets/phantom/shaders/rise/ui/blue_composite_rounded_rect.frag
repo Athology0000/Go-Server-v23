@@ -33,7 +33,7 @@ void main() {
 
     float vertical = 1.0 - uv.y;
     float diagonal = clamp((uv.x * 0.72 + vertical * 0.55), 0.0, 1.0);
-    float pulse = 0.5 + 0.5 * sin(u_time * 1.25 + uv.x * 4.2 + uv.y * 2.4);
+    float pulse = 0.5 + 0.5 * sin(u_time * 0.85 + uv.x * 3.4 + uv.y * 2.0);
     float wave = smoothstep(0.18, 1.0, diagonal) * (0.72 + pulse * 0.28);
 
     vec3 base = u_base_color.rgb;
@@ -47,9 +47,9 @@ void main() {
     float rim = 1.0 - smoothstep(0.0, max(1.0, 2.6 + u_intensity), edgeDistance);
     color = mix(color, shine, rim * 0.42 * u_intensity);
 
-    float scan = sin((uv.y * u_size.y + u_time * 18.0) * 0.52) * 0.5 + 0.5;
-    float grain = hash(floor(uv * u_size) + floor(u_time * 24.0)) - 0.5;
-    color += (scan * 0.025 + grain * 0.018) * u_intensity;
+    float scan = sin((uv.y * u_size.y + u_time * 7.0) * 0.22) * 0.5 + 0.5;
+    float grain = hash(floor(uv * u_size * 0.5)) - 0.5;
+    color += (scan * 0.012 + grain * 0.008) * u_intensity;
 
     float alpha = (u_base_color.a + rim * u_glow_color.a * 0.32 + wave * 0.10) * u_alpha * mask;
     fragColor = vec4(color, alpha);

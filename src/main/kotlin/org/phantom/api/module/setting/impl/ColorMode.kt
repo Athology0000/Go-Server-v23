@@ -59,6 +59,7 @@ sealed class ColorMode {
     val startArgb: Int,
     val endArgb: Int,
     val direction: String = DIRECTION_LEFT_TO_RIGHT,
+    val animated: Boolean = false,
   ) : ColorMode()
 
   /**

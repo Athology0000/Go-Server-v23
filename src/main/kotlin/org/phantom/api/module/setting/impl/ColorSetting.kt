@@ -12,6 +12,8 @@ class ColorSetting(
   name: String,
   description: String,
   defaultValue: Int,
+  val supportsGradient: Boolean = true,
+  val supportsAnimatedGradient: Boolean = true,
 ) : Setting<Int>(name, description, defaultValue) {
 
   override val defaultValue: Int = defaultValue
@@ -57,7 +59,9 @@ class ColorSetting(
         (alpha shl 24) or (rgb and 0x00FFFFFF)
       }
 
-      is ColorMode.Gradient -> m.startArgb
+      is ColorMode.Gradient -> {
+        if (m.animated) sampleGradient(m.startArgb, m.endArgb, gradientPhase()) else m.startArgb
+      }
 
       is ColorMode.ThemeColor -> {
         ThemeColorResolver.resolve(m.propertyName)
@@ -140,11 +144,16 @@ class ColorSetting(
           val startArgb = obj.get("startArgb")?.asInt ?: super.value
           val endArgb = obj.get("endArgb")?.asInt ?: startArgb
           super.value = startArgb
-          ColorMode.Gradient(
-            startArgb = startArgb,
-            endArgb = endArgb,
-            direction = obj.get("direction")?.asString ?: ColorMode.DIRECTION_LEFT_TO_RIGHT,
-          )
+          if (supportsGradient) {
+            ColorMode.Gradient(
+              startArgb = startArgb,
+              endArgb = endArgb,
+              direction = obj.get("direction")?.asString ?: ColorMode.DIRECTION_LEFT_TO_RIGHT,
+              animated = supportsAnimatedGradient && (obj.get("animated")?.asBoolean ?: false),
+            )
+          } else {
+            ColorMode.Static(startArgb)
+          }
         }
 
         "tweaked_theme" -> {
@@ -206,6 +215,7 @@ class ColorSetting(
           addProperty("startArgb", m.startArgb)
           addProperty("endArgb", m.endArgb)
           addProperty("direction", m.direction)
+          addProperty("animated", m.animated)
         }
       }
 
@@ -220,6 +230,24 @@ class ColorSetting(
         }
       }
     }
+  }
+
+  private fun gradientPhase(): Float {
+    val phase = (System.currentTimeMillis() % 4200L).toFloat() / 4200f
+    return ((kotlin.math.cos(phase * Math.PI * 2.0) + 1.0) * 0.5).toFloat()
+  }
+
+  private fun sampleGradient(startArgb: Int, endArgb: Int, t: Float): Int {
+    val clamped = t.coerceIn(0f, 1f)
+    val a = lerpChannel(startArgb ushr 24, endArgb ushr 24, clamped)
+    val r = lerpChannel(startArgb ushr 16, endArgb ushr 16, clamped)
+    val g = lerpChannel(startArgb ushr 8, endArgb ushr 8, clamped)
+    val b = lerpChannel(startArgb, endArgb, clamped)
+    return (a shl 24) or (r shl 16) or (g shl 8) or b
+  }
+
+  private fun lerpChannel(start: Int, end: Int, t: Float): Int {
+    return ((start and 0xFF) + (((end and 0xFF) - (start and 0xFF)) * t)).toInt().coerceIn(0, 255)
   }
 
 }

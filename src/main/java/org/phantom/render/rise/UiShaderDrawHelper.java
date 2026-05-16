@@ -123,6 +123,7 @@ public final class UiShaderDrawHelper {
             program.set1f("u_border_size", borderSize);
             UniformHelper.setColor(program, "u_color_1", firstColor);
             UniformHelper.setColor(program, "u_color_2", secondColor);
+            applyGradientDirection(program, gradient);
         });
     }
 
@@ -179,7 +180,13 @@ public final class UiShaderDrawHelper {
     }
 
     private static void applyGradientDirection(ShaderProgram program, Gradient gradient) {
-        program.set1i("u_direction", gradient == Gradient.TopToBottom ? 1 : 0);
+        int direction = 0;
+        if (gradient == Gradient.TopToBottom) {
+            direction = 1;
+        } else if (gradient == Gradient.TopLeftToBottomRight) {
+            direction = 2;
+        }
+        program.set1i("u_direction", direction);
     }
 
     private static float clamp01(float value) {

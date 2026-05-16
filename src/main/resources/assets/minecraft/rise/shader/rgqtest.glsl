@@ -11,8 +11,10 @@ uniform vec4 u_edges;
 void main() {
     vec2 tex_coord = gl_TexCoord[0].st;
     float newTexCoord = u_direction > 0.0 ? tex_coord.y : tex_coord.x;
+    float phase = fract(u_time * 0.18);
+    float wave = abs(fract(newTexCoord + phase) * 2.0 - 1.0);
 
-    vec4 color = mix(u_first_color, u_second_color, 0.5 + 0.5 * sin(3.0 * (newTexCoord + u_time)));
+    vec4 color = mix(u_first_color, u_second_color, smoothstep(0.0, 1.0, wave));
 
     if (tex_coord.x < 0.5 && tex_coord.y > 0.5 && u_edges.x == 0.0 ||
     tex_coord.x > 0.5 && tex_coord.y > 0.5 && u_edges.y == 0.0 ||

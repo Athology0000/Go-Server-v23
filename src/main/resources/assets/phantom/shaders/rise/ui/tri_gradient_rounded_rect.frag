@@ -11,15 +11,25 @@ uniform int u_direction;
 uniform vec4 u_edges;
 out vec4 fragColor;
 
+float gradientAxis(vec2 uv) {
+    if (u_direction == 1) {
+        return uv.y;
+    }
+    if (u_direction == 2) {
+        return clamp((uv.x + uv.y) * 0.5, 0.0, 1.0);
+    }
+    return uv.x;
+}
+
 void main() {
     vec2 tex_coord = fragTexCoord;
-    float newTexCoord = u_direction > 0 ? tex_coord.y : tex_coord.x;
+    float axis = gradientAxis(tex_coord);
+    float phase = fract(u_time * 0.18);
+    float band = fract(axis + phase);
 
-    float blendFactor = smoothstep(0.0, 1.0, sin(3.0 * (newTexCoord + u_time)));
-
-    vec4 color = mix(mix(u_first_color, u_second_color, 0.5 + 0.5 * sin(3.0 * (newTexCoord + u_time))),
-    mix(u_second_color, u_third_color, 0.5 + 0.5 * sin(3.0 * (newTexCoord + u_time))),
-    blendFactor);
+    vec4 firstBlend = mix(u_first_color, u_second_color, smoothstep(0.0, 0.5, band));
+    vec4 secondBlend = mix(u_second_color, u_third_color, smoothstep(0.5, 1.0, band));
+    vec4 color = mix(firstBlend, secondBlend, smoothstep(0.42, 0.58, band));
 
     if (tex_coord.x < 0.5 && tex_coord.y > 0.5 && u_edges.x == 0.0 ||
         tex_coord.x > 0.5 && tex_coord.y > 0.5 && u_edges.y == 0.0 ||

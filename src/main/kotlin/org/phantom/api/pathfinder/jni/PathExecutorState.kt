@@ -1571,22 +1571,27 @@ object PathExecutorState {
         isFootprintSafe(level, point.x, point.y - PLAYER_LOOK_HEIGHT, point.z)
 
     private fun isFootprintSafe(level: Level, x: Double, feetY: Double, z: Double): Boolean {
-        val samples = doubleArrayOf(
+        // Mandatory: centre + 4 cardinal samples at FOOTPRINT_RADIUS. These lie
+        // within the player's real ~0.3 collision half-width, so if any of them
+        // lacks support the player would actually fall.
+        val mandatory = doubleArrayOf(
             0.0, 0.0,
-            FOOTPRINT_RADIUS, FOOTPRINT_RADIUS,
-            FOOTPRINT_RADIUS, -FOOTPRINT_RADIUS,
-            -FOOTPRINT_RADIUS, FOOTPRINT_RADIUS,
-            -FOOTPRINT_RADIUS, -FOOTPRINT_RADIUS,
             FOOTPRINT_RADIUS, 0.0,
             -FOOTPRINT_RADIUS, 0.0,
             0.0, FOOTPRINT_RADIUS,
             0.0, -FOOTPRINT_RADIUS
         )
         var i = 0
-        while (i < samples.size) {
-            if (!hasNearbySupport(level, x + samples[i], feetY, z + samples[i + 1])) return false
+        while (i < mandatory.size) {
+            if (!hasNearbySupport(level, x + mandatory[i], feetY, z + mandatory[i + 1])) return false
             i += 2
         }
+
+        // Advisory: the 4 diagonal corners sit ~0.54 blocks out — beyond the
+        // player's collision box. Requiring them tripped a phantom ledge on
+        // every 1-wide path / doorway the native planner deliberately chose.
+        // A genuine cliff also fails the mandatory ring, so dropping the corner
+        // requirement keeps real edge detection while letting tight routes pass.
         return true
     }
 

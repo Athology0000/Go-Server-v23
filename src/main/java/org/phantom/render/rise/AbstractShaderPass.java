@@ -42,7 +42,11 @@ public abstract class AbstractShaderPass {
         int prevProgram = GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM);
         int prevVao = GL11.glGetInteger(GL30.GL_VERTEX_ARRAY_BINDING);
         int prevActiveTexture = GL11.glGetInteger(GL13.GL_ACTIVE_TEXTURE);
-        int prevTexture = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
+        GL13.glActiveTexture(GL13.GL_TEXTURE0);
+        int prevTexture0 = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
+        GL13.glActiveTexture(GL13.GL_TEXTURE1);
+        int prevTexture1 = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
+        GL13.glActiveTexture(prevActiveTexture);
         int prevBlendSrcRgb = GL11.glGetInteger(GL30.GL_BLEND_SRC_RGB);
         int prevBlendDstRgb = GL11.glGetInteger(GL30.GL_BLEND_DST_RGB);
         int prevBlendSrcAlpha = GL11.glGetInteger(GL30.GL_BLEND_SRC_ALPHA);
@@ -69,8 +73,11 @@ public abstract class AbstractShaderPass {
         } finally {
             GL20.glUseProgram(prevProgram);
             GL30.glBindVertexArray(prevVao);
+            GL13.glActiveTexture(GL13.GL_TEXTURE0);
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, prevTexture0);
+            GL13.glActiveTexture(GL13.GL_TEXTURE1);
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, prevTexture1);
             GL13.glActiveTexture(prevActiveTexture);
-            GL11.glBindTexture(GL11.GL_TEXTURE_2D, prevTexture);
             GL30.glBlendFuncSeparate(prevBlendSrcRgb, prevBlendDstRgb, prevBlendSrcAlpha, prevBlendDstAlpha);
             GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, prevFbo);
             GL11.glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);

@@ -71,6 +71,14 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
   private var gradientInputDragging = false
   private var gradientStartValid = true
   private var gradientEndValid = true
+  private var activeGradientStop = 1
+  private var gradientHue = 0f
+  private var gradientSaturation = 1f
+  private var gradientBrightness = 0.5f
+  private var gradientOpacity = 1f
+  private var draggingGradientHue = false
+  private var draggingGradientOpacity = false
+  private var draggingGradientColor = false
 
   init {
     // Initialize static HSB from current mode if Static
@@ -94,6 +102,7 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
         hexInputHandler.setText(argbToHex(mode.startArgb))
         gradientStartInputHandler.setText(argbToHex(mode.startArgb))
         gradientEndInputHandler.setText(argbToHex(mode.endArgb))
+        syncGradientPickerFromColor(mode.startArgb)
       }
       is ColorMode.ThemeColor -> {
         selectedThemeProperty = mode.propertyName
@@ -133,7 +142,7 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
 
     val pickerHeight = when (setting.mode) {
       is ColorMode.Static -> 450F
-      is ColorMode.Gradient -> 360F
+      is ColorMode.Gradient -> 540F
       is ColorMode.Rainbow, is ColorMode.SyncedRainbow -> 360F
       is ColorMode.ThemeColor -> 400F
       is ColorMode.TweakedTheme -> 470F
@@ -207,9 +216,11 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
       val isSynced = setting.mode is ColorMode.SyncedRainbow
       drawCheckbox(syncX, by, checkboxSize, isSynced, "Sync")
 
-      val gradientX = bx + 170F
-      val isGradient = setting.mode is ColorMode.Gradient
-      drawCheckbox(gradientX, by, checkboxSize, isGradient, "Gradient")
+      if (setting.supportsGradient) {
+        val gradientX = bx + 170F
+        val isGradient = setting.mode is ColorMode.Gradient
+        drawCheckbox(gradientX, by, checkboxSize, isGradient, "Gradient")
+      }
     } else {
       val isAdjusted = setting.mode is ColorMode.TweakedTheme
       drawCheckbox(bx, by, checkboxSize, isAdjusted, "Adjust")
@@ -323,34 +334,39 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
     var currentY = py + 10F
     val panelWidth = 320F
 
-    NVGRenderer.gradientRect(bx, currentY, panelWidth, 48F, mode.startArgb, mode.endArgb, gradientDirection(mode.direction), 6F)
-    NVGRenderer.hollowRect(bx, currentY, panelWidth, 48F, 1F, ThemeManager.currentTheme.controlBorder, 6F)
-    currentY += 66F
+    drawGradientRect(bx, currentY, panelWidth, 42F, mode, 6F)
+    NVGRenderer.hollowRect(bx, currentY, panelWidth, 42F, 1F, ThemeManager.currentTheme.controlBorder, 6F)
+    currentY += 56F
 
-    drawGradientHexInput(bx, currentY, "Start", 1, gradientStartInputHandler, gradientStartValid, mode.startArgb)
+    drawGradientHexInput(bx, currentY, "Start", 1, gradientStartInputHandler, gradientStartValid, mode.startArgb, 156F)
+    drawGradientHexInput(bx + 164F, currentY, "End", 2, gradientEndInputHandler, gradientEndValid, mode.endArgb, 156F)
     currentY += 58F
-    drawGradientHexInput(bx, currentY, "End", 2, gradientEndInputHandler, gradientEndValid, mode.endArgb)
-    currentY += 58F
+
+    drawGradientColorPicker(bx, currentY)
+    currentY += 164F
 
     NVGRenderer.text("Direction", bx, currentY, 13F, ThemeManager.currentTheme.text)
     currentY += 22F
 
     val labels = listOf(
-      "Horizontal" to ColorMode.DIRECTION_LEFT_TO_RIGHT,
-      "Vertical" to ColorMode.DIRECTION_TOP_TO_BOTTOM,
-      "Diagonal" to ColorMode.DIRECTION_DIAGONAL,
+      "Horz" to ColorMode.DIRECTION_LEFT_TO_RIGHT,
+      "Vert" to ColorMode.DIRECTION_TOP_TO_BOTTOM,
+      "Diag" to ColorMode.DIRECTION_DIAGONAL,
     )
     val gap = 8F
-    val buttonWidth = (panelWidth - gap * 2F) / 3F
+    val buttonWidth = 72F
     labels.forEachIndexed { index, (label, direction) ->
       val buttonX = bx + index * (buttonWidth + gap)
       val selected = mode.direction == direction
       val bg = if (selected) ThemeManager.currentTheme.accent else ThemeManager.currentTheme.controlBg
       val textColor = if (selected) ThemeManager.currentTheme.white else ThemeManager.currentTheme.text
-      NVGRenderer.rect(buttonX, currentY, buttonWidth, 28F, bg, 5F)
-      NVGRenderer.hollowRect(buttonX, currentY, buttonWidth, 28F, 1F, ThemeManager.currentTheme.controlBorder, 5F)
+      NVGRenderer.rect(buttonX, currentY, buttonWidth, 26F, bg, 5F)
+      NVGRenderer.hollowRect(buttonX, currentY, buttonWidth, 26F, 1F, ThemeManager.currentTheme.controlBorder, 5F)
       val textWidth = NVGRenderer.textWidth(label, 12F)
-      NVGRenderer.text(label, buttonX + (buttonWidth - textWidth) / 2F, currentY + 8F, 12F, textColor)
+      NVGRenderer.text(label, buttonX + (buttonWidth - textWidth) / 2F, currentY + 7F, 12F, textColor)
+    }
+    if (setting.supportsAnimatedGradient) {
+      drawCheckbox(bx + panelWidth - 98F, currentY + 3F, 18F, mode.animated, "Animated")
     }
   }
 
@@ -362,11 +378,15 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
     handler: TextInputHandler,
     valid: Boolean,
     color: Int,
+    width: Float = 320F,
   ) {
-    NVGRenderer.text(label, x, y, 13F, ThemeManager.currentTheme.text)
+    val labelColor = if (activeGradientStop == index) ThemeManager.currentTheme.accent else ThemeManager.currentTheme.text
+    NVGRenderer.text(label, x, y, 13F, labelColor)
     val inputY = y + 20F
     val focused = focusedGradientInput == index
     val borderColor = if (focused) {
+      ThemeManager.currentTheme.accent
+    } else if (activeGradientStop == index) {
       ThemeManager.currentTheme.accent
     } else if (!valid) {
       ThemeManager.currentTheme.error
@@ -374,13 +394,14 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
       ThemeManager.currentTheme.inputBorder
     }
 
-    NVGRenderer.rect(x, inputY, 320F, 30F, ThemeManager.currentTheme.inputBg, 5F)
-    NVGRenderer.hollowRect(x, inputY, 320F, 30F, 2F, borderColor, 5F)
-    NVGRenderer.rect(x + 286F, inputY + 6F, 18F, 18F, color, 3F)
-    NVGRenderer.hollowRect(x + 286F, inputY + 6F, 18F, 18F, 1F, ThemeManager.currentTheme.controlBorder, 3F)
+    NVGRenderer.rect(x, inputY, width, 30F, ThemeManager.currentTheme.inputBg, 5F)
+    NVGRenderer.hollowRect(x, inputY, width, 30F, 2F, borderColor, 5F)
+    NVGRenderer.rect(x + width - 34F, inputY + 6F, 18F, 18F, color, 3F)
+    NVGRenderer.hollowRect(x + width - 34F, inputY + 6F, 18F, 18F, 1F, ThemeManager.currentTheme.controlBorder, 3F)
 
-    if (focused) handler.updateScroll(260F, 13F)
-    NVGRenderer.pushScissor(x + 10F, inputY, 260F, 30F)
+    val textWidth = width - 52F
+    if (focused) handler.updateScroll(textWidth, 13F)
+    NVGRenderer.pushScissor(x + 10F, inputY, textWidth, 30F)
     if (focused) {
       handler.renderSelection(x + 10F, inputY + 9F, 13F, 13F, ThemeManager.currentTheme.selection)
     }
@@ -389,6 +410,50 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
       handler.renderCursor(x + 10F, inputY + 9F, 13F, ThemeManager.currentTheme.text)
     }
     NVGRenderer.popScissor()
+  }
+
+  private fun drawGradientColorPicker(bx: Float, by: Float) {
+    val boxWidth = 156F
+    val boxHeight = 120F
+    val sliderX = bx + boxWidth + 16F
+    val sliderWidth = 148F
+    val hueColor = Color.HSBtoRGB(gradientHue, 1f, 1f)
+
+    NVGRenderer.pushScissor(bx, by, boxWidth, boxHeight)
+    NVGRenderer.rect(bx, by, boxWidth, boxHeight, hueColor, 6F)
+    NVGRenderer.gradientRect(bx, by, boxWidth, boxHeight, ThemeManager.currentTheme.white, ThemeManager.currentTheme.transparent, Gradient.LeftToRight, 6F)
+    NVGRenderer.gradientRect(bx, by, boxWidth, boxHeight, ThemeManager.currentTheme.transparent, ThemeManager.currentTheme.black, Gradient.TopToBottom, 6F)
+    NVGRenderer.popScissor()
+    NVGRenderer.hollowRect(bx, by, boxWidth, boxHeight, 1F, ThemeManager.currentTheme.controlBorder, 6F)
+
+    val selectorX = bx + gradientSaturation * boxWidth
+    val selectorY = by + (1f - gradientBrightness) * boxHeight
+    val currentRgb = Color.HSBtoRGB(gradientHue, gradientSaturation, gradientBrightness)
+    NVGRenderer.circle(selectorX, selectorY, 7F, ThemeManager.currentTheme.white)
+    NVGRenderer.circle(selectorX, selectorY, 5F, currentRgb)
+
+    NVGRenderer.text(if (activeGradientStop == 1) "Start Color" else "End Color", sliderX, by + 2F, 13F, ThemeManager.currentTheme.text)
+
+    val hueY = by + 34F
+    for (i in 0..17) {
+      val x1 = sliderX + (sliderWidth / 18f) * i
+      val x2 = sliderX + (sliderWidth / 18f) * (i + 1)
+      val color1 = Color.HSBtoRGB(i / 18f, 1f, 1f)
+      val color2 = Color.HSBtoRGB((i + 1) / 18f, 1f, 1f)
+      NVGRenderer.gradientRect(x1, hueY, x2 - x1, 6F, color1, color2, Gradient.LeftToRight, 0F)
+    }
+    NVGRenderer.hollowRect(sliderX, hueY, sliderWidth, 6F, 1F, ThemeManager.currentTheme.controlBorder, 3F)
+    NVGRenderer.circle(sliderX + gradientHue * sliderWidth, hueY + 3F, 8F, ThemeManager.currentTheme.white)
+
+    val opacityY = hueY + 34F
+    val currentColor = Color.HSBtoRGB(gradientHue, gradientSaturation, gradientBrightness)
+    val opaqueColor = Color(currentColor or (255 shl 24), true).rgb
+    val transparentColor = Color(currentColor and 0x00FFFFFF, true).rgb
+    NVGRenderer.text("Opacity", sliderX, opacityY - 18F, 12F, ThemeManager.currentTheme.textSecondary)
+    NVGRenderer.rect(sliderX, opacityY, sliderWidth, 6F, ThemeManager.currentTheme.white, 3F)
+    NVGRenderer.gradientRect(sliderX, opacityY, sliderWidth, 6F, transparentColor, opaqueColor, Gradient.LeftToRight, 3F)
+    NVGRenderer.hollowRect(sliderX, opacityY, sliderWidth, 6F, 1F, ThemeManager.currentTheme.controlBorder, 3F)
+    NVGRenderer.circle(sliderX + gradientOpacity * sliderWidth, opacityY + 3F, 8F, ThemeManager.currentTheme.white)
   }
 
   private fun drawRainbowPanel(px: Float, py: Float, mode: ColorMode.Rainbow) {
@@ -591,9 +656,21 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
   private fun drawColorSwatch(x: Float, y: Float, w: Float, h: Float, radius: Float) {
     val mode = setting.mode
     if (mode is ColorMode.Gradient) {
-      NVGRenderer.gradientRect(x, y, w, h, mode.startArgb, mode.endArgb, gradientDirection(mode.direction), radius)
+      drawGradientRect(x, y, w, h, mode, radius)
     } else {
       NVGRenderer.rect(x, y, w, h, setting.value, radius)
+    }
+  }
+
+  private fun drawGradientRect(x: Float, y: Float, w: Float, h: Float, mode: ColorMode.Gradient, radius: Float) {
+    val direction = gradientDirection(mode.direction)
+    if (mode.animated) {
+      val angle = (System.currentTimeMillis() % 4200L).toFloat() / 4200f * (Math.PI * 2.0).toFloat()
+      val shiftX = kotlin.math.cos(angle) * (w * 0.45f)
+      val shiftY = kotlin.math.sin(angle) * (h * 0.45f)
+      NVGRenderer.gradientRectShifted(x, y, w, h, mode.startArgb, mode.endArgb, direction, radius, shiftX, shiftY)
+    } else {
+      NVGRenderer.gradientRect(x, y, w, h, mode.startArgb, mode.endArgb, direction, radius)
     }
   }
 
@@ -727,10 +804,12 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
       return true
     }
 
-    val gradientX = bx + 170F
-    if (isHoveringOver(gradientX, checkboxY, checkboxSize + 75F, checkboxSize)) {
-      toggleGradientMode()
-      return true
+    if (setting.supportsGradient) {
+      val gradientX = bx + 170F
+      if (isHoveringOver(gradientX, checkboxY, checkboxSize + 75F, checkboxSize)) {
+        toggleGradientMode()
+        return true
+      }
     }
 
     return false
@@ -762,6 +841,7 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
   }
 
   private fun toggleGradientMode() {
+    if (!setting.supportsGradient) return
     val current = setting.mode
     if (current is ColorMode.Gradient) {
       setStaticModeFromArgb(current.startArgb)
@@ -774,6 +854,8 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
     gradientEndInputHandler.setText(argbToHex(end))
     gradientStartValid = true
     gradientEndValid = true
+    activeGradientStop = 1
+    syncGradientPickerFromColor(start)
     setting.mode = ColorMode.Gradient(start, end)
   }
 
@@ -833,26 +915,50 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
 
   private fun handleGradientPanelClick(px: Float, py: Float): Boolean {
     val bx = px + 10F
-    val startInputY = py + 96F
-    val endInputY = py + 154F
+    val startInputY = py + 86F
+    val endInputX = bx + 164F
 
-    if (isHoveringOver(bx, startInputY, 320F, 30F)) {
+    if (isHoveringOver(bx, startInputY, 156F, 30F)) {
+      selectGradientStop(1)
       focusedGradientInput = 1
       gradientInputDragging = true
       gradientStartInputHandler.startSelection(mouseX.toFloat(), bx + 10F, 13F)
       return true
     }
 
-    if (isHoveringOver(bx, endInputY, 320F, 30F)) {
+    if (isHoveringOver(endInputX, startInputY, 156F, 30F)) {
+      selectGradientStop(2)
       focusedGradientInput = 2
       gradientInputDragging = true
-      gradientEndInputHandler.startSelection(mouseX.toFloat(), bx + 10F, 13F)
+      gradientEndInputHandler.startSelection(mouseX.toFloat(), endInputX + 10F, 13F)
       return true
     }
 
-    val directionY = py + 234F
+    val colorBoxY = py + 124F
+    if (isHoveringOver(bx, colorBoxY, 156F, 120F)) {
+      draggingGradientColor = true
+      updateGradientColorFromBox(bx, colorBoxY)
+      return true
+    }
+
+    val sliderX = bx + 172F
+    val hueY = colorBoxY + 34F
+    if (isHoveringOver(sliderX, hueY - 5F, 148F, 16F)) {
+      draggingGradientHue = true
+      updateGradientHueFromSlider(sliderX, 148F)
+      return true
+    }
+
+    val opacityY = hueY + 34F
+    if (isHoveringOver(sliderX, opacityY - 5F, 148F, 16F)) {
+      draggingGradientOpacity = true
+      updateGradientOpacityFromSlider(sliderX, 148F)
+      return true
+    }
+
+    val directionY = py + 310F
     val gap = 8F
-    val buttonWidth = (320F - gap * 2F) / 3F
+    val buttonWidth = 72F
     val directions = listOf(
       ColorMode.DIRECTION_LEFT_TO_RIGHT,
       ColorMode.DIRECTION_TOP_TO_BOTTOM,
@@ -860,12 +966,19 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
     )
     directions.forEachIndexed { index, direction ->
       val buttonX = bx + index * (buttonWidth + gap)
-      if (isHoveringOver(buttonX, directionY, buttonWidth, 28F)) {
+      if (isHoveringOver(buttonX, directionY, buttonWidth, 26F)) {
         val mode = setting.mode as? ColorMode.Gradient ?: return true
         setting.mode = mode.copy(direction = direction)
         focusedGradientInput = 0
         return true
       }
+    }
+
+    if (setting.supportsAnimatedGradient && isHoveringOver(bx + 222F, directionY + 3F, 98F, 18F)) {
+      val mode = setting.mode as? ColorMode.Gradient ?: return true
+      setting.mode = mode.copy(animated = !mode.animated)
+      focusedGradientInput = 0
+      return true
     }
 
     if (focusedGradientInput != 0) {
@@ -977,12 +1090,24 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
       is ColorMode.Gradient -> {
         val bx = px + 10F
         when {
+          draggingGradientColor -> {
+            updateGradientColorFromBox(bx, controlsY + 124F)
+            return true
+          }
+          draggingGradientHue -> {
+            updateGradientHueFromSlider(bx + 172F, 148F)
+            return true
+          }
+          draggingGradientOpacity -> {
+            updateGradientOpacityFromSlider(bx + 172F, 148F)
+            return true
+          }
           gradientInputDragging && focusedGradientInput == 1 -> {
             gradientStartInputHandler.updateSelection(mouseX.toFloat(), bx + 10F, 13F)
             return true
           }
           gradientInputDragging && focusedGradientInput == 2 -> {
-            gradientEndInputHandler.updateSelection(mouseX.toFloat(), bx + 10F, 13F)
+            gradientEndInputHandler.updateSelection(mouseX.toFloat(), bx + 174F, 13F)
             return true
           }
           else -> return false
@@ -1029,6 +1154,9 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
       draggingOpacityMult = false
       hexDragging = false
       gradientInputDragging = false
+      draggingGradientHue = false
+      draggingGradientOpacity = false
+      draggingGradientColor = false
     }
     return false
   }
@@ -1072,6 +1200,53 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
     return (color.alpha shl 24) or (rgb and 0x00FFFFFF)
   }
 
+  private fun selectGradientStop(index: Int) {
+    activeGradientStop = index.coerceIn(1, 2)
+    val mode = setting.mode as? ColorMode.Gradient ?: return
+    syncGradientPickerFromColor(if (activeGradientStop == 1) mode.startArgb else mode.endArgb)
+  }
+
+  private fun syncGradientPickerFromColor(argb: Int) {
+    val color = Color(argb, true)
+    val hsb = Color.RGBtoHSB(color.red, color.green, color.blue, null)
+    gradientHue = hsb[0]
+    gradientSaturation = hsb[1]
+    gradientBrightness = hsb[2]
+    gradientOpacity = color.alpha / 255f
+  }
+
+  private fun updateGradientColorFromBox(boxX: Float, boxY: Float) {
+    gradientSaturation = ((mouseX.toFloat() - boxX) / 156F).coerceIn(0f, 1f)
+    gradientBrightness = (1f - (mouseY.toFloat() - boxY) / 120F).coerceIn(0f, 1f)
+    updateActiveGradientStop()
+  }
+
+  private fun updateGradientHueFromSlider(sliderX: Float, sliderWidth: Float) {
+    gradientHue = ((mouseX.toFloat() - sliderX) / sliderWidth).coerceIn(0f, 1f)
+    updateActiveGradientStop()
+  }
+
+  private fun updateGradientOpacityFromSlider(sliderX: Float, sliderWidth: Float) {
+    gradientOpacity = ((mouseX.toFloat() - sliderX) / sliderWidth).coerceIn(0f, 1f)
+    updateActiveGradientStop()
+  }
+
+  private fun updateActiveGradientStop() {
+    val mode = setting.mode as? ColorMode.Gradient ?: return
+    val rgb = Color.HSBtoRGB(gradientHue, gradientSaturation, gradientBrightness)
+    val alpha = (gradientOpacity * 255).toInt().coerceIn(0, 255)
+    val argb = (alpha shl 24) or (rgb and 0x00FFFFFF)
+    setting.mode = if (activeGradientStop == 1) {
+      gradientStartInputHandler.setText(argbToHex(argb))
+      gradientStartValid = true
+      mode.copy(startArgb = argb)
+    } else {
+      gradientEndInputHandler.setText(argbToHex(argb))
+      gradientEndValid = true
+      mode.copy(endArgb = argb)
+    }
+  }
+
   private fun gradientDirection(direction: String): Gradient {
     return when (direction) {
       ColorMode.DIRECTION_TOP_TO_BOTTOM -> Gradient.TopToBottom
@@ -1085,8 +1260,10 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
     val handler = if (index == 1) gradientStartInputHandler else gradientEndInputHandler
     val parsed = parseHexToARGB(handler.getText()) ?: return
     setting.mode = if (index == 1) {
+      syncGradientPickerFromColor(parsed)
       mode.copy(startArgb = parsed)
     } else {
+      syncGradientPickerFromColor(parsed)
       mode.copy(endArgb = parsed)
     }
   }
