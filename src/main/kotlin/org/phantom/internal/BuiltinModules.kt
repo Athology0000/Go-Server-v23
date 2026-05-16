@@ -26,6 +26,8 @@ import org.phantom.internal.dungeons.DungeonMapModule
 import org.phantom.internal.dungeons.DungeonRoutesModule
 import org.phantom.internal.dungeons.DungeonsModule
 import org.phantom.internal.dungeons.MobEspModule as DungeonMobEspModule
+import org.phantom.internal.dungeons.autoroutes.AutoRoutesModule
+import org.phantom.internal.dungeons.gambling.DungeonChestGamblingModule
 import org.phantom.internal.etherwarp.EtherwarpHelperModule
 import org.phantom.internal.etherwarp.LeftClickEtherwarpModule
 import org.phantom.internal.etherwarp.SmoothAotvModule
@@ -185,7 +187,9 @@ internal object BuiltinModules {
     DungeonsModule,
     DungeonMapModule,
     DungeonRoutesModule,
+    AutoRoutesModule,
     BloodCampHelperModule,
+    DungeonChestGamblingModule,
     DungeonMobEspModule,
     AutoDojoModule,
 

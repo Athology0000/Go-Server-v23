@@ -354,7 +354,26 @@ object DungeonChestGamblingModule : Module("Dungeon Chest Gambling") {
     (alpha.coerceIn(0, 255) shl 24) or (color and 0x00FFFFFF)
 
   private fun String.stripFormatting(): String =
-    replace(Regex("Â§."), "")
+    replace(FORMATTING_CODE, "")
+
+  private fun ItemStack.loreLines(): List<String> =
+    get(DataComponents.LORE)?.lines()?.map { it.string.stripFormatting().trim() }.orEmpty()
+
+  private fun romanToInt(value: String): Int {
+    var total = 0
+    var previous = 0
+    value.uppercase(Locale.US).reversed().forEach { char ->
+      val current = when (char) {
+        'I' -> 1
+        'V' -> 5
+        'X' -> 10
+        else -> 0
+      }
+      if (current < previous) total -= current else total += current
+      previous = current
+    }
+    return total.coerceAtLeast(1)
+  }
 
   private const val ITEM_SCALE = 4
   private const val ITEM_SIZE = 50
@@ -367,4 +386,11 @@ object DungeonChestGamblingModule : Module("Dungeon Chest Gambling") {
 
   private const val FULL_CARD_WIDTH = (DUNGEON_CARD_WIDTH * ITEM_SCALE) + ITEM_GAP
   private const val FULL_CARD_HEIGHT = DUNGEON_CARD_HEIGHT * ITEM_SCALE
+  private const val CROESUS_TYPE = "Croesus"
+
+  private val DUNGEON_CHEST_TITLE = Regex("(?i)^(Wood|Gold|Diamond|Emerald|Obsidian|Bedrock)(?:\\s+Chest)?$")
+  private val CROESUS_TITLE = Regex("(?i)^(?:Master\\s+)?(?:Catacombs|Kuudra)\\s+-\\s+.+$")
+  private val ENCHANTED_BOOK_REWARD = Regex("(?i)^Enchanted Book \\((.+)\\s+([IVX]+)\\)$")
+  private val ESSENCE_REWARD = Regex("(?i)^([\\d,]+)\\s+(.+)\\s+Essence$")
+  private val FORMATTING_CODE = Regex("(?i)§[0-9A-FK-OR]")
 }
