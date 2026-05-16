@@ -97,7 +97,7 @@ object PathExecutorState {
 
     // â”€â”€ Adjustable lookahead (set from PathfindingModule settings) â”€â”€
     // Base "far" distance the lookahead point sits ahead of the player on the spline.
-    @JvmField var lookaheadDistanceFar: Double = 9.0
+    @JvmField var lookaheadDistanceFar: Double = 7.0
     // 0.0 = lookahead never shrinks on turns/deviation (always stays far â†’ smoother rotations,
     //       wider cornering). 1.0 = original aggressive shrink behavior.
     @JvmField var lookaheadShrinkStrength: Double = 0.05
@@ -263,6 +263,18 @@ object PathExecutorState {
     private const val INCLINE_DY_THRESHOLD = 0.05
     private const val INCLINE_MIN_RUN_LENGTH = 1.5
     private const val INCLINE_KEYNOTE_OFFSET = 0.5
+    // For a DESCENDING incline the raw keynote sits at the bottom step, so the
+    // eye->keynote vector pitches steeply down ("staring at the ground" the
+    // whole way down the stairs). Cap that downward pitch so the gaze leads
+    // down the slope the way a human descends, not at their feet.
+    private const val MAX_DESCENT_KEYNOTE_PITCH = 22.0
+    // Turn-tighten: lookahead is firmly capped through corners independent of
+    // lookaheadShrinkStrength (that slider governs off-path deviation, not
+    // cornering). Cap ramps from no-shrink at TURN_BRAKE_CURVATURE down to
+    // TURN_MIN_LOOKAHEAD at TURN_HARD_CURVATURE so the aim rounds the corner
+    // instead of pointing past it and clipping the inside wall.
+    private const val TURN_HARD_CURVATURE = 1.0
+    private const val TURN_MIN_LOOKAHEAD = 3.0
 
     // =========================================================================
     // Public API
@@ -528,9 +540,17 @@ object PathExecutorState {
         val safetyLookaheadCap = when {
             dropAhead || safety.ledgeRisk || safety.corridorUnsafe -> PRECISION_LOOKAHEAD
             pathCurvature >= TURN_BRAKE_CURVATURE -> {
-                // Blend turn-brake cap with shrink setting. At strength=0 the cap is disabled
-                // (keep adaptiveLookahead so the aim stays far through turns).
-                val turnCap = adaptiveLookahead - (adaptiveLookahead - 2.0).coerceAtLeast(0.0) * lookaheadShrinkStrength
+                // Firm turn cap, independent of lookaheadShrinkStrength (that
+                // slider governs off-path deviation, not cornering). Without a
+                // real cap the aim stays ~10 blocks out and points PAST the
+                // corner, so the rotation-only steering walks the chord into
+                // the inside wall and stalls. Tighten progressively from
+                // no-shrink at TURN_BRAKE_CURVATURE to TURN_MIN_LOOKAHEAD at
+                // TURN_HARD_CURVATURE.
+                val sharpness = ((pathCurvature - TURN_BRAKE_CURVATURE) /
+                    (TURN_HARD_CURVATURE - TURN_BRAKE_CURVATURE)).coerceIn(0.0, 1.0)
+                val turnCap = adaptiveLookahead -
+                    (adaptiveLookahead - TURN_MIN_LOOKAHEAD).coerceAtLeast(0.0) * sharpness
                 minOf(adaptiveLookahead, turnCap)
             }
             else -> adaptiveLookahead
@@ -585,7 +605,11 @@ object PathExecutorState {
         if (level != null) {
             val incline = findInclineAhead(spline)
             if (incline != null && isPointVisible(eye, incline.endPoint, level)) {
-                targetPoint = incline.endPoint
+                targetPoint = if (incline.descending) {
+                    levelDescentKeynote(eye, incline.endPoint)
+                } else {
+                    incline.endPoint
+                }
                 inclineKeynoteActive = true
             }
         }
@@ -1217,6 +1241,27 @@ object PathExecutorState {
         val keynoteDist = (runEndDist + INCLINE_KEYNOTE_OFFSET).coerceAtMost(maxScan)
         val keynotePoint = spline.sample(currentSplineDistance + keynoteDist)
         return InclineSegment(keynotePoint, runDir == -1)
+    }
+
+    /**
+     * The raw descending keynote sits at the bottom step of the staircase, so
+     * the eye->keynote vector pitches steeply down and the camera stares at the
+     * ground for the entire descent. Raise the aim point's Y so the downward
+     * pitch is bounded to [MAX_DESCENT_KEYNOTE_PITCH] â€” the gaze leads down the
+     * slope the way a human walks down stairs instead of at their feet. Yaw is
+     * untouched (x/z preserved); only the vertical component is lifted.
+     */
+    private fun levelDescentKeynote(eye: Vec3, endPoint: Vec3): Vec3 {
+        val dx = endPoint.x - eye.x
+        val dz = endPoint.z - eye.z
+        val horz = sqrt(dx * dx + dz * dz)
+        if (horz < 0.5) return endPoint
+        val dy = endPoint.y - eye.y
+        if (dy >= 0.0) return endPoint
+        val pitchDown = atan2(-dy, horz) * (180.0 / PI)
+        if (pitchDown <= MAX_DESCENT_KEYNOTE_PITCH) return endPoint
+        val maxDrop = horz * tan(MAX_DESCENT_KEYNOTE_PITCH * (PI / 180.0))
+        return Vec3(endPoint.x, eye.y - maxDrop, endPoint.z)
     }
 
     /**

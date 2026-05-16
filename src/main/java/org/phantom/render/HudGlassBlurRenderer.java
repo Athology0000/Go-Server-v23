@@ -26,6 +26,92 @@ public class HudGlassBlurRenderer {
   private static final org.phantom.render.rise.RenderTarget blurTempTarget = new org.phantom.render.rise.RenderTarget();
   private static final org.phantom.render.rise.RenderTarget blurredTarget = new org.phantom.render.rise.RenderTarget();
 
+  private static boolean framePrepared = false;
+  private static int preparedFramebuffer = 0;
+  private static int preparedFbWidth = 0;
+  private static int preparedFbHeight = 0;
+
+  public static boolean beginFrame(float blurStrength) {
+    if (!ENABLE_SHADER_BLUR) {
+      return false;
+    }
+
+    if (!initialized) {
+      init();
+    }
+    if (!initialized || blurShader == null || !blurShader.isValid()) {
+      return false;
+    }
+
+    RenderTarget framebuffer = MC.getMainRenderTarget();
+    if (framebuffer == null) {
+      return false;
+    }
+
+    int fbWidth = framebuffer.width;
+    int fbHeight = framebuffer.height;
+    if (fbWidth <= 0 || fbHeight <= 0) {
+      return false;
+    }
+
+    int mainFramebuffer = getMainFramebufferId(framebuffer);
+    int currentFramebuffer = GL11.glGetInteger(GL30.GL_FRAMEBUFFER_BINDING);
+    int renderFramebuffer = currentFramebuffer != 0 ? currentFramebuffer : mainFramebuffer;
+    if (renderFramebuffer == 0) {
+      return false;
+    }
+
+    int prevFramebuffer = 0;
+    int[] viewport = new int[4];
+
+    try {
+      prevFramebuffer = GL11.glGetInteger(GL30.GL_FRAMEBUFFER_BINDING);
+      GL11.glGetIntegerv(GL11.GL_VIEWPORT, viewport);
+
+      sourceTarget.ensureSize(fbWidth, fbHeight);
+      blurTempTarget.ensureSize(fbWidth, fbHeight);
+      blurredTarget.ensureSize(fbWidth, fbHeight);
+
+      GL11.glViewport(0, 0, fbWidth, fbHeight);
+      if (!copyFramebufferToTarget(renderFramebuffer, sourceTarget, fbWidth, fbHeight)) {
+        return false;
+      }
+
+      int screenWidth = MC.getWindow().getScreenWidth();
+      int screenHeight = MC.getWindow().getScreenHeight();
+      float scaleX = screenWidth > 0 ? fbWidth / (float) screenWidth : 1.0f;
+      float scaleY = screenHeight > 0 ? fbHeight / (float) screenHeight : 1.0f;
+      int radius = Math.max(8, Math.min(56, Math.round(blurStrength * Math.max(scaleX, scaleY) * 2.6f)));
+
+      copyFramebufferToTarget(sourceTarget.getFboId(), blurredTarget, fbWidth, fbHeight);
+      if (ShaderRegistry.BLUR_A.isValid() && ShaderRegistry.BLUR_B.isValid()) {
+        ShaderRegistry.BLUR_A.render(sourceTarget, blurTempTarget, radius, 1.0f, 0.0f);
+        ShaderRegistry.BLUR_B.render(blurTempTarget, blurredTarget, radius, 0.0f, 1.0f);
+      }
+
+      framePrepared = true;
+      preparedFramebuffer = renderFramebuffer;
+      preparedFbWidth = fbWidth;
+      preparedFbHeight = fbHeight;
+      return true;
+    } catch (Exception e) {
+      framePrepared = false;
+      System.err.println("[HudGlassBlurRenderer] Error preparing blur frame: " + e.getMessage());
+      e.printStackTrace();
+      return false;
+    } finally {
+      GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, prevFramebuffer);
+      GL11.glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+    }
+  }
+
+  public static void endFrame() {
+    framePrepared = false;
+    preparedFramebuffer = 0;
+    preparedFbWidth = 0;
+    preparedFbHeight = 0;
+  }
+
   public static void renderBlurRect(float x, float y, float width, float height, float cornerRadius, float blurStrength) {
     if (!ENABLE_SHADER_BLUR) {
       return;
@@ -57,6 +143,14 @@ public class HudGlassBlurRenderer {
     int screenHeight = MC.getWindow().getScreenHeight();
     if (screenWidth <= 0 || screenHeight <= 0) {
       return;
+    }
+
+    boolean preparedHere = false;
+    if (!framePrepared) {
+      if (!beginFrame(blurStrength)) {
+        return;
+      }
+      preparedHere = true;
     }
 
     float scaleX = fbWidth / (float) screenWidth;
@@ -107,23 +201,11 @@ public class HudGlassBlurRenderer {
       GL11.glGetIntegerv(GL11.GL_VIEWPORT, viewport);
       stateCaptured = true;
 
-      int renderFramebuffer = prevFramebuffer != 0 ? prevFramebuffer : mainFramebuffer;
+      int renderFramebuffer = framePrepared ? preparedFramebuffer : (prevFramebuffer != 0 ? prevFramebuffer : mainFramebuffer);
       if (renderFramebuffer == 0) {
         return;
       }
 
-      sourceTarget.ensureSize(fbWidth, fbHeight);
-      blurTempTarget.ensureSize(fbWidth, fbHeight);
-      blurredTarget.ensureSize(fbWidth, fbHeight);
-      GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, prevFramebuffer);
-
-      GL11.glViewport(0, 0, fbWidth, fbHeight);
-      if (!copyFramebufferToTarget(renderFramebuffer, sourceTarget, fbWidth, fbHeight)) {
-        return;
-      }
-      int radius = Math.max(8, Math.min(56, Math.round(blurStrength * Math.max(scaleX, scaleY) * 2.6f)));
-      ShaderRegistry.BLUR_A.render(sourceTarget, blurTempTarget, radius, 1.0f, 0.0f);
-      ShaderRegistry.BLUR_B.render(blurTempTarget, blurredTarget, radius, 0.0f, 1.0f);
       GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, renderFramebuffer);
 
       if (scissorEnabled) {
@@ -173,6 +255,9 @@ public class HudGlassBlurRenderer {
       if (scissorEnabled) GL11.glEnable(GL11.GL_SCISSOR_TEST);
       GL11.glDepthMask(depthMaskEnabled);
       GL11.glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+      if (preparedHere) {
+        endFrame();
+      }
     }
   }
 

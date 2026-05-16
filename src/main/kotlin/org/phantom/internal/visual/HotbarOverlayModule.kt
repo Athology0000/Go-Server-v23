@@ -11,8 +11,6 @@ import org.phantom.api.hud.HudElement
 import org.phantom.api.hud.HudModuleManager
 import org.phantom.api.hud.hudElement
 import org.phantom.api.module.Module
-import org.phantom.api.module.ModuleCategory
-import org.phantom.api.module.setting.impl.CheckboxSetting
 import org.phantom.api.ui.theme.ThemeGradient
 import org.phantom.api.ui.theme.ThemeSurface
 import org.phantom.api.util.ui.NVGRenderer
@@ -23,13 +21,7 @@ object HotbarOverlayModule : Module("Liquid Hotbar") {
 
   private val mc = Minecraft.getInstance()
 
-  private val enabledSetting = CheckboxSetting(
-    "Enabled",
-    "Replace the vanilla hotbar with a liquid glass panel.",
-    false
-  )
-
-  val isEnabled: Boolean get() = enabledSetting.value
+  val isEnabled: Boolean get() = hotbarHud.enabled
 
   private lateinit var hudRef: HudElement
 
@@ -92,7 +84,6 @@ object HotbarOverlayModule : Module("Liquid Hotbar") {
   }
 
   init {
-    addSetting(enabledSetting)
     hudRef = hotbarHud
     EventBus.register(this)
   }

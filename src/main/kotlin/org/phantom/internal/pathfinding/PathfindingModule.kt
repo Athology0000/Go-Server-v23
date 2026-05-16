@@ -153,7 +153,7 @@ object PathfindingModule : Module("Pathfinding") {
   private val lookaheadDistance = SliderSetting(
     "Lookahead Distance",
     "How far ahead on the path the steering target sits. Higher = smoother rotations, wider cornering.",
-    9.0, 1.5, 10.0
+    7.0, 1.5, 10.0
   )
 
   private val lookaheadShrink = SliderSetting(

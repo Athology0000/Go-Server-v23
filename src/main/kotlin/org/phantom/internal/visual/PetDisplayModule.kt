@@ -29,7 +29,6 @@ object PetDisplayModule : Module("Pet Display") {
 
     // -- Settings --------------------------------------------------------------
 
-    private val enabledSetting      = CheckboxSetting("Enabled",        "Show the pet info HUD.",         false)
     private val glowSetting         = CheckboxSetting("Glow",           "Animated glow border.",          true)
     private val showHeldItemSetting = CheckboxSetting("Show Held Item", "Show the pet's held item line.", true)
 
@@ -278,11 +277,13 @@ object PetDisplayModule : Module("Pet Display") {
         offsetX = 10f
         offsetY = 10f
 
+        val glow = setting(glowSetting)
+        val showHeldItem = setting(showHeldItemSetting)
+
         width  { W }
         height { hudHeight() }
 
         render { x, y, _ ->
-            if (!enabledSetting.value) return@render
             ensureGhostLoaded()
 
             // Load pending head image on render thread (NVG requires render thread)
@@ -301,7 +302,7 @@ object PetDisplayModule : Module("Pet Display") {
             val data  = PetTabListParser.current
             val titleX = x + TEXT_X
             val titleMaxW = W - TEXT_X - PAD
-            val hasHeldItem = showHeldItemSetting.value && data?.heldItem?.isNotEmpty() == true
+            val hasHeldItem = showHeldItem.value && data?.heldItem?.isNotEmpty() == true
             val detailY = if (hasHeldItem) y + 45f else y + 32f
             val armorY = y + h - PAD - BAR_H - ARMOR_SLOT - 8f
             val armorStartX = titleX
@@ -313,7 +314,7 @@ object PetDisplayModule : Module("Pet Display") {
                 } else 0f
 
             // -- Shadow / glow -------------------------------------------------
-            if (glowSetting.value) {
+            if (glow.value) {
                 NVGRenderer.rect(x + 6f, y + 7f, W, h, 0x28000000, CORNER + 2f)
                 NVGRenderer.rect(x + 3f, y + 3f, W, h, 0x1A000000, CORNER + 1f)
             }
@@ -363,7 +364,7 @@ object PetDisplayModule : Module("Pet Display") {
             NVGRenderer.textShadow(title, titleX, y + 18f, 12f, textColor)
 
             // -- Held item -----------------------------------------------------
-            if (showHeldItemSetting.value && data.heldItem.isNotEmpty()) {
+            if (showHeldItem.value && data.heldItem.isNotEmpty()) {
                 val heldText = ellipsize(data.heldItem, titleMaxW, 9f)
                 NVGRenderer.text(heldText, titleX, y + 32f, 9f, dimColor)
             }
@@ -408,7 +409,6 @@ object PetDisplayModule : Module("Pet Display") {
     // -- Init ------------------------------------------------------------------
 
     init {
-        addSetting(enabledSetting, glowSetting, showHeldItemSetting)
         EventBus.register(this)
     }
 
@@ -416,7 +416,7 @@ object PetDisplayModule : Module("Pet Display") {
 
     @SubscribeEvent
     fun onGuiRender(event: GuiRenderEvent) {
-        if (!enabledSetting.value || !petHud.enabled) return
+        if (!petHud.enabled) return
         if (mc.screen != null && !HudModuleManager.isEditorOpen) return
         val guiScale = mc.window.guiScale.toFloat()
         if (guiScale <= 0f) return
@@ -449,7 +449,7 @@ object PetDisplayModule : Module("Pet Display") {
 
     @SubscribeEvent
     fun onTick(@Suppress("UNUSED_PARAMETER") event: TickEvent.End) {
-        if (!enabledSetting.value || !petHud.enabled) return
+        if (!petHud.enabled) return
         PetTabListParser.update()
         updateCachedPetItem()
     }

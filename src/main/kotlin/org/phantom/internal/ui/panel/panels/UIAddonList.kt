@@ -8,6 +8,8 @@ import org.phantom.api.module.ModuleCategory
 import org.phantom.api.module.ModuleManager
 import org.phantom.api.ui.theme.ThemeManager
 import org.phantom.api.util.ui.NVGRenderer
+import org.phantom.api.hud.modules.InventoryHudModule
+import org.phantom.api.hud.modules.WatermarkModule
 import org.phantom.internal.mining.CommissionMacroModule
 import org.phantom.api.hud.modules.MiningHudModule
 import org.phantom.internal.combat.CombatMacroModule
@@ -123,6 +125,12 @@ internal class UIAddonList : UIPanel(
   private fun buildAddonSections(): List<AddonSection> {
     val addonModules = AddonLoader.getAddons().flatMap { it.second.getModules() }.toSet()
     val builtinModules = ModuleManager.getModules().filter { it !in addonModules }
+    val hudOnlyModules = builtinModules.filter { module ->
+      module is InventoryHudModule ||
+        module is WatermarkModule ||
+        module == HotbarOverlayModule ||
+        module == PetDisplayModule
+    }.toSet()
     val version = FabricLoader.getInstance()
       .getModContainer("phantom")
       .map { it.metadata.version.friendlyString }
@@ -153,10 +161,7 @@ internal class UIAddonList : UIPanel(
 
     val visualModules = builtinModules.filter {
       it == FullBrightModule || it == FreecamModule ||
-        it == OrbitFreecamModule || it == BlockOverlayModule || it == BlockOutlineModule ||
-        it == HotbarOverlayModule || it == PetDisplayModule ||
-        it.name.equals("Watermark", ignoreCase = true) ||
-        it.name.equals("Inventory HUD", ignoreCase = true)
+        it == OrbitFreecamModule || it == BlockOverlayModule || it == BlockOutlineModule
     }
 
     val gardenModules = builtinModules.filter {
@@ -168,7 +173,8 @@ internal class UIAddonList : UIPanel(
         it !in combatModules &&
         it !in slayerModules &&
         it !in visualModules &&
-        it !in gardenModules
+        it !in gardenModules &&
+        it !in hudOnlyModules
     }
 
     val sections = mutableListOf<AddonSection>()

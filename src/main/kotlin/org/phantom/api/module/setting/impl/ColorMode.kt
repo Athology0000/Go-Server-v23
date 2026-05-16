@@ -32,7 +32,9 @@ sealed class ColorMode {
     val speed: Float = 1f,
     val saturation: Float = 1f,
     val brightness: Float = 1f,
-    val opacity: Float = 1f
+    val opacity: Float = 1f,
+    val colors: List<Int> = emptyList(),
+    val customColors: Boolean = false,
   ) : ColorMode()
 
   /**
@@ -48,7 +50,9 @@ sealed class ColorMode {
     val speed: Float = 1f,
     val saturation: Float = 1f,
     val brightness: Float = 1f,
-    val opacity: Float = 1f
+    val opacity: Float = 1f,
+    val colors: List<Int> = emptyList(),
+    val customColors: Boolean = false,
   ) : ColorMode()
 
   /**

@@ -1,5 +1,6 @@
 package org.phantom.internal.dungeons.gambling
 
+import java.util.Locale
 import java.util.concurrent.ThreadLocalRandom
 import kotlin.math.pow
 import kotlin.math.sqrt
@@ -9,11 +10,14 @@ import net.minecraft.client.gui.GuiGraphics
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 import net.minecraft.core.component.DataComponents
+import net.minecraft.nbt.CompoundTag
+import net.minecraft.network.chat.Component
 import net.minecraft.sounds.SoundEvents
 import net.minecraft.util.Mth
 import net.minecraft.world.entity.player.Inventory
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.Items
+import net.minecraft.world.item.component.CustomData
 import org.phantom.api.module.Module
 import org.phantom.api.module.setting.impl.CheckboxSetting
 import org.phantom.api.module.setting.impl.SliderSetting
@@ -104,14 +108,24 @@ object DungeonChestGamblingModule : Module("Dungeon Chest Gambling") {
   private fun tryStart(screen: AbstractContainerScreen<*>) {
     cancel()
 
-    val title = screen.title.string.stripFormatting()
-    val chestType = chestTypeFromTitle(title) ?: return
-    if (!croesus.value && isCroesusTitle(title)) return
+    val title = screen.title.string.stripFormatting().trim()
+    val chestType = chestTypeFromTitle(title) ?: run {
+      debug { "Skipping menu '$title': not a supported dungeon reward chest." }
+      return
+    }
+    if (!croesus.value && chestType == CROESUS_TYPE) {
+      debug { "Skipping Croesus menu '$title' because Croesus is disabled." }
+      return
+    }
 
     val candidates = rewardItems(screen)
-    if (candidates.isEmpty()) return
+    if (candidates.isEmpty()) {
+      debug { "No reward candidates found in '$title'." }
+      return
+    }
 
     val winner = candidates.maxByOrNull(::estimatedValue) ?: candidates.first()
+    debug { "Starting roll for '$title' with ${candidates.size} candidates; winner preview ${winner.hoverName.string.stripFormatting()}." }
     init(screen.menu.containerId, candidates, winner)
   }
 
@@ -201,6 +215,9 @@ object DungeonChestGamblingModule : Module("Dungeon Chest Gambling") {
 
     if (skyblockItems.isNotEmpty()) return skyblockItems
 
+    val loreItems = rewardItemsFromOpenChestLore(slots.map { it.item })
+    if (loreItems.isNotEmpty()) return loreItems
+
     return slots.map { it.item }
       .filter { stack -> !stack.isEmpty }
       .filterNot(::isNavigationItem)
@@ -210,6 +227,7 @@ object DungeonChestGamblingModule : Module("Dungeon Chest Gambling") {
   private fun estimatedValue(stack: ItemStack): Double {
     val internalId = stack.getSkyblockId()
     val apiId = stack.getSkyblockApiId().ifBlank { internalId }
+    if (apiId.isBlank()) return 0.0
     val bazaar = SkyblockPriceService.getBazaarQuote(apiId)
     return listOfNotNull(
       bazaar?.buyPrice,
@@ -220,13 +238,81 @@ object DungeonChestGamblingModule : Module("Dungeon Chest Gambling") {
   }
 
   private fun chestTypeFromTitle(title: String): String? {
-    if (title.contains("Obsidian", ignoreCase = true) && title.contains("Chest", ignoreCase = true)) return "Obsidian"
-    if (title.contains("Bedrock", ignoreCase = true) && title.contains("Chest", ignoreCase = true)) return "Bedrock"
+    val directType = DUNGEON_CHEST_TITLE.matchEntire(title)?.groupValues?.getOrNull(1)
+    if (directType.equals("Obsidian", ignoreCase = true)) return "Obsidian"
+    if (directType.equals("Bedrock", ignoreCase = true)) return "Bedrock"
+    if (isCroesusTitle(title)) return CROESUS_TYPE
     return null
   }
 
   private fun isCroesusTitle(title: String): Boolean =
-    title.startsWith("Catacombs - ") || title.startsWith("Master Catacombs - ")
+    CROESUS_TITLE.matches(title)
+
+  private fun rewardItemsFromOpenChestLore(stacks: List<ItemStack>): List<ItemStack> {
+    val chestStack = stacks.firstOrNull { stack ->
+      !stack.isEmpty && stack.hoverName.string.stripFormatting().trim().equals("Open Reward Chest", ignoreCase = true)
+    } ?: stacks.firstOrNull { stack ->
+      !stack.isEmpty && stack.loreLines().any { it.equals("Contents", ignoreCase = true) }
+    } ?: return emptyList()
+
+    val lore = chestStack.loreLines()
+    val contentsIndex = lore.indexOfFirst { it.equals("Contents", ignoreCase = true) }
+    if (contentsIndex < 0) return emptyList()
+
+    return lore.drop(contentsIndex + 1)
+      .takeWhile { line -> !line.equals("Cost", ignoreCase = true) }
+      .mapNotNull(::rewardStackFromLoreLine)
+      .distinctBy { it.getSkyblockApiId().ifBlank { it.hoverName.string.stripFormatting() } }
+  }
+
+  private fun rewardStackFromLoreLine(line: String): ItemStack? {
+    val rewardName = line
+      .removePrefix("-")
+      .trim()
+      .substringBefore(" x")
+      .substringBefore(" [")
+      .trim()
+
+    if (rewardName.isBlank()) return null
+    if (rewardName.equals("FREE", ignoreCase = true)) return null
+    if (rewardName.contains("Coins", ignoreCase = true)) return null
+    if (rewardName.equals("Dungeon Chest Key", ignoreCase = true)) return null
+
+    val apiId = apiIdFromRewardName(rewardName)
+    return ItemStack(iconForRewardName(rewardName)).also { stack ->
+      stack.set(DataComponents.CUSTOM_NAME, Component.literal(rewardName))
+      stack.set(DataComponents.CUSTOM_DATA, CustomData.of(CompoundTag().apply { putString("id", apiId) }))
+    }
+  }
+
+  private fun apiIdFromRewardName(name: String): String {
+    ENCHANTED_BOOK_REWARD.matchEntire(name)?.let { match ->
+      return "ENCHANTMENT_${normalizeApiId(match.groupValues[1])}_${romanToInt(match.groupValues[2])}"
+    }
+
+    ESSENCE_REWARD.matchEntire(name)?.let { match ->
+      return "${normalizeApiId(match.groupValues[2])}_ESSENCE"
+    }
+
+    return normalizeApiId(name).ifBlank { name.uppercase(Locale.US) }
+  }
+
+  private fun normalizeApiId(value: String): String =
+    value
+      .stripFormatting()
+      .uppercase(Locale.US)
+      .replace("'", "")
+      .replace(Regex("[^A-Z0-9]+"), "_")
+      .trim('_')
+
+  private fun iconForRewardName(name: String) = when {
+    name.startsWith("Enchanted Book", ignoreCase = true) -> Items.ENCHANTED_BOOK
+    name.contains("Essence", ignoreCase = true) -> Items.GLOWSTONE_DUST
+    name.contains("Star", ignoreCase = true) -> Items.NETHER_STAR
+    name.contains("Recombobulator", ignoreCase = true) -> Items.ANVIL
+    name.contains("Catalyst", ignoreCase = true) -> Items.END_CRYSTAL
+    else -> Items.PAPER
+  }
 
   private fun isNavigationItem(stack: ItemStack): Boolean {
     val item = stack.item
@@ -236,7 +322,9 @@ object DungeonChestGamblingModule : Module("Dungeon Chest Gambling") {
     return name.equals("Close", ignoreCase = true) ||
       name.equals("Go Back", ignoreCase = true) ||
       name.equals("Next Page", ignoreCase = true) ||
-      name.equals("Previous Page", ignoreCase = true)
+      name.equals("Previous Page", ignoreCase = true) ||
+      name.equals("Open Reward Chest", ignoreCase = true) ||
+      name.equals("Reroll Chest", ignoreCase = true)
   }
 
   private fun rarityColor(stack: ItemStack): Int {

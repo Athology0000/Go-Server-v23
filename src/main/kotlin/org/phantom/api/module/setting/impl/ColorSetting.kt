@@ -1,6 +1,7 @@
 package org.phantom.api.module.setting.impl
 
 import com.google.gson.JsonElement
+import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonPrimitive
 import org.phantom.api.module.setting.Setting
@@ -44,23 +45,28 @@ class ColorSetting(
         // Per-instance rainbow: use instanceStartTime for phase offset
         val elapsed = (System.currentTimeMillis() - instanceStartTime) / 1000.0
         val hue = ((elapsed * m.speed) % 1.0 + 1.0).toFloat() % 1f
+        if (m.customColors && m.colors.size >= 2) {
+          return sampleLoopingGradient(m.colors, hue, m.opacity)
+        }
         val rgb = Color.HSBtoRGB(hue, m.saturation, m.brightness)
         val alpha = (m.opacity * 255).toInt().coerceIn(0, 255)
         (alpha shl 24) or (rgb and 0x00FFFFFF)
       }
 
       is ColorMode.SyncedRainbow -> {
-        val theme = ThemeManager.currentTheme
-        val hue = ThemeManager.getRainbowHue()
-        val sat = theme.rainbowSaturation
-        val bri = theme.rainbowBrightness
+        val hue = ThemeManager.getRainbowHue(m.speed)
+        if (m.customColors && m.colors.size >= 2) {
+          return sampleLoopingGradient(m.colors, hue, m.opacity)
+        }
+        val sat = m.saturation
+        val bri = m.brightness
         val rgb = Color.HSBtoRGB(hue, sat, bri)
         val alpha = (m.opacity * 255).toInt().coerceIn(0, 255)
         (alpha shl 24) or (rgb and 0x00FFFFFF)
       }
 
       is ColorMode.Gradient -> {
-        if (m.animated) sampleGradient(m.startArgb, m.endArgb, gradientPhase()) else m.startArgb
+        sampleGradient(m.startArgb, m.endArgb, if (m.animated) gradientPhase() else 0.5f)
       }
 
       is ColorMode.ThemeColor -> {
@@ -121,7 +127,9 @@ class ColorSetting(
             speed = obj.get("speed")?.asFloat ?: 1f,
             saturation = obj.get("saturation")?.asFloat ?: 1f,
             brightness = obj.get("brightness")?.asFloat ?: 1f,
-            opacity = obj.get("opacity")?.asFloat ?: 1f
+            opacity = obj.get("opacity")?.asFloat ?: 1f,
+            colors = readColorStops(obj),
+            customColors = obj.get("customColors")?.asBoolean ?: (readColorStops(obj).size >= 2)
           )
         }
 
@@ -130,7 +138,9 @@ class ColorSetting(
             speed = obj.get("speed")?.asFloat ?: 1f,
             saturation = obj.get("saturation")?.asFloat ?: 1f,
             brightness = obj.get("brightness")?.asFloat ?: 1f,
-            opacity = obj.get("opacity")?.asFloat ?: 1f
+            opacity = obj.get("opacity")?.asFloat ?: 1f,
+            colors = readColorStops(obj),
+            customColors = obj.get("customColors")?.asBoolean ?: (readColorStops(obj).size >= 2)
           )
         }
 
@@ -189,6 +199,8 @@ class ColorSetting(
           addProperty("saturation", m.saturation)
           addProperty("brightness", m.brightness)
           addProperty("opacity", m.opacity)
+          addProperty("customColors", m.customColors)
+          writeColorStops(this, m.colors)
         }
       }
 
@@ -199,6 +211,8 @@ class ColorSetting(
           addProperty("saturation", m.saturation)
           addProperty("brightness", m.brightness)
           addProperty("opacity", m.opacity)
+          addProperty("customColors", m.customColors)
+          writeColorStops(this, m.colors)
         }
       }
 
@@ -246,8 +260,39 @@ class ColorSetting(
     return (a shl 24) or (r shl 16) or (g shl 8) or b
   }
 
+  private fun sampleLoopingGradient(colors: List<Int>, position: Float, opacity: Float): Int {
+    val stops = colors.filter { (it ushr 24) != 0 || (it and 0x00FFFFFF) != 0 }
+    if (stops.isEmpty()) return 0
+    if (stops.size == 1) {
+      val rgb = stops.first() and 0x00FFFFFF
+      val alpha = (((stops.first() ushr 24) and 0xFF) * opacity).toInt().coerceIn(0, 255)
+      return (alpha shl 24) or rgb
+    }
+    val scaled = ((position % 1f + 1f) % 1f) * stops.size
+    val index = kotlin.math.floor(scaled).toInt() % stops.size
+    val next = (index + 1) % stops.size
+    val local = scaled - kotlin.math.floor(scaled)
+    val sampled = sampleGradient(stops[index], stops[next], local)
+    val alpha = (((sampled ushr 24) and 0xFF) * opacity).toInt().coerceIn(0, 255)
+    return (alpha shl 24) or (sampled and 0x00FFFFFF)
+  }
+
   private fun lerpChannel(start: Int, end: Int, t: Float): Int {
     return ((start and 0xFF) + (((end and 0xFF) - (start and 0xFF)) * t)).toInt().coerceIn(0, 255)
+  }
+
+  private fun readColorStops(obj: JsonObject): List<Int> {
+    val array = obj.getAsJsonArray("colors") ?: return emptyList()
+    return array.mapNotNull { element ->
+      runCatching { element.asInt }.getOrNull()
+    }.take(8)
+  }
+
+  private fun writeColorStops(obj: JsonObject, colors: List<Int>) {
+    if (colors.isEmpty()) return
+    val array = JsonArray()
+    colors.take(8).forEach { array.add(it) }
+    obj.add("colors", array)
   }
 
 }

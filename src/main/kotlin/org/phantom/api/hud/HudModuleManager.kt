@@ -30,11 +30,22 @@ object HudModuleManager {
     val screenWidth = window.screenWidth.toFloat()
     val screenHeight = window.screenHeight.toFloat()
     val enabledElements = getElements().filter { it.enabled }
+    val blurredElements = enabledElements.filter {
+      it.usesManagedBlurBackground() && it.isBlurBackgroundEnabled()
+    }
+    val maxBlurStrength = blurredElements.maxOfOrNull { it.getBlurStrength().toDouble() }?.toFloat() ?: 0f
+    val blurFramePrepared = blurredElements.isNotEmpty() && HudGlassBlurRenderer.beginFrame(maxBlurStrength)
 
-    enabledElements.forEach { element ->
-      val (screenX, screenY) = element.getScreenPosition(screenWidth, screenHeight)
-      renderElementBlur(element, screenX, screenY)
-      element.renderPre(screenX, screenY, element.scale)
+    try {
+      enabledElements.forEach { element ->
+        val (screenX, screenY) = element.getScreenPosition(screenWidth, screenHeight)
+        renderElementBlur(element, screenX, screenY, blurFramePrepared)
+        element.renderPre(screenX, screenY, element.scale)
+      }
+    } finally {
+      if (blurFramePrepared) {
+        HudGlassBlurRenderer.endFrame()
+      }
     }
 
     NVGRenderer.beginFrame(screenWidth, screenHeight)
@@ -56,9 +67,10 @@ object HudModuleManager {
     }
   }
 
-  private fun renderElementBlur(element: HudElement, screenX: Float, screenY: Float) {
+  private fun renderElementBlur(element: HudElement, screenX: Float, screenY: Float, framePrepared: Boolean) {
     if (!element.usesManagedBlurBackground()) return
     if (!element.isBlurBackgroundEnabled()) return
+    if (!framePrepared) return
 
     val padding = 2f * element.scale
     HudGlassBlurRenderer.renderBlurRect(

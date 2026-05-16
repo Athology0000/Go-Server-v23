@@ -47,6 +47,18 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
   private var draggingSaturation = false
   private var draggingBrightness = false
   private var draggingOpacity = false
+  private var activeRainbowStop = 1
+  private var rainbowHue = 0f
+  private var rainbowSaturation = 1f
+  private var rainbowBrightness = 1f
+  private var rainbowOpacity = 1f
+  private var draggingRainbowColor = false
+  private var draggingRainbowHue = false
+  private var draggingRainbowOpacity = false
+  private val rainbowInputHandlers = Array(4) { TextInputHandler("", 9) }
+  private val rainbowInputValid = BooleanArray(4) { true }
+  private var focusedRainbowInput = 0
+  private var rainbowInputDragging = false
 
   // Theme mode state
   private val themeScrollHandler = ScrollHandler()
@@ -143,7 +155,7 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
     val pickerHeight = when (setting.mode) {
       is ColorMode.Static -> 450F
       is ColorMode.Gradient -> 540F
-      is ColorMode.Rainbow, is ColorMode.SyncedRainbow -> 360F
+      is ColorMode.Rainbow, is ColorMode.SyncedRainbow -> 540F
       is ColorMode.ThemeColor -> 400F
       is ColorMode.TweakedTheme -> 470F
     }
@@ -458,21 +470,32 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
 
   private fun drawRainbowPanel(px: Float, py: Float, mode: ColorMode.Rainbow) {
     val bx = px + 20F
-    drawRainbowSliders(bx, py, mode.speed, mode.saturation, mode.brightness, mode.opacity)
+    drawRainbowSliders(bx, py, mode.speed, mode.saturation, mode.brightness, mode.opacity, mode.colors, mode.customColors)
   }
 
   private fun drawSyncedRainbowPanel(px: Float, py: Float, mode: ColorMode.SyncedRainbow) {
     val bx = px + 20F
-    drawRainbowSliders(bx, py, mode.speed, mode.saturation, mode.brightness, mode.opacity)
+    drawRainbowSliders(bx, py, mode.speed, mode.saturation, mode.brightness, mode.opacity, mode.colors, mode.customColors)
   }
 
-  private fun drawRainbowSliders(bx: Float, by: Float, speed: Float, saturation: Float, brightness: Float, opacity: Float) {
+  private fun drawRainbowSliders(
+    bx: Float,
+    by: Float,
+    speed: Float,
+    saturation: Float,
+    brightness: Float,
+    opacity: Float,
+    colors: List<Int>,
+    customColors: Boolean,
+  ) {
+    syncRainbowInputs(colors)
+    val palette = rainbowPalette(colors)
     val labels = listOf("Speed", "Saturation", "Brightness", "Opacity")
     val values = listOf(speed, saturation, brightness, opacity)
     val sliderWidth = 300F
 
     values.forEachIndexed { index, value ->
-      val sliderY = by + index * 50F
+      val sliderY = by + index * 38F
 
       NVGRenderer.text(labels[index], bx, sliderY + 2F, 13F, ThemeManager.currentTheme.text)
 
@@ -491,6 +514,87 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
       NVGRenderer.rect(bx, trackY, thumbX - bx, 6F, ThemeManager.currentTheme.sliderFill, 3F)
       NVGRenderer.circle(thumbX, trackY + 3F, 8F, ThemeManager.currentTheme.sliderThumb)
     }
+
+    val customY = by + 162F
+    drawCheckbox(bx, customY - 3F, 18F, customColors, "Custom HSV")
+    val hint = if (customColors) "Looping palette" else "Rainbow HSV"
+    NVGRenderer.text(hint, bx + 120F, customY + 1F, 12F, ThemeManager.currentTheme.textSecondary)
+
+    val inputY = customY + 24F
+    val swatchWidth = 70F
+    val rowGap = 8F
+    for (i in 0 until 4) {
+      drawRainbowColorButton(
+        bx + i * (swatchWidth + rowGap),
+        inputY,
+        i + 1,
+        palette[i],
+        swatchWidth,
+      )
+    }
+
+    drawRainbowColorPicker(bx, customY + 76F)
+  }
+
+  private fun drawRainbowColorButton(
+    x: Float,
+    y: Float,
+    index: Int,
+    color: Int,
+    width: Float,
+  ) {
+    val selected = activeRainbowStop == index
+    val borderColor = if (selected) ThemeManager.currentTheme.accent else ThemeManager.currentTheme.inputBorder
+    NVGRenderer.text("Color $index", x, y, 12F, ThemeManager.currentTheme.textSecondary)
+    val inputY = y + 16F
+    NVGRenderer.rect(x, inputY, width, 30F, ThemeManager.currentTheme.inputBg, 5F)
+    NVGRenderer.hollowRect(x, inputY, width, 28F, 2F, borderColor, 5F)
+    NVGRenderer.rect(x + 7F, inputY + 6F, width - 14F, 18F, color, 4F)
+    NVGRenderer.hollowRect(x + 7F, inputY + 6F, width - 14F, 18F, 1F, ThemeManager.currentTheme.controlBorder, 4F)
+  }
+
+  private fun drawRainbowColorPicker(bx: Float, by: Float) {
+    val boxWidth = 156F
+    val boxHeight = 110F
+    val sliderX = bx + boxWidth + 16F
+    val sliderWidth = 128F
+    val hueColor = Color.HSBtoRGB(rainbowHue, 1f, 1f)
+
+    NVGRenderer.pushScissor(bx, by, boxWidth, boxHeight)
+    NVGRenderer.rect(bx, by, boxWidth, boxHeight, hueColor, 6F)
+    NVGRenderer.gradientRect(bx, by, boxWidth, boxHeight, ThemeManager.currentTheme.white, ThemeManager.currentTheme.transparent, Gradient.LeftToRight, 6F)
+    NVGRenderer.gradientRect(bx, by, boxWidth, boxHeight, ThemeManager.currentTheme.transparent, ThemeManager.currentTheme.black, Gradient.TopToBottom, 6F)
+    NVGRenderer.popScissor()
+    NVGRenderer.hollowRect(bx, by, boxWidth, boxHeight, 1F, ThemeManager.currentTheme.controlBorder, 6F)
+
+    val selectorX = bx + rainbowSaturation * boxWidth
+    val selectorY = by + (1f - rainbowBrightness) * boxHeight
+    val currentRgb = Color.HSBtoRGB(rainbowHue, rainbowSaturation, rainbowBrightness)
+    NVGRenderer.circle(selectorX, selectorY, 7F, ThemeManager.currentTheme.white)
+    NVGRenderer.circle(selectorX, selectorY, 5F, currentRgb)
+
+    NVGRenderer.text("Color $activeRainbowStop", sliderX, by + 2F, 13F, ThemeManager.currentTheme.text)
+
+    val hueY = by + 34F
+    for (i in 0..17) {
+      val x1 = sliderX + (sliderWidth / 18f) * i
+      val x2 = sliderX + (sliderWidth / 18f) * (i + 1)
+      val color1 = Color.HSBtoRGB(i / 18f, 1f, 1f)
+      val color2 = Color.HSBtoRGB((i + 1) / 18f, 1f, 1f)
+      NVGRenderer.gradientRect(x1, hueY, x2 - x1, 6F, color1, color2, Gradient.LeftToRight, 0F)
+    }
+    NVGRenderer.hollowRect(sliderX, hueY, sliderWidth, 6F, 1F, ThemeManager.currentTheme.controlBorder, 3F)
+    NVGRenderer.circle(sliderX + rainbowHue * sliderWidth, hueY + 3F, 8F, ThemeManager.currentTheme.white)
+
+    val opacityY = hueY + 34F
+    val currentColor = Color.HSBtoRGB(rainbowHue, rainbowSaturation, rainbowBrightness)
+    val opaqueColor = Color(currentColor or (255 shl 24), true).rgb
+    val transparentColor = Color(currentColor and 0x00FFFFFF, true).rgb
+    NVGRenderer.text("Opacity", sliderX, opacityY - 18F, 12F, ThemeManager.currentTheme.textSecondary)
+    NVGRenderer.rect(sliderX, opacityY, sliderWidth, 6F, ThemeManager.currentTheme.white, 3F)
+    NVGRenderer.gradientRect(sliderX, opacityY, sliderWidth, 6F, transparentColor, opaqueColor, Gradient.LeftToRight, 3F)
+    NVGRenderer.hollowRect(sliderX, opacityY, sliderWidth, 6F, 1F, ThemeManager.currentTheme.controlBorder, 3F)
+    NVGRenderer.circle(sliderX + rainbowOpacity * sliderWidth, opacityY + 3F, 8F, ThemeManager.currentTheme.white)
   }
 
   private fun drawThemePanel(px: Float, py: Float, mode: ColorMode.ThemeColor) {
@@ -829,10 +933,24 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
   private fun toggleSyncedMode() {
     when (val current = setting.mode) {
       is ColorMode.SyncedRainbow -> {
-        setting.mode = ColorMode.Rainbow(current.speed, current.saturation, current.brightness, current.opacity)
+        setting.mode = ColorMode.Rainbow(
+          current.speed,
+          current.saturation,
+          current.brightness,
+          current.opacity,
+          current.colors,
+          current.customColors,
+        )
       }
       is ColorMode.Rainbow -> {
-        setting.mode = ColorMode.SyncedRainbow(current.speed, current.saturation, current.brightness, current.opacity)
+        setting.mode = ColorMode.SyncedRainbow(
+          current.speed,
+          current.saturation,
+          current.brightness,
+          current.opacity,
+          current.colors,
+          current.customColors,
+        )
       }
       else -> {
         setting.mode = ColorMode.SyncedRainbow()
@@ -857,6 +975,20 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
     activeGradientStop = 1
     syncGradientPickerFromColor(start)
     setting.mode = ColorMode.Gradient(start, end)
+  }
+
+  private fun toggleRainbowCustomColors() {
+    setting.mode = when (val mode = setting.mode) {
+      is ColorMode.Rainbow -> {
+        val colors = if (mode.colors.size >= 2) mode.colors else rainbowPalette(mode.colors)
+        mode.copy(colors = colors, customColors = !mode.customColors)
+      }
+      is ColorMode.SyncedRainbow -> {
+        val colors = if (mode.colors.size >= 2) mode.colors else rainbowPalette(mode.colors)
+        mode.copy(colors = colors, customColors = !mode.customColors)
+      }
+      else -> mode
+    }
   }
 
   private fun handleThemeCheckboxClicks(bx: Float, checkboxY: Float, checkboxSize: Float): Boolean {
@@ -995,7 +1127,7 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
     val sliderWidth = 300F
 
     for (i in 0..3) {
-      val sliderY = py + i * 50F + 24F
+      val sliderY = py + i * 38F + 24F
       if (isHoveringOver(bx, sliderY - 5F, sliderWidth, 16F)) {
         when (i) {
           0 -> draggingSpeed = true
@@ -1006,6 +1138,52 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
         updateRainbowSlider(i, bx, sliderWidth)
         return true
       }
+    }
+
+    val customToggleY = py + 159F
+    if (isHoveringOver(bx, customToggleY, 110F, 18F)) {
+      toggleRainbowCustomColors()
+      return true
+    }
+
+    val inputWidth = 70F
+    val rowGap = 8F
+    val inputY = py + 186F
+    for (i in 0 until 4) {
+      val inputX = bx + i * (inputWidth + rowGap)
+      val fieldY = inputY + 16F
+      if (isHoveringOver(inputX, fieldY, inputWidth, 30F)) {
+        selectRainbowStop(i + 1)
+        return true
+      }
+    }
+
+    val colorBoxY = py + 238F
+    if (isHoveringOver(bx, colorBoxY, 156F, 110F)) {
+      draggingRainbowColor = true
+      updateRainbowColorFromBox(bx, colorBoxY)
+      return true
+    }
+
+    val sliderX = bx + 172F
+    val hueY = colorBoxY + 34F
+    if (isHoveringOver(sliderX, hueY - 5F, 128F, 16F)) {
+      draggingRainbowHue = true
+      updateRainbowHueFromSlider(sliderX, 128F)
+      return true
+    }
+
+    val opacityY = hueY + 34F
+    if (isHoveringOver(sliderX, opacityY - 5F, 128F, 16F)) {
+      draggingRainbowOpacity = true
+      updateRainbowOpacityFromSlider(sliderX, 128F)
+      return true
+    }
+
+    if (focusedRainbowInput != 0) {
+      commitRainbowInput()
+      focusedRainbowInput = 0
+      return true
     }
 
     return false
@@ -1117,6 +1295,27 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
         val bx = px + 20F
         val sliderWidth = 300F
         when {
+          draggingRainbowColor -> {
+            updateRainbowColorFromBox(bx, controlsY + 238F)
+            return true
+          }
+          draggingRainbowHue -> {
+            updateRainbowHueFromSlider(bx + 172F, 128F)
+            return true
+          }
+          draggingRainbowOpacity -> {
+            updateRainbowOpacityFromSlider(bx + 172F, 128F)
+            return true
+          }
+          rainbowInputDragging && focusedRainbowInput in 1..4 -> {
+            val index = focusedRainbowInput - 1
+            val inputWidth = 145F
+            val rowGap = 10F
+            val col = index % 2
+            val inputX = bx + col * (inputWidth + rowGap)
+            rainbowInputHandlers[index].updateSelection(mouseX.toFloat(), inputX + 8F, 12F)
+            return true
+          }
           draggingSpeed -> { updateRainbowSlider(0, bx, sliderWidth); return true }
           draggingSaturation -> { updateRainbowSlider(1, bx, sliderWidth); return true }
           draggingBrightness -> { updateRainbowSlider(2, bx, sliderWidth); return true }
@@ -1154,9 +1353,13 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
       draggingOpacityMult = false
       hexDragging = false
       gradientInputDragging = false
+      rainbowInputDragging = false
       draggingGradientHue = false
       draggingGradientOpacity = false
       draggingGradientColor = false
+      draggingRainbowColor = false
+      draggingRainbowHue = false
+      draggingRainbowOpacity = false
     }
     return false
   }
@@ -1353,6 +1556,15 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
       return false
     }
 
+    if (focusedRainbowInput != 0 && (setting.mode is ColorMode.Rainbow || setting.mode is ColorMode.SyncedRainbow)) {
+      if (isHexChar && isPrintable) {
+        rainbowInputHandlers[focusedRainbowInput - 1].insertText(char.toString())
+        validateRainbowInputs()
+        return true
+      }
+      return false
+    }
+
     if (!hexFocused || setting.mode !is ColorMode.Static) return false
 
     if (isHexChar && isPrintable) {
@@ -1379,6 +1591,17 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
         if (handled) return true
       }
       return handleGradientInputKey(input.key, shift, handler)
+    }
+
+    if (focusedRainbowInput != 0 && (setting.mode is ColorMode.Rainbow || setting.mode is ColorMode.SyncedRainbow)) {
+      val handler = rainbowInputHandlers[focusedRainbowInput - 1]
+      if (ctrl) {
+        val handled = handleCtrlKeyCombo(input.key, handler) {
+          validateRainbowInputs()
+        }
+        if (handled) return true
+      }
+      return handleRainbowInputKey(input.key, shift, handler)
     }
 
     if (!hexFocused || setting.mode !is ColorMode.Static) return false
@@ -1459,6 +1682,45 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
     }
   }
 
+  private fun handleRainbowInputKey(key: Int, shift: Boolean, handler: TextInputHandler): Boolean {
+    return when (key) {
+      GLFW.GLFW_KEY_ESCAPE, GLFW.GLFW_KEY_ENTER -> {
+        if (rainbowInputValid[focusedRainbowInput - 1]) {
+          commitRainbowInput()
+        }
+        focusedRainbowInput = 0
+        true
+      }
+      GLFW.GLFW_KEY_BACKSPACE -> {
+        handler.backspace()
+        validateRainbowInputs()
+        true
+      }
+      GLFW.GLFW_KEY_DELETE -> {
+        handler.delete()
+        validateRainbowInputs()
+        true
+      }
+      GLFW.GLFW_KEY_LEFT -> {
+        handler.moveCursorLeft(shift)
+        true
+      }
+      GLFW.GLFW_KEY_RIGHT -> {
+        handler.moveCursorRight(shift)
+        true
+      }
+      GLFW.GLFW_KEY_HOME -> {
+        handler.moveCursorToStart(shift)
+        true
+      }
+      GLFW.GLFW_KEY_END -> {
+        handler.moveCursorToEnd(shift)
+        true
+      }
+      else -> false
+    }
+  }
+
   private fun handleHexInputKey(key: Int, shift: Boolean): Boolean {
     return when (key) {
       GLFW.GLFW_KEY_ESCAPE, GLFW.GLFW_KEY_ENTER -> {
@@ -1507,6 +1769,117 @@ internal class UIColorSetting(private val setting: ColorSetting) : UIComponent(
   private fun validateGradientInputs() {
     gradientStartValid = validateHexInput(gradientStartInputHandler.getText())
     gradientEndValid = validateHexInput(gradientEndInputHandler.getText())
+  }
+
+  private fun syncRainbowInputs(colors: List<Int>) {
+    if (focusedRainbowInput != 0) return
+    for (i in 0 until 4) {
+      val text = colors.getOrNull(i)?.let { argbToHex(it) }.orEmpty()
+      if (rainbowInputHandlers[i].getText() != text) {
+        rainbowInputHandlers[i].setText(text)
+      }
+      rainbowInputValid[i] = text.isEmpty() || validateHexInput(text)
+    }
+    val palette = rainbowPalette(colors)
+    if (activeRainbowStop !in 1..4) activeRainbowStop = 1
+    if (!draggingRainbowColor && !draggingRainbowHue && !draggingRainbowOpacity) {
+      syncRainbowPickerFromColor(palette[activeRainbowStop - 1])
+    }
+  }
+
+  private fun rainbowPalette(colors: List<Int>): List<Int> {
+    val defaults = listOf(
+      0xFFFF4D6D.toInt(),
+      0xFFFFD166.toInt(),
+      0xFF2EE8A6.toInt(),
+      0xFF7C5CFF.toInt(),
+    )
+    return (colors.take(4) + defaults).take(4)
+  }
+
+  private fun currentRainbowPalette(): MutableList<Int> {
+    return when (val mode = setting.mode) {
+      is ColorMode.Rainbow -> rainbowPalette(mode.colors).toMutableList()
+      is ColorMode.SyncedRainbow -> rainbowPalette(mode.colors).toMutableList()
+      else -> rainbowPalette(emptyList()).toMutableList()
+    }
+  }
+
+  private fun selectRainbowStop(index: Int) {
+    activeRainbowStop = index.coerceIn(1, 4)
+    focusedRainbowInput = 0
+    syncRainbowPickerFromColor(currentRainbowPalette()[activeRainbowStop - 1])
+  }
+
+  private fun syncRainbowPickerFromColor(argb: Int) {
+    val color = Color(argb, true)
+    val hsb = Color.RGBtoHSB(color.red, color.green, color.blue, null)
+    rainbowHue = hsb[0]
+    rainbowSaturation = hsb[1]
+    rainbowBrightness = hsb[2]
+    rainbowOpacity = color.alpha / 255f
+  }
+
+  private fun updateRainbowColorFromBox(boxX: Float, boxY: Float) {
+    rainbowSaturation = ((mouseX.toFloat() - boxX) / 156F).coerceIn(0f, 1f)
+    rainbowBrightness = (1f - (mouseY.toFloat() - boxY) / 110F).coerceIn(0f, 1f)
+    updateActiveRainbowStop()
+  }
+
+  private fun updateRainbowHueFromSlider(sliderX: Float, sliderWidth: Float) {
+    rainbowHue = ((mouseX.toFloat() - sliderX) / sliderWidth).coerceIn(0f, 1f)
+    updateActiveRainbowStop()
+  }
+
+  private fun updateRainbowOpacityFromSlider(sliderX: Float, sliderWidth: Float) {
+    rainbowOpacity = ((mouseX.toFloat() - sliderX) / sliderWidth).coerceIn(0f, 1f)
+    updateActiveRainbowStop()
+  }
+
+  private fun updateActiveRainbowStop() {
+    val colors = currentRainbowPalette()
+    val rgb = Color.HSBtoRGB(rainbowHue, rainbowSaturation, rainbowBrightness)
+    val alpha = (rainbowOpacity * 255).toInt().coerceIn(0, 255)
+    colors[activeRainbowStop - 1] = (alpha shl 24) or (rgb and 0x00FFFFFF)
+
+    setting.mode = when (val mode = setting.mode) {
+      is ColorMode.Rainbow -> mode.copy(colors = colors)
+      is ColorMode.SyncedRainbow -> mode.copy(colors = colors)
+      else -> mode
+    }
+    focusedRainbowInput = 0
+    syncRainbowInputTexts(colors)
+  }
+
+  private fun syncRainbowInputTexts(colors: List<Int>) {
+    colors.take(4).forEachIndexed { index, color ->
+      rainbowInputHandlers[index].setText(argbToHex(color))
+      rainbowInputValid[index] = true
+    }
+  }
+
+  private fun validateRainbowInputs() {
+    for (i in 0 until 4) {
+      val text = rainbowInputHandlers[i].getText()
+      rainbowInputValid[i] = text.isBlank() || validateHexInput(text)
+    }
+  }
+
+  private fun commitRainbowInput() {
+    validateRainbowInputs()
+    if (rainbowInputValid.any { !it }) return
+
+    val colors = rainbowInputHandlers
+      .map { it.getText().trim() }
+      .filter { it.isNotEmpty() }
+      .mapNotNull { parseHexToARGB(it) }
+      .let { if (it.size >= 2) it else emptyList() }
+
+    setting.mode = when (val mode = setting.mode) {
+      is ColorMode.Rainbow -> mode.copy(colors = colors)
+      is ColorMode.SyncedRainbow -> mode.copy(colors = colors)
+      else -> mode
+    }
   }
 
   companion object {

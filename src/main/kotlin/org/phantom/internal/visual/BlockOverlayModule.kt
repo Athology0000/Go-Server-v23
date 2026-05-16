@@ -1,6 +1,5 @@
 package org.phantom.internal.visual
 
-import kotlin.math.cos
 import kotlin.math.roundToInt
 import net.minecraft.client.Minecraft
 import net.minecraft.world.phys.BlockHitResult
@@ -10,11 +9,10 @@ import org.phantom.api.event.EventBus
 import org.phantom.api.event.annotation.SubscribeEvent
 import org.phantom.api.event.impl.render.WorldRenderEvent
 import org.phantom.api.module.Module
-import org.phantom.api.module.ModuleCategory
 import org.phantom.api.module.setting.impl.CheckboxSetting
 import org.phantom.api.module.setting.impl.ColorSetting
-import org.phantom.api.module.setting.impl.ModeSetting
 import org.phantom.api.module.setting.impl.SliderSetting
+import org.phantom.api.ui.theme.ThemeManager
 import org.phantom.internal.pathfinding.OverlayRenderEngine
 
 object BlockOverlayModule : Module("Block Overlay") {
@@ -41,11 +39,16 @@ object BlockOverlayModule : Module("Block Overlay") {
     1.0
   )
 
-  private val colorMode = ModeSetting(
-    "Color Mode",
-    "Color mode for the overlay.",
-    0,
-    arrayOf("Static", "Rainbow", "Phantom")
+  private val useTheme = CheckboxSetting(
+    "Use Theme",
+    "Use the active Phantom theme accent color for the overlay.",
+    false
+  )
+
+  private val faceOnly = CheckboxSetting(
+    "Face Only",
+    "Only fill the targeted face instead of the whole block.",
+    false
   )
 
   init {
@@ -53,7 +56,8 @@ object BlockOverlayModule : Module("Block Overlay") {
       enabled,
       overlayColor,
       overlayOpacity,
-      colorMode,
+      useTheme,
+      faceOnly,
     )
     EventBus.register(this)
   }
@@ -109,6 +113,23 @@ object BlockOverlayModule : Module("Block Overlay") {
     val baseColor = toOverlayColor(argb)
     val fillAlpha = (baseColor.a * overlayOpacity.value).roundToInt().coerceIn(0, 255)
     val fillColor = baseColor.withAlpha(fillAlpha)
+    if (faceOnly.value) {
+      TargetFaceOverlay.addFill(
+        level,
+        hit.direction,
+        minX,
+        minY,
+        minZ,
+        maxX,
+        maxY,
+        maxZ,
+        fillColor,
+        2,
+        TAG
+      )
+      return
+    }
+
     OverlayRenderEngine.addBox(
       level,
       minX,
@@ -135,30 +156,10 @@ object BlockOverlayModule : Module("Block Overlay") {
   }
 
   private fun resolveColor(): Int {
-    return when (colorMode.value) {
-      1 -> rainbowColor(overlayColor.value)
-      2 -> phantomColor(overlayColor.value)
-      else -> overlayColor.value
+    if (useTheme.value) {
+      return ThemeManager.currentTheme.accent
     }
-  }
 
-  private fun rainbowColor(baseArgb: Int): Int {
-    val alpha = (baseArgb ushr 24) and 0xFF
-    val time = (System.currentTimeMillis() % 4000L).toFloat() / 4000f
-    val hue = time
-    val rgb = java.awt.Color.HSBtoRGB(hue, 1f, 1f)
-    return (alpha shl 24) or (rgb and 0x00FFFFFF)
-  }
-
-  private fun phantomColor(baseArgb: Int): Int {
-    val alpha = (baseArgb ushr 24) and 0xFF
-    val t = (System.currentTimeMillis() % 5000L).toFloat() / 5000f
-    val blend = 0.5f - 0.5f * cos(t * (Math.PI * 2.0)).toFloat()
-    val pink = 0xFF6ACD
-    val cyan = 0x2DE2FF
-    val r = ((pink ushr 16 and 0xFF) * (1f - blend) + (cyan ushr 16 and 0xFF) * blend).toInt()
-    val g = ((pink ushr 8 and 0xFF) * (1f - blend) + (cyan ushr 8 and 0xFF) * blend).toInt()
-    val b = ((pink and 0xFF) * (1f - blend) + (cyan and 0xFF) * blend).toInt()
-    return (alpha shl 24) or (r shl 16) or (g shl 8) or b
+    return overlayColor.value
   }
 }

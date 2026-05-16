@@ -10,38 +10,21 @@ import org.phantom.api.event.EventBus
 import org.phantom.api.event.annotation.SubscribeEvent
 import org.phantom.api.event.impl.render.WorldRenderEvent
 import org.phantom.api.module.Module
-import org.phantom.api.module.ModuleCategory
 import org.phantom.api.module.setting.impl.CheckboxSetting
-import kotlin.math.cos
 import org.phantom.api.module.setting.impl.ColorSetting
-import org.phantom.api.module.setting.impl.ModeSetting
-import org.phantom.api.module.setting.impl.SliderSetting
+import org.phantom.api.ui.theme.ThemeManager
 import org.phantom.internal.pathfinding.OverlayRenderEngine
 
 object BlockOutlineModule : Module("Block Outline") {
 
   private const val TAG = "block-outline"
+  private const val OUTLINE_RADIUS = 4.0f
+  private const val EDGE_THRESHOLD = 0.3
 
   private val enabled = CheckboxSetting(
     "Enabled",
     "Show a custom outline on the targeted block.",
     false
-  )
-
-  private val blurRadius = SliderSetting(
-    "Blur Radius",
-    "Outline thickness/blur (1-16).",
-    4.0,
-    1.0,
-    16.0
-  )
-
-  private val threshold = SliderSetting(
-    "Threshold",
-    "Edge falloff (0 = soft, 1 = hard).",
-    0.3,
-    0.0,
-    1.0
   )
 
   private val outlineColor = ColorSetting(
@@ -56,21 +39,25 @@ object BlockOutlineModule : Module("Block Outline") {
     true
   )
 
-  private val colorMode = ModeSetting(
-    "Color Mode",
-    "Color mode for the outline.",
-    0,
-    arrayOf("Static", "Rainbow", "Phantom")
+  private val useTheme = CheckboxSetting(
+    "Use Theme",
+    "Use the active Phantom theme accent color for the outline.",
+    false
+  )
+
+  private val faceOnly = CheckboxSetting(
+    "Face Only",
+    "Only outline the targeted face instead of the whole block.",
+    false
   )
 
   init {
     addSetting(
       enabled,
-      blurRadius,
-      threshold,
       outlineColor,
       outlineEnabled,
-      colorMode,
+      useTheme,
+      faceOnly,
     )
     EventBus.register(this)
   }
@@ -124,8 +111,8 @@ object BlockOutlineModule : Module("Block Outline") {
 
     val argb = resolveColor()
     val baseColor = toOverlayColor(argb)
-    val radius = blurRadius.value.toFloat().coerceIn(1f, 16f)
-    val minAlpha = (baseColor.a * threshold.value).roundToInt().coerceIn(0, 255)
+    val radius = OUTLINE_RADIUS
+    val minAlpha = (baseColor.a * EDGE_THRESHOLD).roundToInt().coerceIn(0, 255)
     if (!outlineEnabled.value) {
       return
     }
@@ -137,6 +124,24 @@ object BlockOutlineModule : Module("Block Outline") {
       val width = baseWidth + radius * (0.35f + 0.65f * t)
       val alpha = (baseColor.a + (minAlpha - baseColor.a) * t).roundToInt().coerceIn(0, 255)
       val color = baseColor.withAlpha(alpha)
+      if (faceOnly.value) {
+        TargetFaceOverlay.addOutline(
+          level,
+          hit.direction,
+          minX,
+          minY,
+          minZ,
+          maxX,
+          maxY,
+          maxZ,
+          color,
+          width,
+          2,
+          TAG
+        )
+        continue
+      }
+
       OverlayRenderEngine.addBox(
         level,
         minX,
@@ -164,30 +169,10 @@ object BlockOutlineModule : Module("Block Outline") {
   }
 
   private fun resolveColor(): Int {
-    return when (colorMode.value) {
-      1 -> rainbowColor(outlineColor.value)
-      2 -> phantomColor(outlineColor.value)
-      else -> outlineColor.value
+    if (useTheme.value) {
+      return ThemeManager.currentTheme.accent
     }
-  }
 
-  private fun rainbowColor(baseArgb: Int): Int {
-    val alpha = (baseArgb ushr 24) and 0xFF
-    val time = (System.currentTimeMillis() % 4000L).toFloat() / 4000f
-    val hue = time
-    val rgb = java.awt.Color.HSBtoRGB(hue, 1f, 1f)
-    return (alpha shl 24) or (rgb and 0x00FFFFFF)
-  }
-
-  private fun phantomColor(baseArgb: Int): Int {
-    val alpha = (baseArgb ushr 24) and 0xFF
-    val t = (System.currentTimeMillis() % 5000L).toFloat() / 5000f
-    val blend = 0.5f - 0.5f * cos(t * (Math.PI * 2.0)).toFloat()
-    val pink = 0xFF6ACD
-    val cyan = 0x2DE2FF
-    val r = ((pink ushr 16 and 0xFF) * (1f - blend) + (cyan ushr 16 and 0xFF) * blend).toInt()
-    val g = ((pink ushr 8 and 0xFF) * (1f - blend) + (cyan ushr 8 and 0xFF) * blend).toInt()
-    val b = ((pink and 0xFF) * (1f - blend) + (cyan and 0xFF) * blend).toInt()
-    return (alpha shl 24) or (r shl 16) or (g shl 8) or b
+    return outlineColor.value
   }
 }
