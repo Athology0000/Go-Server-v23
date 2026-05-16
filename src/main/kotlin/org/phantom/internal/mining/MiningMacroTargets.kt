@@ -113,6 +113,13 @@ internal fun MiningMacroModule.selectMineTarget(
       if (behindPen > 0.0 && dot < MiningMacroModule.BEHIND_DOT_THRESHOLD) {
         s += behindPen
       }
+      // Below-player penalty (parity with the legacy miningTargetScore and the
+      // approach branch). Without it the cost model happily picks a close,
+      // well-aimed block *under* the player, pitching the camera straight down
+      // ("looks down randomly"). Non-negative, so the prune bound stays valid.
+      if (pos.y < player.blockY - 1) {
+        s += 16.0
+      }
       // Cluster bonus: a block surrounded by more vein blocks is cheaper, so
       // the macro commits to the dense clump instead of chasing a lone nearer
       // block. Deterministic and non-positive, so `s` stays an admissible

@@ -666,6 +666,13 @@ object MiningMacroModule : Module("Mining Macro") {
   /** Normalized look-dot below which a block counts as "behind" (V5 -0.05). */
   internal const val BEHIND_DOT_THRESHOLD = -0.05
 
+  // The native pathfinder only serializes a 96x40x96 buffer around the player,
+  // so a goal outside it can never be solved and just FAILs on repeat. Past
+  // these conservative half-extents we walk straight at the target instead of
+  // asking the pather (no frontier A* â€” matches the "fail cleanly" decision).
+  internal const val NATIVE_PATH_MAX_HORIZONTAL = 40.0
+  internal const val NATIVE_PATH_MAX_VERTICAL = 16.0
+
   internal data class AimTarget(
     val point: Vec3,
     val usesPrecisionPoint: Boolean,

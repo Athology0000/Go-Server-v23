@@ -30,6 +30,20 @@ internal fun MiningMacroModule.nudgeToward(player: Player, target: BlockPos) {
   nudgeToward(player, Vec3(target.x + 0.5, player.y, target.z + 0.5))
 }
 
+/**
+ * True if [target] is inside the native pathfinder's serialized world buffer.
+ * Beyond this the pather can never solve the goal and just FAILs on repeat, so
+ * callers should walk straight at the target until it comes into range.
+ */
+internal fun MiningMacroModule.nativeReachableTarget(player: Player, target: BlockPos): Boolean {
+  val dx = (target.x + 0.5) - player.x
+  val dz = (target.z + 0.5) - player.z
+  val dy = kotlin.math.abs((target.y + 0.5) - player.y)
+  return dx * dx + dz * dz <=
+    MiningMacroModule.NATIVE_PATH_MAX_HORIZONTAL * MiningMacroModule.NATIVE_PATH_MAX_HORIZONTAL &&
+    dy <= MiningMacroModule.NATIVE_PATH_MAX_VERTICAL
+}
+
 internal fun MiningMacroModule.nudgeToward(player: Player, targetPoint: Vec3) {
   val dx = targetPoint.x - player.x
   val dz = targetPoint.z - player.z
@@ -494,6 +508,19 @@ internal fun MiningMacroModule.moveToward(
   PathfindingModule.ensureEnabledForAutomation("mining macro")
   val currentDistance = sqrt(distanceToBlockSq(player, target))
   val holdDistance = preferredApproachDistance()
+  // Target outside the native buffer: asking the pather would just FAIL on
+  // repeat ("path failed" spam). Walk straight at it (V5-style) and turn to
+  // face it; a later tick hands off to the pather once it's in range.
+  if (!nativeReachableTarget(player, target)) {
+    if (startedPath && nativeActive()) {
+      nativeStop()
+    }
+    startedPath = false
+    lastPathTarget = null
+    nudgeToward(player, target)
+    focusApproachTarget(player, target)
+    return
+  }
   // Only skip stepping when we're already in an ideal spot: close AND with LOS.
   // Without the LOS check, a block that sits within 4 blocks but is occluded (corners,
   // ceiling ores, short walls) would never trigger a step to a visible position.

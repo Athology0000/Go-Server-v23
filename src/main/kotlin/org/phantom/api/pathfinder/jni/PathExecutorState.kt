@@ -179,6 +179,14 @@ object PathExecutorState {
     private const val PRECISION_CURVATURE = 0.34
     private const val DROP_SCAN_DISTANCE = 3.5
     private const val DROP_HEIGHT_THRESHOLD = 0.45
+    // Single source of truth for "is the path going down here?". The native
+    // planner only routes the spline through traversable space, so ANY descent
+    // on the spline is intentional and safe to walk/fall down: it must not
+    // engage sneak/precision or freeze cursor progress (those are the stair
+    // shift / edge-circling / freeze symptoms) â€” it only caps the downward
+    // gaze. Off-spline hazards are still caught independently by edgeDrift.
+    private const val DESCENT_CLASSIFY_DISTANCE = 3.0
+    private const val DESCENT_MIN_DROP = 0.4
     // A walkable staircase descends at most ~1 block down per 1 block forward.
     // A ledge/cliff drops far more vertically than it travels horizontally.
     // Only a descent steeper than this slope, or a single sudden vertical
@@ -483,6 +491,7 @@ object PathExecutorState {
         val isJumpingHigh = motionY > 0.1 || player.y - pathAnchor.y > 2.0
         val isTeleportResync = postTeleportResyncTicks > 0
         val dropAhead = hasDropAhead(spline, DROP_SCAN_DISTANCE, DROP_HEIGHT_THRESHOLD)
+        val descent = classifyDescent(spline)
 
         val projection = spline.project(
             point = eye,
@@ -510,18 +519,21 @@ object PathExecutorState {
             currentSplineDistance = maxOf(currentSplineDistance, advanced).coerceAtMost(spline.totalLength)
         }
 
-        if (!isTeleportResync && !dropAhead) {
+        // An intended on-spline descent must NOT freeze cursor progress â€” that
+        // freeze is what made the player stop at the lip and circle. dropAhead's
+        // other (conservative lookahead/precision) uses are left intact.
+        if (!isTeleportResync && (!dropAhead || descent.descending)) {
             catchUpSplineProgress(player, spline, isFalling || isJumpingHigh)
         }
 
-        if (!isTeleportResync && !dropAhead) {
+        if (!isTeleportResync && (!dropAhead || descent.descending)) {
             applyPredictedSplineProgress(player, spline)
         }
         currentPathPosition = currentSplineDistance
 
         val adaptiveLookahead = getAdaptiveLookaheadDistance(eye, spline, dropAhead)
         currentLookaheadDistance = adaptiveLookahead
-        val safety = if (level != null) assessSplineSafety(level, player, spline, projection) else SafetyAssessment.NONE
+        val safety = if (level != null) assessSplineSafety(level, player, spline, projection, descent) else SafetyAssessment.NONE
         // Soft-trigger thresholds scale with precisionAggressiveness. At 0 they are
         // effectively disabled and only hard safety (dropAhead / safety.requiresPrecision)
         // can engage precision. At 1 the original thresholds apply.
@@ -645,6 +657,14 @@ object PathExecutorState {
         }
         if (!requiresPrecisionMovement && pathCurvature <= STRAIGHT_STABILIZE_CURVATURE) {
             targetPoint = stabilizeStraightTarget(eye, spline, targetPoint)
+        }
+
+        // Universal descent gaze cap: whenever the path goes down, bound the
+        // downward pitch so it leads down the slope, not at the player's feet.
+        // This used to require findInclineAhead + endpoint LOS (fragile) â€” every
+        // case it missed was the "looks directly down on stairs" symptom.
+        if (descent.descending) {
+            targetPoint = levelDescentKeynote(eye, targetPoint)
         }
 
         targetPoint = clampLookDistance(eye, targetPoint)
@@ -1545,6 +1565,29 @@ object PathExecutorState {
         return false
     }
 
+    private data class DescentInfo(
+        /** The spline itself drops over the next horizon (planner-intended). */
+        val descending: Boolean,
+        /** Total vertical drop over the horizon, blocks (>= 0). */
+        val drop: Double,
+    )
+
+    /**
+     * The one classifier for "is the path descending here?". Spline-only and
+     * planner-trusted: the native A* never routes through space it can't
+     * traverse, so a descent on the spline is always an intended, safe
+     * walk-down or fall. Pitch-cap, sneak suppression, and cursor progression
+     * all read this instead of the old web of disagreeing heuristics.
+     */
+    private fun classifyDescent(spline: SplinePath): DescentInfo {
+        val horizon = minOf(DESCENT_CLASSIFY_DISTANCE, spline.totalLength - currentSplineDistance)
+        if (horizon <= 0.0) return DescentInfo(false, 0.0)
+        val base = spline.sample(currentSplineDistance)
+        val ahead = spline.sample(currentSplineDistance + horizon)
+        val drop = base.y - ahead.y
+        return DescentInfo(drop > DESCENT_MIN_DROP, drop.coerceAtLeast(0.0))
+    }
+
     private data class SafetyAssessment(
         val ledgeRisk: Boolean,
         val corridorUnsafe: Boolean,
@@ -1564,43 +1607,43 @@ object PathExecutorState {
         level: Level,
         player: LocalPlayer,
         spline: SplinePath,
-        projection: SplineProjection
+        projection: SplineProjection,
+        descent: DescentInfo
     ): SafetyAssessment {
         val remaining = spline.totalLength - currentSplineDistance
         val arrival = remaining <= ARRIVAL_BRAKE_DISTANCE
         val edgeDrift = projection.distSq >= EDGE_DRIFT_DISTANCE * EDGE_DRIFT_DISTANCE &&
             !isFootprintSafe(level, player.x, player.y, player.z)
 
-        // Both ledge and corridor scans now bail when the spline itself drops
-        // below the start sample by more than FOOTPRINT_DROP_DEPTH â€” that means
-        // the "unsafe footprint" we'd otherwise hit IS the intentional descent
-        // we're meant to fall down, not a side ledge. Without this the executor
-        // sneaks up to the edge of the drop and refuses to step off.
-        val scanStartY = spline.sample(currentSplineDistance).y
-
+        // Single source of truth: if the spline itself is descending here, the
+        // planner routed it, so it's an intended walk-down/fall â€” the ledge and
+        // corridor footprint scans (which sample the smoothed spline floating
+        // above the treads and false-positive on every staircase) are skipped
+        // entirely. Off-spline danger is still caught by edgeDrift above. This
+        // replaces the old coarse per-sample FOOTPRINT_DROP_DEPTH bail.
         var ledgeRisk = false
-        var distance = 0.0
-        val effectiveEdgeScan = edgeScanDistance.coerceAtLeast(0.5)
-        while (distance <= effectiveEdgeScan && currentSplineDistance + distance <= spline.totalLength) {
-            val sample = spline.sample(currentSplineDistance + distance)
-            if (scanStartY - sample.y > FOOTPRINT_DROP_DEPTH) break // intentional drop ahead
-            if (!isSplineFootprintSafe(level, sample)) {
-                ledgeRisk = true
-                break
-            }
-            distance += EDGE_SCAN_STEP
-        }
-
         var corridorUnsafe = false
-        distance = CORRIDOR_SCAN_STEP
-        while (distance <= CORRIDOR_SCAN_DISTANCE && currentSplineDistance + distance <= spline.totalLength) {
-            val sample = spline.sample(currentSplineDistance + distance)
-            if (scanStartY - sample.y > FOOTPRINT_DROP_DEPTH) break // intentional drop ahead
-            if (!isSplineFootprintSafe(level, sample)) {
-                corridorUnsafe = true
-                break
+        if (!descent.descending) {
+            var distance = 0.0
+            val effectiveEdgeScan = edgeScanDistance.coerceAtLeast(0.5)
+            while (distance <= effectiveEdgeScan && currentSplineDistance + distance <= spline.totalLength) {
+                val sample = spline.sample(currentSplineDistance + distance)
+                if (!isSplineFootprintSafe(level, sample)) {
+                    ledgeRisk = true
+                    break
+                }
+                distance += EDGE_SCAN_STEP
             }
-            distance += CORRIDOR_SCAN_STEP
+
+            distance = CORRIDOR_SCAN_STEP
+            while (distance <= CORRIDOR_SCAN_DISTANCE && currentSplineDistance + distance <= spline.totalLength) {
+                val sample = spline.sample(currentSplineDistance + distance)
+                if (!isSplineFootprintSafe(level, sample)) {
+                    corridorUnsafe = true
+                    break
+                }
+                distance += CORRIDOR_SCAN_STEP
+            }
         }
 
         return SafetyAssessment(

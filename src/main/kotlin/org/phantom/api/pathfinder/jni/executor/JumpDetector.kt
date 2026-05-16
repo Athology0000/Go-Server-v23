@@ -42,7 +42,7 @@ internal object JumpDetector {
      * only fire when the player is closer to the obstacle (more conservative,
      * fewer "random" early jumps).
      */
-    @JvmField var jumpRangeMultiplier: Double = 0.55
+    @JvmField var jumpRangeMultiplier: Double = 0.28
 
     fun detectJump(player: LocalPlayer): Boolean {
         val state = PathExecutorState
@@ -365,7 +365,11 @@ internal object JumpDetector {
 
     private fun effectiveJumpRiseMin(): Double = jumpRiseMin.coerceAtLeast(0.95)
 
-    private fun effectiveJumpRangeMultiplier(): Double = jumpRangeMultiplier.coerceAtMost(0.55)
+    // Cap lowered 0.55 -> 0.40: even 0.55 fired jumps ~0.74x the raw trigger
+    // distance out, which read as early/twitchy. 0.40 keeps the latest jump at
+    // ~0.63x distance (decisive, near the edge) while leaving headroom before
+    // the opposite "jumps too late / misses" failure.
+    private fun effectiveJumpRangeMultiplier(): Double = jumpRangeMultiplier.coerceAtMost(0.40)
 
     private fun isAheadOnSegment(playerPos: Vec3, start: Vec3, end: Vec3): Boolean {
         val sx = end.x - start.x

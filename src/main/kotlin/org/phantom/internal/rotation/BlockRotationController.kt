@@ -33,10 +33,31 @@ class BlockRotationController {
     private var smoothedPitch: Float = 0f
     private var smoothingInitialized: Boolean = false
 
+    // Critically-damped spring state for continuous path mode. Carrying
+    // velocity (instead of a pure exp low-pass) gives accel-in / decel-out:
+    // the head leads decisively into the turn and eases out without snapping
+    // or trailing â€” "smooth and intentional" at the same time.
+    private var directMode: Boolean = false
+    private var yawSpringVel: Float = 0f
+    private var pitchSpringVel: Float = 0f
+
+    /** SmoothDamp approach time (seconds) for path mode â€” roughly how long the
+     *  head takes to settle onto a new travel direction. Lower = more urgent /
+     *  intentional, higher = softer. ~0.13 s reads as a deliberate human turn. */
+    var pathSmoothTime: Double = 0.13
+
     /** Smoothing rate constant (1/seconds). Higher = snappier, lower = floatier.
      *  ~16 gives a 60 ms time constant â€” reaches 63% catchup in 60 ms and 95%
      *  in ~190 ms, which matches the cadence of a human flicking and settling. */
     var smoothingRate: Double = 16.0
+
+    /** Smoothing rate used in continuous path mode ([setDirectTarget]). The
+     *  pathing aim is a live lookahead that the 16/s block rate trails behind,
+     *  reading as floaty/unintentional. ~30/s (~33 ms time constant) makes the
+     *  camera commit to the travel direction decisively without going robotic;
+     *  upstream yaw/pitch deadzones still swallow sub-degree lookahead jitter
+     *  so this doesn't reintroduce the straight-path head wobble. */
+    var pathSmoothingRate: Double = 30.0
 
     /**
      * Optional precision point set by the caller (e.g. mining macro) once the
@@ -102,6 +123,8 @@ class BlockRotationController {
         // Pathfinding's continuous mode adjusts this per frame; mining etc.
         // should always start fresh.
         smoothingRate = 16.0
+        // Leaving path mode: block segments use the eased-curve + exp smoother.
+        directMode = false
         // Keep smoothingInitialized â€” preserves velocity continuity across retargets.
         precisionPoint = null
         pendingPrecisionPoint = null
@@ -181,6 +204,11 @@ class BlockRotationController {
     fun setDirectTarget(yaw: Float, pitch: Float) {
         if (softReleaseFrames > 0) return
         val player = mc.player ?: return
+
+        // Path mode: critically-damped spring (see update()) instead of the
+        // block-mining exp low-pass. Scoped here; rotate() clears it.
+        directMode = true
+        smoothingRate = pathSmoothingRate
 
         if (request == null) {
             request = BlockRotationRequest(
@@ -344,27 +372,65 @@ class BlockRotationController {
         // Critically-damped exp-smoother chases the curve. blend = 1 - exp(-k*dt)
         // is the frame-rate-independent low-pass that absorbs any retarget jump
         // and produces continuous velocity even when start/target change mid-flight.
-        val blend = (1.0 - kotlin.math.exp(-smoothingRate * dt))
-            .coerceIn(0.0, 1.0).toFloat()
+        if (directMode) {
+            // Critically-damped spring (Game-Gems / Unity SmoothDamp). Carries
+            // angular velocity so the head accelerates into the new travel
+            // direction and decelerates onto it with no overshoot and no
+            // first-order trailing lag â€” reads as a deliberate, smooth turn.
+            val st = pathSmoothTime.coerceAtLeast(0.01)
+            val omega = 2.0 / st
+            val x = omega * dt
+            val expo = (1.0 / (1.0 + x + 0.48 * x * x + 0.235 * x * x * x)).toFloat()
+            val omF = omega.toFloat()
+            val dtF = dt.toFloat()
 
-        val yawDelta = RotationMath.wrapDegrees(curveYaw - smoothedYaw)
-        smoothedYaw = RotationMath.wrapDegrees(smoothedYaw + yawDelta * blend)
-        smoothedPitch = (smoothedPitch + (curvePitch - smoothedPitch) * blend)
-            .coerceIn(-90f, 90f)
+            val yChange = RotationMath.wrapDegrees(smoothedYaw - curveYaw)
+            val yTemp = (yawSpringVel + omF * yChange) * dtF
+            yawSpringVel = (yawSpringVel - omF * yTemp) * expo
+            smoothedYaw = RotationMath.wrapDegrees(curveYaw + (yChange + yTemp) * expo)
 
-        // Once the eased curve has reached the target and the smoother is
-        // essentially settled, snap to the exact target rotation. The exp
-        // smoother only ever asymptotes â€” without this, the player rotation
-        // sits ~0.01â€“0.05Â° off the computed aim point indefinitely, which is
-        // enough to make the pick raycast graze past the block onto adjacent
-        // geometry (the "macro stares but never mines" symptom).
-        if (progress >= 1.0 &&
-            kotlin.math.abs(yawDelta) < 0.25f &&
-            kotlin.math.abs(curvePitch - smoothedPitch) < 0.25f
-        ) {
-            smoothedYaw = curveYaw
-            smoothedPitch = curvePitch.coerceIn(-90f, 90f)
+            val pChange = smoothedPitch - curvePitch
+            val pTemp = (pitchSpringVel + omF * pChange) * dtF
+            pitchSpringVel = (pitchSpringVel - omF * pTemp) * expo
+            smoothedPitch = (curvePitch + (pChange + pTemp) * expo).coerceIn(-90f, 90f)
+
+            // Settle: kill the residual asymptote + velocity so the aim doesn't
+            // micro-drift around the travel direction forever.
+            if (kotlin.math.abs(RotationMath.wrapDegrees(smoothedYaw - curveYaw)) < 0.1f &&
+                kotlin.math.abs(curvePitch - smoothedPitch) < 0.1f
+            ) {
+                smoothedYaw = curveYaw
+                smoothedPitch = curvePitch.coerceIn(-90f, 90f)
+                yawSpringVel = 0f
+                pitchSpringVel = 0f
+            }
+        } else {
+            val blend = (1.0 - kotlin.math.exp(-smoothingRate * dt))
+                .coerceIn(0.0, 1.0).toFloat()
+
+            val yawDelta = RotationMath.wrapDegrees(curveYaw - smoothedYaw)
+            smoothedYaw = RotationMath.wrapDegrees(smoothedYaw + yawDelta * blend)
+            smoothedPitch = (smoothedPitch + (curvePitch - smoothedPitch) * blend)
+                .coerceIn(-90f, 90f)
+
+            // Once the eased curve has reached the target and the smoother is
+            // essentially settled, snap to the exact target rotation. The exp
+            // smoother only ever asymptotes â€” without this, the player rotation
+            // sits ~0.01â€“0.05Â° off the computed aim point indefinitely, which is
+            // enough to make the pick raycast graze past the block onto adjacent
+            // geometry (the "macro stares but never mines" symptom).
+            if (progress >= 1.0 &&
+                kotlin.math.abs(yawDelta) < 0.25f &&
+                kotlin.math.abs(curvePitch - smoothedPitch) < 0.25f
+            ) {
+                smoothedYaw = curveYaw
+                smoothedPitch = curvePitch.coerceIn(-90f, 90f)
+            }
         }
+
+        // Residual error after smoothing â€” drives the arrival / soft-release
+        // settle tests below for both smoother branches.
+        val yawDelta = RotationMath.wrapDegrees(curveYaw - smoothedYaw)
 
         // Seed the *O ("previous render frame") fields from the value we wrote
         // last frame so MC's renderer interpolates from that anchor â€” no gap.
