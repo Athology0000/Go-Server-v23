@@ -32,6 +32,35 @@ enum VoxelFlags : uint16_t {
   VF_STAIR_FACING_WEST = 2u << 14,
   VF_STAIR_FACING_EAST = 3u << 14,
   VF_STAIR_FACING_MASK = 3u << 14,
+  // Marker: this voxel is a thin-snow layer (SnowLayerBlock, 1..7 layers).
+  // The exact layer count rides a parallel uint8 plane (WorldSnapshot::snowAt),
+  // not the flag word, so only one bit is needed here. Aliases a stair-facing
+  // bit: this is sound because snow is never VF_STAIRS_BOTTOM and the only
+  // reader of bits 14-15 (isStairAscentDirection) early-returns unless
+  // VF_STAIRS_BOTTOM is set. 8-layer snow is a full block (no VF_SNOW).
+  VF_SNOW = 1u << 14,
+};
+
+// Snow geometry, measured in eighths of a block (one snow layer = one eighth).
+struct SnowGeometry {
+  static constexpr int BLOCK_EIGHTHS = 8;
+  // A move onto a cell is auto-steppable (no jump, no stuck) iff
+  //   topEighths(target support) - standEighths(current support) <= MAX_STEP.
+  // 5/8 = 0.625 block, matching observed Minecraft snow step behaviour.
+  static constexpr int MAX_STEP_EIGHTHS = 5;
+
+  // Top surface of a support voxel, in eighths. snowLayers: 0 = not snow.
+  static constexpr int topEighths(const bool solid, const int snowLayers) {
+    if (snowLayers > 0 && snowLayers < 8) return snowLayers;
+    return solid ? BLOCK_EIGHTHS : 0;
+  }
+
+  // Effective standing height once the player is on this support, in eighths.
+  // 1..7 layer snow sinks the player by one layer; full blocks do not.
+  static constexpr int standEighths(const bool solid, const int snowLayers) {
+    if (snowLayers > 0 && snowLayers < 8) return snowLayers - 1;
+    return solid ? BLOCK_EIGHTHS : 0;
+  }
 };
 
 constexpr uint16_t VF_AIR_DEFAULT = VF_PASSABLE | VF_PASSABLE_FLY | VF_ETHER_PASSABLE | VF_ETHER_TELEPORT_CLEAR;
@@ -64,6 +93,9 @@ struct ActionCosts {
   static constexpr double JUMP_PENALTY = 2.0;
   static constexpr double GAP_JUMP_REWARD_OFFSET = 1.5;
   static constexpr double SLAB_ASCENT_TIME = SPRINT_ONE_BLOCK_TIME * 1.1;
+  // Cost of an in-rule snow auto-step (no jump). Its own constant so snow
+  // tunes independently of slabs and never borrows the slab/BT_STEP path.
+  static constexpr double SNOW_ASCENT_TIME = SPRINT_ONE_BLOCK_TIME * 1.08;
   static constexpr double WALK_OFF_EDGE_TIME = SPRINT_ONE_BLOCK_TIME * 0.5;
   static constexpr double LAND_RECOVERY_TIME = 2.0;
   static constexpr double JUMP_UP_ONE_BLOCK_TIME = 28.0 + MOMENTUM_LOSS_PENALTY + SPRINT_ONE_BLOCK_TIME;

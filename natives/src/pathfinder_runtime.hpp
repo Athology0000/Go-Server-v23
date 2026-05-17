@@ -110,6 +110,17 @@ class Runtime {
   [[nodiscard]] bool isFenceLike(int x, int y, int z) const;
   [[nodiscard]] bool isStairsBottom(int x, int y, int z) const;
   [[nodiscard]] bool isStairAscentDirection(int x, int y, int z, int dx, int dz) const;
+  // Snow-layer awareness. snowLayersAt is 0 unless the voxel carries VF_SNOW.
+  // The *Abs* helpers return an absolute height in eighths of a block for a
+  // support voxel (cell.y*8 + local), so snow's sub-block height composes with
+  // integer cell coords. snowStepAllowed enforces the auto-step rule.
+  [[nodiscard]] bool isSnow(int x, int y, int z) const;
+  [[nodiscard]] int snowLayersAt(int x, int y, int z) const;
+  [[nodiscard]] int supportTopAbsEighths(int x, int y, int z) const;
+  [[nodiscard]] int supportStandAbsEighths(int x, int y, int z) const;
+  [[nodiscard]] bool snowStepAllowed(
+    int curSupX, int curSupY, int curSupZ,
+    int destSupX, int destSupY, int destSupZ) const;
   [[nodiscard]] bool isBlockingWall(int x, int y, int z) const;
   [[nodiscard]] bool isFluid(int x, int y, int z) const;
   [[nodiscard]] bool isLava(int x, int y, int z) const;

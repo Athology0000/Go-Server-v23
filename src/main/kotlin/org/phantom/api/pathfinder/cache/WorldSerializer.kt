@@ -11,8 +11,10 @@ import java.util.zip.GZIPOutputStream
 object WorldSerializer {
 
     private const val MAGIC = 0x5CAFEBAB
-    private const val VERSION = 4
-    private const val LEGACY_STATE_ID_VERSION = 3
+    // v5: flag section (4096 shorts) + parallel snow section (4096 bytes).
+    private const val VERSION = 5
+    private const val LEGACY_FLAGS_VERSION = 4 // flags only, no snow plane
+    private const val LEGACY_STATE_ID_VERSION = 3 // stateIds; flags+snow recomputed
     private val CACHE_DIR = File("pathfinder_cache")
 
     init {
@@ -31,6 +33,7 @@ object WorldSerializer {
 
             val byteBuffer = ByteBuffer.allocate(4096 * 2).order(ByteOrder.BIG_ENDIAN)
             val rawSection = ShortArray(4096)
+            val rawSnow = ByteArray(4096)
 
             for ((key, chunk) in readyChunks) {
                 out.writeLong(key)
@@ -51,6 +54,10 @@ object WorldSerializer {
                         byteBuffer.clear()
                         byteBuffer.asShortBuffer().put(rawSection)
                         out.write(byteBuffer.array())
+
+                        // v5: parallel snow plane (zero-filled when absent).
+                        chunk.copySectionSnow(i, rawSnow, 0)
+                        out.write(rawSnow)
                     }
                 }
             }
@@ -65,12 +72,17 @@ object WorldSerializer {
             DataInputStream(BufferedInputStream(GZIPInputStream(FileInputStream(file)))).use { input ->
                 if (input.readInt() != MAGIC) return null
                 val version = input.readInt()
-                if (version != VERSION && version != LEGACY_STATE_ID_VERSION) return null
+                if (version != VERSION &&
+                    version != LEGACY_FLAGS_VERSION &&
+                    version != LEGACY_STATE_ID_VERSION
+                ) return null
 
                 val count = input.readInt()
                 val map = ConcurrentHashMap<Long, CachedChunk>(count)
-                val sectionByteSize = if (version == VERSION) 4096 * 2 else 4096 * 4
-                val rawBytes = ByteArray(sectionByteSize)
+                // v3 stored 4-byte stateIds; v4/v5 store 2-byte flags.
+                val flagByteSize = if (version == LEGACY_STATE_ID_VERSION) 4096 * 4 else 4096 * 2
+                val rawBytes = ByteArray(flagByteSize)
+                val rawSnow = ByteArray(4096)
 
                 repeat(count) {
                     val key = input.readLong()
@@ -84,6 +96,18 @@ object WorldSerializer {
                         if ((sectionMask and (1L shl i)) != 0L) {
                             input.readFully(rawBytes)
                             chunk.setSection(i, decodeSection(version, rawBytes))
+                            when (version) {
+                                VERSION -> {
+                                    // Parallel snow block follows the flags.
+                                    input.readFully(rawSnow)
+                                    if (rawSnow.any { it.toInt() != 0 }) {
+                                        chunk.setSnowSection(i, rawSnow.copyOf())
+                                    }
+                                }
+                                LEGACY_STATE_ID_VERSION ->
+                                    chunk.setSnowSection(i, decodeSnowFromStateIds(rawBytes))
+                                // LEGACY_FLAGS_VERSION: no snow data, safe to skip.
+                            }
                         }
                     }
                     chunk.ready = true
@@ -101,7 +125,7 @@ object WorldSerializer {
     }
 
     private fun decodeSection(version: Int, rawBytes: ByteArray): ShortArray {
-        return if (version == VERSION) {
+        return if (version != LEGACY_STATE_ID_VERSION) {
             val section = ShortArray(4096)
             ByteBuffer.wrap(rawBytes).order(ByteOrder.BIG_ENDIAN).asShortBuffer().get(section)
             section
@@ -110,6 +134,21 @@ object WorldSerializer {
             ByteBuffer.wrap(rawBytes).order(ByteOrder.BIG_ENDIAN).asIntBuffer().get(stateIds)
             ShortArray(4096) { index -> NativeStateEncoder.flagsShortForStateId(stateIds[index]) }
         }
+    }
+
+    /** Recompute the snow plane from a v3 stateId section; null if snow-free. */
+    private fun decodeSnowFromStateIds(rawBytes: ByteArray): ByteArray? {
+        val stateIds = IntArray(4096)
+        ByteBuffer.wrap(rawBytes).order(ByteOrder.BIG_ENDIAN).asIntBuffer().get(stateIds)
+        var plane: ByteArray? = null
+        for (index in 0 until 4096) {
+            val snow = NativeStateEncoder.snowLayersForStateId(stateIds[index])
+            if (snow != 0) {
+                val p = plane ?: ByteArray(4096).also { plane = it }
+                p[index] = snow.toByte()
+            }
+        }
+        return plane
     }
 
     private fun sanitize(name: String): String = name.replace(Regex("[^a-zA-Z0-9_\\-]"), "_")

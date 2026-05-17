@@ -7,6 +7,16 @@ inline bool Runtime::moveTraverse(const Int3& current, const int dx, const int d
   const int destZ = current.z + dz;
   if (!isSafe(destX, current.y, destZ)) return false;
 
+  // Same-level walk: if snow is on either support, the sub-block height
+  // difference must be within the auto-step rule, else this is not an edge.
+  if (isSnow(current.x, current.y - 1, current.z) || isSnow(destX, current.y - 1, destZ)) {
+    if (!snowStepAllowed(
+          current.x, current.y - 1, current.z,
+          destX, current.y - 1, destZ)) {
+      return false;
+    }
+  }
+
   out.pos = {destX, current.y, destZ};
   out.cost = ActionCosts::SPRINT_ONE_BLOCK_TIME +
     pathPenalty(destX, current.y, destZ) +
@@ -24,6 +34,14 @@ inline bool Runtime::moveDiagonal(const Int3& current, const int dx, const int d
   if (!isPassable(current.x, current.y, destZ)) return false;
   if (!isPassable(destX, current.y + 1, current.z)) return false;
   if (!isPassable(current.x, current.y + 1, destZ)) return false;
+
+  if (isSnow(current.x, current.y - 1, current.z) || isSnow(destX, current.y - 1, destZ)) {
+    if (!snowStepAllowed(
+          current.x, current.y - 1, current.z,
+          destX, current.y - 1, destZ)) {
+      return false;
+    }
+  }
 
   out.pos = {destX, current.y, destZ};
   out.cost = ActionCosts::SPRINT_DIAGONAL_TIME +
@@ -53,9 +71,24 @@ inline bool Runtime::moveAscend(const Int3& current, const int dx, const int dz,
   const bool destStair = isStairsBottom(destX, current.y, destZ);
   if (destStair && !isStairAscentDirection(destX, current.y, destZ, dx, dz)) return false;
 
+  const bool snowInvolved =
+    isSnow(destX, current.y, destZ) || isSnow(current.x, current.y - 1, current.z);
+  if (snowInvolved) {
+    // Snow has its own first-class rule, never the slab/BT_STEP path: an
+    // in-rule snow rise auto-steps (no jump); out-of-rule snow is not an edge
+    // so the planner routes around it or fails cleanly.
+    if (!snowStepAllowed(
+          current.x, current.y - 1, current.z,
+          destX, current.y, destZ)) {
+      return false;
+    }
+  }
+
   out.pos = {destX, current.y + 1, destZ};
   double baseCost = ActionCosts::JUMP_UP_ONE_BLOCK_TIME;
-  if (destBottom || srcStair || destStair) {
+  if (snowInvolved) {
+    baseCost = ActionCosts::SNOW_ASCENT_TIME;
+  } else if (destBottom || srcStair || destStair) {
     baseCost = ActionCosts::SLAB_ASCENT_TIME;
   }
 

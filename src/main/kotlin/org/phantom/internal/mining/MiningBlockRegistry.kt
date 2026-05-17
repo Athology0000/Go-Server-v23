@@ -2,6 +2,24 @@ package org.phantom.internal.mining
 
 object MiningBlockRegistry {
 
+  data class BlockFamily(
+    val centerBlockIds: Set<String> = emptySet(),
+    val perimeterBlockIds: Set<String> = emptySet(),
+  ) {
+    val blockIds: Set<String> = centerBlockIds + perimeterBlockIds
+  }
+
+  val BLOCK_FAMILIES = mapOf(
+    "Umber" to BlockFamily(
+      centerBlockIds = setOf("minecraft:smooth_red_sandstone"),
+      perimeterBlockIds = setOf("minecraft:terracotta", "minecraft:brown_terracotta"),
+    ),
+    "Tungsten" to BlockFamily(
+      centerBlockIds = setOf("minecraft:clay"),
+      perimeterBlockIds = setOf("minecraft:infested_cobblestone"),
+    ),
+  )
+
   val BLOCK_HARDNESS = linkedMapOf(
     "Custom" to null,
     "Pure Coal" to 600.0,
@@ -36,7 +54,7 @@ object MiningBlockRegistry {
 
   val BLOCK_TYPES: Array<String> = BLOCK_HARDNESS.keys.toTypedArray()
 
-  val BLOCK_ID_TO_TYPE = mapOf(
+  val BLOCK_ID_TO_TYPE = linkedMapOf(
     "minecraft:coal_ore" to "Pure Coal",
     "minecraft:deepslate_coal_ore" to "Pure Coal",
     "minecraft:coal_block" to "Pure Coal",
@@ -73,8 +91,8 @@ object MiningBlockRegistry {
     "minecraft:orange_stained_glass_pane" to "Amber Gemstone",
     "minecraft:purple_stained_glass" to "Amethyst Gemstone",
     "minecraft:purple_stained_glass_pane" to "Amethyst Gemstone",
-    "minecraft:green_stained_glass" to "Jade Gemstone",
-    "minecraft:green_stained_glass_pane" to "Jade Gemstone",
+    "minecraft:green_stained_glass" to "Peridot Gemstone",
+    "minecraft:green_stained_glass_pane" to "Peridot Gemstone",
     "minecraft:light_blue_stained_glass" to "Sapphire Gemstone",
     "minecraft:light_blue_stained_glass_pane" to "Sapphire Gemstone",
     "minecraft:white_stained_glass" to "Opal Gemstone",
@@ -87,16 +105,27 @@ object MiningBlockRegistry {
     "minecraft:black_stained_glass_pane" to "Onyx Gemstone",
     "minecraft:cyan_stained_glass" to "Aquamarine Gemstone",
     "minecraft:cyan_stained_glass_pane" to "Aquamarine Gemstone",
-    "minecraft:lime_stained_glass" to "Peridot Gemstone",
-    "minecraft:lime_stained_glass_pane" to "Peridot Gemstone",
+    "minecraft:blue_stained_glass" to "Aquamarine Gemstone",
+    "minecraft:blue_stained_glass_pane" to "Aquamarine Gemstone",
+    "minecraft:lime_stained_glass" to "Jade Gemstone",
+    "minecraft:lime_stained_glass_pane" to "Jade Gemstone",
     "minecraft:light_gray_stained_glass" to "Citrine Gemstone",
     "minecraft:light_gray_stained_glass_pane" to "Citrine Gemstone",
+    "minecraft:brown_stained_glass" to "Citrine Gemstone",
+    "minecraft:brown_stained_glass_pane" to "Citrine Gemstone",
     "minecraft:packed_ice" to "Glacite",
     "minecraft:blue_ice" to "Glacite",
     "minecraft:brown_wool" to "Umber",
     "minecraft:yellow_wool" to "Sulphur",
-    "minecraft:light_gray_terracotta" to "Tungsten",
-  )
+  ).apply {
+    for ((type, family) in BLOCK_FAMILIES) {
+      for (blockId in family.blockIds) {
+        put(blockId, type)
+      }
+    }
+  }
+
+  fun familyForType(type: String): BlockFamily? = BLOCK_FAMILIES[normalizeType(type)]
 
   val TYPE_TO_BLOCK_IDS: Map<String, Set<String>> =
     BLOCK_ID_TO_TYPE.entries.groupBy({ it.value }, { it.key }).mapValues { it.value.toSet() }

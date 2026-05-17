@@ -61,9 +61,12 @@ object NativePathfinderBridge {
     }
 
     @JvmStatic
-    fun upsertChunk(chunkX: Int, chunkZ: Int, minY: Int, maxY: Int, sectionMask: Long, sectionFlags: ShortArray) {
+    fun upsertChunk(
+        chunkX: Int, chunkZ: Int, minY: Int, maxY: Int, sectionMask: Long,
+        sectionFlags: ShortArray, sectionSnow: ByteArray
+    ) {
         try {
-            NativePathfinderJNI.upsertChunk(chunkX, chunkZ, minY, maxY, sectionMask, sectionFlags)
+            NativePathfinderJNI.upsertChunk(chunkX, chunkZ, minY, maxY, sectionMask, sectionFlags, sectionSnow)
             lastError = null
         } catch (t: Throwable) {
             lastError = t.message ?: t.javaClass.simpleName

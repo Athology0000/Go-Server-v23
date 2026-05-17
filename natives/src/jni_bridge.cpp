@@ -47,6 +47,17 @@ std::vector<jshort> toShortVector(JNIEnv* env, jshortArray array) {
   return out;
 }
 
+std::vector<uint8_t> toByteVector(JNIEnv* env, jbyteArray array) {
+  if (array == nullptr) return {};
+
+  const jsize len = env->GetArrayLength(array);
+  if (len <= 0) return {};
+
+  std::vector<uint8_t> out(static_cast<size_t>(len));
+  env->GetByteArrayRegion(array, 0, len, reinterpret_cast<jbyte*>(out.data()));
+  return out;
+}
+
 class ScopedUtfChars {
  public:
   ScopedUtfChars(JNIEnv* env, jstring value)
@@ -236,7 +247,8 @@ JNIEXPORT void JNICALL Java_org_phantom_api_pathfinder_jni_NativePathfinderJNI_u
   jint minY,
   jint maxY,
   jlong sectionMask,
-  jshortArray sectionFlags
+  jshortArray sectionFlags,
+  jbyteArray sectionSnow
 ) {
   try {
     if (!isValidHeightRange(minY, maxY)) {
@@ -248,8 +260,13 @@ JNIEXPORT void JNICALL Java_org_phantom_api_pathfinder_jni_NativePathfinderJNI_u
     if (hasPendingJavaException(env)) {
       return;
     }
+    const auto snow = toByteVector(env, sectionSnow);
+    if (hasPendingJavaException(env)) {
+      return;
+    }
 
     const auto* sectionData = flags.empty() ? nullptr : reinterpret_cast<const uint16_t*>(flags.data());
+    const auto* snowData = snow.empty() ? nullptr : snow.data();
     g_worldState.upsertChunk(
       static_cast<int>(chunkX),
       static_cast<int>(chunkZ),
@@ -257,7 +274,9 @@ JNIEXPORT void JNICALL Java_org_phantom_api_pathfinder_jni_NativePathfinderJNI_u
       static_cast<int>(maxY),
       static_cast<uint64_t>(sectionMask),
       sectionData,
-      flags.size()
+      flags.size(),
+      snowData,
+      snow.size()
     );
   } catch (const std::exception& ex) {
     throwRuntimeFromException(env, "upsertChunk", ex);
@@ -284,11 +303,15 @@ JNIEXPORT void JNICALL Java_org_phantom_api_pathfinder_jni_NativePathfinderJNI_a
     parsed.reserve(flat.size() / 4);
 
     for (size_t i = 0; i + 3 < flat.size(); i += 4) {
+      // flat[i+3] low 16 bits = voxel flags; bits 16-19 = snow layer count
+      // (0 = not snow, 1..7). Packed this way so the update path needs no
+      // extra array.
       parsed.push_back(v5pf::BlockUpdate{
         flat[i],
         flat[i + 1],
         flat[i + 2],
-        static_cast<uint16_t>(flat[i + 3])
+        static_cast<uint16_t>(flat[i + 3] & 0xFFFF),
+        static_cast<uint8_t>((static_cast<uint32_t>(flat[i + 3]) >> 16) & 0xF)
       });
     }
 

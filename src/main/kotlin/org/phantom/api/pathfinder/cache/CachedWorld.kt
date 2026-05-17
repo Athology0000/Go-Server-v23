@@ -117,8 +117,11 @@ object CachedWorld {
         val chunk = chunks[key]
         if (chunk != null && chunk.ready) {
             val flags = NativeStateEncoder.flagsShortForState(event.newBlock)
+            val snow = NativeStateEncoder.snowLayersForState(event.newBlock)
             chunk.setFlags(pos.x and 15, pos.y, pos.z and 15, flags)
-            queueNativeUpdate(pos.x, pos.y, pos.z, flags.toInt() and 0xFFFF)
+            chunk.setSnow(pos.x and 15, pos.y, pos.z and 15, snow.toByte())
+            // Low 16 bits = flags; bits 16-19 = snow layers (native unpacks).
+            queueNativeUpdate(pos.x, pos.y, pos.z, (flags.toInt() and 0xFFFF) or ((snow and 0xF) shl 16))
             if (cacheKey == key) cacheChunk = chunk
             dirty = true
         }
@@ -147,17 +150,25 @@ object CachedWorld {
                 if (section.hasOnlyAir()) continue
 
                 val sectionData = ShortArray(4096) { CachedChunk.AIR_FLAGS }
+                var snowData: ByteArray? = null
                 for (ly in 0..15) {
                     val yOffset = ly shl 8
                     for (lz in 0..15) {
                         val zOffset = lz shl 4
                         for (lx in 0..15) {
-                            sectionData[yOffset or zOffset or lx] =
-                                NativeStateEncoder.flagsShortForState(section.getBlockState(lx, ly, lz))
+                            val state = section.getBlockState(lx, ly, lz)
+                            val idx = yOffset or zOffset or lx
+                            sectionData[idx] = NativeStateEncoder.flagsShortForState(state)
+                            val snow = NativeStateEncoder.snowLayersForState(state)
+                            if (snow != 0) {
+                                val plane = snowData ?: ByteArray(4096).also { snowData = it }
+                                plane[idx] = snow.toByte()
+                            }
                         }
                     }
                 }
                 cached.setSection(sectionIndex, sectionData)
+                if (snowData != null) cached.setSnowSection(sectionIndex, snowData)
             }
 
             cached.ready = true
@@ -338,18 +349,29 @@ object CachedWorld {
         }
 
         if (totalValues == 0) {
-            NativePathfinderBridge.upsertChunk(chunkX, chunkZ, chunk.minY, chunk.maxY, 0L, ShortArray(0))
+            NativePathfinderBridge.upsertChunk(
+                chunkX, chunkZ, chunk.minY, chunk.maxY, 0L, ShortArray(0), ByteArray(0)
+            )
             return
         }
 
         val sectionFlags = ShortArray(totalValues)
+        // Parallel snow plane; only allocated if the chunk actually has snow.
+        var sectionSnow: ByteArray? = null
         var offset = 0
         for (i in 0 until sectionCount) {
             if ((sectionMask and (1L shl i)) == 0L) continue
             chunk.copySectionFlags(i, sectionFlags, offset)
+            if (chunk.hasSnowSection(i)) {
+                val snow = sectionSnow ?: ByteArray(totalValues).also { sectionSnow = it }
+                chunk.copySectionSnow(i, snow, offset)
+            }
             offset += 4096
         }
-        NativePathfinderBridge.upsertChunk(chunkX, chunkZ, chunk.minY, chunk.maxY, sectionMask, sectionFlags)
+        NativePathfinderBridge.upsertChunk(
+            chunkX, chunkZ, chunk.minY, chunk.maxY, sectionMask,
+            sectionFlags, sectionSnow ?: ByteArray(0)
+        )
     }
 
     private fun flushPendingNativeUpdates() {

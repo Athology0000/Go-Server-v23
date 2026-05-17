@@ -18,12 +18,16 @@ object NativePathfinderJNI {
      * sectionMask: bit i set = section i has data in sectionFlags.
      * sectionFlags: packed uint16_t voxel flags, 4096 shorts per section,
      *   index within section = ((y & 15) shl 8) or ((z & 15) shl 4) or (x & 15).
+     * sectionSnow: parallel snow-layer plane, 4096 bytes per section in the
+     *   same section order/index as sectionFlags (0 = not snow, 1..7 = layers).
+     *   May be empty when the chunk contains no snow.
      */
     @JvmStatic external fun upsertChunk(
         chunkX: Int, chunkZ: Int,
         minY: Int, maxY: Int,
         sectionMask: Long,
-        sectionFlags: ShortArray
+        sectionFlags: ShortArray,
+        sectionSnow: ByteArray
     )
 
     /** updates: flat [x, y, z, flags(uint16 as int)] quads */

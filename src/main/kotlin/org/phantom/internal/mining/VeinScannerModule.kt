@@ -629,6 +629,19 @@ data class ScannedVein(
   val blocks: List<BlockPos>,
 )
 
+private fun blockIdKeywords(vararg blockIds: String): Set<String> =
+  blockIds.flatMapTo(linkedSetOf()) { blockId ->
+    listOf(blockId.lowercase(), blockId.substringAfter(':').lowercase())
+  }
+
+private fun miningTypeKeywords(type: String, vararg aliases: String): Set<String> =
+  linkedSetOf<String>().apply {
+    addAll(aliases.map { it.lowercase() })
+    MiningBlockRegistry.familyForType(type)?.blockIds.orEmpty().forEach { blockId ->
+      addAll(blockIdKeywords(blockId))
+    }
+  }
+
 enum class VeinOre(
   val displayName: String,
   val keywords: Set<String>,
@@ -656,8 +669,20 @@ enum class VeinOre(
   ),
   TITANIUM("Titanium", setOf("diorite", "polished_diorite", "quartz"), OverlayRenderEngine.Color(235, 235, 255, 240)),
   GLACITE("Glacite", setOf("packed_ice", "blue_ice", "glacite"), OverlayRenderEngine.Color(120, 210, 255, 235)),
-  TUNGSTEN("Tungsten", setOf("tungsten"), OverlayRenderEngine.Color(210, 210, 210, 235)),
-  UMBER("Umber", setOf("umber"), OverlayRenderEngine.Color(210, 145, 80, 235)),
+  TUNGSTEN(
+    "Tungsten",
+    miningTypeKeywords("Tungsten", "tungsten"),
+    OverlayRenderEngine.Color(210, 210, 210, 235),
+    anchorKeywords = blockIdKeywords("minecraft:infested_cobblestone"),
+    centerKeywords = blockIdKeywords("minecraft:clay"),
+  ),
+  UMBER(
+    "Umber",
+    miningTypeKeywords("Umber", "umber"),
+    OverlayRenderEngine.Color(210, 145, 80, 235),
+    anchorKeywords = blockIdKeywords("minecraft:terracotta", "minecraft:brown_terracotta"),
+    centerKeywords = blockIdKeywords("minecraft:smooth_red_sandstone"),
+  ),
   GEMSTONE("Gemstone", setOf("stained_glass", "glass_pane", "gemstone", "ruby", "amber", "jade", "sapphire", "amethyst", "topaz", "jasper"), OverlayRenderEngine.Color(255, 80, 220, 235));
 
   fun matches(level: Level, pos: BlockPos): Boolean {

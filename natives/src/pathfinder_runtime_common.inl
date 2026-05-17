@@ -186,6 +186,39 @@ inline bool Runtime::isStairAscentDirection(const int x, const int y, const int 
   }
 }
 
+inline bool Runtime::isSnow(const int x, const int y, const int z) const {
+  return hasFlag(flagsAt(x, y, z), VF_SNOW);
+}
+
+inline int Runtime::snowLayersAt(const int x, const int y, const int z) const {
+  // Gate on the flag so non-snow voxels never touch the parallel snow plane,
+  // keeping the common path free of the extra fetch.
+  if (!hasFlag(flagsAt(x, y, z), VF_SNOW)) return 0;
+  return static_cast<int>(voxelCursor_.getSnow(x, y, z));
+}
+
+inline int Runtime::supportTopAbsEighths(const int x, const int y, const int z) const {
+  const bool solid = hasFlag(flagsAt(x, y, z), VF_SOLID);
+  return y * SnowGeometry::BLOCK_EIGHTHS +
+    SnowGeometry::topEighths(solid, snowLayersAt(x, y, z));
+}
+
+inline int Runtime::supportStandAbsEighths(const int x, const int y, const int z) const {
+  const bool solid = hasFlag(flagsAt(x, y, z), VF_SOLID);
+  return y * SnowGeometry::BLOCK_EIGHTHS +
+    SnowGeometry::standEighths(solid, snowLayersAt(x, y, z));
+}
+
+inline bool Runtime::snowStepAllowed(
+  const int curSupX, const int curSupY, const int curSupZ,
+  const int destSupX, const int destSupY, const int destSupZ) const {
+  const int rise = supportTopAbsEighths(destSupX, destSupY, destSupZ) -
+    supportStandAbsEighths(curSupX, curSupY, curSupZ);
+  // Stepping level or down is always fine; stepping up is capped at the snow
+  // auto-step height. 8-layer snow / full blocks fall out of this naturally.
+  return rise <= SnowGeometry::MAX_STEP_EIGHTHS;
+}
+
 inline bool Runtime::isBlockingWall(const int x, const int y, const int z) const {
   return hasFlag(flagsAt(x, y, z), VF_BLOCKING_WALL);
 }

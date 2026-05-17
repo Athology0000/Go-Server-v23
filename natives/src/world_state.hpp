@@ -13,6 +13,7 @@ struct BlockUpdate {
   int y;
   int z;
   uint16_t flags;
+  uint8_t snowLayers; // 0 = not snow, 1..7 = SnowLayerBlock layer count
 };
 
 struct ChunkData {
@@ -20,6 +21,11 @@ struct ChunkData {
   int maxY = 320; // exclusive
   std::vector<int32_t> sectionOffsets;
   std::vector<uint16_t> voxels;
+  // Parallel snow-layer plane. Same offset layout as `voxels` (sections grow
+  // in lockstep), one byte per voxel: 0 = not snow, 1..7 = layer count. Kept
+  // out of the 16-bit flag word so the hot flagsAt() path is unchanged; only
+  // read when a voxel has VF_SNOW set.
+  std::vector<uint8_t> snow;
 
   [[nodiscard]] int sectionCount() const {
     const int64_t minY64 = static_cast<int64_t>(minY);
@@ -41,9 +47,12 @@ struct ChunkData {
   [[nodiscard]] bool hasSection(int sectionIdx) const;
   [[nodiscard]] const uint16_t* sectionData(int sectionIdx) const;
   [[nodiscard]] uint16_t* sectionData(int sectionIdx);
-  void assignSection(int sectionIdx, const uint16_t* source);
+  void assignSection(int sectionIdx, const uint16_t* source, const uint8_t* snowSource);
   [[nodiscard]] uint16_t getFlags(int localX, int y, int localZ) const;
   void setFlags(int localX, int y, int localZ, uint16_t flags);
+  [[nodiscard]] uint8_t getSnow(int localX, int y, int localZ) const;
+  void setSnow(int localX, int y, int localZ, uint8_t snowLayers);
+  [[nodiscard]] const uint8_t* snowSectionData(int sectionIdx) const;
 };
 
 using SharedChunkData = std::shared_ptr<const ChunkData>;
@@ -64,6 +73,7 @@ struct WorldSnapshot {
 
   [[nodiscard]] const ChunkMap& chunks() const;
   [[nodiscard]] uint16_t getFlags(int x, int y, int z) const;
+  [[nodiscard]] uint8_t getSnow(int x, int y, int z) const;
 };
 
 class WorldState {
@@ -78,7 +88,9 @@ class WorldState {
     int maxY,
     uint64_t sectionMask,
     const uint16_t* sectionFlags,
-    size_t sectionFlagCount
+    size_t sectionFlagCount,
+    const uint8_t* sectionSnow,
+    size_t sectionSnowCount
   );
 
   void applyUpdates(const std::vector<BlockUpdate>& updates);

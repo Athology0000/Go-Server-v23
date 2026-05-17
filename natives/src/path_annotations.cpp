@@ -14,6 +14,31 @@ constexpr int FLAG_NEAR_WALL = 1 << 4;
 constexpr int FLAG_STEP_UP_NEXT = 1 << 5;
 constexpr int FLAG_DROP_NEXT = 1 << 6;
 constexpr int FLAG_TIGHT_CORRIDOR = 1 << 7;
+// Next node is an in-rule snow auto-step: the executor must NOT jump here,
+// it should let vanilla step-assist carry the player up the snow.
+constexpr int FLAG_SNOW_STEP = 1 << 8;
+
+// Top surface / standing height of a support voxel, in eighths of a block
+// (one snow layer = one eighth = two pixels). Mirrors native SnowGeometry.
+inline int supportTopEighths(const WorldSnapshot& world, const int x, const int y, const int z) {
+  const uint16_t f = flagsAt(world, x, y, z);
+  const bool solid = hasVoxelFlag(f, VF_SOLID);
+  if (hasVoxelFlag(f, VF_SNOW)) {
+    const int layers = static_cast<int>(world.getSnow(x, y, z));
+    if (layers > 0 && layers < 8) return layers;
+  }
+  return solid ? SnowGeometry::BLOCK_EIGHTHS : 0;
+}
+
+inline int supportStandEighths(const WorldSnapshot& world, const int x, const int y, const int z) {
+  const uint16_t f = flagsAt(world, x, y, z);
+  const bool solid = hasVoxelFlag(f, VF_SOLID);
+  if (hasVoxelFlag(f, VF_SNOW)) {
+    const int layers = static_cast<int>(world.getSnow(x, y, z));
+    if (layers > 0 && layers < 8) return layers - 1;
+  }
+  return solid ? SnowGeometry::BLOCK_EIGHTHS : 0;
+}
 
 inline int edgeDistance(const WorldSnapshot& world, const int x, const int y, const int z) {
   return directionalDistance(world, x, y, z, isEdgeVoxel);
@@ -60,9 +85,31 @@ std::vector<int> encodeNodeFlags(
     }
 
     if (i + 1 < nodes.size()) {
-      const int dy = nodes[i + 1].y - p.y;
+      const Int3& n = nodes[i + 1];
+      const int dy = n.y - p.y;
       if (dy > 0) flags |= FLAG_STEP_UP_NEXT;
       if (dy < 0) flags |= FLAG_DROP_NEXT;
+
+      if (!isFly) {
+        // Support is the voxel below the feet node (walkY-1 == p.y-1 here).
+        const int curSupY = p.y - 1;
+        const int nextSupY = n.y - 1;
+        const bool snowInvolved =
+          hasVoxelFlag(flagsAt(world, p.x, curSupY, p.z), VF_SNOW) ||
+          hasVoxelFlag(flagsAt(world, n.x, nextSupY, n.z), VF_SNOW);
+        if (snowInvolved) {
+          const int curStand =
+            curSupY * SnowGeometry::BLOCK_EIGHTHS +
+            supportStandEighths(world, p.x, curSupY, p.z);
+          const int nextTop =
+            nextSupY * SnowGeometry::BLOCK_EIGHTHS +
+            supportTopEighths(world, n.x, nextSupY, n.z);
+          const int rise = nextTop - curStand;
+          if (rise > 0 && rise <= SnowGeometry::MAX_STEP_EIGHTHS) {
+            flags |= FLAG_SNOW_STEP;
+          }
+        }
+      }
     }
 
     out[i] = flags;

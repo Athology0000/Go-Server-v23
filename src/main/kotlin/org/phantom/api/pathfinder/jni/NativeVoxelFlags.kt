@@ -20,4 +20,11 @@ object NativeVoxelFlags {
     const val STAIR_FACING_WEST = 2 shl 14
     const val STAIR_FACING_EAST = 3 shl 14
     const val STAIR_FACING_MASK = 3 shl 14
+
+    // Thin-snow marker (SnowLayerBlock, 1..7 layers). The exact layer count
+    // travels on the parallel snow plane, not this word. Aliases a stair-facing
+    // bit, which is safe: snow is never STAIRS_BOTTOM and the native side only
+    // reads bits 14-15 behind a STAIRS_BOTTOM guard. 8-layer snow = full block
+    // (plain SOLID, no SNOW).
+    const val SNOW = 1 shl 14
 }

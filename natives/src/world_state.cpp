@@ -31,6 +31,7 @@ void ChunkData::ensureLayout() {
   if (count <= 0) {
     sectionOffsets.clear();
     voxels.clear();
+    snow.clear();
     return;
   }
 
@@ -61,7 +62,7 @@ uint16_t* ChunkData::sectionData(const int sectionIdx) {
   return voxels.data() + static_cast<size_t>(sectionOffsets[static_cast<size_t>(sectionIdx)]);
 }
 
-void ChunkData::assignSection(const int sectionIdx, const uint16_t* source) {
+void ChunkData::assignSection(const int sectionIdx, const uint16_t* source, const uint8_t* snowSource) {
   if (source == nullptr) return;
 
   ensureLayout();
@@ -73,6 +74,7 @@ void ChunkData::assignSection(const int sectionIdx, const uint16_t* source) {
   if (offset < 0) {
     offset = static_cast<int32_t>(voxels.size());
     voxels.resize(voxels.size() + 4096, VF_AIR_DEFAULT);
+    snow.resize(snow.size() + 4096, 0);
   }
 
   std::memcpy(
@@ -80,6 +82,13 @@ void ChunkData::assignSection(const int sectionIdx, const uint16_t* source) {
     source,
     4096 * sizeof(uint16_t)
   );
+
+  uint8_t* snowDst = snow.data() + static_cast<size_t>(offset);
+  if (snowSource != nullptr) {
+    std::memcpy(snowDst, snowSource, 4096 * sizeof(uint8_t));
+  } else {
+    std::memset(snowDst, 0, 4096 * sizeof(uint8_t));
+  }
 }
 
 namespace {
@@ -97,6 +106,7 @@ void ensureMutableSection(ChunkData& chunk, const int sectionIdx) {
 
   offset = static_cast<int32_t>(chunk.voxels.size());
   chunk.voxels.resize(chunk.voxels.size() + 4096, VF_AIR_DEFAULT);
+  chunk.snow.resize(chunk.snow.size() + 4096, 0);
 }
 
 } // namespace
@@ -124,6 +134,42 @@ void ChunkData::setFlags(const int localX, const int y, const int localZ, const 
   section[static_cast<size_t>(index)] = flags;
 }
 
+uint8_t ChunkData::getSnow(const int localX, const int y, const int localZ) const {
+  if (y < minY || y >= maxY) return 0;
+
+  const int sectionIdx = (y - minY) >> 4;
+  if (!hasSection(sectionIdx)) return 0;
+  const size_t base = static_cast<size_t>(sectionOffsets[static_cast<size_t>(sectionIdx)]);
+  if (base >= snow.size()) return 0;
+
+  const int index = ((y & 15) << 8) | ((localZ & 15) << 4) | (localX & 15);
+  return snow[base + static_cast<size_t>(index)];
+}
+
+void ChunkData::setSnow(const int localX, const int y, const int localZ, const uint8_t snowLayers) {
+  if (y < minY || y >= maxY) return;
+
+  const int sectionIdx = (y - minY) >> 4;
+  ensureMutableSection(*this, sectionIdx);
+  if (!hasSection(sectionIdx)) return;
+  const size_t base = static_cast<size_t>(sectionOffsets[static_cast<size_t>(sectionIdx)]);
+  if (base >= snow.size()) return;
+
+  const int index = ((y & 15) << 8) | ((localZ & 15) << 4) | (localX & 15);
+  snow[base + static_cast<size_t>(index)] = snowLayers;
+}
+
+const uint8_t* ChunkData::snowSectionData(const int sectionIdx) const {
+  if (!hasSection(sectionIdx)) {
+    return nullptr;
+  }
+  const size_t base = static_cast<size_t>(sectionOffsets[static_cast<size_t>(sectionIdx)]);
+  if (base >= snow.size()) {
+    return nullptr;
+  }
+  return snow.data() + base;
+}
+
 const ChunkMap& WorldSnapshot::chunks() const {
   static const ChunkMap kEmptyChunks;
   return data != nullptr ? data->chunks : kEmptyChunks;
@@ -141,6 +187,20 @@ uint16_t WorldSnapshot::getFlags(const int x, const int y, const int z) const {
   }
 
   return it->second->getFlags(x & 15, y, z & 15);
+}
+
+uint8_t WorldSnapshot::getSnow(const int x, const int y, const int z) const {
+  if (y < minY || y >= maxY) return 0;
+
+  const int chunkX = x >> 4;
+  const int chunkZ = z >> 4;
+  const auto& chunkMap = chunks();
+  const auto it = chunkMap.find(chunkKey(chunkX, chunkZ));
+  if (it == chunkMap.end() || it->second == nullptr) {
+    return 0;
+  }
+
+  return it->second->getSnow(x & 15, y, z & 15);
 }
 
 void WorldState::setWorld(std::string worldKey, const int minY, const int maxY) {
@@ -172,7 +232,9 @@ void WorldState::upsertChunk(
   const int maxY,
   const uint64_t sectionMask,
   const uint16_t* sectionFlags,
-  const size_t sectionFlagCount
+  const size_t sectionFlagCount,
+  const uint8_t* sectionSnow,
+  const size_t sectionSnowCount
 ) {
   if (!isValidWorldBounds(minY, maxY)) {
     return;
@@ -195,7 +257,9 @@ void WorldState::upsertChunk(
       break;
     }
 
-    chunk.assignSection(i, sectionFlags + readOffset);
+    const bool hasSnow =
+      sectionSnow != nullptr && readOffset + 4096 <= sectionSnowCount;
+    chunk.assignSection(i, sectionFlags + readOffset, hasSnow ? sectionSnow + readOffset : nullptr);
     readOffset += 4096;
   }
 
@@ -239,6 +303,7 @@ void WorldState::applyUpdates(const std::vector<BlockUpdate>& updates) {
     }
 
     chunk->setFlags(update.x & 15, update.y, update.z & 15, update.flags);
+    chunk->setSnow(update.x & 15, update.y, update.z & 15, update.snowLayers);
   }
 
   data_ = std::move(next);

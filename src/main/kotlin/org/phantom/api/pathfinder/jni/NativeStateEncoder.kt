@@ -73,6 +73,22 @@ object NativeStateEncoder {
     @JvmStatic
     fun flagsShortForStateId(stateId: Int): Short = flagsForStateId(stateId)
 
+    /** Snow layer count for the parallel snow plane: 0 = not snow, 1..7. */
+    @JvmStatic
+    fun snowLayersForState(state: BlockState): Int {
+        val block = state.block
+        if (block !is SnowLayerBlock) return 0
+        val layers = state.getValue(SnowLayerBlock.LAYERS)
+        return if (layers in 1..7) layers else 0
+    }
+
+    @JvmStatic
+    fun snowLayersForStateId(stateId: Int): Int {
+        if (stateId < 0 || stateId >= Block.BLOCK_STATE_REGISTRY.size()) return 0
+        val state = Block.BLOCK_STATE_REGISTRY.byId(stateId) ?: return 0
+        return snowLayersForState(state)
+    }
+
     private fun computeFlags(state: BlockState): Int {
         if (state.isAir) return DEFAULT_EMPTY_FLAGS
 
@@ -89,6 +105,18 @@ object NativeStateEncoder {
             flags = flags or NativeVoxelFlags.FLUID
             if (state.fluidState.`is`(FluidTags.LAVA)) {
                 flags = flags or NativeVoxelFlags.LAVA
+            }
+        }
+
+        if (block is SnowLayerBlock) {
+            // Snow is first-class, not routed through the slab/passable path.
+            // 1..7 layers: standable support carrying VF_SNOW (the layer count
+            // rides the parallel snow plane). 8 layers: an ordinary full block.
+            val layers = state.getValue(SnowLayerBlock.LAYERS)
+            return if (layers in 1..7) {
+                flags or NativeVoxelFlags.SOLID or NativeVoxelFlags.SNOW
+            } else {
+                flags or NativeVoxelFlags.SOLID
             }
         }
 

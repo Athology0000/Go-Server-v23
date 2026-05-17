@@ -80,6 +80,11 @@ internal object JumpDetector {
             return false
         }
 
+        // In-rule snow auto-step: the planner guarantees vanilla step-assist
+        // clears it. Suppress every jump rung this tick (fluid already handled
+        // above) so we never hop or fight the auto-step.
+        if (nextFlags and FLAG_SNOW_STEP != 0) return false
+
         val playerFloorY = Math.floor(player.y - 0.001).toInt()
 
         // 5. Native flag fast path + geometry fallback
@@ -94,8 +99,8 @@ internal object JumpDetector {
         // 7. Gap
         if (checkGapJump(player, nodes, nearIdx, playerFloorY)) return true
 
-        // 8. Snow
-        if (checkSnowJump(level, player, nodes, nearIdx)) return true
+        // 8. Snow jump (V5 checkSnowJump)
+        if (checkSnowJump(level, nodes, nearIdx, playerFloorY)) return true
 
         // 9. Obstacle
         if (checkObstacleJump(level, player, nodes, nearIdx, playerFloorY)) return true
@@ -273,41 +278,66 @@ internal object JumpDetector {
      *  - rise > 1.25: too tall to clear with a step-jump; left to the obstacle
      *    rung / replan rather than a doomed hop.
      */
+    /**
+     * Snow rung, eighths-consistent with the planner. The planner refuses
+     * out-of-rule snow edges and marks in-rule steps with FLAG_SNOW_STEP, so
+     * normally we never jump here. We still guard against the live world
+     * differing from the cached plan: a genuine snow lip taller than the
+     * 5/8-block auto-step (but still single-jump clearable) gets one jump,
+     * measured from the player's *effective* stand height (one-layer sink
+     * applied when standing on snow).
+     */
     private fun checkSnowJump(
         level: Level,
         player: LocalPlayer,
         nodes: List<Vec3>,
-        nearIdx: Int,
+        nearIdx: Int
     ): Boolean {
-        val end = minOf(nodes.lastIndex, nearIdx + STEP_LOOKAHEAD_NODES)
-        for (i in (nearIdx + 1)..end) {
-            val n = nodes[i]
-            val floorPos = BlockPos(
-                Math.floor(n.x).toInt(),
-                Math.round(n.y).toInt(),
-                Math.floor(n.z).toInt(),
-            )
-            val bs = cachedBlock(level, floorPos)
-            if (!bs.block.descriptionId.contains("snow")) continue
+        val nextIdx = (nearIdx + 1).coerceAtMost(nodes.lastIndex)
 
-            val shape = bs.getCollisionShape(level, floorPos)
-            if (shape.isEmpty) continue
-            val snowTopY = floorPos.y + shape.bounds().maxY
-            val rise = snowTopY - player.y
-            if (rise <= STEP_HEIGHT) continue          // walk-up passable
-            if (rise > 1.25) continue                  // not a single-jump clear
+        val nextFlags = NativePathfinder.cachedKeyNodeFlags.getOrElse(nextIdx) { 0 }
+        if (nextFlags and FLAG_SNOW_STEP != 0) return false  // auto-step: never jump
 
-            val prev = nodes[(i - 1).coerceAtLeast(nearIdx)]
-            val takeoff = Vec3(prev.x + 0.5, prev.y, prev.z + 0.5)
-            val landing = Vec3(n.x + 0.5, n.y, n.z + 0.5)
-            if (!isAheadOnSegment(player.position(), takeoff, landing)) continue
-            if (distanceToSegmentHorizontalSq(player.x, player.z, takeoff, landing) >
-                HILL_JUMP_TRIGGER_DIST_SQ * effectiveJumpRangeMultiplier()
-            ) continue
+        val n = nodes[nextIdx]
+        val floorPos = BlockPos(
+            Math.floor(n.x).toInt(),
+            Math.round(n.y).toInt(),
+            Math.floor(n.z).toInt()
+        )
 
-            return jumpTrue(JUMP_SUPPRESS_TICKS)
+        val bs = cachedBlock(level, floorPos)
+        if (!bs.block.descriptionId.contains("snow")) return false
+
+        val shape = bs.getCollisionShape(level, floorPos)
+        if (shape.isEmpty) return false
+
+        val snowTopY = floorPos.y + shape.bounds().maxY
+        val rise = snowTopY - effectiveStandY(level, player)
+
+        if (rise <= SNOW_STEP_BLOCK) return false        // vanilla auto-steps it
+        if (rise > SNOW_MAX_JUMP_CLEAR) return false      // too tall: replan, no hop
+        return jumpTrue(JUMP_SUPPRESS_TICKS)
+    }
+
+    /**
+     * Player's effective standing height in blocks. Standing on snow sinks the
+     * player one layer (2px) for the purpose of the *next* step — the
+     * user-confirmed "the L-1 comes after you step in" rule.
+     */
+    private fun effectiveStandY(level: Level, player: LocalPlayer): Double {
+        val supportPos = BlockPos(
+            Math.floor(player.x).toInt(),
+            Math.floor(player.y - 0.001).toInt(),
+            Math.floor(player.z).toInt()
+        )
+        val support = cachedBlock(level, supportPos)
+        if (support.block.descriptionId.contains("snow")) {
+            val shape = support.getCollisionShape(level, supportPos)
+            if (!shape.isEmpty) {
+                return supportPos.y + shape.bounds().maxY - SNOW_SINK_BLOCK
+            }
         }
-        return false
+        return player.y
     }
 
     /**
@@ -467,9 +497,27 @@ internal object JumpDetector {
         return false
     }
 
-    // â”€â”€ Per-node flag bits (mirrored from NativePathfinder) â”€â”€
-    private const val FLAG_LOW_HEADROOM = 1 shl 2
-    private const val FLAG_STEP_UP_NEXT = 1 shl 5
+    // ── Helpers ───────────────────────────────────────────────────────────
+
+    private fun usesGroundMovement(): Boolean =
+        activeAction == ActionType.WALK ||
+            activeAction == ActionType.SPRINT ||
+            activeAction == ActionType.JUMP ||
+            activeAction == ActionType.SPRINT_JUMP ||
+            activeAction == ActionType.AOTV
+
+    companion object {
+        // Per-node flag bits (mirrored from NativePathfinder)
+        private const val FLAG_LOW_HEADROOM   = 1 shl 2
+        private const val FLAG_STEP_UP_NEXT   = 1 shl 5
+        // Planner marked this as an in-rule snow auto-step: suppress the jump.
+        private const val FLAG_SNOW_STEP      = 1 shl 8
+
+        // Snow geometry in blocks (1 layer = 2px = 1/8). Mirrors native
+        // SnowGeometry so the executor and planner never disagree.
+        private const val SNOW_STEP_BLOCK = 5.0 / 8.0      // 0.625 auto-step cap
+        private const val SNOW_SINK_BLOCK = 1.0 / 8.0      // post-step "sink" of one layer
+        private const val SNOW_MAX_JUMP_CLEAR = 1.25       // taller → replan, not a hop
 
     // â”€â”€ Jump detection (Phantom values) â”€â”€
     private const val STEP_HEIGHT = 0.6
