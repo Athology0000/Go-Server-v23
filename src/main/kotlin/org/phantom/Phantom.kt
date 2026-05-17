@@ -175,6 +175,7 @@ object Phantom : ClientModInitializer {
         ColoredEnchantsModule,
         MissingEnchantsModule,
         LagDetectorModule,
+        TimerModule,
         CraftHelperModule,
         AutoStashModule,
         RsaAutoGfsModule,

@@ -22,6 +22,8 @@ import org.phantom.internal.routes.RouteType
 object GemstoneMinerModule : Module("Gemstone Miner") {
 
   override val category = ModuleCategory.MINING
+  override fun isVisibleInUi(): Boolean =
+    MiningMacroModule.currentMiningArea() != MiningArea.GLACITE
 
   private val mc: Minecraft = Minecraft.getInstance()
 

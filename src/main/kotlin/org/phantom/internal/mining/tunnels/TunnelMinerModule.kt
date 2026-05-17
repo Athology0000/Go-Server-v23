@@ -2,9 +2,14 @@ package org.phantom.internal.mining.tunnels
 
 import org.phantom.api.module.Module
 import org.phantom.api.module.ModuleCategory
+import org.phantom.internal.mining.MiningArea
+import org.phantom.internal.mining.MiningMacroModule
 
 object TunnelMinerModule : Module("Tunnel Miner") {
   override val category = ModuleCategory.MINING
+
+  override fun isVisibleInUi(): Boolean =
+    MiningMacroModule.currentMiningArea() == MiningArea.GLACITE
 
   var isActive: Boolean = false
     private set

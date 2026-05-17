@@ -110,14 +110,18 @@ object HypixelManager {
         currentMap = cleanPlace(map) ?: UNKNOWN
         currentMode = mode.toDisplayName().ifBlank { UNKNOWN }
         currentArea = detectLiveArea() ?: currentMap.takeIf(::isKnown) ?: UNKNOWN
+        updateWorldCacheLocation()
+    }
 
-        val cacheName = cleanPlace(map) ?: currentMap.takeIf(::isKnown) ?: currentMode.takeIf(::isKnown) ?: currentServerType
+    private fun updateWorldCacheLocation() {
+        val cacheName = cachePlaceName()
         val rawId = when {
             cacheName.isNotBlank() && isKnown(cacheName) -> cacheName
-            serverType.equals("SKYBLOCK", ignoreCase = true) -> if (mode.isNotBlank()) "skyblock_$mode" else "skyblock_generic"
-            lobbyName.isNotBlank() -> "lobby_$lobbyName"
-            serverType.isNotBlank() -> "type_$serverType"
-            else -> "server_$serverName"
+            currentServerType.equals("SKYBLOCK", ignoreCase = true) ->
+                if (currentMode.isNotBlank() && isKnown(currentMode)) "skyblock_$currentMode" else "skyblock_generic"
+            currentLobbyName.isNotBlank() && isKnown(currentLobbyName) -> "lobby_$currentLobbyName"
+            currentServerType.isNotBlank() && isKnown(currentServerType) -> "type_$currentServerType"
+            else -> "server_$currentServerName"
         }
 
         val newLobby = rawId.replace(Regex("[^a-zA-Z0-9_\\-]"), "_")
@@ -134,6 +138,23 @@ object HypixelManager {
             currentLobby = newLobby
             sendWorldChangeMessage(displayName, newLobby)
         }
+    }
+
+    private fun cachePlaceName(): String {
+        val area = currentArea.takeIf(::isKnown)
+        val map = currentMap.takeIf(::isKnown)
+        val mode = currentMode.takeIf(::isKnown)
+        if (currentServerType.equals("SKYBLOCK", ignoreCase = true) && area != null && shouldCacheByArea(area, map, mode)) {
+            return area
+        }
+        return map ?: mode ?: currentServerType
+    }
+
+    private fun shouldCacheByArea(area: String, map: String?, mode: String?): Boolean {
+        if (area.equals("Dwarven Mines", ignoreCase = true)) return false
+        return isDwarvenOrGlaciteLocation(area) ||
+            map?.equals("Dwarven Mines", ignoreCase = true) == true ||
+            mode?.equals("Dwarven Mines", ignoreCase = true) == true
     }
 
     private fun onDisconnect() {
@@ -155,8 +176,9 @@ object HypixelManager {
 
     private fun refreshLiveLocation() {
         val detected = detectLiveArea()
-        if (detected != null) {
+        if (detected != null && !detected.equals(currentArea, ignoreCase = true)) {
             currentArea = detected
+            updateWorldCacheLocation()
         }
     }
 
@@ -187,12 +209,24 @@ object HypixelManager {
         var fallback: String? = null
 
         for (line in lines) {
-            detectKnownDwarvenLocation(line)?.let { return it }
+            detectKnownDwarvenLocation(line)?.let { place ->
+                if (isBroadDwarvenMap(place)) {
+                    if (fallback == null) fallback = place
+                } else {
+                    return place
+                }
+            }
 
             for (regex in LOCATION_LABELS) {
                 regex.find(line)?.let { match ->
                     cleanPlace(match.groupValues[1])?.let { place ->
-                        detectKnownDwarvenLocation(place)?.let { return it }
+                        detectKnownDwarvenLocation(place)?.let { detected ->
+                            if (isBroadDwarvenMap(detected)) {
+                                if (fallback == null) fallback = detected
+                            } else {
+                                return detected
+                            }
+                        }
                         if (fallback == null) fallback = place
                     }
                 }
@@ -201,7 +235,13 @@ object HypixelManager {
             val symbolIndex = line.indexOf('\u23E3')
             if (symbolIndex >= 0 && symbolIndex + 1 < line.length) {
                 cleanPlace(line.substring(symbolIndex + 1))?.let { place ->
-                    detectKnownDwarvenLocation(place)?.let { return it }
+                    detectKnownDwarvenLocation(place)?.let { detected ->
+                        if (isBroadDwarvenMap(detected)) {
+                            if (fallback == null) fallback = detected
+                        } else {
+                            return detected
+                        }
+                    }
                     if (fallback == null) fallback = place
                 }
             }
@@ -233,8 +273,18 @@ object HypixelManager {
 
     private fun detectKnownDwarvenLocation(raw: String): String? {
         val normalized = normalizeLocationKey(raw)
-        return DWARVEN_LOCATION_ALIASES[normalized]
+        DWARVEN_LOCATION_ALIASES[normalized]?.let { return it }
+        return DWARVEN_LOCATION_ALIASES.entries
+            .sortedByDescending { it.key.length }
+            .firstOrNull { (alias, _) -> normalized.contains(alias) }
+            ?.value
     }
+
+    private fun isBroadDwarvenMap(place: String): Boolean =
+        place.equals("Dwarven Mines", ignoreCase = true)
+
+    private fun isDwarvenOrGlaciteLocation(place: String): Boolean =
+        detectKnownDwarvenLocation(place) != null
 
     private fun normalizeLocationKey(raw: String): String =
         ChatFormatting.stripFormatting(raw).orEmpty()
@@ -290,6 +340,7 @@ object HypixelManager {
         "royal mines" to "Royal Mines",
         "cliffside veins" to "Cliffside Veins",
         "upper mines" to "Upper Mines",
+        "upper mine" to "Upper Mines",
         "ramparts quarry" to "Rampart's Quarry",
         "rampart quarry" to "Rampart's Quarry",
         "lava springs" to "Lava Springs",
@@ -304,6 +355,15 @@ object HypixelManager {
         "divans gateway" to "Divan's Gateway",
         "miners guild" to "Miner's Guild",
         "dwarven village" to "Dwarven Village",
+        "dwarven base camp" to "Dwarven Base Camp",
+        "glacite tunnels" to "Glacite Tunnels",
+        "the glacite tunnels" to "Glacite Tunnels",
+        "great glacite lake" to "Great Glacite Lake",
+        "glacite lake" to "Great Glacite Lake",
+        "glacite mineshafts" to "Glacite Mineshafts",
+        "glacite mineshaft" to "Glacite Mineshafts",
+        "fossil research center" to "Fossil Research Center",
+        "grandpa wolfs cave" to "Grandpa Wolf's Cave",
         "dwarven mines" to "Dwarven Mines",
     )
 }

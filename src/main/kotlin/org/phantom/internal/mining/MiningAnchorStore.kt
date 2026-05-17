@@ -35,7 +35,7 @@ internal object MiningAnchorStore {
         "Citrine Gemstone",
     )
 
-    fun areaForY(y: Int): MiningArea = if (y < 189) MiningArea.DWARVEN else MiningArea.GLACITE
+    fun areaForY(y: Int): MiningArea = if (y > 187) MiningArea.GLACITE else MiningArea.DWARVEN
 
     fun areaFor(pos: BlockPos): MiningArea = areaForY(pos.y)
 

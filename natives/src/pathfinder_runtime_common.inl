@@ -319,10 +319,22 @@ inline bool Runtime::isStepSurface(const int x, const int y, const int z) {
 }
 
 inline bool Runtime::isEdge(const int x, const int y, const int z) {
+  // A block occupies this cell -> it's a wall, not a fall edge (walls are
+  // handled separately by wallDistance/WALL_PENALTIES).
   if (isSolid(x, y, z)) return false;
-  if (isSolid(x, y - 1, z)) return false;
-  if (isSolid(x, y - 2, z)) return false;
-  return true;
+  // Lava at / adjacent to the cell is a "bad tile" to keep clearance from
+  // even though it isn't a drop.
+  if (isHazardousForWalking(x, y, z)) return true;
+  // No solid floor directly below the path level == a drop. Previously this
+  // only counted a >=3-block void (also checked y-1 and y-2), so the rims of
+  // 1-2 block ledges, lava edges and the world-buffer boundary produced ~0
+  // centering penalty and the min-cost route hugged them ("walks the edge,
+  // falls off"). Treating ANY missing floor as an edge makes the existing
+  // EDGE_PENALTIES gradient pull the path toward the middle of the walkable
+  // band (the user's `ooo iii ooo` -> centre `i`). Penalty is finite, so a
+  // genuine narrow ledge / required descent is still traversable.
+  if (!isSolid(x, y - 1, z)) return true;
+  return false;
 }
 
 inline bool Runtime::isWall(const int x, const int y, const int z) {

@@ -23,12 +23,34 @@ object CommissionHudModule : Module("Commission HUD") {
 
   private val labelColor  get() = (ThemeManager.currentTheme.text and 0x00FFFFFF) or 0x99000000.toInt()
   private val valueColor  get() = ThemeManager.currentTheme.accent
-  private fun rows() = listOf(
-    "Status"     to CommissionMacroModule.statusDisplay,
-    "Mode"       to CommissionMacroModule.modeDisplay,
-    "Commission" to CommissionMacroModule.commissionDisplay,
-    "Area"       to CommissionMacroModule.currentZoneDisplay,
-  )
+  private fun rows(): List<Pair<String, String>> {
+    return if (isGlaciteMode()) {
+      listOf(
+        "Status"     to GlaciteCommissionMacroModule.statusDisplay,
+        "Mode"       to GlaciteCommissionMacroModule.modeDisplay,
+        "Commission" to GlaciteCommissionMacroModule.commissionDisplay,
+        "Area"       to GlaciteCommissionMacroModule.currentZoneDisplay,
+      )
+    } else {
+      listOf(
+        "Status"     to CommissionMacroModule.statusDisplay,
+        "Mode"       to CommissionMacroModule.modeDisplay,
+        "Commission" to CommissionMacroModule.commissionDisplay,
+        "Area"       to CommissionMacroModule.currentZoneDisplay,
+      )
+    }
+  }
+
+  private val debugRow = CheckboxSetting("Debug", "Show parsed-commission debug line (gradient)", false)
+
+  private fun debugText(): String? =
+    if (debugRow.value && !isGlaciteMode()) CommissionMacroModule.commissionDebugDisplay else null
+
+  private fun isActiveCommissionMacro(): Boolean =
+    if (isGlaciteMode()) GlaciteCommissionMacroModule.isRunning else CommissionMacroModule.isRunning
+
+  private fun isGlaciteMode(): Boolean =
+    MiningMacroModule.currentMiningArea() == MiningArea.GLACITE
 
   val commissionHud = hudElement("commission-hud", "Commission HUD", "Tracks commission macro status") {
     anchor  = HudAnchor.TOP_LEFT
@@ -36,19 +58,27 @@ object CommissionHudModule : Module("Commission HUD") {
     offsetY = 80f
 
     val onlyWhenActive = setting(CheckboxSetting("Only When Active", "Hide when macro is off", true))
+    setting(debugRow)
 
     width {
-      (rows().maxOfOrNull { (l, v) -> NVGRenderer.textWidth("$l: $v", textSize) } ?: 120f) + padding * 2
+      val rowsW = rows().maxOfOrNull { (l, v) -> NVGRenderer.textWidth("$l: $v", textSize) } ?: 120f
+      val dbgW = debugText()?.let { NVGRenderer.textWidth(it, textSize) } ?: 0f
+      maxOf(rowsW, dbgW) + padding * 2
     }
 
-    height { lineHeight * rows().size + padding * 2 }
+    height {
+      lineHeight * rows().size + (if (debugText() != null) lineHeight else 0f) + padding * 2
+    }
 
     render { x, y, _ ->
-      if (onlyWhenActive.value && !CommissionMacroModule.isRunning) return@render
+      if (onlyWhenActive.value && !isActiveCommissionMacro()) return@render
 
       val r      = rows()
-      val panelW = (r.maxOfOrNull { (l, v) -> NVGRenderer.textWidth("$l: $v", textSize) } ?: 120f) + padding * 2
-      val panelH = lineHeight * r.size + padding * 2
+      val dbg    = debugText()
+      val rowsW  = r.maxOfOrNull { (l, v) -> NVGRenderer.textWidth("$l: $v", textSize) } ?: 120f
+      val dbgW   = dbg?.let { NVGRenderer.textWidth(it, textSize) } ?: 0f
+      val panelW = maxOf(rowsW, dbgW) + padding * 2
+      val panelH = lineHeight * r.size + (if (dbg != null) lineHeight else 0f) + padding * 2
       val now    = System.currentTimeMillis()
       val twoPi  = (Math.PI * 2).toFloat()
 
@@ -66,6 +96,12 @@ object CommissionHudModule : Module("Commission HUD") {
         NVGRenderer.text(labelStr, x + padding, ty, textSize, labelColor)
         val labelW = NVGRenderer.textWidth(labelStr, textSize)
         NVGRenderer.text(value, x + padding + labelW, ty, textSize, valueColor)
+      }
+
+      if (dbg != null) {
+        val ty = y + padding + r.size * lineHeight
+        val (g1, g2) = ThemeGradient.colors()
+        NVGRenderer.textGradient(dbg, x + padding, ty, textSize, g1, g2, Gradient.LeftToRight)
       }
     }
   }

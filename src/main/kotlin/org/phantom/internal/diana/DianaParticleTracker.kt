@@ -36,6 +36,7 @@ object DianaParticleTracker {
         START("Start", 0x55FF55),
         MOB("Mob", 0xFF5555),
         TREASURE("Treasure", 0xFFAA00),
+        GUESS("Guess", 0xFFFFFF),
         UNKNOWN("Burrow", 0xFFD700);
 
         fun toColor(alpha: Int): Color {
@@ -73,12 +74,6 @@ object DianaParticleTracker {
         val marker = markerFor(pkt) ?: return
 
         val player = mc.player ?: return
-        val dx = pkt.x - player.x
-        val dy = pkt.y - player.y
-        val dz = pkt.z - player.z
-        // Ignore local effects; burrow markers are projected away from the player.
-        if (dx * dx + dy * dy + dz * dz < 9.0) return
-
         if (activationPos == null) activationPos = player.position()
 
         val bx = pkt.x.roundToInt()
@@ -126,6 +121,22 @@ object DianaParticleTracker {
         synchronized(seenBurrows) { seenBurrows.remove(key) }
     }
 
+    fun addGuess(pos: Vec3, type: BurrowType = BurrowType.GUESS) {
+        val bx = pos.x.roundToInt()
+        val by = pos.y.roundToInt()
+        val bz = pos.z.roundToInt()
+        val key = (bx.toLong() shl 32) or (bz.toLong() and 0xFFFFFFFFL)
+        val now = System.currentTimeMillis()
+        synchronized(seenBurrows) {
+            val rec = seenBurrows.getOrPut(key) { BurrowRecord(bx, by, bz, lastSeenMs = now) }
+            rec.type = type
+            rec.hasEnchant = true
+            rec.found = true
+            rec.lastSeenMs = now
+        }
+        lastParticleMs = now
+    }
+
     /** Number of matching CRIT packets received - used by the macro threshold check. */
     fun count(): Int = packetCount
 
@@ -160,6 +171,8 @@ object DianaParticleTracker {
 
     /** Most recently confirmed burrow position, or null. */
     fun getBurrowPos(level: Level): Vec3? = getBurrowPositions(level).firstOrNull()
+
+    fun getBurrowRecord(level: Level): Pair<Vec3, BurrowType>? = getBurrowRecords(level).firstOrNull()
 
     private fun markerFor(packet: ClientboundLevelParticlesPacket): ParticleMarker? {
         val type = packet.particle.type

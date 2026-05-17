@@ -216,7 +216,7 @@ object MiningHudModule : Module("Mining HUD") {
 
   private fun activeMacroLabel(): String = when {
     RoutesModule.isRunning && RoutesModule.routeOwnsMining -> "Routes"
-    CommissionMacroModule.isRunning                       -> "Commission Macro"
+    CommissionMacroModule.isRunning                       -> "Dwarven Commission Macro"
     MiningModule.isNukerActive()                          -> "Mining Nuker"
     MiningMacroModule.isActive                            -> "Mining Macro"
     else                                                  -> "â€”"

@@ -49,9 +49,7 @@ internal class UIModuleList(
   private val allModules: List<UIModule> = addon.getModules()
     .map { module -> UIModule(module, this, false) }
 
-  private val allItems: List<UIComponent> = buildCategoryItems(allModules)
-
-  private var modules: List<UIComponent> = allItems
+  private var modules: List<UIComponent> = emptyList()
   private val modulesScroll = ScrollHandler()
 
   private var module = allModules.first()
@@ -73,7 +71,7 @@ internal class UIModuleList(
   )
 
   init {
-    components.addAll(allItems)
+    refreshModuleItems(resetSelection = true)
     components.add(backButton)
     components.add(topBar)
 
@@ -82,33 +80,13 @@ internal class UIModuleList(
     updateAuxPanel(allModules.first().module)
 
     topBar.searchChanged { searchText ->
-      modules = if (searchText.isEmpty()) {
-        allItems
-      } else {
-        val searchLower = searchText.lowercase()
-        allModules.filter { uiModule ->
-          uiModule.module.name.lowercase().contains(searchLower) ||
-            uiModule.module.getSettings().any { setting ->
-              setting.name.lowercase().contains(searchLower) ||
-                setting.description.lowercase().contains(searchLower)
-            }
-        }
-      }
-
-      val firstModule = modules.filterIsInstance<UIModule>().firstOrNull()
-      if (firstModule != null) {
-        setModule(firstModule)
-      } else {
-        components.removeAll(settings)
-        settings = emptyList()
-        settingsTabs = emptyList()
-        tabHitboxes = emptyList()
-        UIConfig.clearAuxPanel()
-      }
+      refreshModuleItems(resetSelection = true)
     }
   }
 
   override fun render() {
+    refreshModuleItems(resetSelection = false)
+
     NVGRenderer.rect(x, y, width, height, ThemeManager.currentTheme.background, 10F)
     NVGRenderer.line(
       x + width / 4F,
@@ -231,6 +209,40 @@ internal class UIModuleList(
       UIConfig.setAuxPanel(UIMiningStatsPanel())
     } else {
       UIConfig.clearAuxPanel()
+    }
+  }
+
+  private fun refreshModuleItems(resetSelection: Boolean) {
+    val searchLower = topBar.getSearchText().trim().lowercase()
+    val visibleModules = allModules.filter { uiModule ->
+      uiModule.module.isVisibleInUi() && (
+        searchLower.isEmpty() ||
+          uiModule.module.name.lowercase().contains(searchLower) ||
+          uiModule.module.getSettings().any { setting ->
+            setting.name.lowercase().contains(searchLower) ||
+              setting.description.lowercase().contains(searchLower)
+          }
+        )
+    }
+    val nextModules = if (searchLower.isEmpty()) buildCategoryItems(visibleModules) else visibleModules
+    if (nextModules == modules) return
+
+    components.removeAll(modules)
+    modules = nextModules
+    components.addAll(modules)
+
+    val selectedStillVisible = modules.filterIsInstance<UIModule>().any { it === module }
+    if (resetSelection || !selectedStillVisible) {
+      val firstModule = modules.filterIsInstance<UIModule>().firstOrNull()
+      if (firstModule != null) {
+        setModule(firstModule)
+      } else {
+        components.removeAll(settings)
+        settings = emptyList()
+        settingsTabs = emptyList()
+        tabHitboxes = emptyList()
+        UIConfig.clearAuxPanel()
+      }
     }
   }
 

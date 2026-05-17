@@ -1,5 +1,6 @@
 package org.phantom.internal.diana
 
+import net.minecraft.ChatFormatting
 import net.minecraft.client.Minecraft
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.phys.AABB
@@ -46,6 +47,7 @@ object DianaMacroModule : Module("Diana Macro") {
     private var waitTicksElapsed        = 0
 
     private var burrowPos: Vec3?   = null
+    private var burrowType: DianaParticleTracker.BurrowType = DianaParticleTracker.BurrowType.UNKNOWN
     private var targetEntityId: Int = -1
 
     // -- Settings --------------------------------------------------------------
@@ -74,9 +76,18 @@ object DianaMacroModule : Module("Diana Macro") {
     // -- Constants -------------------------------------------------------------
 
     private val DIANA_MOB_NAMES = listOf(
-        "Minotaur", "Minos Hunter", "Minos Champion", "Gaia Construct", "Minos Inquisitor"
+        "Siamese Lynxes",
+        "Minos Hunter",
+        "Minotaur",
+        "Gaia Construct",
+        "Minos Champion",
+        "Minos Inquisitor",
+        "Cretan Bull",
+        "Harpy",
+        "Sphinx",
+        "King Minos",
+        "Manticore",
     )
-
     private const val COMBAT_ROTATION_STEP_SCALE = 0.62
 
     private val rotationStrategy = BezierTrackingRotationStrategy(
@@ -105,6 +116,7 @@ object DianaMacroModule : Module("Diana Macro") {
         RotationExecutor.stopRotating()
         state = State.IDLE
         burrowPos = null
+        burrowType = DianaParticleTracker.BurrowType.UNKNOWN
         targetEntityId = -1
         activatingTicksElapsed = 0
         collectTicksElapsed = 0
@@ -158,10 +170,13 @@ object DianaMacroModule : Module("Diana Macro") {
             State.COLLECTING_PARTICLES -> {
                 collectTicksElapsed++
                 // Transition as soon as we have enough packets - don't wait the full duration
-                if (DianaParticleTracker.count() >= minParticlesSetting.value.toInt()) {
-                    val pos = DianaParticleTracker.getBurrowPos(level)
-                    if (pos != null) {
-                        burrowPos = pos
+                val record = DianaParticleTracker.getBurrowRecord(level)
+                if (record != null || DianaParticleTracker.count() >= minParticlesSetting.value.toInt()) {
+                    val resolved = record ?: DianaParticleTracker.getBurrowRecord(level)
+                    if (resolved != null) {
+                        burrowPos = resolved.first
+                        burrowType = resolved.second
+                        DianaProfitTracker.onMacroTarget(burrowType)
                         pathfindingTicksElapsed = 0
                         state = State.PATHFINDING
                         return
@@ -199,6 +214,7 @@ object DianaMacroModule : Module("Diana Macro") {
                             NativePathfinder.stop()
                             val bp2 = burrowPos
                             if (bp2 != null) DianaParticleTracker.removeBurrow(floor(bp2.x).toInt(), floor(bp2.z).toInt())
+                            DianaProfitTracker.onMacroArrived()
                             player.inventory.selectedSlot = spadeSlot
                             digTicksElapsed = 0
                             state = State.DIGGING
@@ -226,6 +242,7 @@ object DianaMacroModule : Module("Diana Macro") {
                 if (state == State.PATHFINDING && player.position().distanceTo(Vec3(bp.x, bp.y + 1.0, bp.z)) <= 2.0) {
                     NativePathfinder.stop()
                     DianaParticleTracker.removeBurrow(floor(bp.x).toInt(), floor(bp.z).toInt())
+                    DianaProfitTracker.onMacroArrived()
                     player.inventory.selectedSlot = spadeSlot
                     digTicksElapsed = 0
                     state = State.DIGGING
@@ -240,16 +257,30 @@ object DianaMacroModule : Module("Diana Macro") {
                 MovementManager.forcedUse = true
                 digTicksElapsed++
 
+                if (burrowType != DianaParticleTracker.BurrowType.MOB &&
+                    burrowType != DianaParticleTracker.BurrowType.GUESS &&
+                    digTicksElapsed >= 12
+                ) {
+                    MovementManager.forcedUse = false
+                    DianaParticleTracker.removeBurrow(floor(bp.x).toInt(), floor(bp.z).toInt())
+                    DianaProfitTracker.onMacroDug()
+                    waitTicksElapsed = 0
+                    state = State.WAITING
+                    return
+                }
+
                 val mob = level.getEntitiesOfClass(
                     LivingEntity::class.java,
-                    AABB(bp, bp).inflate(6.0)
+                    AABB(bp, bp).inflate(10.0)
                 ).firstOrNull { e ->
-                    val name = e.displayName.string
+                    val name = ChatFormatting.stripFormatting(e.displayName.string).orEmpty()
                     DIANA_MOB_NAMES.any { n -> name.contains(n, ignoreCase = true) }
                 }
 
                 if (mob != null) {
                     MovementManager.forcedUse = false
+                    DianaProfitTracker.onMacroDug()
+                    DianaProfitTracker.onMacroMobFound()
                     targetEntityId = mob.id
                     player.inventory.selectedSlot = weaponSlot
                     state = State.COMBAT
@@ -270,6 +301,7 @@ object DianaMacroModule : Module("Diana Macro") {
 
                 val target = level.getEntity(targetEntityId)
                 if (target == null || (target as? LivingEntity)?.isAlive != true) {
+                    DianaProfitTracker.onMacroKill()
                     waitTicksElapsed = 0
                     state = State.WAITING
                     return

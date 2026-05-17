@@ -191,7 +191,9 @@ internal fun MiningMacroModule.tryStartFromLearnedAnchors(
   val merged = mergeSelections(selections)
   val playerPos = player.blockPosition()
   val anchorKeys = linkedSetOf<Long>()
-  for (area in MiningAnchorStore.areasForTypes(selections.map { it.label }, player.blockY)) {
+  val areas = MiningAnchorStore.areasForTypes(selections.map { it.label }, player.blockY)
+  areas += currentMiningArea(player)
+  for (area in areas) {
     anchorKeys.addAll(MiningAnchorStore.get(area))
   }
   if (anchorKeys.isEmpty()) return false
@@ -254,7 +256,10 @@ internal fun MiningMacroModule.rememberVeinAnchor(pos: BlockPos) {
   if (!rememberVeinSpots.value) return
   val type = mc.level
     ?.let { level -> MiningBlockRegistry.BLOCK_ID_TO_TYPE[blockIdAt(level, pos)] }
-  val area = MiningAnchorStore.areaForType(type, pos.y)
+  val area = when (currentMiningArea()) {
+    MiningArea.GLACITE -> MiningArea.GLACITE
+    MiningArea.DWARVEN -> MiningAnchorStore.areaForType(type, pos.y)
+  }
   MiningAnchorStore.add(pos, MiningMacroModule.LEARNED_ANCHOR_CAP, area)
 }
 

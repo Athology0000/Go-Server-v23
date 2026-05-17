@@ -36,7 +36,7 @@ import org.phantom.api.util.player.MovementManager
 import org.phantom.internal.combat.CombatMacroModule
 import org.phantom.internal.pathfinding.PathfindingModule
 
-object CommissionMacroModule : Module("Commission Macro") {
+object CommissionMacroModule : Module("Dwarven Commission Macro") {
 
   override val category = ModuleCategory.MINING
 
@@ -50,7 +50,7 @@ object CommissionMacroModule : Module("Commission Macro") {
 
   private val toggleKeybind = KeyBindSetting(
     "Toggle Keybind",
-    "Key to start/stop the commission macro.",
+    "Key to start/stop the Dwarven commission macro.",
     KeyBind(-1),
   )
 
@@ -137,6 +137,25 @@ object CommissionMacroModule : Module("Commission Macro") {
   private var emissariesUnlocked = true
   private var suppressPathCallbacks = false
 
+  // --- Optimal warping -------------------------------------------------------
+  // Before generating any commission path, if warping to the Forge or Dwarven
+  // hub lands meaningfully closer (3D) to the destination than walking from
+  // here, warp first then path. Loop-safe: after warping the player is ~at the
+  // anchor, so the min-gain check fails on the re-evaluation.
+  private val optimalWarpForge = Vec3(-48.5, 200.0, -121.5)
+  private val optimalWarpDwarves = Vec3(0.5, 149.0, -68.5)
+  private val optimalWarpForgeCmd = "warpforge"
+  private val optimalWarpDwarvesCmd = "warp dwarves"
+  private val optimalWarpMinGain = 25.0          // blocks the warp must save vs walking
+  private val optimalWarpLoadDelayTicks = 40     // skip processing while the warp loads (~2s)
+  private val optimalWarpArriveDist = 8.0        // within this of the anchor => warp landed
+  private val optimalWarpTimeoutTicks = 200L     // hard cap: path anyway if never arrives (~10s)
+  private var pendingWarpPathPos: BlockPos? = null
+  private var pendingWarpPathRadius = 2.5
+  private var pendingWarpPathSuppress = false
+  private var pendingWarpAnchor: Vec3? = null
+  private var pendingWarpDeadlineTick = 0L
+
   private data class DetectedCommission(
     val label: String,
     val progress: Double,
@@ -172,8 +191,15 @@ object CommissionMacroModule : Module("Commission Macro") {
   )
 
   val statusDisplay: String get() = statusText.value
-  val modeDisplay: String get() = "PHANTOMV2"
+  val modeDisplay: String get() = "DWARVEN"
   val commissionDisplay: String get() = commissionText.value
+  // Debug: what commission set was last parsed, from where, and the claim
+  // debounce state â€” surfaced by the Commission HUD's gradient debug line.
+  private var lastParsedCommissions = "-"
+  private var lastParseSource = "-"
+  val commissionDebugDisplay: String
+    get() = "src=$lastParseSource [$lastParsedCommissions] det=$detectorAttempts " +
+      "done=${lastCompletedCommissionName ?: "-"} st=${state.name}"
   val currentZoneDisplay: String get() = detectAreaFromTabList() ?: "Unknown"
   val targetedCommissionName: String? get() = currentCommission?.name
   val targetZoneDisplay: String get() = if (currentTask?.type == CommissionTaskType.SLAYER) "Combat Zone" else "Dwarven Mines"
@@ -224,6 +250,25 @@ object CommissionMacroModule : Module("Commission Macro") {
     }
 
     val tick = mc.level?.gameTime ?: 0L
+
+    // Deferred optimal-warp path: wait until the teleport lands near the warp
+    // anchor (or the hard timeout), then generate the path from the new spot.
+    val pendingPos = pendingWarpPathPos
+    if (pendingPos != null) {
+      val anchor = pendingWarpAnchor
+      val p = mc.player
+      val landed = p != null && anchor != null &&
+        Vec3(p.x, p.y, p.z).distanceTo(anchor) <= optimalWarpArriveDist
+      if (landed || tick >= pendingWarpDeadlineTick) {
+        val r = pendingWarpPathRadius
+        val sup = pendingWarpPathSuppress
+        pendingWarpPathPos = null
+        pendingWarpAnchor = null
+        startPath(pendingPos, r, suppressArriveCallbacks = sup, skipOptimalWarp = true)
+      }
+      return
+    }
+
     if (tick - lastTabReadTick >= 20L) {
       updateCommissionsIfChanged(readCommissionsFromTabList())
       lastTabReadTick = tick
@@ -286,6 +331,26 @@ object CommissionMacroModule : Module("Commission Macro") {
     if (screen != null) {
       val parsed = parseCommissionSelectionFromGui(screen)
       if (parsed.commissions.isNotEmpty()) {
+        lastParsedCommissions = parsed.commissions.joinToString(",") {
+          "${it.name}${if (it.progress >= 1.0) "*" else ""}"
+        }
+        val doneName = lastCompletedCommissionName
+        val staleCompleted = doneName != null &&
+          parsed.commissions.any { it.name == doneName && it.progress >= 1.0 }
+        if (staleCompleted) {
+          // Post-claim hole: the menu still shows the just-claimed commission
+          // as complete (server hasn't refreshed it yet). Letting
+          // updateCommissionsFromGui seed this makes it GUI-authoritative for
+          // 5s, suppressing the fresh tab list â€” so we'd re-pick the OLD
+          // commission. Discard this stale parse and wait for the real refresh.
+          lastParseSource = "GUI-stale"
+          mc.player?.closeContainer()
+          awaitingTabUpdate = true
+          setStatus("Waiting for commissions to refresh...")
+          delay(2)
+          return
+        }
+        lastParseSource = "GUI"
         updateCommissionsFromGui(parsed.commissions)
         mc.player?.closeContainer()
         detectorAttempts = 0
@@ -454,8 +519,10 @@ object CommissionMacroModule : Module("Commission Macro") {
         setStatus("Claiming rewards...")
         return
       }
+      val synced = syncCommissionsAfterClaim(screen)
       mc.player?.closeContainer()
       resetCommissionAfterClaim()
+      if (!synced) awaitingTabUpdate = true
       setState(State.WAITING_GUI_CLOSE)
       return
     }
@@ -476,8 +543,15 @@ object CommissionMacroModule : Module("Commission Macro") {
 
     val target = getClosestEmissaryLocation(player)
     if (!hasArrivedAt(target, 4.0)) {
-      travelPurpose = null
-      startPath(target, 2.5)
+      // Issue the walk ONCE and let it run â€” re-requesting every tick
+      // cancels+restarts the pather 20Ã—/s so the player never actually moves.
+      // suppressArriveCallbacks: arrival is handled by this poll, not by
+      // startPath's onPathComplete (which would re-mine the finished task).
+      val claimPathActive = PathService.isActive && PathService.owner == PathOwner.COMMISSION
+      if (!claimPathActive) {
+        travelPurpose = null
+        startPath(target, 2.5, suppressArriveCallbacks = true)
+      }
       setStatus("Traveling to emissary...")
       return
     }
@@ -581,6 +655,10 @@ object CommissionMacroModule : Module("Commission Macro") {
     ignoreTabUpdatesUntil = System.currentTimeMillis() + 5_000L
     awaitingTabUpdate = true
     claimAttempts = 0
+    // The task is finished. Clearing it here kills the stale-task hazard: a
+    // path arriving during CLAIMING must never route back into onPathComplete
+    // and restart mining.
+    currentTask = null
     setState(State.CLAIMING)
   }
 
@@ -625,6 +703,8 @@ object CommissionMacroModule : Module("Commission Macro") {
     claimAttempts = 0
     detectorAttempts = 0
     suppressPathCallbacks = false
+    pendingWarpPathPos = null
+    pendingWarpAnchor = null
     sessionStartMs = 0L
     setStatus(State.IDLE.label)
     commissionText.value = "None"
@@ -640,6 +720,19 @@ object CommissionMacroModule : Module("Commission Macro") {
     awaitingTabUpdate = false
     claimAttempts = 0
     detectorAttempts = 0
+  }
+
+  private fun syncCommissionsAfterClaim(screen: AbstractContainerScreen<*>): Boolean {
+    val parsed = parseCommissionSelectionFromGui(screen)
+    if (parsed.commissions.isEmpty()) {
+      return false
+    }
+    lastParsedCommissions = parsed.commissions.joinToString(",") {
+      "${it.name}${if (it.progress >= 1.0) "*" else ""}"
+    }
+    lastParseSource = "GUI-claim"
+    updateCommissionsFromGui(parsed.commissions)
+    return true
   }
 
   private fun setState(newState: State) {
@@ -823,9 +916,18 @@ object CommissionMacroModule : Module("Commission Macro") {
     currentWaypoint = best
   }
 
-  private fun startPath(pos: BlockPos, radius: Double) {
+  private fun startPath(
+    pos: BlockPos,
+    radius: Double,
+    suppressArriveCallbacks: Boolean = false,
+    skipOptimalWarp: Boolean = false,
+  ) {
     val level = mc.level
     val resolved = if (level != null) MinecraftPathingRules.resolveTarget(level, pos) ?: pos else pos
+    if (!skipOptimalWarp && maybeOptimalWarp(resolved, radius, suppressArriveCallbacks)) {
+      // Warp issued; the path is deferred until the teleport lands (onTick).
+      return
+    }
     cancelCommissionPath()
     pathActivated = false
     PathfindingModule.ensureEnabledForAutomation("commission macro")
@@ -839,15 +941,25 @@ object CommissionMacroModule : Module("Commission Macro") {
         timeoutTicks = 2400,
         arrivalRadius = radius,
         onArrive = {
-          if (!suppressPathCallbacks) {
+          if (!suppressPathCallbacks && !suppressArriveCallbacks) {
             pathActivated = true
             currentTask?.let(::onPathComplete) ?: setState(State.CHOOSING)
+          } else if (!suppressPathCallbacks) {
+            // Claim walk: arrival is handled by handleClaiming's own
+            // hasArrivedAt poll while staying in CLAIMING. Do NOT route
+            // through onPathComplete â€” currentTask may still be the finished
+            // mining task, which would bounce us back into MINING instead of
+            // claiming at the emissary.
+            pathActivated = true
           }
         },
         onFail = {
-          if (!suppressPathCallbacks) {
+          if (!suppressPathCallbacks && !suppressArriveCallbacks) {
             onPathFail()
           }
+          // Claim walk: a fail just lets handleClaiming re-request next tick
+          // (and the existing King fallback handles a missing emissary once
+          // close). Leaving CLAIMING via onPathFail was a hole.
         },
       )
     )
@@ -855,6 +967,36 @@ object CommissionMacroModule : Module("Commission Macro") {
       ChatUtils.sendMessage("Commission Macro: path request was rejected.")
       onPathFail()
     }
+  }
+
+  /**
+   * If warping to Forge or Dwarven lands meaningfully closer (3D) to [target]
+   * than walking from the player's current spot, issue the closer warp and
+   * stash the path request to fire once the teleport lands (handled in
+   * onTick). Returns true if a warp was issued (caller must defer the path).
+   */
+  private fun maybeOptimalWarp(target: BlockPos, radius: Double, suppress: Boolean): Boolean {
+    val player = mc.player ?: return false
+    val tgt = Vec3(target.x + 0.5, target.y.toDouble(), target.z + 0.5)
+    val dPlayer = Vec3(player.x, player.y, player.z).distanceTo(tgt)
+    val dForge = optimalWarpForge.distanceTo(tgt)
+    val dDwarves = optimalWarpDwarves.distanceTo(tgt)
+    val useForge = dForge <= dDwarves
+    val dWarp = if (useForge) dForge else dDwarves
+    // Must save at least the min-gain margin to be worth a multi-second warp.
+    if (dWarp + optimalWarpMinGain >= dPlayer) return false
+
+    cancelCommissionPath()
+    MovementManager.clearForcedMovement()
+    pendingWarpPathPos = target
+    pendingWarpPathRadius = radius
+    pendingWarpPathSuppress = suppress
+    pendingWarpAnchor = if (useForge) optimalWarpForge else optimalWarpDwarves
+    pendingWarpDeadlineTick = (mc.level?.gameTime ?: 0L) + optimalWarpTimeoutTicks
+    sendCommand(if (useForge) optimalWarpForgeCmd else optimalWarpDwarvesCmd)
+    setStatus("Optimal warp (saves ~${(dPlayer - dWarp).toInt()}b)...")
+    delay(optimalWarpLoadDelayTicks)
+    return true
   }
 
   private fun cancelCommissionPath() {
@@ -975,6 +1117,10 @@ object CommissionMacroModule : Module("Commission Macro") {
     if (newCommissions.isNotEmpty()) detectorAttempts = 0
     commissions = newCommissions
     lastCommissionSyncSource = "TAB"
+    lastParseSource = "TAB"
+    lastParsedCommissions = newCommissions.joinToString(",") {
+      "${it.name}${if (it.progress >= 1.0) "*" else ""}"
+    }
 
     if (awaitingTabUpdate) {
       val stillCompleted = commissions.any { c ->

@@ -40,6 +40,12 @@ abstract class Module(val name: String) : SettingsContainer {
    */
   open val autoDisableOnWorldUnload: Boolean = false
 
+  /**
+   * Dynamic UI visibility hook. Modules remain registered and runnable; this
+   * only controls whether the config module list shows them.
+   */
+  open fun isVisibleInUi(): Boolean = true
+
   val isEntitled: Boolean
     get() = Auth.isModuleEntitled(name)
 

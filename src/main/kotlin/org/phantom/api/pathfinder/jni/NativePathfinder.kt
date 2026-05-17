@@ -122,6 +122,7 @@ object NativePathfinder {
     private var selectedTeleportAction: ActionType = ActionType.WALK
 
     private var stuckTicks: Int = 0
+    private var deviationTicks: Int = 0
     private var lastStuckCheckPos: Vec3 = Vec3.ZERO
     private var collisionTicks: Int = 0
     private var lastCollisionCheckPos: Vec3 = Vec3.ZERO
@@ -148,6 +149,23 @@ object NativePathfinder {
 
     private const val STUCK_CHECK_INTERVAL = 20
     private const val STUCK_THRESHOLD = 0.5
+    // Fell-off / drifted-off-path replan: if the player stays this far (3D, in
+    // blocks) from EVERY path node for this many consecutive ticks while
+    // EXECUTING, replan from the current position. The no-movement stuck check
+    // can't catch a "fall off corner -> climb back -> fall off" loop because
+    // the player keeps moving; intended drops keep the player near the path
+    // nodes (the planner routed them down), so this only fires on a genuine
+    // off-path fall/drift.
+    private const val DEVIATION_CHECK_INTERVAL = 12
+    private const val DEVIATION_THRESHOLD = 3.5
+    // When a genuine physical stuck/drift recovery starts, force a short
+    // lookahead for a while so the executor actually does the CLOSE corrective
+    // movement (wiggle onto the next node / off the stair side) instead of
+    // staying glued to the far adaptive/velocity aim and chord-cutting. The
+    // short-lookahead path existed but had no caller, so recovery only ever
+    // did the far part. Auto-expires via PathExecutorState.tickOverrides().
+    private const val RECOVERY_LOOKAHEAD_DIST = 2.0
+    private const val RECOVERY_LOOKAHEAD_TICKS = 40
     private const val COLLISION_REPLAN_TICKS = 12
     private const val COLLISION_STUCK_THRESHOLD = 0.22
     private const val TELEPORT_YAW_THRESHOLD = 8f
@@ -302,6 +320,7 @@ object NativePathfinder {
         noTunnelCenter = false
         routeWpIndex = 0
         stuckTicks = 0
+        deviationTicks = 0
         collisionTicks = 0
         lastStuckCheckPos = Vec3.ZERO
         lastCollisionCheckPos = Vec3.ZERO
@@ -454,8 +473,36 @@ object NativePathfinder {
         if (stuckTicks >= STUCK_CHECK_INTERVAL && state == PathStatus.EXECUTING) {
             stuckTicks = 0
             val moved = playerPos.distanceTo(lastStuckCheckPos)
-            if (moved < STUCK_THRESHOLD) startReplan(playerPos)
+            if (moved < STUCK_THRESHOLD) startReplan(playerPos, crawlRecovery = true)
             lastStuckCheckPos = playerPos
+        }
+
+        if (state == PathStatus.EXECUTING) {
+            val devNodes = cachedFullPathNodes.ifEmpty { nodes }
+            if (devNodes.isNotEmpty()) {
+                var nearestSq = Double.MAX_VALUE
+                for (n in devNodes) {
+                    val ndx = playerPos.x - (n.x + 0.5)
+                    val ndy = playerPos.y - n.y
+                    val ndz = playerPos.z - (n.z + 0.5)
+                    val d2 = ndx * ndx + ndy * ndy + ndz * ndz
+                    if (d2 < nearestSq) nearestSq = d2
+                }
+                if (nearestSq > DEVIATION_THRESHOLD * DEVIATION_THRESHOLD) {
+                    deviationTicks++
+                    if (deviationTicks >= DEVIATION_CHECK_INTERVAL) {
+                        deviationTicks = 0
+                        // Persistently off the entire path while still moving:
+                        // the no-movement stuck check never fires and the
+                        // executor keeps steering back to the stale spline
+                        // (the corner we fell off) -> fall/climb/fall loop.
+                        // Replan from where we actually are to break it.
+                        startReplan(playerPos, crawlRecovery = true)
+                    }
+                } else {
+                    deviationTicks = 0
+                }
+            }
         }
 
         if (state == PathStatus.EXECUTING && stuckPositions.isNotEmpty()) {
@@ -768,11 +815,15 @@ object NativePathfinder {
             penalty = 36.0,
             ttlSearches = 2
         )
-        startReplan(playerPos)
+        startReplan(playerPos, crawlRecovery = true)
     }
 
-    private fun startReplan(playerPos: Vec3) {
+    private fun startReplan(playerPos: Vec3, crawlRecovery: Boolean = false) {
         if (state == PathStatus.REPLANNING) return
+        if (crawlRecovery) {
+            // Genuine stuck/drift: do the close part of recovery first.
+            PathExecutorState.setTemporaryLookahead(RECOVERY_LOOKAHEAD_DIST, RECOVERY_LOOKAHEAD_TICKS)
+        }
         state = PathStatus.REPLANNING
         NativePathfinderJNI.cancelSearch()
         searchFuture?.cancel(true)

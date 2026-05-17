@@ -174,7 +174,11 @@ object PathExecutorState {
     // =========================================================================
 
     private const val MIN_LOOKAHEAD = 2.35
-    private const val MAX_LOOKAHEAD = 10.0
+    // Ceiling raised 10.0 -> 14.0: SkyBlock movement speed is well above vanilla
+    // (often 8-16 b/s vs ~5.6 sprint), so the speed-scaled lead needs headroom
+    // to keep a roughly constant lead *time*. At vanilla speeds the target
+    // never approaches the old 10.0, so this only affects high SkyBlock speeds.
+    private const val MAX_LOOKAHEAD = 14.0
     private const val PRECISION_LOOKAHEAD = 1.25
     private const val PRECISION_CURVATURE = 0.34
     private const val DROP_SCAN_DISTANCE = 3.5
@@ -1030,9 +1034,15 @@ object PathExecutorState {
     }
 
     /**
-     * Extra lookahead distance proportional to the player's horizontal speed.
-     * Capped at half of the configured "far" distance so it can't dominate the
-     * adaptive behavior. Returns 0 when boost is disabled or speed is tiny.
+     * Extra lookahead distance proportional to the player's horizontal speed,
+     * so the aim leads by a roughly constant *time* (~lookaheadVelocityBoost
+     * seconds) regardless of how fast SkyBlock movement is. The old cap was
+     * `lookaheadDistanceFar * 0.5` (= 3.5 b), a vanilla-sprint-derived value
+     * that saturated by ~11 b/s â€” at SkyBlock speeds the lead distance stopped
+     * growing while speed kept rising, so the lead time collapsed and the aim
+     * turned late (slight overshoot / wide corners). Cap now scales with the
+     * real lookahead ceiling; the curvature/turn caps still rein this in
+     * through corners, so the extra reach only applies on straights.
      */
     private fun velocityLookaheadBoost(): Double {
         if (lookaheadVelocityBoost <= 0.0) return 0.0
@@ -1040,7 +1050,7 @@ object PathExecutorState {
         val speedXZ = sqrt(motion.x * motion.x + motion.z * motion.z) * 20.0 // blocks/sec
         if (speedXZ < 0.5) return 0.0
         val boost = speedXZ * lookaheadVelocityBoost
-        return boost.coerceAtMost(lookaheadDistanceFar * 0.5)
+        return boost.coerceAtMost(MAX_LOOKAHEAD - MIN_LOOKAHEAD)
     }
 
     private fun getAdaptiveLookaheadDistance(eye: Vec3, spline: SplinePath, dropAhead: Boolean): Double {

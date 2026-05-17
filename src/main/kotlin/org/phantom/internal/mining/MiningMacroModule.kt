@@ -52,6 +52,7 @@ import org.phantom.internal.rotation.RotationEasingType
 import org.phantom.internal.rotation.RotationsModule
 import org.phantom.internal.routes.RoutePickerSetting
 import org.phantom.internal.routes.RouteType
+import org.phantom.internal.skyblock.HypixelManager
 import org.phantom.internal.ui.panel.panels.UIModuleList
 
 object MiningMacroModule : Module("Mining Macro") {
@@ -182,9 +183,26 @@ object MiningMacroModule : Module("Mining Macro") {
    */
   internal val learnedVeinAnchors: LinkedHashSet<Long>
     get() {
-      val y = mc.player?.blockY ?: return MiningAnchorStore.get(MiningArea.DWARVEN)
-      return MiningAnchorStore.get(MiningAnchorStore.areaForY(y))
+      return MiningAnchorStore.get(currentMiningArea())
     }
+
+  internal fun currentMiningArea(player: Player? = mc.player): MiningArea {
+    if (player != null && player.blockY > 187) return MiningArea.GLACITE
+    val snapshot = HypixelManager.snapshot()
+    if (isGlaciteSubspace(snapshot.area) || isGlaciteSubspace(snapshot.map) || isGlaciteSubspace(snapshot.placeName)) {
+      return MiningArea.GLACITE
+    }
+    return player?.let { MiningAnchorStore.areaForY(it.blockY) } ?: MiningArea.DWARVEN
+  }
+
+  private fun isGlaciteSubspace(value: String): Boolean {
+    val normalized = value.lowercase()
+      .replace("'", "")
+      .replace(Regex("""[^a-z0-9]+"""), " ")
+      .replace(Regex("""\s+"""), " ")
+      .trim()
+    return normalized in GLACITE_SUBSPACES
+  }
 
   private val highlightPossibleBlocks = CheckboxSetting(
     "Highlight Possible Blocks",
@@ -762,6 +780,10 @@ object MiningMacroModule : Module("Mining Macro") {
   internal var cachedPreviewTarget: BlockPos? = null
   internal var previewCacheTick = -1L
   internal var lastPruneTick = 0L
+  // Last tick we force-refreshed the vein (prune+grow) on-demand because the
+  // selector was about to path away / give up. Throttled so genuine long
+  // travel doesn't re-flood the vein every tick.
+  internal var lastForcedRefreshTick = -1L
   internal var miningUsesPrecisionPoint = false
   internal val precisionRolls = HashMap<Long, Boolean>()
   internal var precisionPointChanceSnapshot = precisionPointChance.value
@@ -881,6 +903,7 @@ object MiningMacroModule : Module("Mining Macro") {
   internal const val SKIP_OCCUPIED_VEINS = true
   internal const val NUDGE_RANGE_EXTRA = 2.5   // blocks beyond mineRange to attempt a gentle nudge
   internal const val PUSH_EXTRA = 3.0           // within mineRange+this, close the gap with the deterministic nudge, not the native pather
+  internal const val REFRESH_BEFORE_PATH_TICKS = 4L  // min ticks between on-demand vein refreshes before a path/stop decision
   internal const val MAX_WALK_BLOCKS = 5.0      // never walk more than this many blocks to reach a target
   internal const val NEARBY_STEP_RANGE_EXTRA = 0.85
   internal const val NEARBY_STEP_REACH_BUFFER = 0.65
@@ -895,6 +918,12 @@ object MiningMacroModule : Module("Mining Macro") {
   internal const val RETURN_TO_ANCHOR_SCAN_VERTICAL = 2
   internal const val GOLDEN_GOBLIN_NAME = "golden goblin"
   internal const val GOLDEN_GOBLIN_LOST_TICKS = 20L
+  private val GLACITE_SUBSPACES = setOf(
+    "dwarven base camp",
+    "glacite tunnels",
+    "great glacite lake",
+    "grandpa wolfs cave",
+  )
 
   @SubscribeEvent
   fun onTick(@Suppress("UNUSED_PARAMETER") event: TickEvent.Start) {
@@ -1101,7 +1130,26 @@ object MiningMacroModule : Module("Mining Macro") {
       return
     }
 
-    val target = selectMineTarget(level, player, vein)
+    var target = selectMineTarget(level, player, vein)
+    // Prefer-close-before-path / no-stale-path: prune+grow only run every 20t,
+    // so when the cheap pick (an in-range block) fails, the vein set is stale
+    // â€” a block we just mined may still be in it (target gone) and close ore
+    // the mine just exposed isn't in it yet. Deciding to path away or give up
+    // on that stale set is exactly what makes the macro abandon nearby ore,
+    // stall, and stand still. So the moment the pick is null or out of range,
+    // refresh ore state on-demand and re-select once before committing to a
+    // path/stop. Throttled so genuine long travel doesn't re-flood per tick.
+    if ((target == null ||
+        mineReachDistanceSq(player, target) > mineRange.value * mineRange.value) &&
+      gameTime - lastForcedRefreshTick >= REFRESH_BEFORE_PATH_TICKS
+    ) {
+      lastForcedRefreshTick = gameTime
+      pruneVein(level, player, vein)
+      growVein(level, player, vein)
+      lastPruneTick = gameTime
+      sanitizeActiveTargets(level, player, vein)
+      target = selectMineTarget(level, player, vein)
+    }
     if (target == null) {
       currentTarget = null
       currentTargetNoLosTicks = 0

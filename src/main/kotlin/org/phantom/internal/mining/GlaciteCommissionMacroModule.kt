@@ -92,6 +92,16 @@ object GlaciteCommissionMacroModule : Module("Glacite Commission Macro") {
     private var pendingUseRelease = false
     private var lastAreaWarpAt = 0L
 
+    val statusDisplay: String get() = state.name.toDisplayLabel()
+    val modeDisplay: String get() = "GLACITE"
+    val commissionDisplay: String
+        get() {
+            val commission = currentCommission ?: getSupportedActiveCommissions().firstOrNull()
+            return commission?.let { "${it.name} ${formatProgressDisplay(it.progress)}" } ?: "None"
+        }
+    val currentZoneDisplay: String get() = detectAreaFromTab() ?: "Unknown"
+    val isRunning: Boolean get() = enabled.value
+
     init {
         addSetting(enabled, info)
         EventBus.register(this)
@@ -516,6 +526,14 @@ object GlaciteCommissionMacroModule : Module("Glacite Commission Macro") {
 
         return 0.0
     }
+
+    private fun formatProgressDisplay(progress: Double): String =
+        "${(progress * 100.0).toInt().coerceIn(0, 100)}%"
+
+    private fun String.toDisplayLabel(): String =
+        lowercase(Locale.US)
+            .split('_')
+            .joinToString(" ") { word -> word.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() } }
 
     private fun readTabLines(): List<String> {
         val connection = mc.connection ?: return emptyList()

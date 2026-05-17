@@ -2,9 +2,13 @@ package org.phantom.internal.diana
 
 import net.minecraft.ChatFormatting
 import net.minecraft.client.Minecraft
+import net.minecraft.core.BlockPos
+import net.minecraft.core.particles.ParticleTypes
 import net.minecraft.network.chat.Component
+import net.minecraft.network.protocol.game.ClientboundLevelParticlesPacket
 import net.minecraft.network.protocol.game.ServerboundUseItemPacket
 import net.minecraft.world.entity.LivingEntity
+import net.minecraft.world.level.block.Blocks
 import net.minecraft.world.phys.Vec3
 import org.phantom.api.event.EventBus
 import org.phantom.api.event.annotation.SubscribeEvent
@@ -31,7 +35,15 @@ import org.phantom.internal.pathfinding.OverlayRenderEngine
 import org.phantom.internal.pathfinding.OverlayRenderEngine.Color as OREColor
 import org.phantom.internal.visual.PetTabListParser
 import java.util.UUID
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.cos
 import kotlin.math.floor
+import kotlin.math.pow
+import kotlin.math.roundToInt
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 /**
  * Diana Helper - shows up to 4 predicted burrow locations as waypoints + directional compass HUD.
@@ -58,7 +70,18 @@ object DianaHelperModule : Module("Diana Helper") {
     val shareRareMobs = CheckboxSetting("Share Rare Mobs", "Send rare Diana mob coordinates to party chat when detected.", false)
     val petWarning = CheckboxSetting("Griffin Pet Warning", "Warn when using a Diana spade without a Griffin pet visible in tab.", true)
     val particleFailHint = CheckboxSetting("Particle Fail Hint", "Warn if a spade use does not produce Diana guess particles.", true)
+    val preciseGuess = CheckboxSetting("Precise Spade Guess", "Use SkyHanni-style spade lava trails to guess burrow locations before confirmation.", true)
+    val arrowGuess = CheckboxSetting("Arrow Guess", "Use SkyHanni-style arrow particles to guess the next burrow after digging.", true)
+    val nearestWarp = CheckboxSetting("Nearest Warp Hint", "Show a suggested hub warp when it saves enough travel distance.", true)
+    val warpDistanceDifference = SliderSetting("Warp Difference", "Minimum distance saved before suggesting a warp.", 60.0, 20.0, 180.0, step = 5.0)
+    val useSuggestedWarp = ActionSetting("Use Suggested Warp", "Warp to the currently suggested Diana hub warp.", "Warp", { currentWarp?.displayName ?: "No Warp" }) {
+        currentWarp?.let { mc.player?.connection?.sendCommand("warp ${it.command}") }
+    }
     val creatureTracker = CheckboxSetting("Creature Tracker", "Show Mythological creature counts and rare-mob since counters.", true)
+    val profitTracker = CheckboxSetting("Profit Tracker", "Show Diana profit, rates, and timing stats.", true)
+    val resetProfitTracker = ActionSetting("Reset Profit Tracker", "Clear the Diana profit/timing session.", "Reset") {
+        DianaProfitTracker.reset()
+    }
     val resetCreatureTracker = ActionSetting("Reset Creature Tracker", "Clear the Diana creature tracker counters.", "Reset") {
         resetTracker()
     }
@@ -81,6 +104,11 @@ object DianaHelperModule : Module("Diana Helper") {
     private var lastParticleFailWarnMs = 0L
     private var lastPetWarnMs = 0L
     private var tickCounter = 0
+    private val preciseTrail = ArrayList<Vec3>()
+    private var lastPreciseGuess: Vec3? = null
+    private val arrowPoints = ArrayList<Vec3>()
+    private val recentArrowKeys = linkedSetOf<String>()
+    private var currentWarp: WarpPoint? = null
 
     private val MYTHOLOGICAL_SPAWN_PATTERN = Regex(
         """^(?:Oh|Uh oh|Yikes|Oi|Good Grief|Danger|Woah)! You dug out (?:a )?(.+)!$""",
@@ -140,10 +168,18 @@ object DianaHelperModule : Module("Diana Helper") {
             shareRareMobs,
             petWarning,
             particleFailHint,
+            preciseGuess,
+            arrowGuess,
+            nearestWarp,
+            warpDistanceDifference,
+            useSuggestedWarp,
             creatureTracker,
+            profitTracker,
+            resetProfitTracker,
             resetCreatureTracker,
         )
         EventBus.register(this)
+        DianaProfitTracker.ensureInitialized()
     }
 
     @SubscribeEvent
@@ -164,6 +200,7 @@ object DianaHelperModule : Module("Diana Helper") {
             syncRareMobs(level, player)
             maybeWarnPet()
             maybeWarnParticleQuality()
+            updateNearestWarp()
         }
     }
 
@@ -174,6 +211,40 @@ object DianaHelperModule : Module("Diana Helper") {
         val player = mc.player ?: return
         if (!isDianaSpade(player.getItemInHand(packet.hand))) return
         lastSpadeUseMs = System.currentTimeMillis()
+        preciseTrail.clear()
+        lastPreciseGuess = null
+    }
+
+    @SubscribeEvent
+    fun onIncomingPacket(event: PacketEvent.Incoming) {
+        if (!enabled.value) return
+        val packet = event.packet as? ClientboundLevelParticlesPacket ?: return
+        if (arrowGuess.value && handleArrowParticle(packet)) return
+        if (!preciseGuess.value) return
+        if (!isPreciseSpadeParticle(packet)) return
+
+        val now = System.currentTimeMillis()
+        if (lastSpadeUseMs == 0L || now - lastSpadeUseMs > 3_000L) return
+
+        val point = Vec3(packet.x, packet.y, packet.z)
+        val last = preciseTrail.lastOrNull()
+        if (last != null) {
+            val dist = last.distanceTo(point)
+            if (dist == 0.0 || dist > 3.0) return
+        }
+
+        preciseTrail += point
+        if (preciseTrail.size > 18) preciseTrail.removeAt(0)
+
+        val guess = solvePreciseGuess() ?: return
+        val blockGuess = Vec3(
+            guess.x.roundToInt().toDouble(),
+            (guess.y - 0.5).roundToInt().toDouble(),
+            guess.z.roundToInt().toDouble()
+        )
+        if (lastPreciseGuess == blockGuess) return
+        lastPreciseGuess = blockGuess
+        DianaParticleTracker.addGuess(blockGuess)
     }
 
     @SubscribeEvent
@@ -204,6 +275,232 @@ object DianaHelperModule : Module("Diana Helper") {
             rareMobTargets.clear()
             ChatUtils.sendMessage("Diana burrow data cleared.")
         }
+    }
+
+    private fun isPreciseSpadeParticle(packet: ClientboundLevelParticlesPacket): Boolean {
+        return packet.particle.type == ParticleTypes.DRIPPING_LAVA &&
+            packet.count == 2 &&
+            abs(packet.maxSpeed - -0.5f) <= 0.005f
+    }
+
+    private fun handleArrowParticle(packet: ClientboundLevelParticlesPacket): Boolean {
+        val player = mc.player ?: return false
+        if (packet.particle.type != ParticleTypes.DUST) return false
+        if (packet.count != 0 || abs(packet.maxSpeed - 1.0f) > 0.005f) return false
+        if (player.position().distanceToSqr(packet.x, packet.y, packet.z) > 36.0) return false
+        val range = arrowRange(packet.xDist, packet.yDist, packet.zDist) ?: return false
+
+        arrowPoints += Vec3(packet.x, packet.y, packet.z)
+        if (arrowPoints.size > 80) arrowPoints.removeAt(0)
+
+        val ray = detectArrowRay() ?: return true
+        val key = "${ray.origin.x.roundToInt()}:${ray.origin.y.roundToInt()}:${ray.origin.z.roundToInt()}:${ray.direction.x}:${ray.direction.y}:${ray.direction.z}"
+        if (!recentArrowKeys.add(key)) return true
+        while (recentArrowKeys.size > 10) recentArrowKeys.remove(recentArrowKeys.first())
+        arrowPoints.clear()
+        addArrowGuess(ray, range)
+        return true
+    }
+
+    private data class Ray(val origin: Vec3, val direction: Vec3)
+
+    private fun arrowRange(r: Float, g: Float, b: Float): IntRange? {
+        return when {
+            close(r, 0f) && close(g, 128f) && close(b, 0f) -> 0..117
+            close(r, 255f) && close(g, 255f) && close(b, 0f) -> 112..282
+            close(r, 255f) && close(g, 0f) && close(b, 0f) -> 281..600
+            else -> null
+        }
+    }
+
+    private fun detectArrowRay(): Ray? {
+        val line = findParticleLine(arrowPoints, 20, 0.12)
+        if (line.size < 20) return null
+        val candidate1 = line[1]
+        val candidate2 = line[line.size - 2]
+        val count1 = countNear(arrowPoints, candidate1, 0.12)
+        val count2 = countNear(arrowPoints, candidate2, 0.12)
+        if (setOf(count1, count2) != setOf(2, 4)) return null
+
+        val tip: Vec3
+        val base: Vec3
+        if (count1 == 4) {
+            tip = line.first()
+            base = line.last()
+        } else {
+            tip = line.last()
+            base = line.first()
+        }
+
+        val adjustedBase = base.add(0.0, -1.5, 0.0)
+        val adjustedTip = tip.add(0.0, -1.5, 0.0)
+        val direction = adjustedTip.subtract(adjustedBase).normalize()
+        if (!direction.x.isFinite() || !direction.y.isFinite() || !direction.z.isFinite()) return null
+        return Ray(adjustedBase, direction)
+    }
+
+    private fun findParticleLine(points: List<Vec3>, shaftLength: Int, maxDist: Double): List<Vec3> {
+        for (index in points.indices) {
+            val line = ArrayList<Vec3>()
+            val used = HashSet<Int>()
+            line += points[index]
+            used += index
+            if (extendParticleLine(line, used, points, shaftLength, maxDist)) return line
+        }
+        return emptyList()
+    }
+
+    private fun extendParticleLine(
+        line: MutableList<Vec3>,
+        used: MutableSet<Int>,
+        points: List<Vec3>,
+        shaftLength: Int,
+        maxDist: Double,
+    ): Boolean {
+        if (line.size == shaftLength) return true
+        var nextIndex = -1
+        var minDist = Double.MAX_VALUE
+        for (i in points.indices) {
+            if (i in used) continue
+            val point = points[i]
+            val dist = line.last().distanceTo(point)
+            if (dist > maxDist) continue
+            val second = if (line.size > 1) line[1] else line[0]
+            if (!isCollinear(line.first(), second, point)) continue
+            if (dist < minDist) {
+                minDist = dist
+                nextIndex = i
+            }
+        }
+        if (nextIndex < 0) return false
+        line += points[nextIndex]
+        used += nextIndex
+        if (extendParticleLine(line, used, points, shaftLength, maxDist)) return true
+        line.removeAt(line.lastIndex)
+        used.remove(nextIndex)
+        return false
+    }
+
+    private fun isCollinear(a: Vec3, b: Vec3, c: Vec3): Boolean {
+        val ab = b.subtract(a)
+        val ac = c.subtract(a)
+        return ab.cross(ac).lengthSqr() < 1.0e-6
+    }
+
+    private fun countNear(points: Iterable<Vec3>, origin: Vec3, maxDist: Double): Int {
+        val maxDistSq = maxDist * maxDist
+        return points.count { it != origin && it.distanceToSqr(origin) <= maxDistSq }
+    }
+
+    private fun addArrowGuess(ray: Ray, range: IntRange) {
+        val level = mc.level ?: return
+        var distance = range.first.coerceAtLeast(1).toDouble()
+        while (distance <= range.last) {
+            val point = ray.origin.add(ray.direction.scale(distance))
+            val pos = BlockPos(point.x.roundToInt(), point.y.roundToInt(), point.z.roundToInt())
+            if (isValidBurrowBlock(level, pos)) {
+                DianaParticleTracker.addGuess(Vec3(pos.x.toDouble(), pos.y.toDouble(), pos.z.toDouble()))
+                return
+            }
+            distance += 1.0
+        }
+    }
+
+    private fun isValidBurrowBlock(level: net.minecraft.world.level.Level, pos: BlockPos): Boolean {
+        if (!level.isLoaded(pos)) return false
+        val block = level.getBlockState(pos).block
+        val above = level.getBlockState(pos.above()).block
+        return block == Blocks.GRASS_BLOCK && above in ALLOWED_BURROW_ABOVE
+    }
+
+    private fun solvePreciseGuess(): Vec3? {
+        if (preciseTrail.size < 4) return null
+        val degree = 3
+        val coeffX = fitPolynomial(preciseTrail.map { it.x }, degree) ?: return null
+        val coeffY = fitPolynomial(preciseTrail.map { it.y }, degree) ?: return null
+        val coeffZ = fitPolynomial(preciseTrail.map { it.z }, degree) ?: return null
+
+        val derivative = Vec3(coeffX.getOrElse(1) { 0.0 }, coeffY.getOrElse(1) { 0.0 }, coeffZ.getOrElse(1) { 0.0 })
+        val len = derivative.length()
+        if (!len.isFinite() || len < 1.0e-6) return null
+        val t = (3.0 * computePitchWeight(derivative) / len).coerceIn(0.0, 120.0)
+        val guess = Vec3(evalPolynomial(coeffX, t), evalPolynomial(coeffY, t), evalPolynomial(coeffZ, t))
+        if (!guess.x.isFinite() || !guess.y.isFinite() || !guess.z.isFinite()) return null
+        return guess
+    }
+
+    private fun fitPolynomial(values: List<Double>, degree: Int): DoubleArray? {
+        val n = degree + 1
+        val matrix = Array(n) { DoubleArray(n + 1) }
+        for (row in 0 until n) {
+            for (col in 0 until n) {
+                var sum = 0.0
+                for (i in values.indices) sum += i.toDouble().pow(row + col)
+                matrix[row][col] = sum
+            }
+            var rhs = 0.0
+            for (i in values.indices) rhs += values[i] * i.toDouble().pow(row)
+            matrix[row][n] = rhs
+        }
+        return solveLinearSystem(matrix)
+    }
+
+    private fun solveLinearSystem(matrix: Array<DoubleArray>): DoubleArray? {
+        val n = matrix.size
+        for (pivot in 0 until n) {
+            var best = pivot
+            for (row in pivot + 1 until n) {
+                if (abs(matrix[row][pivot]) > abs(matrix[best][pivot])) best = row
+            }
+            if (abs(matrix[best][pivot]) < 1.0e-9) return null
+            if (best != pivot) {
+                val tmp = matrix[pivot]
+                matrix[pivot] = matrix[best]
+                matrix[best] = tmp
+            }
+
+            val scale = matrix[pivot][pivot]
+            for (col in pivot until n + 1) matrix[pivot][col] /= scale
+            for (row in 0 until n) {
+                if (row == pivot) continue
+                val factor = matrix[row][pivot]
+                for (col in pivot until n + 1) matrix[row][col] -= factor * matrix[pivot][col]
+            }
+        }
+        return DoubleArray(n) { matrix[it][n] }
+    }
+
+    private fun evalPolynomial(coefficients: DoubleArray, t: Double): Double {
+        var result = 0.0
+        for (i in coefficients.indices.reversed()) {
+            result = result * t + coefficients[i]
+        }
+        return result
+    }
+
+    private fun computePitchWeight(derivative: Vec3): Double {
+        return sqrt(24.0 * sin(getPitchFromDerivative(derivative) - PI) + 25.0)
+    }
+
+    private fun getPitchFromDerivative(derivative: Vec3): Double {
+        val xzLength = sqrt(derivative.x.pow(2) + derivative.z.pow(2))
+        val pitchRadians = -atan2(derivative.y, xzLength)
+        var guessPitch = pitchRadians
+        var resultPitch = atan2(sin(guessPitch) - 0.75, cos(guessPitch))
+        var windowMax = PI / 2.0
+        var windowMin = -PI / 2.0
+        repeat(100) {
+            if (resultPitch < pitchRadians) {
+                windowMin = guessPitch
+                guessPitch = (windowMin + windowMax) / 2.0
+            } else {
+                windowMax = guessPitch
+                guessPitch = (windowMin + windowMax) / 2.0
+            }
+            resultPitch = atan2(sin(guessPitch) - 0.75, cos(guessPitch))
+            if (resultPitch == pitchRadians) return guessPitch
+        }
+        return guessPitch
     }
 
     // -- World Render ----------------------------------------------------------
@@ -249,7 +546,12 @@ object DianaHelperModule : Module("Diana Helper") {
             }
         }
 
-        val nearest = burrowPos ?: return
+        val nearest = burrowPos
+        if (nearest == null) {
+            renderRareMobWaypoints(level, r, g, blue, alpha)
+            renderWarpHint(level, alpha)
+            return
+        }
 
         // Particle direction line - from activation position toward the nearest burrow
         val activationPos = DianaParticleTracker.getActivationPos()
@@ -307,6 +609,7 @@ object DianaHelperModule : Module("Diana Helper") {
         }
 
         renderRareMobWaypoints(level, r, g, blue, alpha)
+        renderWarpHint(level, alpha)
     }
 
     // -- Compass HUD -----------------------------------------------------------
@@ -357,6 +660,13 @@ object DianaHelperModule : Module("Diana Helper") {
             val distStr = if (dist >= 100.0) "${dist.toInt()}m" else "${"%.1f".format(dist)}m"
             val textW = NVGRenderer.textWidth(distStr, 11f)
             NVGRenderer.text(distStr, centerX - textW / 2f, y + 74f, 11f, ThemeManager.currentTheme.text)
+
+            val warp = currentWarp
+            if (warp != null && nearestWarp.value) {
+                val label = "Warp ${warp.displayName}"
+                val warpW = NVGRenderer.textWidth(label, 9f)
+                NVGRenderer.text(label, centerX - warpW / 2f, y + 62f, 9f, ThemeManager.currentTheme.accent)
+            }
         }
     }
 
@@ -367,32 +677,55 @@ object DianaHelperModule : Module("Diana Helper") {
 
         width { 178f }
         height {
-            if (!creatureTracker.value || creatureCounts.isEmpty()) 26f
-            else (42f + creatureCounts.size.coerceAtMost(8) * 13f + trackedRareSinceCount() * 13f)
+            val creatureRows = if (creatureTracker.value) creatureCounts.size.coerceAtMost(8) + trackedRareSinceCount() else 0
+            val profitRows = if (profitTracker.value) 11 else 0
+            (42f + creatureRows * 13f + profitRows * 13f).coerceAtLeast(26f)
         }
 
         render { x, y, _ ->
-            if (!creatureTracker.value) return@render
+            if (!creatureTracker.value && !profitTracker.value) return@render
 
             val rows = creatureCounts.entries.sortedByDescending { it.value }.take(8)
             val rareSince = rareSinceRows()
-            val h = 42f + rows.size * 13f + rareSince.size * 13f
+            val snap = DianaProfitTracker.snapshot()
+            val profitRows = if (profitTracker.value) 11 else 0
+            val h = 42f + (if (creatureTracker.value) rows.size + rareSince.size else 0) * 13f + profitRows * 13f
             NVGRenderer.rect(x, y, 178f, h, ThemeManager.currentTheme.panel, 8f)
             NVGRenderer.hollowRect(x, y, 178f, h, 1f, ThemeManager.currentTheme.controlBorder, 8f)
-            NVGRenderer.text("Mythological Creatures", x + 10f, y + 10f, 11f, ThemeManager.currentTheme.text)
+            NVGRenderer.text("Diana Session", x + 10f, y + 10f, 11f, ThemeManager.currentTheme.text)
 
-            val total = creatureCounts.values.sum()
-            NVGRenderer.text("Total: $total", x + 10f, y + 25f, 9f, ThemeManager.currentTheme.textSecondary)
+            NVGRenderer.text("Runtime: ${formatDuration(snap.runtimeMs)}", x + 10f, y + 25f, 9f, ThemeManager.currentTheme.textSecondary)
 
             var rowY = y + 42f
-            for ((name, count) in rows) {
-                val label = "$name: $count"
-                NVGRenderer.text(label, x + 10f, rowY, 9f, ThemeManager.currentTheme.text)
-                rowY += 13f
+            if (profitTracker.value) {
+                val timing = listOf(
+                    "Profit: ${formatCoins(snap.coins)}",
+                    "Profit/hr: ${formatCoins(snap.coinsPerHour)}",
+                    "Burrows: ${snap.burrows}  Chains: ${snap.chains}",
+                    "Mobs: ${snap.mobs}  Rare: ${snap.rareMobs}",
+                    "Detect: ${formatDuration(snap.avgDetectMs)}",
+                    "Travel: ${formatDuration(snap.avgTravelMs)}",
+                    "Dig: ${formatDuration(snap.avgDigMs)}",
+                    "Combat: ${formatDuration(snap.avgCombatMs)}",
+                    "Loop: ${formatDuration(snap.avgLoopMs)}",
+                    "Drops: ${snap.drops.sumOf { it.second }}",
+                    snap.drops.firstOrNull()?.let { "${it.first}: ${it.second}" } ?: "Drops: none",
+                )
+                for (line in timing) {
+                    NVGRenderer.text(line, x + 10f, rowY, 9f, ThemeManager.currentTheme.text)
+                    rowY += 13f
+                }
             }
-            for ((name, since) in rareSince) {
-                NVGRenderer.text("Since $name: $since", x + 10f, rowY, 9f, ThemeManager.currentTheme.accent)
-                rowY += 13f
+
+            if (creatureTracker.value) {
+                for ((name, count) in rows) {
+                    NVGRenderer.text("$name: $count", x + 10f, rowY, 9f, ThemeManager.currentTheme.text)
+                    rowY += 13f
+                }
+                for ((name, since) in rareSince) {
+                    NVGRenderer.text("Since $name: $since", x + 10f, rowY, 9f, ThemeManager.currentTheme.accent)
+                    rowY += 13f
+                }
             }
         }
     }
@@ -501,6 +834,57 @@ object DianaHelperModule : Module("Diana Helper") {
 
     private fun trackedRareSinceCount(): Int = rareSinceRows().size
 
+    private fun formatCoins(value: Long): String {
+        val absValue = kotlin.math.abs(value)
+        return when {
+            absValue >= 1_000_000_000L -> String.format("%.2fb", value / 1_000_000_000.0)
+            absValue >= 1_000_000L -> String.format("%.2fm", value / 1_000_000.0)
+            absValue >= 1_000L -> String.format("%.1fk", value / 1_000.0)
+            else -> value.toString()
+        }
+    }
+
+    private fun formatDuration(ms: Long): String {
+        if (ms <= 0L) return "--"
+        val totalSeconds = ms / 1000L
+        val minutes = totalSeconds / 60L
+        val seconds = totalSeconds % 60L
+        return if (minutes > 0L) "${minutes}m ${seconds}s" else "${seconds}s"
+    }
+
+    private fun updateNearestWarp() {
+        if (!nearestWarp.value) {
+            currentWarp = null
+            return
+        }
+        val player = mc.player ?: return
+        val target = burrowPos ?: run {
+            currentWarp = null
+            return
+        }
+        val best = HUB_WARPS.minByOrNull { it.pos.distanceTo(target) + it.extraBlocks } ?: return
+        val playerDistance = player.position().distanceTo(target)
+        val warpDistance = best.pos.distanceTo(target) + best.extraBlocks
+        currentWarp = if (playerDistance - warpDistance >= warpDistanceDifference.value) best else null
+    }
+
+    private fun renderWarpHint(level: net.minecraft.world.level.Level, alpha: Int) {
+        val warp = currentWarp ?: return
+        if (!nearestWarp.value) return
+        OverlayRenderEngine.addBox(
+            level,
+            warp.pos.x - 0.5, warp.pos.y, warp.pos.z - 0.5,
+            warp.pos.x + 0.5, warp.pos.y + 2.0, warp.pos.z + 0.5,
+            fill = OREColor(85, 255, 255, alpha / 6),
+            outline = OREColor(85, 255, 255, alpha * 3 / 4),
+            durationTicks = 3,
+            tag = "diana-helper",
+            forceRender = true
+        )
+    }
+
+    private fun close(actual: Float, expected: Float): Boolean = abs(actual - expected) <= 0.005f
+
     private fun resetTracker() {
         creatureCounts.clear()
         creatureSince.clear()
@@ -551,6 +935,39 @@ object DianaHelperModule : Module("Diana Helper") {
             .removePrefix("a ")
             .trim()
     }
+
+    private val ALLOWED_BURROW_ABOVE = setOf(
+        Blocks.AIR,
+        Blocks.DANDELION,
+        Blocks.POPPY,
+        Blocks.SHORT_GRASS,
+        Blocks.TALL_GRASS,
+        Blocks.OAK_LEAVES,
+        Blocks.SPRUCE_LEAVES,
+        Blocks.BIRCH_LEAVES,
+        Blocks.JUNGLE_LEAVES,
+        Blocks.ACACIA_LEAVES,
+        Blocks.DARK_OAK_LEAVES,
+        Blocks.SPRUCE_FENCE,
+    )
+
+    private data class WarpPoint(
+        val command: String,
+        val displayName: String,
+        val pos: Vec3,
+        val extraBlocks: Int = 0,
+    )
+
+    private val HUB_WARPS = listOf(
+        WarpPoint("hub", "Hub", Vec3(-3.0, 70.0, -70.0), 0),
+        WarpPoint("castle", "Castle", Vec3(-250.0, 130.0, 45.0), 15),
+        WarpPoint("crypt", "Crypt", Vec3(-160.0, 61.0, -100.0), 20),
+        WarpPoint("da", "Dark Auction", Vec3(91.0, 75.0, 173.0), 15),
+        WarpPoint("museum", "Museum", Vec3(-75.0, 76.0, 80.0), 15),
+        WarpPoint("wizard", "Wizard", Vec3(42.0, 122.0, 69.0), 20),
+        WarpPoint("stonks", "Stonks", Vec3(51.0, 72.0, -52.0), 10),
+        WarpPoint("taylor", "Taylor", Vec3(-24.0, 71.0, -39.0), 10),
+    )
 
     private const val RARE_MOB_GLOW_SCOPE = "diana_rare_mobs"
     private const val RARE_MOB_GLOW_PRIORITY = 20

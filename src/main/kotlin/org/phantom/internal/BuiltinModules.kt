@@ -72,6 +72,7 @@ import org.phantom.internal.qol.MissingEnchantsModule
 import org.phantom.internal.qol.PriceTooltipModule
 import org.phantom.internal.qol.QolModule
 import org.phantom.internal.qol.RsaAutoGfsModule
+import org.phantom.internal.qol.TimerModule
 import org.phantom.internal.rotation.RotationsModule
 import org.phantom.internal.seal.YearOfTheSealModule
 import org.phantom.internal.spotify.SpotifyModule
@@ -207,6 +208,7 @@ internal object BuiltinModules {
     ColoredEnchantsModule,
     MissingEnchantsModule,
     LagDetectorModule,
+    TimerModule,
     RsaAutoGfsModule,
     WardrobeModule,
     SpotifyModule,

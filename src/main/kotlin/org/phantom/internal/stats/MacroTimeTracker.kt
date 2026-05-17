@@ -47,7 +47,7 @@ object MacroTimeTracker {
   private val statsFile = File(mc.gameDirectory, "config/phantom/macro_time_stats.json")
   private val zoneId: ZoneId = ZoneId.systemDefault()
   private val macroDefinitions = listOf(
-    MacroDefinition("commission", "Commission Macro", 100) { CommissionMacroModule.isRunning },
+    MacroDefinition("commission", "Dwarven Commission Macro", 100) { CommissionMacroModule.isRunning },
     MacroDefinition("mining", "Mining Macro", 90) { MiningMacroModule.isActive },
     MacroDefinition("combat", "Combat Macro", 80) { CombatMacroModule.isRunning },
     MacroDefinition("garden", "Garden Macro", 70) { GardenMacroModule.isActive },
