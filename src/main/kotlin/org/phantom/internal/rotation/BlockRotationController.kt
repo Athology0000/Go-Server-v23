@@ -247,6 +247,81 @@ class BlockRotationController {
     }
 
     /**
+     * Continuity-preserving retarget for consecutive block hops (mining down a
+     * vein). Unlike [rotate] this does NOT cold-start: the smoother position
+     * is preserved (no [cancel], no re-seed), the new eased curve starts from
+     * the *current in-motion* rotation, and the easing defaults to
+     * [RotationEasingType.EASE_OUT_CUBIC] (max velocity at t=0). The camera
+     * therefore carries its momentum straight into the next block and eases
+     * out onto it, instead of decelerating to a dead stop and re-accelerating
+     * from zero every block boundary (the inter-block "microstop").
+     *
+     * Falls back to a normal accel-in [rotate] when there is no active segment
+     * to chain from (the first block of a vein, where starting from a true
+     * standstill *should* ease in).
+     */
+    fun chainTo(
+        toBlock: BlockPos,
+        toAimPoint: Vec3,
+        durationTicks: Int,
+        easing: RotationEasingType = RotationEasingType.EASE_OUT_CUBIC,
+    ) {
+        val player = mc.player ?: return
+        val active = request
+        if (active == null || !smoothingInitialized) {
+            rotate(
+                BlockRotationRequest(
+                    fromBlock = toBlock,
+                    toBlock = toBlock,
+                    durationTicks = durationTicks,
+                    useFromBlockAsStartRotation = false,
+                    maxDegreesPerTick = 12f,
+                    easing = RotationEasingType.EASE_IN_OUT_SINE,
+                    toAimPoint = toAimPoint,
+                )
+            )
+            return
+        }
+        // An explicit chain supersedes any in-progress soft-release.
+        softReleaseFrames = 0
+        request = active.copy(
+            fromBlock = active.toBlock,
+            toBlock = toBlock,
+            toAimPoint = toAimPoint,
+            durationTicks = durationTicks.coerceAtLeast(1),
+            easing = easing,
+        )
+        // Previous destination becomes the new origin.
+        fromPoint = toPoint
+        toPoint = BlockAimPoint(
+            block = toBlock,
+            point = toAimPoint,
+            faceHint = active.toFaceHint,
+        )
+        val eye = RotationMath.eyePos(player)
+        val computedTarget = RotationMath.rotationToPoint(eye, toAimPoint)
+        // Start the new curve from where the camera actually is *right now*
+        // (live smoother state), not a parked block aim â€” this is what keeps
+        // velocity continuous across the hop.
+        startYaw = smoothedYaw
+        startPitch = smoothedPitch
+        targetYaw = computedTarget.yaw
+        targetPitch = computedTarget.pitch
+        tick = 0
+        elapsedSeconds = 0.0
+        lastFrameNanos = 0L
+        directMode = false
+        smoothingRate = 16.0
+        precisionPoint = null
+        pendingPrecisionPoint = null
+        arrivedAtBlockEdge = false
+        nextFallbackBlock = null
+        // smoothingInitialized / smoothedYaw / smoothedPitch deliberately
+        // preserved (no cancel(), no re-seed) so motion stays continuous.
+        debugState = debugSnapshot(active = true, finished = false)
+    }
+
+    /**
      * Stage / apply a precision sub-block aim point.
      *
      *  - During the initial visible-face rotation: queue for application on arrival.

@@ -443,6 +443,52 @@ internal fun MiningMacroModule.pruneVein(
   }
 }
 
+/**
+ * Re-flood the vein outward from its current members, adding same-id blocks
+ * that have since become mineable. [buildVein] runs once at scan time and
+ * `isMineableTarget` requires an air-adjacent face, so the *enclosed core* of
+ * a solid cluster (e.g. interior Hot Mithril) is never captured and also
+ * blocks the initial flood from reaching anything behind it. As the macro
+ * mines the shell the core gains air faces; without this re-grow those blocks
+ * are never re-added and the macro leaves them behind.
+ *
+ * Bounded by [maxVeinBlocks] and the vein-start anchor radius (the same gate
+ * [canStepToNearbyTarget] enforces) so growth can't bleed into an adjacent
+ * cluster. The vein still empties normally once the whole cluster is mined.
+ */
+internal fun MiningMacroModule.growVein(
+  level: net.minecraft.world.level.Level,
+  player: Player,
+  vein: ScanVein
+) {
+  if (vein.blocks.isEmpty()) return
+  val maxBlocks = maxVeinBlocks.value.toInt()
+  if (vein.blocks.size >= maxBlocks) return
+
+  val anchor = veinStartAnchor
+  val maxAnchorDistSq: Double = if (anchor != null) {
+    val maxTargetDist = anchorRadius.value + mineRange.value
+    maxTargetDist * maxTargetDist
+  } else {
+    Double.POSITIVE_INFINITY
+  }
+
+  val neighborOffsets = veinNeighborOffsets6()
+  val queue = ArrayDeque(vein.blocks)
+  while (queue.isNotEmpty() && vein.blocks.size < maxBlocks) {
+    val pos = queue.removeFirst()
+    for (off in neighborOffsets) {
+      val next = pos.offset(off.dx, off.dy, off.dz)
+      if (vein.blocks.contains(next)) continue
+      if (anchor != null && anchor.distSqr(next) > maxAnchorDistSq) continue
+      if (!isMineableTarget(level, player, next, vein.targetIds)) continue
+      vein.blocks.add(next)
+      queue.add(next)
+      if (vein.blocks.size >= maxBlocks) break
+    }
+  }
+}
+
 internal fun MiningMacroModule.sanitizeActiveTargets(
   level: net.minecraft.world.level.Level,
   player: Player,

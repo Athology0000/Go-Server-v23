@@ -55,6 +55,7 @@ import org.phantom.internal.mining.pingless.PinglessMiningModule
 import org.phantom.internal.mining.powder.PowderMacroModule
 import org.phantom.internal.mining.scatha.ScathaMacroModule
 import org.phantom.internal.pathfinding.PathfindingModule
+import org.phantom.internal.pathfinding.PathServiceTickBridge
 import org.phantom.internal.pathfinding.WorldCacheModule
 import org.phantom.internal.pathfinding.debug.PathPreviewRenderModule
 import org.phantom.internal.pathfinding.debug.PathRouteQuickAssignCommand
@@ -236,6 +237,7 @@ object Phantom : ClientModInitializer {
       RouteEditMode,
       HypixelManager,
       SkyblockEventManager,
+      PathServiceTickBridge,
     ).forEach { EventBus.register(it) }
   }
 

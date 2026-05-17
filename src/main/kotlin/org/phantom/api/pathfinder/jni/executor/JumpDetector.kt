@@ -95,7 +95,7 @@ internal object JumpDetector {
         if (checkGapJump(player, nodes, nearIdx, playerFloorY)) return true
 
         // 8. Snow
-        if (checkSnowJump(level, nodes, nearIdx, playerFloorY)) return true
+        if (checkSnowJump(level, player, nodes, nearIdx)) return true
 
         // 9. Obstacle
         if (checkObstacleJump(level, player, nodes, nearIdx, playerFloorY)) return true
@@ -260,31 +260,54 @@ internal object JumpDetector {
         return jumpTrue(GAP_JUMP_SUPPRESS_TICKS)
     }
 
-    /** Phantom checkSnowJump: upcoming node is snow â‰¥ 7 layers, height diff > 0.75. */
+    /**
+     * Snow jump, height- and passability-aware. Uses the snow layer's *actual*
+     * collision top vs the player's feet:
+     *  - rise <= STEP_HEIGHT (0.6): the player auto-steps it â€” genuinely
+     *    passable, never jump (this is the bulk of low snow that used to cause
+     *    needless hops).
+     *  - STEP_HEIGHT < rise <= 1.25: a real snow lip that needs exactly one
+     *    jump â€” fire, but only when actually near it and ahead on the path,
+     *    same intentional gating as the other rungs (no more firing the moment
+     *    any snow appears several nodes out).
+     *  - rise > 1.25: too tall to clear with a step-jump; left to the obstacle
+     *    rung / replan rather than a doomed hop.
+     */
     private fun checkSnowJump(
         level: Level,
+        player: LocalPlayer,
         nodes: List<Vec3>,
         nearIdx: Int,
-        playerFloorY: Int,
     ): Boolean {
-        val nextIdx = (nearIdx + 1).coerceAtMost(nodes.lastIndex)
-        val n = nodes[nextIdx]
+        val end = minOf(nodes.lastIndex, nearIdx + STEP_LOOKAHEAD_NODES)
+        for (i in (nearIdx + 1)..end) {
+            val n = nodes[i]
+            val floorPos = BlockPos(
+                Math.floor(n.x).toInt(),
+                Math.round(n.y).toInt(),
+                Math.floor(n.z).toInt(),
+            )
+            val bs = cachedBlock(level, floorPos)
+            if (!bs.block.descriptionId.contains("snow")) continue
 
-        val floorPos = BlockPos(
-            Math.floor(n.x).toInt(),
-            Math.round(n.y).toInt(),
-            Math.floor(n.z).toInt(),
-        )
+            val shape = bs.getCollisionShape(level, floorPos)
+            if (shape.isEmpty) continue
+            val snowTopY = floorPos.y + shape.bounds().maxY
+            val rise = snowTopY - player.y
+            if (rise <= STEP_HEIGHT) continue          // walk-up passable
+            if (rise > 1.25) continue                  // not a single-jump clear
 
-        val bs = cachedBlock(level, floorPos)
-        if (!bs.block.descriptionId.contains("snow")) return false
+            val prev = nodes[(i - 1).coerceAtLeast(nearIdx)]
+            val takeoff = Vec3(prev.x + 0.5, prev.y, prev.z + 0.5)
+            val landing = Vec3(n.x + 0.5, n.y, n.z + 0.5)
+            if (!isAheadOnSegment(player.position(), takeoff, landing)) continue
+            if (distanceToSegmentHorizontalSq(player.x, player.z, takeoff, landing) >
+                HILL_JUMP_TRIGGER_DIST_SQ * effectiveJumpRangeMultiplier()
+            ) continue
 
-        val shape = bs.getCollisionShape(level, floorPos)
-        if (shape.isEmpty) return false
-        val topY = shape.bounds().maxY
-        val heightAboveFloor = (Math.round(n.y).toInt() + topY) - (playerFloorY + 1)
-        if (topY < 0.875 || heightAboveFloor <= 0.75) return false
-        return jumpTrue(JUMP_SUPPRESS_TICKS)
+            return jumpTrue(JUMP_SUPPRESS_TICKS)
+        }
+        return false
     }
 
     /**

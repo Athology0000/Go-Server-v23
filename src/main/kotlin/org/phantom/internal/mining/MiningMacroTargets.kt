@@ -1,6 +1,7 @@
 package org.phantom.internal.mining
 
 import kotlin.math.ceil
+import kotlin.math.floor
 import kotlin.math.sqrt
 import net.minecraft.ChatFormatting
 import net.minecraft.world.entity.player.Player
@@ -109,15 +110,25 @@ internal fun MiningMacroModule.selectMineTarget(
       val dot = if (dist > 1e-6 && lookVec != null)
         (dx * lookVec.x + dy * lookVec.y + dz * lookVec.z) / dist
       else 1.0
-      var s = baseCostFor(level, vein, pos) + dist * distW - dot * lookBias
+      // Distance is the hard primary key: bucket the aim distance into
+      // `band`-wide rings weighted by COST_BAND_WEIGHT (larger than the
+      // combined swing of every tie-break term), so the nearest ring always
+      // wins and look-bias / cluster / visibility only choose *within* a
+      // ring. Restores the closest-first guarantee the header comment asks
+      // for without discarding V5's in-ring preferences. The ring term and
+      // all negative terms are applied before the visibility prune below, so
+      // `s` there is still an admissible lower bound (visPen is non-negative).
+      val band = costDistanceBand.value.coerceAtLeast(0.05)
+      var s = floor(dist / band) * MiningMacroModule.COST_BAND_WEIGHT +
+        baseCostFor(level, vein, pos) + dist * distW - dot * lookBias
       if (behindPen > 0.0 && dot < MiningMacroModule.BEHIND_DOT_THRESHOLD) {
         s += behindPen
       }
-      // Below-player penalty (parity with the legacy miningTargetScore and the
-      // approach branch). Without it the cost model happily picks a close,
-      // well-aimed block *under* the player, pitching the camera straight down
-      // ("looks down randomly"). Non-negative, so the prune bound stays valid.
-      if (pos.y < player.blockY - 1) {
+      // Vertical-extreme penalty. Without it the cost model happily picks a
+      // close, well-aimed block far *under* the player (camera pitches straight
+      // down â€” "looks down randomly") or far *above* (pitches straight up).
+      // Symmetric; non-negative so the prune bound stays valid.
+      if (pos.y < player.blockY - 1 || pos.y > player.blockY + 1) {
         s += 16.0
       }
       // Cluster bonus: a block surrounded by more vein blocks is cheaper, so
@@ -151,7 +162,13 @@ internal fun MiningMacroModule.selectMineTarget(
   for (pos in vein.blocks) {
     if (!isMineableTarget(level, player, pos, vein.targetIds)) continue
     if (!canStepToNearbyTarget(player, pos)) continue
-    if (REQUIRE_MINE_LOS && !hasLineOfSight(level, player, pos)) continue
+    // Approach target needs a real mineable face from here, not just
+    // center-to-center LOS. The in-range stare-recovery/blacklist only runs
+    // once in range, so a center-visible/face-occluded approach pick makes
+    // the macro walk up and stare at a wall with no recovery. If none
+    // qualify, `best` stays null and the crosshair / acquisition fallback
+    // below still drives movement, so approach itself never breaks.
+    if (REQUIRE_MINE_LOS && findVisibleAimPoint(level, player, eye, pos) == null) continue
     val distSq = if (!costMode) {
       miningTargetScore(player, pos)
     } else {
@@ -159,8 +176,8 @@ internal fun MiningMacroModule.selectMineTarget(
       val ddy = (pos.y + 0.5) - eye.y
       val ddz = (pos.z + 0.5) - eye.z
       val d = sqrt(ddx * ddx + ddy * ddy + ddz * ddz)
-      val belowPenalty = if (pos.y < player.blockY - 1) 16.0 else 0.0
-      baseCostFor(level, vein, pos) + d * distW + belowPenalty
+      val verticalPenalty = if (pos.y < player.blockY - 1 || pos.y > player.blockY + 1) 16.0 else 0.0
+      baseCostFor(level, vein, pos) + d * distW + verticalPenalty
     }
     if (distSq < bestDist) {
       bestDist = distSq

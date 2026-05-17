@@ -56,8 +56,8 @@ public class HudGlassBlurRenderer {
 
     int mainFramebuffer = getMainFramebufferId(framebuffer);
     int currentFramebuffer = GL11.glGetInteger(GL30.GL_FRAMEBUFFER_BINDING);
-    int renderFramebuffer = currentFramebuffer != 0 ? currentFramebuffer : mainFramebuffer;
-    if (renderFramebuffer == 0) {
+    int sourceFramebuffer = mainFramebuffer != 0 ? mainFramebuffer : currentFramebuffer;
+    if (sourceFramebuffer == 0) {
       return false;
     }
 
@@ -73,7 +73,7 @@ public class HudGlassBlurRenderer {
       blurredTarget.ensureSize(fbWidth, fbHeight);
 
       GL11.glViewport(0, 0, fbWidth, fbHeight);
-      if (!copyFramebufferToTarget(renderFramebuffer, sourceTarget, fbWidth, fbHeight)) {
+      if (!copyFramebufferToTarget(sourceFramebuffer, sourceTarget, fbWidth, fbHeight)) {
         return false;
       }
 
@@ -90,7 +90,7 @@ public class HudGlassBlurRenderer {
       }
 
       framePrepared = true;
-      preparedFramebuffer = renderFramebuffer;
+      preparedFramebuffer = sourceFramebuffer;
       preparedFbWidth = fbWidth;
       preparedFbHeight = fbHeight;
       return true;

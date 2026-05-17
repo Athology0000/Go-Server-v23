@@ -667,6 +667,7 @@ internal fun MiningMacroModule.focusApproachTarget(player: Player, target: Block
 
 internal fun MiningMacroModule.resetApproachTracking() {
   approachTarget = null
+  pushModeTarget = null
   approachStartTick = 0L
   approachStartDistance = 0.0
 }

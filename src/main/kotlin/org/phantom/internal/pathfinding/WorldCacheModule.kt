@@ -98,13 +98,23 @@ object WorldCacheModule : Module("World Cache HUD") {
     }
 
     private fun displayLines(snapshot: HypixelManager.LocationSnapshot): Pair<String, String> {
-        val place = snapshot.placeName.takeIf(::isKnown)
+        val map = snapshot.map.takeIf(::isKnown)
+        val sublocation = snapshot.area.takeIf { area ->
+            map.equals("Dwarven Mines", ignoreCase = true) &&
+                isKnown(area) &&
+                !area.equals(map, ignoreCase = true)
+        }
+        val place = when {
+            map != null && sublocation != null -> "$map - $sublocation"
+            map != null -> map
+            else -> snapshot.placeName.takeIf(::isKnown)
+        }
             ?: CachedWorld.getWorldDisplayName().takeIf(::isKnown)
             ?: "Unknown"
 
         val locationParts = mutableListOf<String>()
         snapshot.serverType.takeIf(::isKnown)?.let { locationParts += it }
-        snapshot.mode.takeIf { isKnown(it) && !it.equals(place, ignoreCase = true) }?.let { locationParts += it }
+        snapshot.mode.takeIf { isKnown(it) && !matchesDisplayPlace(it, place, map, sublocation) }?.let { locationParts += it }
         snapshot.serverName.takeIf(::isKnown)?.let { locationParts += it }
 
         val detailPrefix = locationParts.joinToString(" - ").takeIf { it.isNotBlank() }
@@ -115,4 +125,9 @@ object WorldCacheModule : Module("World Cache HUD") {
 
     private fun isKnown(value: String): Boolean =
         value.isNotBlank() && !value.equals("Unknown", ignoreCase = true)
+
+    private fun matchesDisplayPlace(value: String, place: String, map: String?, sublocation: String?): Boolean =
+        value.equals(place, ignoreCase = true) ||
+            map?.let { value.equals(it, ignoreCase = true) } == true ||
+            sublocation?.let { value.equals(it, ignoreCase = true) } == true
 }

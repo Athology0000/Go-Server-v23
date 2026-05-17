@@ -184,19 +184,29 @@ object HypixelManager {
     }
 
     private fun detectFromLines(lines: List<String>): String? {
+        var fallback: String? = null
+
         for (line in lines) {
+            detectKnownDwarvenLocation(line)?.let { return it }
+
             for (regex in LOCATION_LABELS) {
                 regex.find(line)?.let { match ->
-                    cleanPlace(match.groupValues[1])?.let { return it }
+                    cleanPlace(match.groupValues[1])?.let { place ->
+                        detectKnownDwarvenLocation(place)?.let { return it }
+                        if (fallback == null) fallback = place
+                    }
                 }
             }
 
             val symbolIndex = line.indexOf('\u23E3')
             if (symbolIndex >= 0 && symbolIndex + 1 < line.length) {
-                cleanPlace(line.substring(symbolIndex + 1))?.let { return it }
+                cleanPlace(line.substring(symbolIndex + 1))?.let { place ->
+                    detectKnownDwarvenLocation(place)?.let { return it }
+                    if (fallback == null) fallback = place
+                }
             }
         }
-        return null
+        return fallback
     }
 
     private fun splitCleanLines(text: String): List<String> =
@@ -220,6 +230,19 @@ object HypixelManager {
         if (value.length > 64) return null
         return value
     }
+
+    private fun detectKnownDwarvenLocation(raw: String): String? {
+        val normalized = normalizeLocationKey(raw)
+        return DWARVEN_LOCATION_ALIASES[normalized]
+    }
+
+    private fun normalizeLocationKey(raw: String): String =
+        ChatFormatting.stripFormatting(raw).orEmpty()
+            .lowercase(Locale.ROOT)
+            .replace("'", "")
+            .replace(Regex("""[^a-z0-9]+"""), " ")
+            .replace(Regex("""\s+"""), " ")
+            .trim()
 
     private fun parseLocationJson(message: String): Map<String, String>? {
         if (!message.startsWith("{") || !message.endsWith("}")) return null
@@ -263,4 +286,24 @@ object HypixelManager {
         Regex("""(?i)^\s*(?:area|island|location|map|zone)\s+(.+)$"""),
     )
     private val LOCATION_JSON_FIELD = Regex(""""([A-Za-z0-9_]+)"\s*:\s*"([^"]*)"""")
+    private val DWARVEN_LOCATION_ALIASES = linkedMapOf(
+        "royal mines" to "Royal Mines",
+        "cliffside veins" to "Cliffside Veins",
+        "upper mines" to "Upper Mines",
+        "ramparts quarry" to "Rampart's Quarry",
+        "rampart quarry" to "Rampart's Quarry",
+        "lava springs" to "Lava Springs",
+        "the forge" to "The Forge",
+        "forge" to "The Forge",
+        "aristocrat passage" to "Aristocrat Passage",
+        "palace bridge" to "Palace Bridge",
+        "hanging court" to "Hanging Court",
+        "great ice wall" to "Great Ice Wall",
+        "goblin burrows" to "Goblin Burrows",
+        "far reserve" to "Far Reserve",
+        "divans gateway" to "Divan's Gateway",
+        "miners guild" to "Miner's Guild",
+        "dwarven village" to "Dwarven Village",
+        "dwarven mines" to "Dwarven Mines",
+    )
 }

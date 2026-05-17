@@ -23,11 +23,15 @@ import org.phantom.api.event.impl.client.TickEvent
 import org.phantom.api.module.Module
 import org.phantom.api.module.ModuleCategory
 import org.phantom.api.module.setting.impl.*
+import org.phantom.api.pathfinder.PathOwner
+import org.phantom.api.pathfinder.PathRequest
+import org.phantom.api.pathfinder.PathService
 import org.phantom.api.pathfinder.jni.NativePathfinder
 import org.phantom.api.pathfinder.jni.PathStatus
 import org.phantom.api.pathfinder.minecraft.MinecraftPathingRules
 import org.phantom.api.rotation.RotationExecutor
 import org.phantom.api.util.*
+import org.phantom.api.util.helper.KeyBind
 import org.phantom.api.util.player.MovementManager
 import org.phantom.internal.combat.CombatMacroModule
 import org.phantom.internal.pathfinding.PathfindingModule
@@ -42,6 +46,12 @@ object CommissionMacroModule : Module("Commission Macro") {
     "Enabled",
     "Completes Dwarven Mines commissions using the RDBT Phantom commission loop.",
     false,
+  )
+
+  private val toggleKeybind = KeyBindSetting(
+    "Toggle Keybind",
+    "Key to start/stop the commission macro.",
+    KeyBind(-1),
   )
 
   private val info = InfoSetting(
@@ -125,6 +135,7 @@ object CommissionMacroModule : Module("Commission Macro") {
   private var claimAttempts = 0
   private var detectorAttempts = 0
   private var emissariesUnlocked = true
+  private var suppressPathCallbacks = false
 
   private data class DetectedCommission(
     val label: String,
@@ -173,14 +184,14 @@ object CommissionMacroModule : Module("Commission Macro") {
       val percent = (commission.progress * 100.0).toInt().coerceIn(0, 100)
       CommissionHudRow(
         label = commission.name,
-        detail = if (percent >= 100) "DONE" else "$percent%",
+        detail = formatProgressDisplay(commission.progress),
         isTargeted = commission.name == currentCommission?.name,
         percent = percent,
       )
     }
 
   init {
-    addSetting(enabled, info, avoidanceRadius, goblinWeaponSlot, statusText, commissionText, progressText, toolText)
+    addSetting(enabled, toggleKeybind, info, avoidanceRadius, goblinWeaponSlot, statusText, commissionText, progressText, toolText)
     EventBus.register(this)
   }
 
@@ -195,6 +206,10 @@ object CommissionMacroModule : Module("Commission Macro") {
     if (pendingUseRelease) {
       mc.options.keyUse.setDown(false)
       pendingUseRelease = false
+    }
+
+    if (toggleKeybind.value.isPressed()) {
+      enabled.value = !enabled.value
     }
 
     if (!enabled.value) {
@@ -377,17 +392,16 @@ object CommissionMacroModule : Module("Commission Macro") {
       return
     }
     PathfindingModule.ensureEnabledForAutomation("commission macro")
-    val cmd = NativePathfinder.tick()
-    if (cmd != null) {
+
+    if (PathService.isActive) {
       pathActivated = true
-      cmd.applyToPlayer()
-    } else {
-      MovementManager.clearForcedMovement()
+      setStatus(State.TRAVELING.label)
+      return
     }
 
-    when (NativePathfinder.status) {
-      PathStatus.ARRIVED -> if (pathActivated || hasArrivedAt(currentWaypoint)) onPathComplete(task)
-      PathStatus.FAILED -> onPathFail()
+    when {
+      NativePathfinder.status == PathStatus.ARRIVED || hasArrivedAt(currentWaypoint) -> onPathComplete(task)
+      NativePathfinder.status == PathStatus.FAILED -> onPathFail()
       else -> setStatus(State.TRAVELING.label)
     }
   }
@@ -586,7 +600,7 @@ object CommissionMacroModule : Module("Commission Macro") {
   }
 
   private fun resetState() {
-    NativePathfinder.stop()
+    cancelCommissionPath()
     MovementManager.clearForcedMovement()
     MiningMacroModule.stopForAutomation()
     CombatMacroModule.stopForAutomation()
@@ -610,6 +624,7 @@ object CommissionMacroModule : Module("Commission Macro") {
     openAttempts = 0
     claimAttempts = 0
     detectorAttempts = 0
+    suppressPathCallbacks = false
     sessionStartMs = 0L
     setStatus(State.IDLE.label)
     commissionText.value = "None"
@@ -651,7 +666,14 @@ object CommissionMacroModule : Module("Commission Macro") {
   private fun getCommissionProgressDisplay(): String {
     val name = currentCommission?.name ?: return "0%"
     val progress = commissions.firstOrNull { it.name == name }?.progress ?: currentCommission?.progress ?: 0.0
-    return if (progress >= 1.0) "DONE" else "${(progress * 100.0).toInt().coerceIn(0, 100)}%"
+    return formatProgressDisplay(progress)
+  }
+
+  private fun formatProgressDisplay(progress: Double): String {
+    val percent = (progress * 100.0).coerceIn(0.0, 100.0)
+    if (percent >= 100.0) return "DONE"
+    val rounded = String.format(Locale.US, "%.1f", percent).trimEnd('0').trimEnd('.')
+    return "$rounded%"
   }
 
   private fun truncateToolName(name: String): String =
@@ -804,9 +826,47 @@ object CommissionMacroModule : Module("Commission Macro") {
   private fun startPath(pos: BlockPos, radius: Double) {
     val level = mc.level
     val resolved = if (level != null) MinecraftPathingRules.resolveTarget(level, pos) ?: pos else pos
-    NativePathfinder.stop()
+    cancelCommissionPath()
     pathActivated = false
-    NativePathfinder.setTargetWithRadius(resolved.x + 0.5, resolved.y.toDouble(), resolved.z + 0.5, radius)
+    PathfindingModule.ensureEnabledForAutomation("commission macro")
+    val accepted = PathService.requestPath(
+      PathRequest(
+        x = resolved.x + 0.5,
+        y = resolved.y.toDouble(),
+        z = resolved.z + 0.5,
+        owner = PathOwner.COMMISSION,
+        source = "CommissionMacro",
+        timeoutTicks = 2400,
+        arrivalRadius = radius,
+        onArrive = {
+          if (!suppressPathCallbacks) {
+            pathActivated = true
+            currentTask?.let(::onPathComplete) ?: setState(State.CHOOSING)
+          }
+        },
+        onFail = {
+          if (!suppressPathCallbacks) {
+            onPathFail()
+          }
+        },
+      )
+    )
+    if (!accepted) {
+      ChatUtils.sendMessage("Commission Macro: path request was rejected.")
+      onPathFail()
+    }
+  }
+
+  private fun cancelCommissionPath() {
+    val owner = PathService.owner
+    suppressPathCallbacks = true
+    if (owner == PathOwner.COMMISSION) {
+      PathService.cancel(PathOwner.COMMISSION)
+    }
+    suppressPathCallbacks = false
+    if (owner == PathOwner.NONE || owner == PathOwner.COMMISSION) {
+      NativePathfinder.stop()
+    }
   }
 
   private fun hasArrivedAt(pos: BlockPos?, radius: Double = 2.5): Boolean {
@@ -1048,18 +1108,18 @@ object CommissionMacroModule : Module("Commission Macro") {
       normalized.contains("completed")
   }
 
-  private fun parseCommissionProgress(combined: String): Pair<Int, Int> {
+  private fun parseCommissionProgress(combined: String): Pair<Double, Double> {
     Regex("([0-9,]+)\\s*/\\s*([0-9,]+)").find(combined)?.let { match ->
-      val current = match.groupValues[1].replace(",", "").toIntOrNull() ?: 0
-      val max = match.groupValues[2].replace(",", "").toIntOrNull() ?: 100
-      return current to max.coerceAtLeast(1)
+      val current = match.groupValues[1].replace(",", "").toDoubleOrNull() ?: 0.0
+      val max = match.groupValues[2].replace(",", "").toDoubleOrNull() ?: 100.0
+      return current to max.coerceAtLeast(1.0)
     }
     Regex("([0-9]{1,3}(?:\\.[0-9]+)?)\\s*%").find(combined)?.let { match ->
       val percent = match.groupValues[1].toDoubleOrNull() ?: 0.0
-      return percent.toInt().coerceIn(0, 100) to 100
+      return percent.coerceIn(0.0, 100.0) to 100.0
     }
-    if (isClaimCommissionText(combined)) return 100 to 100
-    return 0 to 100
+    if (isClaimCommissionText(combined)) return 100.0 to 100.0
+    return 0.0 to 100.0
   }
 
   private fun buildCommissionLabel(item: ItemStack, lines: List<String>): String? {

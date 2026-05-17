@@ -615,7 +615,7 @@ object PathfindingModule : Module("Pathfinding") {
       }
     }
 
-    if (!enabled.value || !moduleOwnsPath) return
+    if (!enabled.value || !moduleOwnsPath || PathService.isActive) return
 
     val cmd = NativePathfinder.tick()
     if (cmd != null) {

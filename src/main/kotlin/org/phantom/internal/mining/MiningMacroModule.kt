@@ -260,6 +260,15 @@ object MiningMacroModule : Module("Mining Macro") {
     0.5,
   )
 
+  internal val costDistanceBand = SliderSetting(
+    "Distance Band",
+    "Width (blocks) of each distance ring. The nearest ring always wins; look-bias/cluster/visibility only break ties within a ring. Smaller = stricter closest-first.",
+    1.0,
+    0.25,
+    5.0,
+    0.25,
+  )
+
   private val highlightAimPoint = CheckboxSetting(
     "Highlight Aim Point",
     "Show the exact point on the block face the macro is rotating toward.",
@@ -533,6 +542,7 @@ object MiningMacroModule : Module("Mining Macro") {
       costVisibilityPenalty,
       costBehindPenalty,
       costClusterBonus,
+      costDistanceBand,
       highlightAimPoint,
       highlightBedrock,
       highlightBedrockRadius,
@@ -605,6 +615,7 @@ object MiningMacroModule : Module("Mining Macro") {
     costVisibilityPenalty.uiGroup = targetCostGroup
     costBehindPenalty.uiGroup = targetCostGroup
     costClusterBonus.uiGroup = targetCostGroup
+    costDistanceBand.uiGroup = targetCostGroup
     highlightAimPoint.uiGroup = miningGroup
     highlightBedrock.uiGroup = miningGroup
     highlightBedrockRadius.uiGroup = miningGroup
@@ -665,6 +676,13 @@ object MiningMacroModule : Module("Mining Macro") {
   internal const val DEFAULT_TARGET_BASE_COST = 4.0
   /** Normalized look-dot below which a block counts as "behind" (V5 -0.05). */
   internal const val BEHIND_DOT_THRESHOLD = -0.05
+  /**
+   * Per-distance-ring weight in the cost scorer. Must exceed the combined
+   * swing of every in-ring tie-break term (base + dist*distW + behind +
+   * vertical + visPen, minus lookBias + cluster ~= [-340, +350] at max
+   * settings) so the nearest ring strictly dominates. 1000 > ~690 span.
+   */
+  internal const val COST_BAND_WEIGHT = 1000.0
 
   // The native pathfinder only serializes a 96x40x96 buffer around the player,
   // so a goal outside it can never be solved and just FAILs on repeat. Past
@@ -714,7 +732,15 @@ object MiningMacroModule : Module("Mining Macro") {
   // precision point that grazes a face edge.
   internal var stareTarget: BlockPos? = null
   internal var stareTicks: Int = 0
-  internal const val STARE_RECOVERY_TICKS = 6
+  // Blacklist fires at stareTicks > STARE_RECOVERY_TICKS * 2. The opening
+  // sweep into a fresh vein is an eased rotation up to scaledDuration (capped
+  // 18 ticks) plus the exp-smoother settle tail (~a few ticks), during which
+  // the crosshair is legitimately not yet on the block. At 6 the blacklist
+  // tripped at 12 ticks â€” well inside a normal opening sweep â€” so start-of-
+  // vein blocks got 60-tick-skipped and never mined. 14 -> blacklist at 28
+  // ticks, clear of the worst-case ~24-tick sweep, while still catching a
+  // genuinely unmineable target.
+  internal const val STARE_RECOVERY_TICKS = 14
 
   // Block keys (BlockPos.asLong) â†’ gameTime tick when the skip expires. A
   // target gets added here when stuck-stare recovery gives up on it, so the
@@ -742,6 +768,10 @@ object MiningMacroModule : Module("Mining Macro") {
   internal var startedPath = false
   internal var lastPathStartTick = 0L
   internal var approachTarget: BlockPos? = null
+  // Sticky "push mode" target: once a short out-of-range block is being closed
+  // by the deterministic nudge, keep nudging it (instead of flip-flopping back
+  // to the native pather every tick at the push/native range boundary).
+  internal var pushModeTarget: BlockPos? = null
   internal var approachStartTick = 0L
   internal var approachStartDistance = 0.0
   private var wasEnabled = false
@@ -850,6 +880,7 @@ object MiningMacroModule : Module("Mining Macro") {
   internal const val REQUIRE_MINE_LOS = true
   internal const val SKIP_OCCUPIED_VEINS = true
   internal const val NUDGE_RANGE_EXTRA = 2.5   // blocks beyond mineRange to attempt a gentle nudge
+  internal const val PUSH_EXTRA = 3.0           // within mineRange+this, close the gap with the deterministic nudge, not the native pather
   internal const val MAX_WALK_BLOCKS = 5.0      // never walk more than this many blocks to reach a target
   internal const val NEARBY_STEP_RANGE_EXTRA = 0.85
   internal const val NEARBY_STEP_REACH_BUFFER = 0.65
@@ -947,8 +978,25 @@ object MiningMacroModule : Module("Mining Macro") {
       }
       if (startedPath && nativeActive()) {
         val cmd = NativePathfinder.tick()
-        if (cmd != null) cmd.applyToPlayer()
-        else MovementManager.clearForcedMovement()
+        if (cmd != null) {
+          cmd.applyToPlayer()
+        } else {
+          // Transient null (PLANNING / ARRIVED-but-still-out-of-range). Do NOT
+          // zero inputs and freeze. If we still owe a *short* approach to an
+          // out-of-range block, nudge the remaining gap; only clear when
+          // genuinely idle. Bounded to the push zone so long-range PLANNING
+          // keeps its original clear-and-wait behavior (no straight-line
+          // wall-bonk before a long path solves).
+          val at = approachTarget
+          val d2 = if (at != null) mineReachDistanceSq(player, at) else 0.0
+          val mr = mineRange.value
+          val pr = mr + PUSH_EXTRA
+          if (at != null && d2 > mr * mr && d2 <= pr * pr) {
+            nudgeToward(player, at)
+          } else {
+            MovementManager.clearForcedMovement()
+          }
+        }
       }
     }
 
@@ -1017,6 +1065,10 @@ object MiningMacroModule : Module("Mining Macro") {
     val gameTime = level.gameTime
     if (gameTime - lastPruneTick >= 20L) {
       pruneVein(level, player, vein)
+      // Re-flood after pruning: the mined shell exposes the enclosed core
+      // (interior Hot Mithril etc.) which buildVein could not capture at scan
+      // time. Bounded by maxVeinBlocks + anchor radius so it can't run away.
+      growVein(level, player, vein)
       lastPruneTick = gameTime
     }
     sanitizeActiveTargets(level, player, vein)
@@ -1287,18 +1339,26 @@ object MiningMacroModule : Module("Mining Macro") {
           val baseDuration = (initialDist / 30f * 3f).toInt().coerceIn(3, 12)
           val scaledDuration = (baseDuration / precisionRotScale.coerceAtLeast(0.1))
             .toInt().coerceIn(3, 18)
-          val fromBlock = frameRotPrevBlock ?: target
-          PhantomRotation.blockController.rotate(
-            BlockRotationRequest(
-              fromBlock = fromBlock,
-              toBlock = target,
-              durationTicks = scaledDuration,
-              useFromBlockAsStartRotation = false,
-              maxDegreesPerTick = 12f,
-              easing = RotationEasingType.EASE_IN_OUT_SINE,
-              toAimPoint = aim.point,
+          if (forceCenter) {
+            // Stare-recovery re-aim at the *same* block: a deliberate cold
+            // ease-in is correct here, not a momentum-carrying chain.
+            val fromBlock = frameRotPrevBlock ?: target
+            PhantomRotation.blockController.rotate(
+              BlockRotationRequest(
+                fromBlock = fromBlock,
+                toBlock = target,
+                durationTicks = scaledDuration,
+                useFromBlockAsStartRotation = false,
+                maxDegreesPerTick = 12f,
+                easing = RotationEasingType.EASE_IN_OUT_SINE,
+                toAimPoint = aim.point,
+              )
             )
-          )
+          } else {
+            // New vein block: chain off the in-flight segment so the camera
+            // carries momentum into it (no inter-block microstop).
+            PhantomRotation.blockController.chainTo(target, aim.point, scaledDuration)
+          }
           frameRotPrevBlock = target
           frameRotLastNs = 0L
         }
@@ -1326,24 +1386,32 @@ object MiningMacroModule : Module("Mining Macro") {
         stepToNearbyBlocks.value &&
           canStepToNearbyTarget(player, target) &&
           distSq <= nudgeThresh * nudgeThresh
-      // Fast path: target is just barely out of mining range (â‰¤ mineRange + 2).
-      // The native pathfinder is unreliable at these tiny distances â€” it
-      // oscillates between PLANNING and ARRIVED, and during those states the
-      // early-tick block calls clearForcedMovement, killing any step. Drive a
-      // direct nudge in that window so the player actually walks the half-block
-      // they need to put the block in range.
-      val closeNudgeRange = mineRange.value + 2.0
-      if (canShortStep && blockingPlayer == null && distSq <= closeNudgeRange * closeNudgeRange) {
+      // Push zone: target is only a few blocks out of mining range. The native
+      // pather is unreliable here â€” it flaps PLANNING/ARRIVED, returns a null
+      // command, and the early path-tick then clearForcedMovement()s, so the
+      // path is "generated" but the player never moves and never mines. Drive
+      // the deterministic nudge instead. Gated ONLY on the anchor bound + no
+      // blocking player â€” explicitly NOT on stepToNearbyBlocks: that toggle
+      // decides whether to chase nearby blocks at all, not how to close a tiny
+      // committed gap. Sticky via pushModeTarget so a block hovering at the
+      // edge can't flip-flop between nudge and native every tick.
+      val pushRange = mineRange.value + PUSH_EXTRA
+      val inPushZone = distSq <= pushRange * pushRange || pushModeTarget == target
+      if (blockingPlayer == null && canStepToNearbyTarget(player, target) && inPushZone) {
         if (startedPath && nativeActive()) {
           nativeStop()
         }
         startedPath = false
         lastPathTarget = null
         resetApproachTracking()
+        pushModeTarget = target
         nudgeTowardApproach(level, player, target)
         focusApproachTarget(player, target)
         return
       }
+      // Not closing a short gap this tick â€” drop any stale push stickiness so a
+      // later far target doesn't get pinned to the nudge.
+      pushModeTarget = null
         // V5 rotates toward the approach target while moving toward it. Drive
         // the rotation controller for every movement arm (the pathfinding arms
         // used to call only moveToward, so the camera never turned to the ore
@@ -1720,18 +1788,10 @@ object MiningMacroModule : Module("Mining Macro") {
     val baseDuration = (initialDist / 30f * 3f).toInt().coerceIn(3, 12)
     val scaledDuration = (baseDuration / precisionRotScale.coerceAtLeast(0.1))
       .toInt().coerceIn(3, 18)
-    val fromBlock = frameRotPrevBlock ?: target
-    PhantomRotation.blockController.rotate(
-      BlockRotationRequest(
-        fromBlock = fromBlock,
-        toBlock = target,
-        durationTicks = scaledDuration,
-        useFromBlockAsStartRotation = false,
-        maxDegreesPerTick = 12f,
-        easing = RotationEasingType.EASE_IN_OUT_SINE,
-        toAimPoint = aimPoint,
-      )
-    )
+    // Chain off the in-flight segment so the camera carries momentum block to
+    // block (no decel-to-stop + re-accel "microstop"). chainTo cold-starts
+    // with accel-in easing on the first block of a vein automatically.
+    PhantomRotation.blockController.chainTo(target, aimPoint, scaledDuration)
     frameRotPrevBlock = target
     frameRotLastNs = 0L
   }
@@ -1759,19 +1819,21 @@ object MiningMacroModule : Module("Mining Macro") {
     }
     val preview = cachedPreviewTarget
     val returnPos = goldenGoblinReturnPos
-    val connectedBlocks = collectConnectedHighlightBlocks(level, player, active, preview)
+    val highlightBlocks = collectHighlightBlocks(level, player, active, preview)
     val vein = currentVein
     OverlayRenderEngine.clearTag(OVERLAY_TAG)
     val nothingToRender =
-      active == null && preview == null && returnPos == null && connectedBlocks.isEmpty() && vein == null
+      active == null && preview == null && returnPos == null && highlightBlocks.isEmpty() && vein == null
     if (nothingToRender && !highlightBedrock.value) return
 
     val activeFill = OverlayRenderEngine.Color(0x2D, 0xE2, 0xFF, 0x44)
     val activeOutline = OverlayRenderEngine.Color(0x2D, 0xE2, 0xFF, 0xFF)
     val previewOutline = OverlayRenderEngine.Color(0xFF, 0xD8, 0x4C, 0xFF)
-    val possibleOutline = OverlayRenderEngine.Color(0x2D, 0xE2, 0xFF, 0xA0)
+    val inRangeOutline = OverlayRenderEngine.Color(0x2D, 0xE2, 0xFF, 0xB8)
+    val pathTargetOutline = OverlayRenderEngine.Color(0xFF, 0xA8, 0x34, 0xB8)
     val returnOutline = OverlayRenderEngine.Color(0x6E, 0xEA, 0x92, 0xFF)
-    renderSingleVeinOutline(level, vein, connectedBlocks, possibleOutline)
+    renderBlockOutlines(level, highlightBlocks.pathTargets, pathTargetOutline, 1.15f)
+    renderBlockOutlines(level, highlightBlocks.inRangeTargets, inRangeOutline, 1.45f)
 
     if (active != null) {
       val pad = 0.002
@@ -1959,107 +2021,60 @@ object MiningMacroModule : Module("Mining Macro") {
     aimRenderPoint = point
   }
 
-  private fun renderSingleVeinOutline(
-    level: net.minecraft.world.level.Level,
-    vein: Vein?,
-    fallbackBlocks: Set<BlockPos>,
-    color: OverlayRenderEngine.Color,
+  private data class HighlightBlocks(
+    val inRangeTargets: Set<BlockPos>,
+    val pathTargets: Set<BlockPos>,
   ) {
-    if (!highlightPossibleBlocks.value) return
-
-    val blocks = fallbackBlocks.takeIf { it.isNotEmpty() }
-      ?: vein?.blocks?.takeIf { it.isNotEmpty() }
-      ?: return
-    val bounds = boundsForBlocks(blocks)
-
-    // One outline around the currently reachable highlight set, so stale or distant
-    // scan members do not stretch the preview box away from the blocks being mined.
-    val pad = 0.025
-    OverlayRenderEngine.addBox(
-      level,
-      bounds.minX - pad,
-      bounds.minY - pad,
-      bounds.minZ - pad,
-      bounds.maxX + pad,
-      bounds.maxY + pad,
-      bounds.maxZ + pad,
-      null,
-      color,
-      2.6f,
-      2,
-      OVERLAY_TAG,
-      forceRender = true,
-    )
+    fun isEmpty(): Boolean = inRangeTargets.isEmpty() && pathTargets.isEmpty()
   }
 
-  private fun boundsForBlocks(blocks: Collection<BlockPos>): AABB {
-    var minX = Int.MAX_VALUE
-    var minY = Int.MAX_VALUE
-    var minZ = Int.MAX_VALUE
-    var maxX = Int.MIN_VALUE
-    var maxY = Int.MIN_VALUE
-    var maxZ = Int.MIN_VALUE
-
-    for (pos in blocks) {
-      if (pos.x < minX) minX = pos.x
-      if (pos.y < minY) minY = pos.y
-      if (pos.z < minZ) minZ = pos.z
-      if (pos.x > maxX) maxX = pos.x
-      if (pos.y > maxY) maxY = pos.y
-      if (pos.z > maxZ) maxZ = pos.z
-    }
-
-    return AABB(
-      minX.toDouble(),
-      minY.toDouble(),
-      minZ.toDouble(),
-      maxX + 1.0,
-      maxY + 1.0,
-      maxZ + 1.0,
-    )
-  }
-
-  private data class RenderEdge(
-    val x1: Int,
-    val y1: Int,
-    val z1: Int,
-    val x2: Int,
-    val y2: Int,
-    val z2: Int,
-  )
-
-  private fun collectConnectedHighlightBlocks(
+  private fun collectHighlightBlocks(
     level: net.minecraft.world.level.Level,
     player: Player,
     active: BlockPos?,
     preview: BlockPos?,
-  ): Set<BlockPos> {
-    if (!highlightPossibleBlocks.value) return emptySet()
-    val vein = currentVein ?: return emptySet()
+  ): HighlightBlocks {
+    if (!highlightPossibleBlocks.value) return HighlightBlocks(emptySet(), emptySet())
+    val vein = currentVein ?: return HighlightBlocks(emptySet(), emptySet())
     val limit = highlightPossibleLimit.value.toInt().coerceAtLeast(1)
-    val result = LinkedHashSet<BlockPos>(minOf(limit, vein.blocks.size))
+    val inRange = LinkedHashSet<BlockPos>(minOf(limit, vein.blocks.size))
+    val pathTargets = LinkedHashSet<BlockPos>(minOf(limit, vein.blocks.size))
+    val rangeSq = mineRange.value * mineRange.value
+    val now = level.gameTime
 
-    // Always include the active and preview blocks first so the connected shell does not
-    // draw a fake seam between the block being mined and the rest of the vein.
-    if (active != null && vein.blocks.contains(active) && isMineableTarget(level, player, active, vein.targetIds)) {
-      result.add(active)
+    fun canHighlight(pos: BlockPos): Boolean {
+      if (!vein.blocks.contains(pos)) return false
+      if (!isMineableTarget(level, player, pos, vein.targetIds)) return false
+      val skipUntil = stuckMiningTargets[pos.asLong()]
+      return skipUntil == null || skipUntil <= now
     }
-    if (preview != null && vein.blocks.contains(preview) && isMineableTarget(level, player, preview, vein.targetIds)) {
-      result.add(preview)
+
+    fun addCandidate(pos: BlockPos) {
+      if (!canHighlight(pos)) return
+      val targetSet = if (mineReachDistanceSq(player, pos) <= rangeSq) inRange else pathTargets
+      if (inRange.size + pathTargets.size < limit || targetSet.contains(pos)) {
+        targetSet.add(pos)
+      }
     }
+
+    // Active and preview first: these mirror the selector's current answer even
+    // when the sorted debug list would otherwise be truncated by the limit.
+    active?.let(::addCandidate)
+    preview?.let(::addCandidate)
 
     val sorted = vein.blocks
       .asSequence()
       .filter { it != active && it != preview }
-      .filter { isMineableTarget(level, player, it, vein.targetIds) }
-      .sortedBy { highlightSortScore(player, it) }
+      .filter(::canHighlight)
+      .sortedWith(compareBy<BlockPos> { mineReachDistanceSq(player, it) > rangeSq }
+        .thenBy { highlightSortScore(player, it) })
 
     for (pos in sorted) {
-      result.add(pos)
-      if (result.size >= limit) break
+      if (inRange.size + pathTargets.size >= limit) break
+      addCandidate(pos)
     }
 
-    return result
+    return HighlightBlocks(inRange, pathTargets)
   }
 
   private fun highlightSortScore(player: Player, pos: BlockPos): Double {
@@ -2070,97 +2085,30 @@ object MiningMacroModule : Module("Mining Macro") {
     return dx * dx + dy * dy + dz * dz + belowPenalty
   }
 
-  private fun renderConnectedBlockShell(
+  private fun renderBlockOutlines(
     level: net.minecraft.world.level.Level,
     blocks: Set<BlockPos>,
     color: OverlayRenderEngine.Color,
+    lineWidth: Float,
   ) {
     if (blocks.isEmpty()) return
-    val edges = LinkedHashSet<RenderEdge>()
+    val pad = 0.006
     for (pos in blocks) {
-      for (dir in Direction.values()) {
-        if (blocks.contains(pos.relative(dir))) continue
-        addFaceEdges(edges, pos, dir)
-      }
-    }
-    for (edge in edges) {
-      OverlayRenderEngine.addLine(
+      OverlayRenderEngine.addBox(
         level,
-        edge.x1.toDouble(), edge.y1.toDouble(), edge.z1.toDouble(),
-        edge.x2.toDouble(), edge.y2.toDouble(), edge.z2.toDouble(),
+        pos.x - pad,
+        pos.y - pad,
+        pos.z - pad,
+        pos.x + 1.0 + pad,
+        pos.y + 1.0 + pad,
+        pos.z + 1.0 + pad,
+        null,
         color,
-        1.35f,
-        2,
-        OVERLAY_TAG,
+        lineWidth = lineWidth,
+        durationTicks = 2,
+        tag = OVERLAY_TAG,
+        forceRender = true,
       )
-    }
-  }
-
-  private fun addFaceEdges(edges: MutableSet<RenderEdge>, pos: BlockPos, dir: Direction) {
-    val x0 = pos.x
-    val y0 = pos.y
-    val z0 = pos.z
-    val x1 = pos.x + 1
-    val y1 = pos.y + 1
-    val z1 = pos.z + 1
-
-    when (dir) {
-      Direction.DOWN -> {
-        addEdge(edges, x0, y0, z0, x1, y0, z0)
-        addEdge(edges, x1, y0, z0, x1, y0, z1)
-        addEdge(edges, x1, y0, z1, x0, y0, z1)
-        addEdge(edges, x0, y0, z1, x0, y0, z0)
-      }
-      Direction.UP -> {
-        addEdge(edges, x0, y1, z0, x1, y1, z0)
-        addEdge(edges, x1, y1, z0, x1, y1, z1)
-        addEdge(edges, x1, y1, z1, x0, y1, z1)
-        addEdge(edges, x0, y1, z1, x0, y1, z0)
-      }
-      Direction.NORTH -> {
-        addEdge(edges, x0, y0, z0, x1, y0, z0)
-        addEdge(edges, x1, y0, z0, x1, y1, z0)
-        addEdge(edges, x1, y1, z0, x0, y1, z0)
-        addEdge(edges, x0, y1, z0, x0, y0, z0)
-      }
-      Direction.SOUTH -> {
-        addEdge(edges, x0, y0, z1, x1, y0, z1)
-        addEdge(edges, x1, y0, z1, x1, y1, z1)
-        addEdge(edges, x1, y1, z1, x0, y1, z1)
-        addEdge(edges, x0, y1, z1, x0, y0, z1)
-      }
-      Direction.WEST -> {
-        addEdge(edges, x0, y0, z0, x0, y0, z1)
-        addEdge(edges, x0, y0, z1, x0, y1, z1)
-        addEdge(edges, x0, y1, z1, x0, y1, z0)
-        addEdge(edges, x0, y1, z0, x0, y0, z0)
-      }
-      Direction.EAST -> {
-        addEdge(edges, x1, y0, z0, x1, y0, z1)
-        addEdge(edges, x1, y0, z1, x1, y1, z1)
-        addEdge(edges, x1, y1, z1, x1, y1, z0)
-        addEdge(edges, x1, y1, z0, x1, y0, z0)
-      }
-    }
-  }
-
-  private fun addEdge(
-    edges: MutableSet<RenderEdge>,
-    ax: Int,
-    ay: Int,
-    az: Int,
-    bx: Int,
-    by: Int,
-    bz: Int,
-  ) {
-    val forward =
-      ax < bx ||
-        (ax == bx && ay < by) ||
-        (ax == bx && ay == by && az <= bz)
-    if (forward) {
-      edges.add(RenderEdge(ax, ay, az, bx, by, bz))
-    } else {
-      edges.add(RenderEdge(bx, by, bz, ax, ay, az))
     }
   }
 
