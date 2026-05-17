@@ -52,6 +52,7 @@ import org.phantom.internal.rotation.RotationEasingType
 import org.phantom.internal.rotation.RotationsModule
 import org.phantom.internal.routes.RoutePickerSetting
 import org.phantom.internal.routes.RouteType
+import org.phantom.internal.skyblock.DwarvenSidebarLocationParser
 import org.phantom.internal.skyblock.HypixelManager
 import org.phantom.internal.ui.panel.panels.UIModuleList
 
@@ -188,20 +189,18 @@ object MiningMacroModule : Module("Mining Macro") {
 
   internal fun currentMiningArea(player: Player? = mc.player): MiningArea {
     if (player != null && player.blockY > 187) return MiningArea.GLACITE
+    DwarvenSidebarLocationParser.currentSidebarLocation()?.let { sidebarLocation ->
+      if (DwarvenSidebarLocationParser.isGlaciteLocation(sidebarLocation)) return MiningArea.GLACITE
+    }
     val snapshot = HypixelManager.snapshot()
-    if (isGlaciteSubspace(snapshot.area) || isGlaciteSubspace(snapshot.map) || isGlaciteSubspace(snapshot.placeName)) {
+    if (
+      DwarvenSidebarLocationParser.isGlaciteLocation(snapshot.area) ||
+      DwarvenSidebarLocationParser.isGlaciteLocation(snapshot.map) ||
+      DwarvenSidebarLocationParser.isGlaciteLocation(snapshot.placeName)
+    ) {
       return MiningArea.GLACITE
     }
     return player?.let { MiningAnchorStore.areaForY(it.blockY) } ?: MiningArea.DWARVEN
-  }
-
-  private fun isGlaciteSubspace(value: String): Boolean {
-    val normalized = value.lowercase()
-      .replace("'", "")
-      .replace(Regex("""[^a-z0-9]+"""), " ")
-      .replace(Regex("""\s+"""), " ")
-      .trim()
-    return normalized in GLACITE_SUBSPACES
   }
 
   private val highlightPossibleBlocks = CheckboxSetting(
@@ -918,13 +917,6 @@ object MiningMacroModule : Module("Mining Macro") {
   internal const val RETURN_TO_ANCHOR_SCAN_VERTICAL = 2
   internal const val GOLDEN_GOBLIN_NAME = "golden goblin"
   internal const val GOLDEN_GOBLIN_LOST_TICKS = 20L
-  private val GLACITE_SUBSPACES = setOf(
-    "dwarven base camp",
-    "glacite tunnels",
-    "great glacite lake",
-    "grandpa wolfs cave",
-  )
-
   @SubscribeEvent
   fun onTick(@Suppress("UNUSED_PARAMETER") event: TickEvent.Start) {
     if (toggleKeybind.value.isPressed()) {

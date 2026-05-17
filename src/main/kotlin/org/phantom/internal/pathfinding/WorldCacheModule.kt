@@ -10,9 +10,9 @@ import org.phantom.api.pathfinder.cache.CachedWorld
 import org.phantom.api.ui.theme.ThemeGradient
 import org.phantom.api.ui.theme.ThemeManager
 import org.phantom.api.ui.theme.ThemeSurface
-import org.phantom.api.util.ScoreboardUtils
 import org.phantom.api.util.ui.NVGRenderer
 import org.phantom.api.util.ui.helper.Gradient
+import org.phantom.internal.skyblock.DwarvenSidebarLocationParser
 import org.phantom.internal.skyblock.HypixelManager
 
 object WorldCacheModule : Module("World Cache HUD") {
@@ -103,10 +103,11 @@ object WorldCacheModule : Module("World Cache HUD") {
         val basePlace = map
             ?: snapshot.placeName.takeIf(::isKnown)
             ?: CachedWorld.getWorldDisplayName().takeIf(::isKnown)
-        val isDwarven = listOfNotNull(map, snapshot.area, snapshot.mode, snapshot.placeName, basePlace)
+        val sidebarLocation = DwarvenSidebarLocationParser.currentSidebarLocation()
+        val isDwarven = sidebarLocation != null || listOfNotNull(map, snapshot.area, snapshot.mode, snapshot.placeName, basePlace)
             .any { it.equals("Dwarven Mines", ignoreCase = true) }
         val sublocation = if (isDwarven) {
-            detectDwarvenSidebarSublocation()
+            sidebarLocation?.takeUnless { it.equals("Dwarven Mines", ignoreCase = true) }
         } else {
             null
         }
@@ -136,55 +137,4 @@ object WorldCacheModule : Module("World Cache HUD") {
         value.equals(place, ignoreCase = true) ||
             map?.let { value.equals(it, ignoreCase = true) } == true ||
             sublocation?.let { value.equals(it, ignoreCase = true) } == true
-
-    private fun detectDwarvenSidebarSublocation(): String? {
-        val lines = buildList {
-            ScoreboardUtils.sidebarObjective()?.displayName?.string?.let { add(it) }
-            addAll(ScoreboardUtils.sidebarLines())
-        }
-        for (line in lines) {
-            val normalized = normalizeLocationKey(line)
-            for ((needle, display) in DWARVEN_SIDEBAR_LOCATIONS) {
-                if (normalized.contains(needle)) return display
-            }
-        }
-        return null
-    }
-
-    private fun normalizeLocationKey(raw: String): String =
-        raw.lowercase()
-            .replace("'", "")
-            .replace(Regex("""[^a-z0-9]+"""), " ")
-            .replace(Regex("""\s+"""), " ")
-            .trim()
-
-    private val DWARVEN_SIDEBAR_LOCATIONS = linkedMapOf(
-        "royal mines" to "Royal Mines",
-        "cliffside veins" to "Cliffside Veins",
-        "upper mines" to "Upper Mines",
-        "ramparts quarry" to "Rampart's Quarry",
-        "rampart quarry" to "Rampart's Quarry",
-        "lava springs" to "Lava Springs",
-        "the forge" to "The Forge",
-        "forge" to "The Forge",
-        "aristocrat passage" to "Aristocrat Passage",
-        "palace bridge" to "Palace Bridge",
-        "hanging court" to "Hanging Court",
-        "great ice wall" to "Great Ice Wall",
-        "goblin burrows" to "Goblin Burrows",
-        "far reserve" to "Far Reserve",
-        "divans gateway" to "Divan's Gateway",
-        "miners guild" to "Miner's Guild",
-        "dwarven village" to "Dwarven Village",
-        // Glacite subspaces are reported under the Dwarven Mines parent by the
-        // SkyBlock location API, so the scoreboard area is the only signal that
-        // we're in Glacite Tunnels et al. Without these the HUD just showed
-        // "Dwarven Mines" with no "- Glacite Tunnels".
-        "glacite tunnels" to "Glacite Tunnels",
-        "glacite mineshafts" to "Glacite Mineshafts",
-        "glacite mineshaft" to "Glacite Mineshafts",
-        "fossil research center" to "Fossil Research Center",
-        "dwarven base camp" to "Dwarven Base Camp",
-        "great glacite lake" to "Great Glacite Lake",
-    )
 }
