@@ -1,9 +1,7 @@
 package middleware
 
 import (
-	"crypto/sha256"
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
@@ -15,10 +13,13 @@ func ParseBearerToken(header string) (string, error) {
 	if header == "" {
 		return "", errors.New("missing authorization header")
 	}
+
 	parts := strings.Fields(header)
+
 	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") || strings.TrimSpace(parts[1]) == "" {
 		return "", errors.New("invalid authorization header")
 	}
+
 	return parts[1], nil
 }
 
@@ -30,6 +31,7 @@ func SecurityHeaders() fiber.Handler {
 		c.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		c.Set("Permissions-Policy", "interest-cohort=()")
 		c.Set("X-XSS-Protection", "0")
+
 		return c.Next()
 	}
 }
