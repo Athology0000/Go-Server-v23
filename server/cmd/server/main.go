@@ -43,7 +43,9 @@ func main() {
 		log.Fatalf("db: %v", err)
 	}
 	defer pool.Close()
-
+if err := db.RunMigrations(ctx, pool); err != nil {
+	log.Fatalf("migrations: %v", err)
+}
 	rdb, err := cache.NewClient(cfg.RedisURL)
 	if err != nil {
 		log.Fatalf("redis: %v", err)
