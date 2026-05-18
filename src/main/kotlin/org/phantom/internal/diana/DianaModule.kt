@@ -5,7 +5,9 @@ import net.minecraft.client.Minecraft
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
+import kotlin.math.abs
 import kotlin.math.floor
+import kotlin.random.Random
 import org.phantom.api.event.EventBus
 import org.phantom.api.event.annotation.SubscribeEvent
 import org.phantom.api.event.impl.client.TickEvent
@@ -20,13 +22,17 @@ import org.phantom.api.rotation.RotationExecutor
 import org.phantom.api.rotation.strategy.BezierTrackingRotationStrategy
 import org.phantom.api.util.AngleUtils
 import org.phantom.api.util.ChatUtils
+import org.phantom.api.util.InventoryUtils
+import org.phantom.api.util.TickScheduler
+import org.phantom.api.util.helper.Rotation
 import org.phantom.api.util.player.MovementManager
+import org.phantom.internal.etherwarp.EtherwarpLogic
 import org.phantom.internal.pathfinding.OverlayRenderEngine
 import org.phantom.internal.rotation.RotationsModule
 
 object DianaMacroModule : Module("Diana Macro") {
 
-    override val category = ModuleCategory.COMBAT
+    override val category = ModuleCategory.DIANA
 
     private val mc = Minecraft.getInstance()
     val isActive: Boolean get() = enabledSetting.value
@@ -44,11 +50,27 @@ object DianaMacroModule : Module("Diana Macro") {
     private var collectTicksElapsed     = 0
     private var pathfindingTicksElapsed = 0
     private var digTicksElapsed         = 0
+    private var digApproachTicks        = 0
+    private var combatMoving            = false
+    private var lastTravelDebugMs       = 0L
     private var waitTicksElapsed        = 0
 
     private var burrowPos: Vec3?   = null
     private var burrowType: DianaParticleTracker.BurrowType = DianaParticleTracker.BurrowType.UNKNOWN
     private var targetEntityId: Int = -1
+
+    // -- Teleport-first hop executor state -------------------------------------
+    private var planSubmitted = false
+    private var hops: List<DianaTeleportPlanner.Hop> = emptyList()
+    private var hopIndex = 0
+    private var lastCastMs = 0L
+    private var castCooldownMs = 280L
+    private var aimStableSinceMs = 0L
+    private var lastAimYaw = Float.NaN
+    private var lastAimPitch = Float.NaN
+    private var noProgressTicks = 0
+    private var lastProgressDistSq = Double.MAX_VALUE
+    private var castRestoreSlot = -1
 
     // -- Settings --------------------------------------------------------------
 
@@ -69,9 +91,45 @@ object DianaMacroModule : Module("Diana Macro") {
     private val minParticlesSetting = SliderSetting(
         "Min Particles", "Minimum CRIT packets required before pathfinding to burrow.", 2.0, 1.0, 10.0, step = 1.0
     )
+    private val aotvSlotSetting = SliderSetting(
+        "AOTV Slot", "Hotbar slot of the Aspect of the Void used for travel (1-9). 0 = auto-detect.",
+        0.0, 0.0, 9.0, step = 1.0
+    )
+    private val useEtherwarpSetting = CheckboxSetting(
+        "Use Etherwarp", "Allow long sneak-teleport (etherwarp) hops while travelling.", true
+    )
+    private val useAotvSetting = CheckboxSetting(
+        "Use Instant Transmission", "Allow short AOTV transmission hops while travelling.", true
+    )
+    private val smoothAimSetting = CheckboxSetting(
+        "Smooth Aim", "Human-like Bezier rotation toward each hop (off = snap, for testing).", true
+    )
+    private val showNodeMapSetting = CheckboxSetting(
+        "Show Node Map", "Render the planned hop path (walk/AOTV/etherwarp) while travelling.", true
+    )
+    private val travelDebugSetting = CheckboxSetting(
+        "Travel Debug Chat", "Print planner results / fallbacks to chat.", true
+    )
+    private val aimSettleSetting = SliderSetting(
+        "Aim Settle (ms)", "How long the aim must stay on-target before a teleport fires.",
+        110.0, 0.0, 400.0, step = 10.0
+    )
+    private val castCdMinSetting = SliderSetting(
+        "Cast Cooldown Min (ms)", "Minimum delay between teleport casts.", 240.0, 80.0, 600.0, step = 10.0
+    )
+    private val castCdMaxSetting = SliderSetting(
+        "Cast Cooldown Max (ms)", "Maximum delay between teleport casts (randomised with min).",
+        320.0, 80.0, 800.0, step = 10.0
+    )
 
     private val spadeSlot  get() = spadeSlotSetting.value.toInt() - 1
     private val weaponSlot get() = weaponSlotSetting.value.toInt() - 1
+    private fun resolveAotvSlot(): Int {
+        val configured = aotvSlotSetting.value.toInt()
+        if (configured in 1..9) return configured - 1
+        val auto = EtherwarpLogic.findEtherwarpHotbarSlot()
+        return if (auto in 0..8) auto else -1
+    }
 
     // -- Constants -------------------------------------------------------------
 
@@ -89,6 +147,13 @@ object DianaMacroModule : Module("Diana Macro") {
         "Manticore",
     )
     private const val COMBAT_ROTATION_STEP_SCALE = 0.62
+    private const val AIM_ERROR_DEG = 3.5f
+    // Combat positioning: start walking only when the mob drifts past
+    // COMBAT_MOVE_START, stop once back within COMBAT_MOVE_STOP, and swing
+    // whenever it is within COMBAT_ATTACK_RANGE.
+    private const val COMBAT_MOVE_START = 5.0
+    private const val COMBAT_MOVE_STOP = 3.0
+    private const val COMBAT_ATTACK_RANGE = 4.0
 
     private val rotationStrategy = BezierTrackingRotationStrategy(
         yawStepSampler   = { (RotationsModule.sample(RotationsModule.combatYawStep.value)   * COMBAT_ROTATION_STEP_SCALE).toFloat() },
@@ -102,8 +167,11 @@ object DianaMacroModule : Module("Diana Macro") {
 
     init {
         addSetting(
-            enabledSetting, spadeSlotSetting, weaponSlotSetting,
+            enabledSetting, spadeSlotSetting, weaponSlotSetting, aotvSlotSetting,
             collectDurationSetting, postKillWaitSetting, minParticlesSetting,
+            useEtherwarpSetting, useAotvSetting, smoothAimSetting,
+            showNodeMapSetting, travelDebugSetting, aimSettleSetting,
+            castCdMinSetting, castCdMaxSetting,
         )
         EventBus.register(this)
     }
@@ -122,10 +190,94 @@ object DianaMacroModule : Module("Diana Macro") {
         collectTicksElapsed = 0
         pathfindingTicksElapsed = 0
         digTicksElapsed = 0
+        digApproachTicks = 0
         waitTicksElapsed = 0
+        combatMoving = false
+        releaseTravelInputs()
+        DianaTeleportPlanner.cancel()
+        resetHopState()
     }
 
     private fun stop() { cleanup() }
+
+    // -- Teleport-first hop executor helpers -----------------------------------
+
+    private fun resetHopState() {
+        planSubmitted = false
+        hops = emptyList()
+        hopIndex = 0
+        noProgressTicks = 0
+        lastProgressDistSq = Double.MAX_VALUE
+        resetAimSettle()
+    }
+
+    private fun resetAimSettle() {
+        aimStableSinceMs = 0L
+        lastAimYaw = Float.NaN
+        lastAimPitch = Float.NaN
+    }
+
+    private fun releaseTravelInputs() {
+        MovementManager.setMovementLock(false)
+        MovementManager.clearForcedMovement()
+        RotationExecutor.stopIfUsing(rotationStrategy)
+        mc.options.keyShift?.setDown(false)
+        mc.options.keyUse?.setDown(false)
+    }
+
+    private fun endTravel() {
+        releaseTravelInputs()
+        DianaTeleportPlanner.cancel()
+        resetHopState()
+    }
+
+    private fun aimAt(rot: Rotation) {
+        if (smoothAimSetting.value) {
+            RotationExecutor.rotateTo(rot, rotationStrategy)
+        } else {
+            val p = mc.player ?: return
+            p.yRot = rot.yaw
+            p.xRot = rot.pitch
+        }
+    }
+
+    /** Walk straight at the burrow while the planner has nothing usable. */
+    private fun directApproach(player: net.minecraft.client.player.LocalPlayer, target: Vec3) {
+        aimAt(AngleUtils.getRotation(player.eyePosition, Vec3(target.x, target.y + 0.3, target.z)))
+        MovementManager.setMovementLock(true)
+        MovementManager.setForcedMovement(true, false, false, false, false, false, true)
+    }
+
+    private fun debugTravel(msg: String) {
+        if (!travelDebugSetting.value) return
+        val now = System.currentTimeMillis()
+        if (now - lastTravelDebugMs < 1500L) return
+        lastTravelDebugMs = now
+        ChatUtils.sendMessage("Diana: $msg")
+    }
+
+    private fun randomCastCooldown(): Long {
+        val lo = castCdMinSetting.value.toLong()
+        val hi = castCdMaxSetting.value.toLong().coerceAtLeast(lo)
+        return if (hi <= lo) lo else lo + Random.nextLong(hi - lo + 1)
+    }
+
+    private fun fireCast(isEtherwarp: Boolean, aotvSlot: Int) {
+        val player = mc.player ?: return
+        castRestoreSlot = player.inventory.selectedSlot
+        InventoryUtils.holdHotbarSlot(aotvSlot)
+        if (isEtherwarp) mc.options.keyShift?.setDown(true)
+        mc.options.keyUse?.setDown(true)
+        TickScheduler.schedule(1L) {
+            mc.options.keyUse?.setDown(false)
+            if (isEtherwarp) mc.options.keyShift?.setDown(false)
+        }
+        TickScheduler.schedule(4L) {
+            val r = castRestoreSlot
+            if (r in 0..8) InventoryUtils.holdHotbarSlot(r)
+            castRestoreSlot = -1
+        }
+    }
 
     // -- Tick ------------------------------------------------------------------
 
@@ -190,77 +342,222 @@ object DianaMacroModule : Module("Diana Macro") {
 
             State.PATHFINDING -> {
                 val bp = burrowPos ?: run { state = State.IDLE; return }
+                val target = Vec3(bp.x, bp.y + 1.0, bp.z)
 
-                if (pathfindingTicksElapsed == 0) {
-                    // bp.y is the grass block; player stands one block above it
-                    NativePathfinder.setTarget(bp.x, bp.y + 1.0, bp.z)
-                }
                 pathfindingTicksElapsed++
-
-                if (pathfindingTicksElapsed > 300) {
-                    NativePathfinder.stop()
-                    MovementManager.setMovementLock(false)
-                    ChatUtils.sendMessage("Diana: pathfinding timed out, retrying.")
+                if (pathfindingTicksElapsed > 600) {
+                    endTravel()
+                    ChatUtils.sendMessage("Diana: travel timed out, retrying.")
                     state = State.IDLE
                     return
                 }
 
-                val cmd = NativePathfinder.tick()
-                if (cmd != null) {
-                    cmd.applyToPlayer()
-                } else {
-                    when (NativePathfinder.status) {
-                        PathStatus.ARRIVED -> {
-                            NativePathfinder.stop()
-                            val bp2 = burrowPos
-                            if (bp2 != null) DianaParticleTracker.removeBurrow(floor(bp2.x).toInt(), floor(bp2.z).toInt())
-                            DianaProfitTracker.onMacroArrived()
-                            player.inventory.selectedSlot = spadeSlot
-                            digTicksElapsed = 0
-                            state = State.DIGGING
-                        }
-                        PathStatus.FAILED -> {
-                            NativePathfinder.stop()
-                            MovementManager.setMovementLock(false)
-                            ChatUtils.sendMessage("Diana: pathfinding failed, retrying.")
-                            state = State.IDLE
-                        }
-                        PathStatus.IDLE -> {
-                            // Guard: ignore IDLE for the first 3 ticks - the native engine
-                            // may not have processed setTarget yet on tick 0.
-                            if (pathfindingTicksElapsed > 3) {
-                                NativePathfinder.stop()
-                                MovementManager.setMovementLock(false)
-                                state = State.IDLE
-                            }
-                        }
-                        PathStatus.PLANNING -> MovementManager.clearForcedMovement()
-                        else -> { /* REPLANNING, RECOVERING, EXECUTING - handled via cmd != null */ }
-                    }
+                val aotvSlot = resolveAotvSlot()
+                if (aotvSlot < 0) {
+                    endTravel()
+                    ChatUtils.sendMessage("Diana: no AOTV in hotbar (set AOTV Slot).")
+                    state = State.IDLE
+                    return
+                }
+                // Hold AOTV for travelling (unless mid cast-restore).
+                if (castRestoreSlot < 0 && player.inventory.selectedSlot != aotvSlot) {
+                    player.inventory.selectedSlot = aotvSlot
                 }
 
-                if (state == State.PATHFINDING && player.position().distanceTo(Vec3(bp.x, bp.y + 1.0, bp.z)) <= 2.0) {
-                    NativePathfinder.stop()
+                // Arrived at the burrow.
+                if (player.position().distanceTo(target) <= 2.5) {
+                    endTravel()
                     DianaParticleTracker.removeBurrow(floor(bp.x).toInt(), floor(bp.z).toInt())
                     DianaProfitTracker.onMacroArrived()
                     player.inventory.selectedSlot = spadeSlot
                     digTicksElapsed = 0
+                    digApproachTicks = 0
                     state = State.DIGGING
+                    return
+                }
+
+                // Request a hybrid teleport-first plan and wait for it.
+                if (!planSubmitted) {
+                    DianaTeleportPlanner.submit(
+                        start = player.position(),
+                        goal = target,
+                        goalReachedRadius = 2.0,
+                        transmissionRange = 11.0,
+                        etherwarpRange = EtherwarpLogic.getEtherwarpRange().toDouble(),
+                        availableMana = -1,
+                        aotvEnabled = useAotvSetting.value,
+                        etherwarpEnabled = useEtherwarpSetting.value,
+                    )
+                    planSubmitted = true
+                    hops = emptyList()
+                    hopIndex = 0
+                    MovementManager.setMovementLock(true)
+                    MovementManager.setForcedMovement(false, false, false, false, false, false, false)
+                    return
+                }
+                if (hops.isEmpty()) {
+                    val plan = DianaTeleportPlanner.poll()
+                    if (plan == null) {
+                        if (!DianaTeleportPlanner.isPlanning) {
+                            // No plan yet — keep approaching directly so far
+                            // chunks stream in, then resubmit. Never just stand.
+                            debugTravel("planner: no path, walking + retrying")
+                            directApproach(player, target)
+                            planSubmitted = false
+                        }
+                        return
+                    }
+                    debugTravel(
+                        "plan: ${plan.hops.size} hops, reached=${plan.reachedGoal}, " +
+                            "${plan.timeMs}ms, ${plan.nodesExplored} nodes"
+                    )
+                    if (plan.hops.size < 2) {
+                        directApproach(player, target)
+                        planSubmitted = false
+                        return
+                    }
+                    hops = plan.hops
+                    hopIndex = 1 // node 0 is the start position
+                    noProgressTicks = 0
+                    lastProgressDistSq = Double.MAX_VALUE
+                }
+
+                // No-progress watchdog -> replan from current position.
+                val dSq = player.position().distanceToSqr(target)
+                if (dSq < lastProgressDistSq - 1.0) {
+                    lastProgressDistSq = dSq
+                    noProgressTicks = 0
+                } else {
+                    noProgressTicks++
+                    if (noProgressTicks > 80) {
+                        releaseTravelInputs()
+                        resetHopState()
+                        return
+                    }
+                }
+
+                if (hopIndex >= hops.size) {
+                    resetHopState()
+                    return
+                }
+
+                val hop = hops[hopIndex]
+                val standPos = hop.standPos()
+
+                when (hop.type) {
+                    DianaTeleportPlanner.HopType.WALK -> {
+                        aimAt(
+                            AngleUtils.getRotation(
+                                player.eyePosition,
+                                Vec3(standPos.x, standPos.y + 0.5, standPos.z)
+                            )
+                        )
+                        MovementManager.setMovementLock(true)
+                        MovementManager.setForcedMovement(true, false, false, false, false, false, true)
+                        if (player.position().distanceTo(standPos) <= 1.3) {
+                            hopIndex++
+                            resetAimSettle()
+                        }
+                    }
+
+                    DianaTeleportPlanner.HopType.AOTV,
+                    DianaTeleportPlanner.HopType.ETHERWARP -> {
+                        MovementManager.setMovementLock(true)
+                        MovementManager.setForcedMovement(false, false, false, false, false, false, false)
+                        val isEther = hop.type == DianaTeleportPlanner.HopType.ETHERWARP
+                        aimAt(Rotation(hop.yaw, hop.pitch))
+
+                        if (player.position().distanceTo(standPos) <= 2.0) {
+                            hopIndex++
+                            resetAimSettle()
+                            return
+                        }
+                        // Cast fired and we're now falling toward the landing.
+                        if (!player.onGround() && player.deltaMovement.y < -0.08 &&
+                            player.y < standPos.y - 1.1
+                        ) {
+                            hopIndex++
+                            resetAimSettle()
+                            return
+                        }
+
+                        val now = System.currentTimeMillis()
+                        if (now - lastCastMs < castCooldownMs) return
+
+                        val yawErr = abs(AngleUtils.getRotationDelta(player.yRot, hop.yaw))
+                        val pitchErr = abs(player.xRot - hop.pitch)
+                        if (yawErr > AIM_ERROR_DEG || (isEther && pitchErr > AIM_ERROR_DEG)) {
+                            aimStableSinceMs = now
+                            return
+                        }
+                        if (now - aimStableSinceMs < aimSettleSetting.value.toLong()) return
+
+                        fireCast(isEther, aotvSlot)
+                        lastCastMs = now
+                        castCooldownMs = randomCastCooldown()
+                    }
                 }
             }
 
             State.DIGGING -> {
                 val bp = burrowPos ?: run { state = State.IDLE; return }
+                val burrowBlock = Vec3(bp.x, bp.y, bp.z)
 
                 MovementManager.forcedActionsEnabled = true
+                // Always look down at the burrow block so the use actually digs it.
+                aimAt(AngleUtils.getRotation(player.eyePosition, burrowBlock))
+
+                val flatDist = kotlin.math.hypot(player.x - bp.x, player.z - bp.z)
+                val onBurrow = flatDist <= 1.3 && abs(player.y - (bp.y + 1.0)) <= 2.0
+
+                if (!onBurrow) {
+                    // Teleport landings are up to ~2 blocks off — walk onto the
+                    // burrow before digging instead of using into thin air.
+                    MovementManager.setMovementLock(true)
+                    MovementManager.setForcedMovement(true, false, false, false, false, false, false)
+                    MovementManager.forcedUse = false
+                    digApproachTicks++
+                    if (digApproachTicks > 70) {
+                        MovementManager.clearForcedMovement()
+                        MovementManager.setMovementLock(false)
+                        DianaParticleTracker.removeBurrow(floor(bp.x).toInt(), floor(bp.z).toInt())
+                        ChatUtils.sendMessage("Diana: couldn't reach burrow, retrying.")
+                        state = State.IDLE
+                    }
+                    return
+                }
+
+                // Positioned on the burrow — stop and dig.
+                MovementManager.setMovementLock(true)
                 MovementManager.setForcedMovement(false, false, false, false, false, false, false)
                 MovementManager.forcedUse = true
                 digTicksElapsed++
 
-                if (burrowType != DianaParticleTracker.BurrowType.MOB &&
-                    burrowType != DianaParticleTracker.BurrowType.GUESS &&
-                    digTicksElapsed >= 12
-                ) {
+                // A mob can spawn from ANY burrow, including guesses/inquisitors.
+                val mob = level.getEntitiesOfClass(
+                    LivingEntity::class.java,
+                    AABB(bp, bp).inflate(12.0)
+                ).firstOrNull { e ->
+                    val name = ChatFormatting.stripFormatting(e.displayName.string).orEmpty()
+                    DIANA_MOB_NAMES.any { n -> name.contains(n, ignoreCase = true) }
+                }
+                if (mob != null) {
+                    MovementManager.forcedUse = false
+                    DianaProfitTracker.onMacroDug()
+                    DianaProfitTracker.onMacroMobFound()
+                    targetEntityId = mob.id
+                    player.inventory.selectedSlot = weaponSlot
+                    combatMoving = false
+                    state = State.COMBAT
+                    return
+                }
+
+                // GUESS / MOB burrows keep digging and watching for a mob; other
+                // types finish after a short dig. Guesses are now dug like any
+                // real burrow rather than skipped.
+                val mobLikely = burrowType == DianaParticleTracker.BurrowType.MOB ||
+                    burrowType == DianaParticleTracker.BurrowType.GUESS
+                if (!mobLikely && digTicksElapsed >= 14) {
                     MovementManager.forcedUse = false
                     DianaParticleTracker.removeBurrow(floor(bp.x).toInt(), floor(bp.z).toInt())
                     DianaProfitTracker.onMacroDug()
@@ -268,39 +565,25 @@ object DianaMacroModule : Module("Diana Macro") {
                     state = State.WAITING
                     return
                 }
-
-                val mob = level.getEntitiesOfClass(
-                    LivingEntity::class.java,
-                    AABB(bp, bp).inflate(10.0)
-                ).firstOrNull { e ->
-                    val name = ChatFormatting.stripFormatting(e.displayName.string).orEmpty()
-                    DIANA_MOB_NAMES.any { n -> name.contains(n, ignoreCase = true) }
-                }
-
-                if (mob != null) {
-                    MovementManager.forcedUse = false
-                    DianaProfitTracker.onMacroDug()
-                    DianaProfitTracker.onMacroMobFound()
-                    targetEntityId = mob.id
-                    player.inventory.selectedSlot = weaponSlot
-                    state = State.COMBAT
-                    return
-                }
-
-                if (digTicksElapsed >= 60) {
+                if (digTicksElapsed >= 70) {
                     MovementManager.forcedUse = false
                     DianaParticleTracker.removeBurrow(floor(bp.x).toInt(), floor(bp.z).toInt())
-                    ChatUtils.sendMessage("Diana: no mob spawned after digging, retrying.")
-                    state = State.IDLE
+                    DianaProfitTracker.onMacroDug()
+                    ChatUtils.sendMessage("Diana: burrow dug (no mob), continuing.")
+                    waitTicksElapsed = 0
+                    state = State.WAITING
                 }
             }
 
             State.COMBAT -> {
                 MovementManager.forcedActionsEnabled = true
+                MovementManager.forcedUse = false
                 MovementManager.forcedAttack = false
 
                 val target = level.getEntity(targetEntityId)
                 if (target == null || (target as? LivingEntity)?.isAlive != true) {
+                    MovementManager.clearForcedMovement()
+                    MovementManager.setMovementLock(false)
                     DianaProfitTracker.onMacroKill()
                     waitTicksElapsed = 0
                     state = State.WAITING
@@ -308,8 +591,21 @@ object DianaMacroModule : Module("Diana Macro") {
                 }
 
                 RotationExecutor.rotateTo(AngleUtils.getRotation(target), rotationStrategy)
-                MovementManager.setForcedMovement(false, false, false, false, false, false, false)
-                MovementManager.forcedAttack = true
+                MovementManager.setMovementLock(true)
+                val tdist = player.position().distanceTo(target.position())
+
+                // Stand still and only move when the mob is genuinely out of
+                // reach. Hysteresis (start vs stop) prevents step/stop jitter.
+                if (combatMoving) {
+                    if (tdist <= COMBAT_MOVE_STOP) combatMoving = false
+                } else if (tdist > COMBAT_MOVE_START) {
+                    combatMoving = true
+                }
+
+                MovementManager.setForcedMovement(
+                    combatMoving, false, false, false, false, false, false
+                )
+                MovementManager.forcedAttack = tdist <= COMBAT_ATTACK_RANGE
             }
 
             State.WAITING -> {
@@ -336,5 +632,39 @@ object DianaMacroModule : Module("Diana Macro") {
             durationTicks = 10,
             tag = "diana-macro-burrow"
         )
+
+        // Node map: draw the planned hop path so it's visible before/while
+        // the macro travels (walk = grey, AOTV = cyan, etherwarp = magenta).
+        if (showNodeMapSetting.value && state == State.PATHFINDING && hops.isNotEmpty()) {
+            val player = mc.player
+            var prev = player?.let { Vec3(it.x, it.y, it.z) } ?: hops.first().standPos()
+            for (h in hops) {
+                val c = h.standPos()
+                val col = when (h.type) {
+                    DianaTeleportPlanner.HopType.WALK ->
+                        OverlayRenderEngine.Color(170, 170, 170, 255)
+                    DianaTeleportPlanner.HopType.AOTV ->
+                        OverlayRenderEngine.Color(0, 220, 255, 255)
+                    DianaTeleportPlanner.HopType.ETHERWARP ->
+                        OverlayRenderEngine.Color(255, 0, 220, 255)
+                }
+                OverlayRenderEngine.addLine(
+                    level,
+                    prev.x, prev.y + 0.5, prev.z,
+                    c.x, c.y + 0.5, c.z,
+                    col, 2.5f, 10, "diana-node-map"
+                )
+                OverlayRenderEngine.addBox(
+                    level,
+                    c.x - 0.25, c.y, c.z - 0.25,
+                    c.x + 0.25, c.y + 0.5, c.z + 0.25,
+                    fill = OverlayRenderEngine.Color(col.r, col.g, col.b, 70),
+                    outline = col,
+                    durationTicks = 10,
+                    tag = "diana-node-map"
+                )
+                prev = c
+            }
+        }
     }
 }

@@ -2,6 +2,7 @@
 
 #include "etherwarp_search.hpp"
 #include "pathfinder.hpp"
+#include "teleport_first.hpp"
 
 #include <atomic>
 #include <cstdint>
@@ -590,6 +591,113 @@ JNIEXPORT jobject JNICALL Java_org_phantom_api_pathfinder_jni_NativePathfinderJN
     return nullptr;
   } catch (...) {
     throwRuntimeUnknown(env, "findEtherwarpPath");
+    return nullptr;
+  }
+}
+
+JNIEXPORT jobject JNICALL Java_org_phantom_api_pathfinder_jni_NativePathfinderJNI_findTeleportFirstPath(
+  JNIEnv* env,
+  jclass,
+  jint startX, jint startY, jint startZ,
+  jint goalX, jint goalY, jint goalZ,
+  jdouble goalReachedRadius,
+  jdouble transmissionRange,
+  jdouble etherwarpRange,
+  jint availableMana,
+  jint transmissionMana,
+  jint etherwarpMana,
+  jboolean aotvEnabled,
+  jboolean etherwarpEnabled,
+  jint maxIterations,
+  jint maxNodes
+) {
+  try {
+    v5pf::TeleportFirstParams params;
+    params.start = v5pf::Int3{static_cast<int>(startX), static_cast<int>(startY), static_cast<int>(startZ)};
+    params.goal = v5pf::Int3{static_cast<int>(goalX), static_cast<int>(goalY), static_cast<int>(goalZ)};
+    params.goalReachedRadius = static_cast<double>(goalReachedRadius);
+    params.transmissionRange = static_cast<double>(transmissionRange);
+    params.etherwarpRange = static_cast<double>(etherwarpRange);
+    params.availableMana = static_cast<int>(availableMana);
+    params.transmissionMana = static_cast<int>(transmissionMana);
+    params.etherwarpMana = static_cast<int>(etherwarpMana);
+    params.aotvEnabled = aotvEnabled == JNI_TRUE;
+    params.etherwarpEnabled = etherwarpEnabled == JNI_TRUE;
+    params.maxIterations = static_cast<int>(maxIterations);
+    params.maxNodes = static_cast<int>(maxNodes);
+
+    g_cancelSearch.store(false);
+    const auto worldSnapshot = g_worldState.snapshot();
+    auto result = v5pf::findTeleportFirstPath(worldSnapshot, params, g_cancelSearch);
+
+    if (!result.has_value() || result->points.empty()) {
+      return nullptr;
+    }
+
+    const auto packedPath = packPoints(result->points);
+    const auto packedTypes = toJIntVector(result->hopTypes);
+    const auto packedYaw = toJFloatVector(result->yaw);
+    const auto packedPitch = toJFloatVector(result->pitch);
+
+    jintArray pathArray = env->NewIntArray(static_cast<jsize>(packedPath.size()));
+    if (pathArray == nullptr) return nullptr;
+    env->SetIntArrayRegion(pathArray, 0, static_cast<jsize>(packedPath.size()), packedPath.data());
+
+    jintArray typeArray = env->NewIntArray(static_cast<jsize>(packedTypes.size()));
+    if (typeArray == nullptr) { env->DeleteLocalRef(pathArray); return nullptr; }
+    if (!packedTypes.empty()) {
+      env->SetIntArrayRegion(typeArray, 0, static_cast<jsize>(packedTypes.size()), packedTypes.data());
+    }
+
+    jfloatArray yawArray = env->NewFloatArray(static_cast<jsize>(packedYaw.size()));
+    if (yawArray == nullptr) {
+      env->DeleteLocalRef(pathArray); env->DeleteLocalRef(typeArray); return nullptr;
+    }
+    if (!packedYaw.empty()) {
+      env->SetFloatArrayRegion(yawArray, 0, static_cast<jsize>(packedYaw.size()), packedYaw.data());
+    }
+
+    jfloatArray pitchArray = env->NewFloatArray(static_cast<jsize>(packedPitch.size()));
+    if (pitchArray == nullptr) {
+      env->DeleteLocalRef(pathArray); env->DeleteLocalRef(typeArray);
+      env->DeleteLocalRef(yawArray); return nullptr;
+    }
+    if (!packedPitch.empty()) {
+      env->SetFloatArrayRegion(pitchArray, 0, static_cast<jsize>(packedPitch.size()), packedPitch.data());
+    }
+
+    jclass resultClass = env->FindClass("org/phantom/api/pathfinder/jni/NativeTeleportPathResult");
+    if (resultClass == nullptr) {
+      env->DeleteLocalRef(pathArray); env->DeleteLocalRef(typeArray);
+      env->DeleteLocalRef(yawArray); env->DeleteLocalRef(pitchArray);
+      return nullptr;
+    }
+
+    jmethodID ctor = env->GetMethodID(resultClass, "<init>", "([I[I[F[FZJID)V");
+    if (ctor == nullptr) {
+      env->DeleteLocalRef(pathArray); env->DeleteLocalRef(typeArray);
+      env->DeleteLocalRef(yawArray); env->DeleteLocalRef(pitchArray);
+      env->DeleteLocalRef(resultClass);
+      return nullptr;
+    }
+
+    return env->NewObject(
+      resultClass,
+      ctor,
+      pathArray,
+      typeArray,
+      yawArray,
+      pitchArray,
+      static_cast<jboolean>(result->reachedGoal ? JNI_TRUE : JNI_FALSE),
+      static_cast<jlong>(result->timeMs),
+      static_cast<jint>(result->nodesExplored),
+      static_cast<jdouble>(result->nanosecondsPerNode)
+    );
+  } catch (const std::exception& ex) {
+    throwRuntimeFromException(env, "findTeleportFirstPath", ex);
+    return nullptr;
+  } catch (...) {
+    throwRuntimeUnknown(env, "findTeleportFirstPath");
     return nullptr;
   }
 }

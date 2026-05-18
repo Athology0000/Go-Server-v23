@@ -16,6 +16,7 @@ set(SOURCES
     src/path_simplifier.cpp
     src/etherwarp_raymarch.cpp
     src/etherwarp_search.cpp
+    src/teleport_first.cpp
 )
 
 add_library(phantom_pathfinder SHARED ${SOURCES})

@@ -7,5 +7,6 @@ enum class ModuleCategory(val displayName: String) {
     FARMING("Farming"),
     VISUAL("Visual"),
     QOL("QoL"),
+    DIANA("Diana"),
     OTHER("Other")
 }

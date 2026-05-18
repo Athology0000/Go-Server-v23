@@ -53,7 +53,7 @@ import kotlin.math.sqrt
  */
 object DianaHelperModule : Module("Diana Helper") {
 
-    override val category = ModuleCategory.COMBAT
+    override val category = ModuleCategory.DIANA
 
     private val mc = Minecraft.getInstance()
 

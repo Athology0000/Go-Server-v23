@@ -1,36 +1,30 @@
 package org.phantom.api.hud.modules
 
 import org.phantom.api.hud.HudAnchor
+import org.phantom.api.hud.HudGlassStyle
 import org.phantom.api.hud.hudElement
 import org.phantom.api.module.Module
 import org.phantom.api.module.ModuleCategory
 import org.phantom.api.module.setting.impl.CheckboxSetting
-import org.phantom.api.ui.theme.ThemeGradient
-import org.phantom.api.ui.theme.ThemeManager
-import org.phantom.api.ui.theme.ThemeSurface
 import org.phantom.api.util.ui.NVGRenderer
-import org.phantom.api.util.ui.helper.Gradient
 import org.phantom.internal.mining.MiningMacroModule
 import org.phantom.internal.mining.MiningModule
 import org.phantom.internal.mining.MiningProfitTracker
 import org.phantom.internal.mining.RoutesModule
 import org.phantom.internal.mining.CommissionMacroModule
-import kotlin.math.cos
 
 object MiningHudModule : Module("Mining HUD") {
 
   override val category = ModuleCategory.MINING
 
-  private val textSize = 13f
-  private val lineHeight = textSize + 5f
-  private val padding = 10f
-  private val corner = 10f
+  private val textSize = HudGlassStyle.BODY_SIZE
+  private val lineHeight = HudGlassStyle.LINE_HEIGHT
+  private val padding = HudGlassStyle.PADDING_X
   private val sectionGap = 10f
   private val sectionLabelGap = 6f
   private val dividerGap = 8f
 
-  private val labelColor get() = (ThemeManager.currentTheme.text and 0x00FFFFFF) or 0x99000000.toInt()
-  private val valueColor get() = ThemeManager.currentTheme.text
+  private val valueColor get() = HudGlassStyle.textColor()
   private val targetedColor = 0xFF6EEA92.toInt()
   private fun overlayRows() = MiningModule.buildOverlayRows()
   private fun buffRows() = MiningModule.buildBuffStatusRows()
@@ -74,12 +68,14 @@ object MiningHudModule : Module("Mining HUD") {
     anchor = HudAnchor.TOP_LEFT
     offsetX = 10f
     offsetY = 80f
+    blurBackground = true
+    blurStrength = 16.0
 
     val onlyWhenActive = setting(CheckboxSetting("Only When Active", "Hide when mining tracking is idle", true))
     val showProfit = setting(CheckboxSetting("Show Profit", "Show active macro, coins/hr, and runtime.", true))
 
-    width { panelWidth() }
-    height { panelHeight(showProfit.value) }
+    width { if (onlyWhenActive.value && !shouldShow()) 0f else panelWidth() }
+    height { if (onlyWhenActive.value && !shouldShow()) 0f else panelHeight(showProfit.value) }
 
     render { x, y, _ ->
       if (onlyWhenActive.value && !shouldShow()) return@render
@@ -89,30 +85,18 @@ object MiningHudModule : Module("Mining HUD") {
       val commissions = commissionRows()
       val panelW = panelWidth()
       val panelH = panelHeight(showProfit.value)
-      val now = System.currentTimeMillis()
-      val twoPi = (Math.PI * 2).toFloat()
 
-      NVGRenderer.rect(x, y, panelW, panelH, ThemeSurface.panelSolid(), corner)
-      NVGRenderer.gradientRect(x, y, panelW, panelH * 0.5f, ThemeSurface.overlay(), 0x00000000, Gradient.TopToBottom, corner)
-
-      val angle = (now % 10000L).toFloat() / 10000f * twoPi
-      val shiftX = cos(angle) * (panelW * 0.42f)
-      val (borderColor1, borderColor2) = ThemeGradient.colors()
-      NVGRenderer.hollowGradientRectShifted(
-        x, y, panelW, panelH, 1.5f,
-        borderColor1, borderColor2,
-        Gradient.LeftToRight, corner, shiftX, 0f
-      )
+      HudGlassStyle.drawPanel(x, y, panelW, panelH)
 
       rows.forEachIndexed { index, row ->
         renderRow(row, x + padding, y + padding + index * lineHeight)
       }
 
       val dividerY = y + padding + rows.size * lineHeight + dividerGap / 2f
-      NVGRenderer.line(x + padding, dividerY, x + panelW - padding, dividerY, 1f, ThemeManager.currentTheme.controlBorder)
+      NVGRenderer.line(x + padding, dividerY, x + panelW - padding, dividerY, 1f, HudGlassStyle.mutedColor())
 
       val buffsLabelY = dividerY + sectionGap
-      NVGRenderer.text("BUFFS", x + padding, buffsLabelY, 11f, ThemeManager.currentTheme.textSecondary)
+      HudGlassStyle.drawSectionTitle("BUFFS", x + padding, buffsLabelY)
 
       val buffsStartY = buffsLabelY + sectionLabelGap + 2f
       buffs.forEachIndexed { index, row ->
@@ -127,11 +111,11 @@ object MiningHudModule : Module("Mining HUD") {
           x + panelW - padding,
           commissionsDividerY,
           1f,
-          ThemeManager.currentTheme.controlBorder
+          HudGlassStyle.mutedColor()
         )
 
         val commissionsLabelY = commissionsDividerY + sectionGap
-        NVGRenderer.text("COMMISSIONS", x + padding, commissionsLabelY, 11f, ThemeManager.currentTheme.textSecondary)
+        HudGlassStyle.drawSectionTitle("COMMISSIONS", x + padding, commissionsLabelY)
 
         val commissionsStartY = commissionsLabelY + sectionLabelGap + 2f
         commissions.forEachIndexed { index, row ->
@@ -151,8 +135,8 @@ object MiningHudModule : Module("Mining HUD") {
         val macroLabelY = macroStartY - sectionLabelGap - 2f
         val profitDividerY = macroLabelY - sectionGap - dividerGap / 2f
 
-        NVGRenderer.line(x + padding, profitDividerY, x + panelW - padding, profitDividerY, 1f, ThemeManager.currentTheme.controlBorder)
-        NVGRenderer.text("MACRO", x + padding, macroLabelY, 11f, ThemeManager.currentTheme.textSecondary)
+        NVGRenderer.line(x + padding, profitDividerY, x + panelW - padding, profitDividerY, 1f, HudGlassStyle.mutedColor())
+        HudGlassStyle.drawSectionTitle("MACRO", x + padding, macroLabelY)
 
         val cph = formatCoinsPerHour(MiningProfitTracker.coinsPerHour())
         val runtime = formatRuntime(MiningProfitTracker.runtimeMs())
@@ -176,7 +160,7 @@ object MiningHudModule : Module("Mining HUD") {
     val detailWidth = NVGRenderer.textWidth(detail, textSize)
     val titleMaxWidth = (panelWidth - NVGRenderer.textWidth(label, textSize) - detailWidth - 18f).coerceAtLeast(40f)
     val title = ellipsize(row.label, titleMaxWidth)
-    val appliedLabelColor = if (rowColor == valueColor) labelColor else rowColor
+    val appliedLabelColor = if (rowColor == valueColor) HudGlassStyle.labelColor() else rowColor
 
     NVGRenderer.text(label, x, y, textSize, appliedLabelColor)
     val labelWidth = NVGRenderer.textWidth(label, textSize)
@@ -193,7 +177,7 @@ object MiningHudModule : Module("Mining HUD") {
 
     val label = row.substring(0, separator + 1)
     val value = row.substring(separator + 1).trimStart()
-    val appliedLabelColor = if (rowColor == valueColor) labelColor else rowColor
+    val appliedLabelColor = if (rowColor == valueColor) HudGlassStyle.labelColor() else rowColor
     NVGRenderer.text(label, x, y, textSize, appliedLabelColor)
     val labelWidth = NVGRenderer.textWidth(label, textSize)
     NVGRenderer.text(value, x + labelWidth + 6f, y, textSize, rowColor)

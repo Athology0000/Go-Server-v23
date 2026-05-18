@@ -1,42 +1,44 @@
 package org.phantom.internal.mining
 
-import kotlin.math.cos
 import org.phantom.api.hud.HudAnchor
+import org.phantom.api.hud.HudGlassStyle
 import org.phantom.api.hud.hudElement
 import org.phantom.api.module.Module
 import org.phantom.api.module.ModuleCategory
 import org.phantom.api.module.setting.impl.CheckboxSetting
-import org.phantom.api.ui.theme.ThemeGradient
-import org.phantom.api.ui.theme.ThemeManager
-import org.phantom.api.ui.theme.ThemeSurface
 import org.phantom.api.util.ui.NVGRenderer
-import org.phantom.api.util.ui.helper.Gradient
 
 object CommissionHudModule : Module("Commission HUD") {
 
   override val category = ModuleCategory.MINING
 
-  private val textSize   = 13f
-  private val lineHeight = textSize + 5f
-  private val padding    = 10f
-  private val corner     = 10f
+  private val textSize = HudGlassStyle.BODY_SIZE
+  private val lineHeight = HudGlassStyle.LINE_HEIGHT
+  private val paddingX = HudGlassStyle.PADDING_X
+  private val paddingY = HudGlassStyle.PADDING_Y
+  private val panelGap = 5f
+  private val titlePanelHeight = 31f
+  private val headerHeight = 29f
 
-  private val labelColor  get() = (ThemeManager.currentTheme.text and 0x00FFFFFF) or 0x99000000.toInt()
-  private val valueColor  get() = ThemeManager.currentTheme.accent
+  private data class GlassSection(
+    val title: String,
+    val rows: List<Pair<String, String>>,
+  )
+
   private fun rows(): List<Pair<String, String>> {
     return if (isGlaciteMode()) {
       listOf(
-        "Status"     to GlaciteCommissionMacroModule.statusDisplay,
-        "Mode"       to GlaciteCommissionMacroModule.modeDisplay,
+        "Commissions Completed" to "-",
         "Commission" to GlaciteCommissionMacroModule.commissionDisplay,
         "Area"       to GlaciteCommissionMacroModule.currentZoneDisplay,
+        "State"      to GlaciteCommissionMacroModule.statusDisplay,
       )
     } else {
       listOf(
-        "Status"     to CommissionMacroModule.statusDisplay,
-        "Mode"       to CommissionMacroModule.modeDisplay,
+        "Commissions Completed" to "-",
         "Commission" to CommissionMacroModule.commissionDisplay,
         "Area"       to CommissionMacroModule.currentZoneDisplay,
+        "State"      to CommissionMacroModule.statusDisplay,
       )
     }
   }
@@ -52,56 +54,100 @@ object CommissionHudModule : Module("Commission HUD") {
   private fun isGlaciteMode(): Boolean =
     MiningMacroModule.currentMiningArea() == MiningArea.GLACITE
 
+  private fun title(): String =
+    if (isGlaciteMode()) "Glacite Commission Macro" else "Dwarven Commission Macro"
+
+  private fun sections(): List<GlassSection> {
+    val miningRows = MiningModule.buildOverlayRows()
+      .take(4)
+      .mapNotNull { row ->
+        val separator = row.indexOf(':')
+        if (separator < 0) null else row.substring(0, separator).trim() to row.substring(separator + 1).trim()
+      }
+
+    return listOf(
+      GlassSection("Commission Info", rows()),
+      GlassSection("Mining Info", miningRows.ifEmpty { listOf("Mining" to "Idle") }),
+      GlassSection(
+        "Macro Info",
+        listOf(
+          "Mode" to if (isGlaciteMode()) GlaciteCommissionMacroModule.modeDisplay else CommissionMacroModule.modeDisplay,
+          "Running" to if (isActiveCommissionMacro()) "Yes" else "No",
+        ),
+      ),
+    )
+  }
+
+  private fun sectionHeight(section: GlassSection): Float =
+    headerHeight + paddingY + section.rows.size * lineHeight
+
+  private fun panelWidth(debug: String?): Float {
+    val titleWidth = NVGRenderer.textWidth(title(), HudGlassStyle.TITLE_SIZE)
+    val sectionWidth = sections().maxOfOrNull { section ->
+      maxOf(
+        NVGRenderer.textWidth(section.title, HudGlassStyle.SECTION_SIZE),
+        section.rows.maxOfOrNull { (label, value) -> NVGRenderer.textWidth("$label: $value", textSize) } ?: 0f,
+      )
+    } ?: 120f
+    val debugWidth = debug?.let { NVGRenderer.textWidth(it, textSize) } ?: 0f
+    return maxOf(titleWidth, sectionWidth, debugWidth) + paddingX * 2f
+  }
+
+  private fun panelHeight(debug: String?): Float {
+    val sectionsHeight = sections().sumOf { sectionHeight(it).toDouble() }.toFloat()
+    val debugHeight = if (debug != null) panelGap + paddingY * 2f + lineHeight else 0f
+    return titlePanelHeight + panelGap * sections().size + sectionsHeight + debugHeight
+  }
+
   val commissionHud = hudElement("commission-hud", "Commission HUD", "Tracks commission macro status") {
     anchor  = HudAnchor.TOP_LEFT
     offsetX = 10f
     offsetY = 80f
+    blurBackground = true
+    blurStrength = 16.0
 
     val onlyWhenActive = setting(CheckboxSetting("Only When Active", "Hide when macro is off", true))
     setting(debugRow)
 
     width {
-      val rowsW = rows().maxOfOrNull { (l, v) -> NVGRenderer.textWidth("$l: $v", textSize) } ?: 120f
-      val dbgW = debugText()?.let { NVGRenderer.textWidth(it, textSize) } ?: 0f
-      maxOf(rowsW, dbgW) + padding * 2
+      if (onlyWhenActive.value && !isActiveCommissionMacro()) 0f else panelWidth(debugText())
     }
 
     height {
-      lineHeight * rows().size + (if (debugText() != null) lineHeight else 0f) + padding * 2
+      if (onlyWhenActive.value && !isActiveCommissionMacro()) 0f else panelHeight(debugText())
     }
 
     render { x, y, _ ->
       if (onlyWhenActive.value && !isActiveCommissionMacro()) return@render
 
-      val r      = rows()
-      val dbg    = debugText()
-      val rowsW  = r.maxOfOrNull { (l, v) -> NVGRenderer.textWidth("$l: $v", textSize) } ?: 120f
-      val dbgW   = dbg?.let { NVGRenderer.textWidth(it, textSize) } ?: 0f
-      val panelW = maxOf(rowsW, dbgW) + padding * 2
-      val panelH = lineHeight * r.size + (if (dbg != null) lineHeight else 0f) + padding * 2
-      val now    = System.currentTimeMillis()
-      val twoPi  = (Math.PI * 2).toFloat()
+      val dbg = debugText()
+      val panelW = panelWidth(dbg)
+      var panelY = y
 
-      NVGRenderer.rect(x, y, panelW, panelH, ThemeSurface.panelSolid(), corner)
-      NVGRenderer.gradientRect(x, y, panelW, panelH * 0.5f, ThemeSurface.overlay(), 0x00000000, Gradient.TopToBottom, corner)
+      HudGlassStyle.drawPanel(x, panelY, panelW, titlePanelHeight)
+      NVGRenderer.text(title(), x + paddingX, panelY + 8f, HudGlassStyle.TITLE_SIZE, HudGlassStyle.mutedColor())
+      panelY += titlePanelHeight + panelGap
 
-      val angle  = (now % 10000L).toFloat() / 10000f * twoPi
-      val shiftX = cos(angle) * (panelW * 0.42f)
-      val (borderColor1, borderColor2) = ThemeGradient.colors()
-      NVGRenderer.hollowGradientRectShifted(x, y, panelW, panelH, 1.5f, borderColor1, borderColor2, Gradient.LeftToRight, corner, shiftX, 0f)
-
-      r.forEachIndexed { i, (label, value) ->
-        val ty       = y + padding + i * lineHeight
-        val labelStr = "$label: "
-        NVGRenderer.text(labelStr, x + padding, ty, textSize, labelColor)
-        val labelW = NVGRenderer.textWidth(labelStr, textSize)
-        NVGRenderer.text(value, x + padding + labelW, ty, textSize, valueColor)
+      sections().forEach { section ->
+        val panelH = sectionHeight(section)
+        HudGlassStyle.drawPanel(x, panelY, panelW, panelH)
+        HudGlassStyle.drawHeader(section.title, x, panelY, panelW)
+        section.rows.forEachIndexed { i, (label, value) ->
+          HudGlassStyle.drawRow(
+            label,
+            value,
+            x + paddingX,
+            panelY + headerHeight + i * lineHeight,
+            if (label == "Commission") HudGlassStyle.accentColor() else HudGlassStyle.textColor(),
+          )
+        }
+        panelY += panelH + panelGap
       }
 
       if (dbg != null) {
-        val ty = y + padding + r.size * lineHeight
-        val (g1, g2) = ThemeGradient.colors()
-        NVGRenderer.textGradient(dbg, x + padding, ty, textSize, g1, g2, Gradient.LeftToRight)
+        val panelH = paddingY * 2f + lineHeight
+        HudGlassStyle.drawPanel(x, panelY, panelW, panelH)
+        NVGRenderer.text(dbg, x + paddingX, panelY + paddingY, textSize, HudGlassStyle.accentColor())
       }
     }
   }

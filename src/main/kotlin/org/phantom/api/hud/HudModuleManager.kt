@@ -71,6 +71,7 @@ object HudModuleManager {
     if (!element.usesManagedBlurBackground()) return
     if (!element.isBlurBackgroundEnabled()) return
     if (!framePrepared) return
+    if (element.getScaledWidth() <= 0f || element.getScaledHeight() <= 0f) return
 
     val padding = 2f * element.scale
     HudGlassBlurRenderer.renderBlurRect(

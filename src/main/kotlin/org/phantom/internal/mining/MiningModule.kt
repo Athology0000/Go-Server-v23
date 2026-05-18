@@ -223,13 +223,7 @@ object MiningModule : Module("Mining") {
     "Equip drill, scrape /stats, then auto-scrape /hotm after.",
     "Scrape"
   ) {
-    val drillSlot = InventoryUtils.findItemInHotbar("drill")
-    if (drillSlot >= 0) InventoryUtils.holdHotbarSlot(drillSlot)
-    pendingStatsScrape = true
-    pendingStatsTick = mc.level?.gameTime ?: 0L
-    pendingScrapeAll = true
-    pendingHotmAfterStats = false
-    sendCommand("/stats")
+    requestStatsAndHotmScrape()
   }
 
   private val exportHotm = ActionSetting(
@@ -334,6 +328,17 @@ object MiningModule : Module("Mining") {
       exportHotm,
     )
     EventBus.register(this)
+  }
+
+  fun requestStatsAndHotmScrape(source: String = "mining") {
+    val drillSlot = InventoryUtils.findItemInHotbar("drill")
+    if (drillSlot >= 0) InventoryUtils.holdHotbarSlot(drillSlot)
+    pendingStatsScrape = true
+    pendingStatsTick = mc.level?.gameTime ?: 0L
+    pendingScrapeAll = true
+    pendingHotmAfterStats = false
+    sendCommand("/stats")
+    notify("Scraping stats and HOTM for $source.")
   }
 
   @SubscribeEvent

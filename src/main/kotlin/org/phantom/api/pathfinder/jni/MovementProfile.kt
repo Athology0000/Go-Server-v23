@@ -1,3 +1,3 @@
 package org.phantom.api.pathfinder.jni
 
-enum class MovementProfile { DEFAULT, MINING, COMBAT, GROUND_ONLY, FLY }
+enum class MovementProfile { DEFAULT, MINING, COMBAT, GROUND_ONLY, FLY, TELEPORT_FIRST }

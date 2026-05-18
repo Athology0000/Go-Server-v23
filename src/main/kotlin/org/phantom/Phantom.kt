@@ -54,6 +54,7 @@ import org.phantom.internal.mining.ore.OreMacroModule
 import org.phantom.internal.mining.pingless.PinglessMiningModule
 import org.phantom.internal.mining.powder.PowderMacroModule
 import org.phantom.internal.mining.scatha.ScathaMacroModule
+import org.phantom.internal.mining.tunnels.TunnelMinerModule
 import org.phantom.internal.pathfinding.PathfindingModule
 import org.phantom.internal.pathfinding.PathServiceTickBridge
 import org.phantom.internal.pathfinding.WorldCacheModule
@@ -114,6 +115,7 @@ object Phantom : ClientModInitializer {
         FairyGrottoModule,
         RoutesModule,
         MiningMacroModule,
+        TunnelMinerModule,
         WorldVeinCacherModule,
         CommissionMacroModule,
         CommissionHudModule,

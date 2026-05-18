@@ -54,6 +54,25 @@ object NativePathfinderJNI {
     ): NativePathResult?
 
     /**
+     * Native teleport-first hybrid planner. Reads the globally-synced world
+     * snapshot. Returns null if no progress could be made toward the goal.
+     */
+    @JvmStatic external fun findTeleportFirstPath(
+        startX: Int, startY: Int, startZ: Int,
+        goalX: Int, goalY: Int, goalZ: Int,
+        goalReachedRadius: Double,
+        transmissionRange: Double,
+        etherwarpRange: Double,
+        availableMana: Int,
+        transmissionMana: Int,
+        etherwarpMana: Int,
+        aotvEnabled: Boolean,
+        etherwarpEnabled: Boolean,
+        maxIterations: Int,
+        maxNodes: Int
+    ): NativeTeleportPathResult?
+
+    /**
      * Returns null if no etherwarp path found.
      * angles in result: flat [yaw0, pitch0, yaw1, pitch1, ...] float pairs.
      */
