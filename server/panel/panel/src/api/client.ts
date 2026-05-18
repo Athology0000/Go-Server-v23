@@ -1,6 +1,5 @@
 const ENV_BASE = (import.meta.env.VITE_API_URL as string | undefined)?.trim()
 const BASE = ENV_BASE && ENV_BASE.length > 0 ? ENV_BASE.replace(/\/+$/, '') : 'http://localhost:8080'
-
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message)
@@ -29,11 +28,6 @@ export async function apiFetch<T>(
     const msg = err instanceof Error ? err.message : 'Network error'
     throw new Error(msg)
   }
-
-  if (!res.ok) {
-    if (res.status === 401 && token) {
-      _onUnauthorized?.()
-    }
 
     if (res.status === 403) {
       const clone = res.clone()
