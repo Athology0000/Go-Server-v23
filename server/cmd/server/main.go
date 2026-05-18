@@ -6,8 +6,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
@@ -23,6 +21,7 @@ import (
 	"github.com/cobalt/server/internal/logbuf"
 	"github.com/cobalt/server/internal/middleware"
 	"github.com/cobalt/server/internal/panel"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 )
@@ -51,88 +50,170 @@ func main() {
 
 	entSvc := entitlement.New(pool)
 	auditSvc := audit.New(pool)
-	authSvc := auth.New(pool, rdb, entSvc, auditSvc, cfg.MasterKey, cfg.ServerPepper, cfg.BaseURL, cfg)
-	enrollSvc := enrollment.New(pool, auditSvc, cfg.MasterKey, cfg.ServerPepper)
-	contentSvc := content.New(pool, entSvc, cfg.ContentDir)
 
-	// Public and admin UI origins are configurable and default to local development URLs.
-	pub := fiber.New(fiber.Config{DisableStartupMessage: true, BodyLimit: cfg.BodyLimit})
+	authSvc := auth.New(
+		pool,
+		rdb,
+		entSvc,
+		auditSvc,
+		cfg.MasterKey,
+		cfg.ServerPepper,
+		cfg.BaseURL,
+	)
+
+	enrollSvc := enrollment.New(
+		pool,
+		auditSvc,
+		cfg.MasterKey,
+		cfg.ServerPepper,
+	)
+
+	contentSvc := content.New(
+		pool,
+		entSvc,
+		cfg.ContentDir,
+	)
+
+	// =========================
+	// Public API server
+	// =========================
+	pub := fiber.New(fiber.Config{
+		DisableStartupMessage: true,
+		BodyLimit:             cfg.BodyLimit,
+	})
+
 	pub.Use(middleware.RealIP())
-	pub.Use(cors.New(cors.Config{AllowOrigins: cfg.PublicCORSAllowOrigins, AllowHeaders: "Content-Type,Authorization"}))
-	pub.Use(middleware.RateLimit(rdb, 120, time.Minute, middleware.IPKey("global")))
+
+	pub.Use(cors.New(cors.Config{
+		AllowOrigins: cfg.PublicCORSAllowOrigins,
+		AllowHeaders: "Content-Type,Authorization",
+		AllowMethods: "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+	}))
+
+	pub.Use(middleware.RateLimit(
+		rdb,
+		120,
+		time.Minute,
+		middleware.IPKey("global"),
+	))
+
 	pub.Use(middleware.SecurityHeaders())
 
-	auth.RegisterRoutes(pub, authSvc, pool, rdb, auditSvc, cfg)
+	// Root route so Railway "/" shows the server is alive.
+	pub.Get("/", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{
+			"ok":      true,
+			"service": "cobalt-public-api",
+			"message": "Cobalt public API is online",
+		})
+	})
+
+	// Simple health check.
+	pub.Get("/health", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{
+			"ok":        true,
+			"service":   "cobalt-public-api",
+			"timestamp": time.Now().UTC().Format(time.RFC3339),
+		})
+	})
+
+	// Debug body parser route.
+	// Remove this after you confirm JSON bodies work.
+	pub.Post("/debug/body", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{
+			"ok":           true,
+			"content_type": c.Get("Content-Type"),
+			"body_len":     len(c.Body()),
+			"body":         string(c.Body()),
+		})
+	})
+
+	// Register public routes.
+	auth.RegisterRoutes(pub, authSvc, pool, rdb, auditSvc)
 	enrollment.RegisterRoutes(pub, enrollSvc, rdb)
 	panel.RegisterRoutes(pub, pool, rdb, auditSvc, cfg.MasterKey)
 	content.RegisterRoutes(pub, contentSvc, pool, rdb, cfg.StrictSessionIP)
-	registerAdminUI(pub)
 
-	// Admin server
-	adm := fiber.New(fiber.Config{DisableStartupMessage: true, BodyLimit: cfg.BodyLimit})
+	// =========================
+	// Admin API server
+	// =========================
+	adm := fiber.New(fiber.Config{
+		DisableStartupMessage: true,
+		BodyLimit:             cfg.BodyLimit,
+	})
+
 	adm.Use(middleware.RealIP())
-	adm.Use(cors.New(cors.Config{AllowOrigins: cfg.AdminCORSAllowOrigins, AllowHeaders: "Content-Type,Authorization"}))
-	adm.Use(middleware.RateLimit(rdb, 60, time.Minute, middleware.IPKey("admin-global")))
-	adm.Use(middleware.SecurityHeaders())
-	admin.RegisterRoutes(adm, pool, rdb, cfg.ManifestSigningKey, auditSvc, cfg.AdminAPISecret)
-	registerAdminUI(adm)
 
+	adm.Use(cors.New(cors.Config{
+		AllowOrigins: cfg.AdminCORSAllowOrigins,
+		AllowHeaders: "Content-Type,Authorization",
+		AllowMethods: "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+	}))
+
+	adm.Use(middleware.RateLimit(
+		rdb,
+		60,
+		time.Minute,
+		middleware.IPKey("admin-global"),
+	))
+
+	adm.Use(middleware.SecurityHeaders())
+
+	adm.Get("/", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{
+			"ok":      true,
+			"service": "cobalt-admin-api",
+			"message": "Cobalt admin API is online",
+		})
+	})
+
+	adm.Get("/health", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{
+			"ok":        true,
+			"service":   "cobalt-admin-api",
+			"timestamp": time.Now().UTC().Format(time.RFC3339),
+		})
+	})
+
+	admin.RegisterRoutes(
+		adm,
+		pool,
+		cfg.ManifestSigningKey,
+		auditSvc,
+		cfg.AdminAPISecret,
+	)
+
+	// =========================
+	// Start servers
+	// =========================
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		log.Printf("public  listening on :%s", cfg.PublicPort)
+		log.Printf("public listening on :%s", cfg.PublicPort)
+
 		if err := pub.Listen(":" + cfg.PublicPort); err != nil {
-			log.Printf("public server error: %v", err)
+			log.Printf("public server stopped: %v", err)
 		}
 	}()
+
 	go func() {
-		log.Printf("admin   listening on :%s", cfg.AdminPort)
+		log.Printf("admin listening on :%s", cfg.AdminPort)
+
 		if err := adm.Listen(":" + cfg.AdminPort); err != nil {
-			log.Printf("admin server error: %v", err)
+			log.Printf("admin server stopped: %v", err)
 		}
 	}()
 
 	<-quit
+
 	log.Println("shutting down")
-	pub.ShutdownWithTimeout(10 * time.Second)
-	adm.ShutdownWithTimeout(10 * time.Second)
-}
 
-func registerAdminUI(app *fiber.App) {
-	dist := firstExistingDir("dist", filepath.Join("admin", "dist"), filepath.Join("admin", "admin", "dist"))
-	if dist == "" {
-		log.Printf("admin UI dist not found; skipping static admin UI")
-		return
+	if err := pub.ShutdownWithTimeout(10 * time.Second); err != nil {
+		log.Printf("public shutdown error: %v", err)
 	}
 
-	app.Static("/assets", filepath.Join(dist, "assets"))
-	app.Get("/", func(c *fiber.Ctx) error {
-		return sendAdminUI(c, dist)
-	})
-	app.Get("/admin", func(c *fiber.Ctx) error {
-		return sendAdminUI(c, dist)
-	})
-	app.Get("/admin/*", func(c *fiber.Ctx) error {
-		return sendAdminUI(c, dist)
-	})
-	app.Get("/*", func(c *fiber.Ctx) error {
-		if !strings.Contains(c.Get("Accept"), "text/html") {
-			return fiber.ErrNotFound
-		}
-		return sendAdminUI(c, dist)
-	})
-}
-
-func sendAdminUI(c *fiber.Ctx, dist string) error {
-	return c.SendFile(filepath.Join(dist, "index.html"))
-}
-
-func firstExistingDir(paths ...string) string {
-	for _, path := range paths {
-		if info, err := os.Stat(path); err == nil && info.IsDir() {
-			return path
-		}
+	if err := adm.ShutdownWithTimeout(10 * time.Second); err != nil {
+		log.Printf("admin shutdown error: %v", err)
 	}
-	return ""
 }
