@@ -146,16 +146,13 @@ func handlePanelLogin(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.Handler
 
 		raw, hash, err := crypto.GenerateToken()
 		if err != nil {
+			log.Printf("panel login GenerateToken failed account_id=%s err=%v", account.ID, err)
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 
 		if _, err := db.CreatePanelSession(c.Context(), pool, hash, account.ID, time.Now().Add(30*24*time.Hour)); err != nil {
 			log.Printf("panel login CreatePanelSession failed account_id=%s err=%v", account.ID, err)
-
-			return c.Status(500).JSON(fiber.Map{
-				"error":   "panel_session_create_failed",
-				"message": err.Error(),
-			})
+			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 
 		auditSvc.Log("panel.login.success", &account.ID, nil, nil, &ip, map[string]any{
@@ -187,11 +184,11 @@ func handlePanelRegister(pool *pgxpool.Pool, allowPublicRegistration bool) fiber
 		}
 
 		if err := c.BodyParser(&body); err != nil {
-			log.Printf("panel register BodyParser failed content_type=%q body=%q err=%v", c.Get("Content-Type"), string(c.Body()), err)
+			log.Printf("panel register BodyParser failed content_type=%q body_len=%d err=%v", c.Get("Content-Type"), len(c.Body()), err)
 
 			return c.Status(400).JSON(fiber.Map{
 				"error":   "invalid_json",
-				"message": err.Error(),
+				"message": "Invalid JSON request body",
 			})
 		}
 
@@ -216,11 +213,7 @@ func handlePanelRegister(pool *pgxpool.Pool, allowPublicRegistration bool) fiber
 		hash, err := crypto.HashPassword(password)
 		if err != nil {
 			log.Printf("panel register HashPassword failed username=%q err=%v", username, err)
-
-			return c.Status(500).JSON(fiber.Map{
-				"error":   "password_hash_failed",
-				"message": err.Error(),
-			})
+			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 
 		var emailPtr *string
@@ -233,28 +226,20 @@ func handlePanelRegister(pool *pgxpool.Pool, allowPublicRegistration bool) fiber
 			log.Printf("panel register CreateAccount failed username=%q email=%q err=%v", username, email, err)
 
 			return c.Status(409).JSON(fiber.Map{
-				"error":   "account_create_failed",
-				"message": err.Error(),
+				"error":   "account_exists_or_create_failed",
+				"message": "Username or email is already taken, or the account could not be created",
 			})
 		}
 
 		raw, tokenHash, err := crypto.GenerateToken()
 		if err != nil {
 			log.Printf("panel register GenerateToken failed account_id=%s err=%v", account.ID, err)
-
-			return c.Status(500).JSON(fiber.Map{
-				"error":   "token_generate_failed",
-				"message": err.Error(),
-			})
+			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 
 		if _, err := db.CreatePanelSession(c.Context(), pool, tokenHash, account.ID, time.Now().Add(30*24*time.Hour)); err != nil {
 			log.Printf("panel register CreatePanelSession failed account_id=%s err=%v", account.ID, err)
-
-			return c.Status(500).JSON(fiber.Map{
-				"error":   "panel_session_create_failed",
-				"message": err.Error(),
-			})
+			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 
 		return c.Status(201).JSON(fiber.Map{
@@ -338,6 +323,7 @@ func handleStart(svc *Service) fiber.Handler {
 		}
 
 		if err != nil {
+			log.Printf("auth start internal error username=%q err=%v", req.Username, err)
 			return c.Status(500).JSON(fiber.Map{"error": "authentication_failed"})
 		}
 
@@ -432,6 +418,7 @@ func handleVerifyMinecraft(svc *Service) fiber.Handler {
 		}
 
 		if err != nil {
+			log.Printf("verify minecraft internal error ip=%s err=%v", ip, err)
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 
@@ -468,10 +455,10 @@ func handleVerifySession(svc *Service) fiber.Handler {
 		var req verifySessionRequest
 		if err := c.BodyParser(&req); err != nil {
 			log.Printf(
-				"[auth.verify_session.route] body_parse_failed ip=%s err=%v body=%s",
+				"[auth.verify_session.route] body_parse_failed ip=%s err=%v body_len=%d",
 				ip,
 				err,
-				string(c.Body()),
+				len(c.Body()),
 			)
 
 			return c.Status(400).JSON(fiber.Map{
@@ -583,6 +570,7 @@ func handleHeartbeat(svc *Service) fiber.Handler {
 		}
 
 		if err != nil {
+			log.Printf("heartbeat internal error ip=%s err=%v", ip, err)
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 
