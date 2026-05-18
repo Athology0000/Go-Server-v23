@@ -34,6 +34,8 @@ func main() {
 		log.Fatalf("config: %v", err)
 	}
 
+	log.Println("BOOTING COBALT SERVER VERSION: railway-debug-root-health-v2")
+
 	ctx := context.Background()
 
 	pool, err := db.NewPool(ctx, cfg.DBURL)
@@ -59,6 +61,7 @@ func main() {
 		cfg.MasterKey,
 		cfg.ServerPepper,
 		cfg.BaseURL,
+		cfg,
 	)
 
 	enrollSvc := enrollment.New(
@@ -99,26 +102,24 @@ func main() {
 
 	pub.Use(middleware.SecurityHeaders())
 
-	// Root route so Railway "/" shows the server is alive.
 	pub.Get("/", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
 			"ok":      true,
 			"service": "cobalt-public-api",
 			"message": "Cobalt public API is online",
+			"version": "railway-debug-root-health-v2",
 		})
 	})
 
-	// Simple health check.
 	pub.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
 			"ok":        true,
 			"service":   "cobalt-public-api",
 			"timestamp": time.Now().UTC().Format(time.RFC3339),
+			"version":   "railway-debug-root-health-v2",
 		})
 	})
 
-	// Debug body parser route.
-	// Remove this after you confirm JSON bodies work.
 	pub.Post("/debug/body", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
 			"ok":           true,
@@ -128,8 +129,7 @@ func main() {
 		})
 	})
 
-	// Register public routes.
-	auth.RegisterRoutes(pub, authSvc, pool, rdb, auditSvc)
+	auth.RegisterRoutes(pub, authSvc, pool, rdb, auditSvc, cfg)
 	enrollment.RegisterRoutes(pub, enrollSvc, rdb)
 	panel.RegisterRoutes(pub, pool, rdb, auditSvc, cfg.MasterKey)
 	content.RegisterRoutes(pub, contentSvc, pool, rdb, cfg.StrictSessionIP)
@@ -164,6 +164,7 @@ func main() {
 			"ok":      true,
 			"service": "cobalt-admin-api",
 			"message": "Cobalt admin API is online",
+			"version": "railway-debug-root-health-v2",
 		})
 	})
 
@@ -172,12 +173,14 @@ func main() {
 			"ok":        true,
 			"service":   "cobalt-admin-api",
 			"timestamp": time.Now().UTC().Format(time.RFC3339),
+			"version":   "railway-debug-root-health-v2",
 		})
 	})
 
 	admin.RegisterRoutes(
 		adm,
 		pool,
+		rdb,
 		cfg.ManifestSigningKey,
 		auditSvc,
 		cfg.AdminAPISecret,
