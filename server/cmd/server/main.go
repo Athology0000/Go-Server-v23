@@ -26,6 +26,8 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 )
 
+const serverVersion = "railway-production-v1"
+
 func main() {
 	log.SetOutput(io.MultiWriter(os.Stdout, logbuf.Writer()))
 
@@ -34,7 +36,7 @@ func main() {
 		log.Fatalf("config: %v", err)
 	}
 
-	log.Println("BOOTING COBALT SERVER VERSION: railway-debug-root-health-v2")
+	log.Printf("BOOTING COBALT SERVER VERSION: %s", serverVersion)
 
 	ctx := context.Background()
 
@@ -43,10 +45,11 @@ func main() {
 		log.Fatalf("db: %v", err)
 	}
 	defer pool.Close()
-	
-if err := db.RunMigrations(ctx, pool); err != nil {
-	log.Fatalf("migrations: %v", err)
-}
+
+	if err := db.RunMigrations(ctx, pool); err != nil {
+		log.Fatalf("migrations: %v", err)
+	}
+
 	rdb, err := cache.NewClient(cfg.RedisURL)
 	if err != nil {
 		log.Fatalf("redis: %v", err)
@@ -80,29 +83,18 @@ if err := db.RunMigrations(ctx, pool); err != nil {
 		cfg.ContentDir,
 	)
 
-	// =========================
-	// Public API server
-	// =========================
 	pub := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
 		BodyLimit:             cfg.BodyLimit,
 	})
 
 	pub.Use(middleware.RealIP())
-
 	pub.Use(cors.New(cors.Config{
 		AllowOrigins: cfg.PublicCORSAllowOrigins,
 		AllowHeaders: "Content-Type,Authorization",
 		AllowMethods: "GET,POST,PUT,PATCH,DELETE,OPTIONS",
 	}))
-
-	pub.Use(middleware.RateLimit(
-		rdb,
-		120,
-		time.Minute,
-		middleware.IPKey("global"),
-	))
-
+	pub.Use(middleware.RateLimit(rdb, 120, time.Minute, middleware.IPKey("global")))
 	pub.Use(middleware.SecurityHeaders())
 
 	pub.Get("/", func(c *fiber.Ctx) error {
@@ -110,7 +102,7 @@ if err := db.RunMigrations(ctx, pool); err != nil {
 			"ok":      true,
 			"service": "cobalt-public-api",
 			"message": "Cobalt public API is online",
-			"version": "railway-debug-root-health-v2",
+			"version": serverVersion,
 		})
 	})
 
@@ -119,16 +111,7 @@ if err := db.RunMigrations(ctx, pool); err != nil {
 			"ok":        true,
 			"service":   "cobalt-public-api",
 			"timestamp": time.Now().UTC().Format(time.RFC3339),
-			"version":   "railway-debug-root-health-v2",
-		})
-	})
-
-	pub.Post("/debug/body", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{
-			"ok":           true,
-			"content_type": c.Get("Content-Type"),
-			"body_len":     len(c.Body()),
-			"body":         string(c.Body()),
+			"version":   serverVersion,
 		})
 	})
 
@@ -137,29 +120,18 @@ if err := db.RunMigrations(ctx, pool); err != nil {
 	panel.RegisterRoutes(pub, pool, rdb, auditSvc, cfg.MasterKey)
 	content.RegisterRoutes(pub, contentSvc, pool, rdb, cfg.StrictSessionIP)
 
-	// =========================
-	// Admin API server
-	// =========================
 	adm := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
 		BodyLimit:             cfg.BodyLimit,
 	})
 
 	adm.Use(middleware.RealIP())
-
 	adm.Use(cors.New(cors.Config{
 		AllowOrigins: cfg.AdminCORSAllowOrigins,
 		AllowHeaders: "Content-Type,Authorization",
 		AllowMethods: "GET,POST,PUT,PATCH,DELETE,OPTIONS",
 	}))
-
-	adm.Use(middleware.RateLimit(
-		rdb,
-		60,
-		time.Minute,
-		middleware.IPKey("admin-global"),
-	))
-
+	adm.Use(middleware.RateLimit(rdb, 60, time.Minute, middleware.IPKey("admin-global")))
 	adm.Use(middleware.SecurityHeaders())
 
 	adm.Get("/", func(c *fiber.Ctx) error {
@@ -167,7 +139,7 @@ if err := db.RunMigrations(ctx, pool); err != nil {
 			"ok":      true,
 			"service": "cobalt-admin-api",
 			"message": "Cobalt admin API is online",
-			"version": "railway-debug-root-health-v2",
+			"version": serverVersion,
 		})
 	})
 
@@ -176,28 +148,17 @@ if err := db.RunMigrations(ctx, pool); err != nil {
 			"ok":        true,
 			"service":   "cobalt-admin-api",
 			"timestamp": time.Now().UTC().Format(time.RFC3339),
-			"version":   "railway-debug-root-health-v2",
+			"version":   serverVersion,
 		})
 	})
 
-	admin.RegisterRoutes(
-		adm,
-		pool,
-		rdb,
-		cfg.ManifestSigningKey,
-		auditSvc,
-		cfg.AdminAPISecret,
-	)
+	admin.RegisterRoutes(adm, pool, rdb, cfg.ManifestSigningKey, auditSvc, cfg.AdminAPISecret)
 
-	// =========================
-	// Start servers
-	// =========================
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
 		log.Printf("public listening on :%s", cfg.PublicPort)
-
 		if err := pub.Listen(":" + cfg.PublicPort); err != nil {
 			log.Printf("public server stopped: %v", err)
 		}
@@ -205,7 +166,6 @@ if err := db.RunMigrations(ctx, pool); err != nil {
 
 	go func() {
 		log.Printf("admin listening on :%s", cfg.AdminPort)
-
 		if err := adm.Listen(":" + cfg.AdminPort); err != nil {
 			log.Printf("admin server stopped: %v", err)
 		}
