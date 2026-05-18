@@ -1,5 +1,7 @@
 const ENV_BASE = (import.meta.env.VITE_API_URL as string | undefined)?.trim()
-const BASE = ENV_BASE && ENV_BASE.length > 0 ? ENV_BASE.replace(/\/+$/, '') : 'http://localhost:8081'
+const BASE = ENV_BASE && ENV_BASE.length > 0
+  ? ENV_BASE.replace(/\/+$/, '')
+  : 'https://valiant-cooperation-production.up.railway.app'
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
