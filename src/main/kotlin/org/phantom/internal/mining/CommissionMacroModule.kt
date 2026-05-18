@@ -13,6 +13,7 @@ import net.minecraft.world.entity.player.Player
 import net.minecraft.world.inventory.ClickType
 import net.minecraft.world.inventory.Slot
 import net.minecraft.world.item.ItemStack
+import net.minecraft.world.item.Items
 import net.minecraft.world.level.ClipContext
 import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.Vec3
@@ -67,6 +68,12 @@ object CommissionMacroModule : Module("Dwarven Commission Macro") {
     0.0,
     30.0,
     1.0,
+  )
+
+  private val useClosestAreaWarp = CheckboxSetting(
+    "Closest Forge/Dwarves Warp",
+    "Before pathing, warp to Forge or Dwarves if that warp lands meaningfully closer to the commission target.",
+    true,
   )
 
   private val goblinWeaponSlot = SliderSetting(
@@ -217,7 +224,18 @@ object CommissionMacroModule : Module("Dwarven Commission Macro") {
     }
 
   init {
-    addSetting(enabled, toggleKeybind, info, avoidanceRadius, goblinWeaponSlot, statusText, commissionText, progressText, toolText)
+    addSetting(
+      enabled,
+      toggleKeybind,
+      info,
+      avoidanceRadius,
+      useClosestAreaWarp,
+      goblinWeaponSlot,
+      statusText,
+      commissionText,
+      progressText,
+      toolText,
+    )
     EventBus.register(this)
   }
 
@@ -569,6 +587,11 @@ object CommissionMacroModule : Module("Dwarven Commission Macro") {
     // us off the NPC the same tick we face + right-click it.
     NativePathfinder.stop()
     MovementManager.clearForcedMovement()
+    if (!ensureSafeInteractItem(player)) {
+      delay(3)
+      setStatus("Swapping to safe item...")
+      return
+    }
     if (emissary != null) faceEntity(emissary) else faceBlock(target)
     rightClick()
     delay(10)
@@ -976,6 +999,8 @@ object CommissionMacroModule : Module("Dwarven Commission Macro") {
    * onTick). Returns true if a warp was issued (caller must defer the path).
    */
   private fun maybeOptimalWarp(target: BlockPos, radius: Double, suppress: Boolean): Boolean {
+    if (!useClosestAreaWarp.value) return false
+
     val player = mc.player ?: return false
     val tgt = Vec3(target.x + 0.5, target.y.toDouble(), target.z + 0.5)
     val dPlayer = Vec3(player.x, player.y, player.z).distanceTo(tgt)
@@ -1434,18 +1459,77 @@ object CommissionMacroModule : Module("Dwarven Commission Macro") {
     openAttempts++
   }
 
+  private fun ensureSafeInteractItem(player: Player): Boolean {
+    if (!isMiningTool(player.inventory.getItem(player.inventory.selectedSlot))) return true
+
+    val safeSlot = findSafeInteractSlot(player)
+    if (safeSlot < 0) return true
+    if (player.inventory.selectedSlot != safeSlot) {
+      InventoryUtils.holdHotbarSlot(safeSlot)
+      return false
+    }
+    return true
+  }
+
+  private fun findSafeInteractSlot(player: Player): Int {
+    val preferred = listOf("Fishing Rod", "Rod", "Shortbow", "Bow", "Sword")
+    for (name in preferred) {
+      for (slot in 0..8) {
+        val stack = player.inventory.getItem(slot)
+        if (stack.isEmpty || isUnsafeInteractItem(stack)) continue
+        if (stack.hoverName.string.contains(name, ignoreCase = true)) return slot
+      }
+    }
+
+    for (slot in 0..8) {
+      if (player.inventory.getItem(slot).isEmpty) return slot
+    }
+
+    for (slot in 0..8) {
+      val stack = player.inventory.getItem(slot)
+      if (!stack.isEmpty && !isUnsafeInteractItem(stack)) return slot
+    }
+
+    return -1
+  }
+
+  private fun isUnsafeInteractItem(stack: ItemStack): Boolean {
+    if (isMiningTool(stack)) return true
+    val name = stack.hoverName.string
+    return stack.item == Items.NETHER_STAR ||
+      stack.getSkyblockId().equals("SKYBLOCK_MENU", ignoreCase = true) ||
+      name.contains("Nether Star", ignoreCase = true) ||
+      name.contains("SkyBlock Menu", ignoreCase = true) ||
+      name.contains("Aspect of the Void", ignoreCase = true) ||
+      name.contains("Aspect of the End", ignoreCase = true) ||
+      name.contains("AOTV", ignoreCase = true) ||
+      name.contains("AOTE", ignoreCase = true)
+  }
+
+  private fun isMiningTool(stack: ItemStack): Boolean {
+    if (stack.isEmpty) return false
+    val name = stack.hoverName.string
+    return name.contains("Drill", ignoreCase = true) ||
+      name.contains("Gauntlet", ignoreCase = true) ||
+      name.contains("Pickaxe", ignoreCase = true)
+  }
+
   private fun sendCommand(command: String) {
     (mc.player as? LocalPlayer)?.connection?.sendCommand(command)
   }
 
   private fun miningTypesFor(task: CommissionTask): String {
     val name = currentCommission?.name ?: task.primaryName
-    return when {
-      name.contains("Titanium", ignoreCase = true) ->
-        "Mithril (Gray), Mithril (Dark), Mithril (Hot), Titanium"
-      else ->
-        "Mithril (Gray), Mithril (Dark), Mithril (Hot)"
+    val defaults = if (name.contains("Titanium", ignoreCase = true)) {
+      listOf("Mithril (Dark)", "Mithril (Hot)", "Titanium")
+    } else {
+      listOf("Mithril (Dark)", "Mithril (Hot)")
     }
+    val defaultSet = defaults.toSet()
+    val activeFilters = MiningMacroModule.getSelectedTypesInOrder()
+      .filter { it in defaultSet }
+
+    return (activeFilters.ifEmpty { defaults }).joinToString(", ")
   }
 
   private fun findMiningTool(player: Player): ItemStack? {
@@ -1458,11 +1542,7 @@ object CommissionMacroModule : Module("Dwarven Commission Macro") {
       val stack = player.inventory.getItem(slot)
       if (stack.isEmpty) continue
       val name = stack.hoverName.string
-      if (
-        name.contains("Drill", ignoreCase = true) ||
-        name.contains("Gauntlet", ignoreCase = true) ||
-        name.contains("Pickaxe", ignoreCase = true)
-      ) {
+      if (isMiningTool(stack)) {
         return slot
       }
     }

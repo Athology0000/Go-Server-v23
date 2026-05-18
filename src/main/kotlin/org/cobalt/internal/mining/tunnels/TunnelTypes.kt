@@ -1,8 +1,8 @@
 package org.cobalt.internal.mining.tunnels
 
 import net.minecraft.core.BlockPos
-import org.cobalt.internal.mining.MiningBlockRegistry
-import org.cobalt.internal.routes.RoutePointType
+import org.phantom.internal.mining.MiningBlockRegistry
+import org.phantom.internal.routes.RoutePointType
 
 enum class TunnelOreType(
   val displayName: String,

@@ -127,11 +127,7 @@ object HypixelManager {
         val newLobby = rawId.replace(Regex("[^a-zA-Z0-9_\\-]"), "_")
 
         if (currentLobby != newLobby) {
-            if (currentLobby != null) {
-                CachedWorld.saveAndClear(currentLobby!!)
-            } else {
-                CachedWorld.clear()
-            }
+            currentLobby?.let { CachedWorld.save(it) }
             val displayName = firstKnown(currentArea, currentMap, currentMode, currentServerType, rawId)
             CachedWorld.setWorldKey(newLobby, displayName)
             CachedWorld.load(newLobby, notify = false)

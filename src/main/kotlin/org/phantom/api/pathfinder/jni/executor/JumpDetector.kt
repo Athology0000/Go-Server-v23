@@ -100,7 +100,7 @@ internal object JumpDetector {
         if (checkGapJump(player, nodes, nearIdx, playerFloorY)) return true
 
         // 8. Snow jump (V5 checkSnowJump)
-        if (checkSnowJump(level, nodes, nearIdx, playerFloorY)) return true
+        if (checkSnowJump(level = level, player = player, nodes = nodes, nearIdx = nearIdx)) return true
 
         // 9. Obstacle
         if (checkObstacleJump(level, player, nodes, nearIdx, playerFloorY)) return true
@@ -499,25 +499,17 @@ internal object JumpDetector {
 
     // ── Helpers ───────────────────────────────────────────────────────────
 
-    private fun usesGroundMovement(): Boolean =
-        activeAction == ActionType.WALK ||
-            activeAction == ActionType.SPRINT ||
-            activeAction == ActionType.JUMP ||
-            activeAction == ActionType.SPRINT_JUMP ||
-            activeAction == ActionType.AOTV
+    // Per-node flag bits (mirrored from NativePathfinder)
+    private const val FLAG_LOW_HEADROOM   = 1 shl 2
+    private const val FLAG_STEP_UP_NEXT   = 1 shl 5
+    // Planner marked this as an in-rule snow auto-step: suppress the jump.
+    private const val FLAG_SNOW_STEP      = 1 shl 8
 
-    companion object {
-        // Per-node flag bits (mirrored from NativePathfinder)
-        private const val FLAG_LOW_HEADROOM   = 1 shl 2
-        private const val FLAG_STEP_UP_NEXT   = 1 shl 5
-        // Planner marked this as an in-rule snow auto-step: suppress the jump.
-        private const val FLAG_SNOW_STEP      = 1 shl 8
-
-        // Snow geometry in blocks (1 layer = 2px = 1/8). Mirrors native
-        // SnowGeometry so the executor and planner never disagree.
-        private const val SNOW_STEP_BLOCK = 5.0 / 8.0      // 0.625 auto-step cap
-        private const val SNOW_SINK_BLOCK = 1.0 / 8.0      // post-step "sink" of one layer
-        private const val SNOW_MAX_JUMP_CLEAR = 1.25       // taller → replan, not a hop
+    // Snow geometry in blocks (1 layer = 2px = 1/8). Mirrors native
+    // SnowGeometry so the executor and planner never disagree.
+    private const val SNOW_STEP_BLOCK = 5.0 / 8.0      // 0.625 auto-step cap
+    private const val SNOW_SINK_BLOCK = 1.0 / 8.0      // post-step "sink" of one layer
+    private const val SNOW_MAX_JUMP_CLEAR = 1.25       // taller → replan, not a hop
 
     // â”€â”€ Jump detection (Phantom values) â”€â”€
     private const val STEP_HEIGHT = 0.6

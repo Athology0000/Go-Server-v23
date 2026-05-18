@@ -17,7 +17,7 @@ object ChunkSerializer {
     }
 
     fun invalidate() {
-        CachedWorld.clear()
+        CachedWorld.invalidateNativeWorld()
         NativePathfinderJNI.clearWorld()
     }
 }

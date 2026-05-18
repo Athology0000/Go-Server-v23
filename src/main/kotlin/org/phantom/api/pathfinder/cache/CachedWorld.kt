@@ -211,6 +211,15 @@ object CachedWorld {
         NativePathfinderBridge.clearWorld()
     }
 
+    fun invalidateNativeWorld() {
+        pendingNativeUpdates.clear()
+        cacheKey = Long.MIN_VALUE
+        cacheChunk = null
+        pendingNativeResync = true
+        nativeWorldToken = ""
+        NativePathfinderBridge.clearWorld()
+    }
+
     fun saveAndClear(lobbyName: String) {
         val mapToSave = chunks
         resetState()

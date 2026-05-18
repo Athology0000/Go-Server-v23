@@ -131,6 +131,13 @@ tasks {
       jvmTarget = JvmTarget.JVM_21
     }
   }
+
+  named<JavaCompile>("compileJava") {
+    dependsOn("compileKotlin")
+    doFirst {
+      classpath += files(layout.buildDirectory.dir("classes/kotlin/main"))
+    }
+  }
 }
 
 java {

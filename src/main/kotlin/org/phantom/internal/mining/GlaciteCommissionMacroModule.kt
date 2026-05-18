@@ -9,6 +9,7 @@ import net.minecraft.client.player.LocalPlayer
 import net.minecraft.core.BlockPos
 import net.minecraft.world.entity.player.Inventory
 import net.minecraft.world.inventory.ClickType
+import net.minecraft.world.item.ItemStack
 import net.minecraft.world.phys.Vec3
 import org.phantom.api.event.EventBus
 import org.phantom.api.event.annotation.SubscribeEvent
@@ -273,7 +274,7 @@ object GlaciteCommissionMacroModule : Module("Glacite Commission Macro") {
         val dist = distance(player.x, player.y, player.z, EMISSARY_POS)
 
         if (dist < 4.0) {
-            if (!ensureDrillEquippedForClaim()) return
+            if (!ensureSafeInteractItem()) return
             if (!npcRotationPending) {
                 val emissaryTarget = Vec3(
                     EMISSARY_POS.x + 0.5,
@@ -643,22 +644,44 @@ object GlaciteCommissionMacroModule : Module("Glacite Commission Macro") {
         return a.zip(b).all { (x, y) -> x == y }
     }
 
-    private fun ensureDrillEquippedForClaim(): Boolean {
+    private fun ensureSafeInteractItem(): Boolean {
         val player = mc.player ?: return true
-        val toolSlot = (0..8).firstOrNull { slot ->
-            val stack = player.inventory.getItem(slot)
-            !stack.isEmpty && (
-                stack.hoverName.string.contains("Drill", ignoreCase = true) ||
-                stack.hoverName.string.contains("Gauntlet", ignoreCase = true) ||
-                stack.hoverName.string.contains("Pickaxe", ignoreCase = true)
-            )
-        } ?: return true
-        if (player.inventory.selectedSlot != toolSlot) {
-            InventoryUtils.holdHotbarSlot(toolSlot)
+        if (!isMiningTool(player.inventory.getItem(player.inventory.selectedSlot))) return true
+
+        val safeSlot = findSafeInteractSlot(player)
+        if (safeSlot < 0) return true
+        if (player.inventory.selectedSlot != safeSlot) {
+            InventoryUtils.holdHotbarSlot(safeSlot)
             delay(3)
             return false
         }
         return true
+    }
+
+    private fun findSafeInteractSlot(player: net.minecraft.world.entity.player.Player): Int {
+        val preferred = listOf("Fishing Rod", "Rod", "Shortbow", "Bow", "Sword")
+        for (name in preferred) {
+            for (slot in 0..8) {
+                val stack = player.inventory.getItem(slot)
+                if (stack.isEmpty || isMiningTool(stack)) continue
+                if (stack.hoverName.string.contains(name, ignoreCase = true)) return slot
+            }
+        }
+
+        for (slot in 0..8) {
+            val stack = player.inventory.getItem(slot)
+            if (!stack.isEmpty && !isMiningTool(stack)) return slot
+        }
+
+        return -1
+    }
+
+    private fun isMiningTool(stack: ItemStack): Boolean {
+        if (stack.isEmpty) return false
+        val name = stack.hoverName.string
+        return name.contains("Drill", ignoreCase = true) ||
+            name.contains("Gauntlet", ignoreCase = true) ||
+            name.contains("Pickaxe", ignoreCase = true)
     }
 
     private fun updateCommissionsFromGui(screen: AbstractContainerScreen<*>) {

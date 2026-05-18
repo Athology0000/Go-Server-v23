@@ -516,13 +516,13 @@ object MiningMacroModule : Module("Mining Macro") {
   internal var pendingAbilityName: String? = null
   internal var preAbilitySlot = -1
   // Retry tracking: after firing the right-click we wait up to 2 s (40 ticks)
-  // for the "You used your X Pickaxe Ability!" confirmation. If it never lands
-  // we re-fire. Capped at a small max so we don't spam right-clicks forever.
+  // for the "You used your X Pickaxe Ability!" confirmation. Keep retries very
+  // conservative; repeated server-side right-clicks can get the player kicked.
   internal var awaitingAbilityResponse = false
   internal var abilityResponseDeadlineTick = -1L
   internal var abilityRetryCount = 0
   internal const val ABILITY_RESPONSE_TIMEOUT_TICKS = 40L
-  internal const val ABILITY_MAX_RETRIES = 4
+  internal const val ABILITY_MAX_RETRIES = 1
 
   // Drill class detection. On macro enable we right-click once with whatever
   // pickaxe/drill is held; the resulting "You used your X Pickaxe Ability!"
@@ -944,11 +944,16 @@ object MiningMacroModule : Module("Mining Macro") {
       macroStartAnchor = player.blockPosition().immutable()
       returningToStart = false
       MiningProfitTracker.resetSession()
-      // Probe the held drill class: one right-click, then wait for the
-      // "You used your X Pickaxe Ability!" reply to classify it.
+      // Probe the held drill class only when auto abilities are enabled. This
+      // avoids an unexpected right-click on manual macro start.
       detectedDrillAbility = null
-      awaitingDrillProbeResponse = true
-      drillProbePendingTick = level.gameTime + 2L
+      if (useMiningAbility.value) {
+        awaitingDrillProbeResponse = true
+        drillProbePendingTick = level.gameTime + 2L
+      } else {
+        awaitingDrillProbeResponse = false
+        drillProbePendingTick = -1L
+      }
       val selections = resolveTypeSelections()
       if (selections.isEmpty()) {
         ChatUtils.sendMessage("Mining macro: no block types selected, cannot start.")
@@ -1620,6 +1625,10 @@ object MiningMacroModule : Module("Mining Macro") {
     val level = mc.level ?: return
     if (level.gameTime < drillProbePendingTick) return
     drillProbePendingTick = -1L
+    if (!enabled.value || !useMiningAbility.value || mc.screen != null || !holdingMiningTool()) {
+      awaitingDrillProbeResponse = false
+      return
+    }
     mc.options.keyUse?.setDown(true)
     mc.execute { mc.options.keyUse?.setDown(false) }
   }
@@ -1633,6 +1642,23 @@ object MiningMacroModule : Module("Mining Macro") {
   internal fun tickAbilityActivation() {
     val level = mc.level ?: return
     val pending = pendingAbilityName ?: return
+
+    if (!enabled.value || !useMiningAbility.value || mc.screen != null) {
+      clearAbilityAttempt()
+      return
+    }
+
+    if (!holdingMiningTool()) {
+      ChatUtils.sendDebug("Mining Ability", "Skipped $pending - no mining tool is selected.")
+      clearAbilityAttempt()
+      return
+    }
+
+    if (currentVein == null && currentTarget == null && miningOnTarget == null) {
+      ChatUtils.sendDebug("Mining Ability", "Skipped $pending - macro is not mining a vein.")
+      clearAbilityAttempt()
+      return
+    }
 
     // Initial fire â€” scheduled delay has elapsed and we're not yet awaiting.
     if (!awaitingAbilityResponse && level.gameTime >= pendingAbilityActivationTick) {
@@ -1660,6 +1686,18 @@ object MiningMacroModule : Module("Mining Macro") {
     ChatUtils.sendDebug("Mining Ability", "Attempting to use $name...")
     mc.options.keyUse?.setDown(true)
     mc.execute { mc.options.keyUse?.setDown(false) }
+  }
+
+  private fun holdingMiningTool(): Boolean {
+    val player = mc.player ?: return false
+    val slot = player.inventory.selectedSlot
+    if (slot !in 0..8) return false
+    val stack = player.inventory.getItem(slot)
+    if (stack.isEmpty) return false
+    val name = stack.hoverName.string
+    return name.contains("Drill", ignoreCase = true) ||
+      name.contains("Gauntlet", ignoreCase = true) ||
+      name.contains("Pickaxe", ignoreCase = true)
   }
 
   private fun clearAbilityAttempt() {
