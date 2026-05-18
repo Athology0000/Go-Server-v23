@@ -150,7 +150,12 @@ func handlePanelLogin(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.Handler
 		}
 
 		if _, err := db.CreatePanelSession(c.Context(), pool, hash, account.ID, time.Now().Add(30*24*time.Hour)); err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
+			log.Printf("panel login CreatePanelSession failed account_id=%s err=%v", account.ID, err)
+
+			return c.Status(500).JSON(fiber.Map{
+				"error":   "panel_session_create_failed",
+				"message": err.Error(),
+			})
 		}
 
 		auditSvc.Log("panel.login.success", &account.ID, nil, nil, &ip, map[string]any{
@@ -181,48 +186,75 @@ func handlePanelRegister(pool *pgxpool.Pool, allowPublicRegistration bool) fiber
 			Password string `json:"password"`
 		}
 
-		if err := c.BodyParser(&body); err != nil || body.Username == "" || body.Password == "" {
+		if err := c.BodyParser(&body); err != nil {
+			log.Printf("panel register BodyParser failed content_type=%q body=%q err=%v", c.Get("Content-Type"), string(c.Body()), err)
+
+			return c.Status(400).JSON(fiber.Map{
+				"error":   "invalid_json",
+				"message": err.Error(),
+			})
+		}
+
+		username := strings.ToLower(strings.TrimSpace(body.Username))
+		password := body.Password
+		email := strings.TrimSpace(body.Email)
+
+		if username == "" || password == "" {
 			return c.Status(400).JSON(fiber.Map{
 				"error":   "invalid_request",
 				"message": "Username and password required",
 			})
 		}
 
-		if len(body.Password) < 8 {
+		if len(password) < 8 {
 			return c.Status(400).JSON(fiber.Map{
 				"error":   "invalid_request",
 				"message": "Password must be at least 8 characters",
 			})
 		}
 
-		hash, err := crypto.HashPassword(body.Password)
+		hash, err := crypto.HashPassword(password)
 		if err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
+			log.Printf("panel register HashPassword failed username=%q err=%v", username, err)
+
+			return c.Status(500).JSON(fiber.Map{
+				"error":   "password_hash_failed",
+				"message": err.Error(),
+			})
 		}
 
-		username := strings.ToLower(strings.TrimSpace(body.Username))
-
 		var emailPtr *string
-		if body.Email != "" {
-			e := strings.TrimSpace(body.Email)
-			emailPtr = &e
+		if email != "" {
+			emailPtr = &email
 		}
 
 		account, err := db.CreateAccount(c.Context(), pool, username, hash, emailPtr)
 		if err != nil {
+			log.Printf("panel register CreateAccount failed username=%q email=%q err=%v", username, email, err)
+
 			return c.Status(409).JSON(fiber.Map{
-				"error":   "username_taken",
-				"message": "Username already taken",
+				"error":   "account_create_failed",
+				"message": err.Error(),
 			})
 		}
 
 		raw, tokenHash, err := crypto.GenerateToken()
 		if err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
+			log.Printf("panel register GenerateToken failed account_id=%s err=%v", account.ID, err)
+
+			return c.Status(500).JSON(fiber.Map{
+				"error":   "token_generate_failed",
+				"message": err.Error(),
+			})
 		}
 
 		if _, err := db.CreatePanelSession(c.Context(), pool, tokenHash, account.ID, time.Now().Add(30*24*time.Hour)); err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
+			log.Printf("panel register CreatePanelSession failed account_id=%s err=%v", account.ID, err)
+
+			return c.Status(500).JSON(fiber.Map{
+				"error":   "panel_session_create_failed",
+				"message": err.Error(),
+			})
 		}
 
 		return c.Status(201).JSON(fiber.Map{
