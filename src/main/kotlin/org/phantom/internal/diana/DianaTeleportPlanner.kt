@@ -27,6 +27,8 @@ object DianaTeleportPlanner {
         /** Cast angles — only meaningful for AOTV / ETHERWARP hops. */
         val yaw: Float,
         val pitch: Float,
+        /** AOTV hop whose landing is mid-air (sky chain) — needs fast timing. */
+        val airborne: Boolean = false,
     ) {
         /** Standing position the player will occupy at this node. */
         fun standPos(): Vec3 = Vec3(x + 0.5, y.toDouble(), z + 0.5)
@@ -88,12 +90,13 @@ object DianaTeleportPlanner {
                 val px = res.path[i * 3]
                 val py = res.path[i * 3 + 1]
                 val pz = res.path[i * 3 + 2]
-                val type = when (res.hopTypes[i]) {
-                    1 -> HopType.AOTV
+                val code = res.hopTypes[i]
+                val type = when (code) {
+                    1, 3 -> HopType.AOTV
                     2 -> HopType.ETHERWARP
                     else -> HopType.WALK
                 }
-                hops.add(Hop(px, py, pz, type, res.yaw[i], res.pitch[i]))
+                hops.add(Hop(px, py, pz, type, res.yaw[i], res.pitch[i], code == 3))
             }
             Plan(hops, res.reachedGoal, res.timeMs, res.nodesExplored)
         }

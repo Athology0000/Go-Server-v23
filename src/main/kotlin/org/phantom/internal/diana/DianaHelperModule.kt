@@ -23,12 +23,15 @@ import org.phantom.api.module.ModuleCategory
 import org.phantom.api.module.setting.impl.ActionSetting
 import org.phantom.api.module.setting.impl.CheckboxSetting
 import org.phantom.api.module.setting.impl.ColorSetting
+import org.phantom.api.module.setting.impl.KeyBindSetting
 import org.phantom.api.module.setting.impl.SliderSetting
+import org.phantom.api.module.setting.impl.TextSetting
 import org.phantom.api.notification.NotificationManager
 import org.phantom.api.pathfinder.jni.NativePathfinder
 import org.phantom.api.ui.theme.ThemeManager
 import org.phantom.api.util.ChatUtils
 import org.phantom.api.util.getSkyblockId
+import org.phantom.api.util.helper.KeyBind
 import org.phantom.api.util.ui.NVGRenderer
 import org.phantom.internal.helper.ClientGlowEspManager
 import org.phantom.internal.pathfinding.OverlayRenderEngine
@@ -65,20 +68,42 @@ object DianaHelperModule : Module("Diana Helper") {
     val showHud       = CheckboxSetting("Show HUD",       "Show the burrow direction compass HUD.", true)
     val waypointColor = ColorSetting(  "Waypoint Color",  "Color of the burrow waypoints.", 0xFFFFD700.toInt())
     val expireSeconds = SliderSetting( "Expire Time",     "Seconds without a confirmed particle before a waypoint disappears.", 30.0, 5.0, 120.0, step = 1.0)
+    val burrowDetection = CheckboxSetting("Burrow Detection", "Detect and render confirmed Diana burrows.", true)
     val highlightRareMobs = CheckboxSetting("Highlight Rare Mobs", "Glow rare Diana mobs like Inquisitor, Sphinx, King Minos, and Manticore.", true)
+    val rareMobGlowColor = ColorSetting("Rare Mob Glow Color", "Glow color for rare Diana mobs.", 0xFFFF55FF.toInt())
     val rareMobWaypoints = CheckboxSetting("Rare Mob Waypoints", "Render waypoints and lines to detected rare Diana mobs.", true)
     val shareRareMobs = CheckboxSetting("Share Rare Mobs", "Send rare Diana mob coordinates to party chat when detected.", false)
+    val receiveRareMobs = CheckboxSetting("Receive Rare Mobs", "Create rare mob waypoints from party chat coordinates.", true)
+    val allChatCoordsAreRare = CheckboxSetting("All Chat Coords Are Rare", "Treat party chat coordinates as rare Diana mobs while this helper is enabled.", false)
     val petWarning = CheckboxSetting("Griffin Pet Warning", "Warn when using a Diana spade without a Griffin pet visible in tab.", true)
     val particleFailHint = CheckboxSetting("Particle Fail Hint", "Warn if a spade use does not produce Diana guess particles.", true)
     val preciseGuess = CheckboxSetting("Precise Spade Guess", "Use SkyHanni-style spade lava trails to guess burrow locations before confirmation.", true)
     val arrowGuess = CheckboxSetting("Arrow Guess", "Use SkyHanni-style arrow particles to guess the next burrow after digging.", true)
     val nearestWarp = CheckboxSetting("Nearest Warp Hint", "Show a suggested hub warp when it saves enough travel distance.", true)
-    val warpDistanceDifference = SliderSetting("Warp Difference", "Minimum distance saved before suggesting a warp.", 60.0, 20.0, 180.0, step = 5.0)
+    val allowedWarps = TextSetting("Allowed Warps", "Comma-separated hub warps usable for Diana warp hints.", "wizard,da,castle,crypt,stonks")
+    val dontWarpIfClose = CheckboxSetting("Don't Warp If Close", "Do not warp if you are already close to the target burrow.", true)
+    val closeWarpDistance = SliderSetting("Close Warp Distance", "Distance under which the warp key is suppressed.", 60.0, 10.0, 120.0, step = 1.0)
+    val warpDistanceDifference = SliderSetting("Warp Difference", "Minimum distance saved before suggesting a warp.", 10.0, 0.0, 180.0, step = 1.0)
+    val warpDelay = SliderSetting("Warp Delay", "Milliseconds after a guess before the warp key may warp.", 0.0, 0.0, 1000.0, step = 25.0)
+    val warpKey = KeyBindSetting("Warp Key", "Warp to the currently suggested Diana hub warp.", KeyBind(-1))
     val useSuggestedWarp = ActionSetting("Use Suggested Warp", "Warp to the currently suggested Diana hub warp.", "Warp", { currentWarp?.displayName ?: "No Warp" }) {
-        currentWarp?.let { mc.player?.connection?.sendCommand("warp ${it.command}") }
+        useSuggestedWarp()
     }
     val creatureTracker = CheckboxSetting("Creature Tracker", "Show Mythological creature counts and rare-mob since counters.", true)
     val profitTracker = CheckboxSetting("Profit Tracker", "Show Diana profit, rates, and timing stats.", true)
+    val statsTracker = CheckboxSetting("Stats Tracker", "Show SBO-style since counters for rare mobs and rare drops.", true)
+    val magicFindTracker = CheckboxSetting("Magic Find Tracker", "Track highest magic find seen on Diana rare drops.", true)
+    val rareDropChatAnnouncer = CheckboxSetting("Rare Drop Chat Announcer", "Print SBO-style chat notices for Diana rare drops.", true)
+    val rareDropScreenAnnouncer = CheckboxSetting("Rare Drop Screen Announcer", "Show a title for major Diana rare drops.", false)
+    val rareDropPartyAnnouncer = CheckboxSetting("Rare Drop Party Announcer", "Announce major Diana rare drops in party chat.", false)
+    val customChimMessage = TextSetting("Custom Chim Message", "Message used for Chimera drops. Supports {mf} and {amount}.", "[SBO] RARE DROP! Chimera! +{mf} Magic Find #{amount}")
+    val guessLine = CheckboxSetting("Guess Line", "Draw lines to guessed burrows.", true)
+    val burrowLine = CheckboxSetting("Burrow Line", "Draw lines to confirmed burrows.", true)
+    val rareMobLine = CheckboxSetting("Rare Mob Line", "Draw lines to rare Diana mobs.", true)
+    val lineWidth = SliderSetting("Line Width", "Diana waypoint line width.", 5.0, 1.0, 20.0, step = 1.0)
+    val removeGuessDistance = SliderSetting("Remove Guess When Close", "Remove guess waypoints when this close. 0 disables.", 0.0, 0.0, 20.0, step = 1.0)
+    val removeRareMobDistance = SliderSetting("Remove Rare Mob When Close", "Remove rare mob waypoints when this close. 0 disables.", 3.0, 0.0, 20.0, step = 1.0)
+    val removeRareMobBeamDistance = SliderSetting("Remove Rare Mob Beam Distance", "Hide rare mob beams when this close. 0 disables.", 8.0, 0.0, 20.0, step = 1.0)
     val resetProfitTracker = ActionSetting("Reset Profit Tracker", "Clear the Diana profit/timing session.", "Reset") {
         DianaProfitTracker.reset()
     }
@@ -109,6 +134,10 @@ object DianaHelperModule : Module("Diana Helper") {
     private val arrowPoints = ArrayList<Vec3>()
     private val recentArrowKeys = linkedSetOf<String>()
     private var currentWarp: WarpPoint? = null
+    private var lastWarpMs = 0L
+    private val rareDropCounts = linkedMapOf<String, Int>()
+    private val rareDropSince = linkedMapOf<String, Int>()
+    private val highestMagicFind = linkedMapOf<String, Int>()
 
     private val MYTHOLOGICAL_SPAWN_PATTERN = Regex(
         """^(?:Oh|Uh oh|Yikes|Oi|Good Grief|Danger|Woah)! You dug out (?:a )?(.+)!$""",
@@ -139,6 +168,16 @@ object DianaHelperModule : Module("Diana Helper") {
     private val RARE_MOBS = listOf("Minos Inquisitor", "Sphinx", "King Minos", "Manticore")
     private val RARE_TRACKED_MOBS = listOf("Minos Inquisitor", "Sphinx", "King Minos", "Manticore")
     private val SHARD_WARNING_MOBS = setOf("Cretan Bull", "Harpy", "Minotaur")
+    private val RARE_DROP_NAMES = listOf(
+        "Chimera",
+        "Daedalus Stick",
+        "Minos Relic",
+        "Manti-core",
+        "Fateful Stinger",
+        "Brain Food",
+        "Shimmering Wool",
+        "Mythological Dye",
+    )
 
     /** Nearest known burrow - used by macro and compass HUD. */
     val burrowPos: Vec3?
@@ -163,18 +202,40 @@ object DianaHelperModule : Module("Diana Helper") {
             showHud,
             waypointColor,
             expireSeconds,
+            burrowDetection,
             highlightRareMobs,
+            rareMobGlowColor,
             rareMobWaypoints,
             shareRareMobs,
+            receiveRareMobs,
+            allChatCoordsAreRare,
             petWarning,
             particleFailHint,
             preciseGuess,
             arrowGuess,
             nearestWarp,
+            allowedWarps,
+            dontWarpIfClose,
+            closeWarpDistance,
             warpDistanceDifference,
+            warpDelay,
+            warpKey,
             useSuggestedWarp,
             creatureTracker,
             profitTracker,
+            statsTracker,
+            magicFindTracker,
+            rareDropChatAnnouncer,
+            rareDropScreenAnnouncer,
+            rareDropPartyAnnouncer,
+            customChimMessage,
+            guessLine,
+            burrowLine,
+            rareMobLine,
+            lineWidth,
+            removeGuessDistance,
+            removeRareMobDistance,
+            removeRareMobBeamDistance,
             resetProfitTracker,
             resetCreatureTracker,
         )
@@ -197,11 +258,13 @@ object DianaHelperModule : Module("Diana Helper") {
         }
 
         if (tickCounter % 5 == 0) {
+            pruneCloseGuesses(level, player)
             syncRareMobs(level, player)
             maybeWarnPet()
             maybeWarnParticleQuality()
             updateNearestWarp()
         }
+        if (warpKey.value.isPressed()) useSuggestedWarp()
     }
 
     @SubscribeEvent
@@ -244,6 +307,7 @@ object DianaHelperModule : Module("Diana Helper") {
         )
         if (lastPreciseGuess == blockGuess) return
         lastPreciseGuess = blockGuess
+        lastWarpMs = now
         DianaParticleTracker.addGuess(blockGuess)
     }
 
@@ -265,6 +329,9 @@ object DianaHelperModule : Module("Diana Helper") {
             }
             return
         }
+
+        maybeHandleRareDrop(message)
+        maybeHandleSharedRareMob(message)
 
         if (message.startsWith("You dug out a Griffin Burrow!") ||
             message.startsWith("You finished the Griffin burrow chain!")
@@ -298,6 +365,7 @@ object DianaHelperModule : Module("Diana Helper") {
         if (!recentArrowKeys.add(key)) return true
         while (recentArrowKeys.size > 10) recentArrowKeys.remove(recentArrowKeys.first())
         arrowPoints.clear()
+        lastWarpMs = System.currentTimeMillis()
         addArrowGuess(ray, range)
         return true
     }
@@ -518,7 +586,11 @@ object DianaHelperModule : Module("Diana Helper") {
 
         OverlayRenderEngine.clearTag("diana-helper")
 
-        val records = DianaParticleTracker.getBurrowRecords(level, expireSeconds.value.toLong() * 1000L)
+        val records = if (burrowDetection.value) {
+            DianaParticleTracker.getBurrowRecords(level, expireSeconds.value.toLong() * 1000L)
+        } else {
+            emptyList()
+        }
 
         // Waypoint box + beacon beam for every known burrow
         if (showWaypoint.value) {
@@ -568,10 +640,11 @@ object DianaHelperModule : Module("Diana Helper") {
         }
 
         // Path line: cached path nodes -> player eye -> nearest burrow
-        if (showLine.value) {
+        if (showLine.value && shouldDrawLineToNearest(records, nearest)) {
             val player = mc.player ?: return
             val eye = player.getEyePosition()
             val nodes = NativePathfinder.cachedPathNodes
+            val width = lineWidth.value.toFloat()
             if (nodes.size >= 2) {
                 for (i in 0 until nodes.size - 1) {
                     val a = nodes[i]; val nb = nodes[i + 1]
@@ -579,7 +652,7 @@ object DianaHelperModule : Module("Diana Helper") {
                         level,
                         a.x, a.y + 0.05, a.z,
                         nb.x, nb.y + 0.05, nb.z,
-                        OREColor(r, g, blue, alpha * 3 / 4), 2f,
+                        OREColor(r, g, blue, alpha * 3 / 4), width,
                         durationTicks = 3,
                         tag = "diana-helper",
                         forceRender = true
@@ -590,7 +663,7 @@ object DianaHelperModule : Module("Diana Helper") {
                     level,
                     last.x, last.y + 0.05, last.z,
                     eye.x, eye.y, eye.z,
-                    OREColor(r, g, blue, alpha / 2), 1.5f,
+                    OREColor(r, g, blue, alpha / 2), (width - 1f).coerceAtLeast(1f),
                     durationTicks = 3,
                     tag = "diana-helper",
                     forceRender = true
@@ -601,7 +674,7 @@ object DianaHelperModule : Module("Diana Helper") {
                 level,
                 eye.x, eye.y, eye.z,
                 nearest.x, nearest.y + 0.5, nearest.z,
-                OREColor(r, g, blue, alpha * 2 / 3), 2f,
+                OREColor(r, g, blue, alpha * 2 / 3), width,
                 durationTicks = 3,
                 tag = "diana-helper",
                 forceRender = true
@@ -679,17 +752,19 @@ object DianaHelperModule : Module("Diana Helper") {
         height {
             val creatureRows = if (creatureTracker.value) creatureCounts.size.coerceAtMost(8) + trackedRareSinceCount() else 0
             val profitRows = if (profitTracker.value) 11 else 0
-            (42f + creatureRows * 13f + profitRows * 13f).coerceAtLeast(26f)
+            val sboRows = if (statsTracker.value || magicFindTracker.value) buildSboStatsRows().take(8).size else 0
+            (42f + (creatureRows + profitRows + sboRows) * 13f).coerceAtLeast(26f)
         }
 
         render { x, y, _ ->
-            if (!creatureTracker.value && !profitTracker.value) return@render
+            if (!creatureTracker.value && !profitTracker.value && !statsTracker.value && !magicFindTracker.value) return@render
 
             val rows = creatureCounts.entries.sortedByDescending { it.value }.take(8)
             val rareSince = rareSinceRows()
             val snap = DianaProfitTracker.snapshot()
             val profitRows = if (profitTracker.value) 11 else 0
-            val h = 42f + (if (creatureTracker.value) rows.size + rareSince.size else 0) * 13f + profitRows * 13f
+            val sboRows = if (statsTracker.value || magicFindTracker.value) buildSboStatsRows().take(8) else emptyList()
+            val h = 42f + ((if (creatureTracker.value) rows.size + rareSince.size else 0) + profitRows + sboRows.size) * 13f
             NVGRenderer.rect(x, y, 178f, h, ThemeManager.currentTheme.panel, 8f)
             NVGRenderer.hollowRect(x, y, 178f, h, 1f, ThemeManager.currentTheme.controlBorder, 8f)
             NVGRenderer.text("Diana Session", x + 10f, y + 10f, 11f, ThemeManager.currentTheme.text)
@@ -727,6 +802,11 @@ object DianaHelperModule : Module("Diana Helper") {
                     rowY += 13f
                 }
             }
+
+            for (line in sboRows) {
+                NVGRenderer.text(line, x + 10f, rowY, 9f, ThemeManager.currentTheme.accent)
+                rowY += 13f
+            }
         }
     }
 
@@ -749,7 +829,7 @@ object DianaHelperModule : Module("Diana Helper") {
         if (highlightRareMobs.value) {
             val targets = rareMobTargets.keys.mapNotNull { uuid ->
                 val entity = level.getEntity(uuid) as? LivingEntity ?: return@mapNotNull null
-                ClientGlowEspManager.GlowTarget(entity, RARE_MOB_COLOR, RARE_MOB_GLOW_PRIORITY)
+                ClientGlowEspManager.GlowTarget(entity, rareMobGlowColor.value, RARE_MOB_GLOW_PRIORITY)
             }
             ClientGlowEspManager.sync(RARE_MOB_GLOW_SCOPE, level, targets)
         } else {
@@ -766,6 +846,8 @@ object DianaHelperModule : Module("Diana Helper") {
 
         for (waypoint in rareMobTargets.values) {
             val pos = waypoint.pos
+            val dist = player.position().distanceTo(pos)
+            if (removeRareMobDistance.value > 0.0 && dist <= removeRareMobDistance.value) continue
             OverlayRenderEngine.addBox(
                 level,
                 pos.x - 0.5, pos.y, pos.z - 0.5,
@@ -776,15 +858,28 @@ object DianaHelperModule : Module("Diana Helper") {
                 tag = "diana-helper",
                 forceRender = true
             )
-            OverlayRenderEngine.addLine(
-                level,
-                eye.x, eye.y, eye.z,
-                pos.x, pos.y + 1.0, pos.z,
-                OREColor(255, 85, 255, alpha * 3 / 4), 2.5f,
-                durationTicks = 3,
-                tag = "diana-helper",
-                forceRender = true
-            )
+            if (rareMobLine.value) {
+                OverlayRenderEngine.addLine(
+                    level,
+                    eye.x, eye.y, eye.z,
+                    pos.x, pos.y + 1.0, pos.z,
+                    OREColor(255, 85, 255, alpha * 3 / 4), lineWidth.value.toFloat(),
+                    durationTicks = 3,
+                    tag = "diana-helper",
+                    forceRender = true
+                )
+            }
+            if (removeRareMobBeamDistance.value <= 0.0 || dist > removeRareMobBeamDistance.value) {
+                OverlayRenderEngine.addLine(
+                    level,
+                    pos.x, pos.y, pos.z,
+                    pos.x, pos.y + 12.0, pos.z,
+                    OREColor(255, 85, 255, alpha / 2), 2f,
+                    durationTicks = 3,
+                    tag = "diana-helper",
+                    forceRender = true
+                )
+            }
         }
     }
 
@@ -862,10 +957,16 @@ object DianaHelperModule : Module("Diana Helper") {
             currentWarp = null
             return
         }
-        val best = HUB_WARPS.minByOrNull { it.pos.distanceTo(target) + it.extraBlocks } ?: return
+        val allowed = allowedWarpCommands()
+        val best = HUB_WARPS
+            .filter { it.command in allowed }
+            .minByOrNull { it.pos.distanceTo(target) + it.extraBlocks } ?: return
         val playerDistance = player.position().distanceTo(target)
         val warpDistance = best.pos.distanceTo(target) + best.extraBlocks
-        currentWarp = if (playerDistance - warpDistance >= warpDistanceDifference.value) best else null
+        currentWarp = if (
+            (!dontWarpIfClose.value || playerDistance > closeWarpDistance.value) &&
+            playerDistance - warpDistance >= warpDistanceDifference.value
+        ) best else null
     }
 
     private fun renderWarpHint(level: net.minecraft.world.level.Level, alpha: Int) {
@@ -899,6 +1000,100 @@ object DianaHelperModule : Module("Diana Helper") {
         val y = floor(waypoint.pos.y).toInt()
         val z = floor(waypoint.pos.z).toInt()
         mc.player?.connection?.sendCommand("pc ${waypoint.name} at x:$x y:$y z:$z")
+    }
+
+    private fun useSuggestedWarp() {
+        val warp = currentWarp ?: return
+        if (warpDelay.value > 0.0 && System.currentTimeMillis() - lastWarpMs < warpDelay.value.toLong()) return
+        mc.player?.connection?.sendCommand("warp ${warp.command}")
+    }
+
+    private fun allowedWarpCommands(): Set<String> {
+        val configured = allowedWarps.value.split(',', ';', ' ')
+            .map { normalizeWarpName(it) }
+            .filter { it.isNotBlank() }
+            .toSet()
+        return configured.ifEmpty { setOf("wizard", "da", "castle", "crypt", "stonks") }
+    }
+
+    private fun normalizeWarpName(raw: String): String {
+        val text = raw.trim().lowercase()
+        return when (text) {
+            "darkauction", "dark_auction", "dark-auction" -> "da"
+            else -> text
+        }
+    }
+
+    private fun shouldDrawLineToNearest(records: List<Pair<Vec3, DianaParticleTracker.BurrowType>>, nearest: Vec3): Boolean {
+        val type = records.firstOrNull { it.first.distanceToSqr(nearest) < 1.0 }?.second ?: DianaParticleTracker.BurrowType.GUESS
+        return when (type) {
+            DianaParticleTracker.BurrowType.GUESS -> guessLine.value
+            else -> burrowLine.value
+        }
+    }
+
+    private fun pruneCloseGuesses(level: net.minecraft.world.level.Level, player: net.minecraft.world.entity.player.Player) {
+        val distance = removeGuessDistance.value
+        if (distance <= 0.0) return
+        DianaParticleTracker.getBurrowRecords(level, expireSeconds.value.toLong() * 1000L)
+            .filter { it.second == DianaParticleTracker.BurrowType.GUESS && player.position().distanceTo(it.first) <= distance }
+            .forEach { DianaParticleTracker.removeBurrow(floor(it.first.x).toInt(), floor(it.first.z).toInt()) }
+    }
+
+    private fun maybeHandleSharedRareMob(message: String) {
+        if (!receiveRareMobs.value) return
+        val coords = COORD_PATTERN.find(message) ?: return
+        val name = RARE_MOBS.firstOrNull { message.contains(it, ignoreCase = true) }
+            ?: if (allChatCoordsAreRare.value) "Rare Diana Mob" else return
+        val x = coords.groupValues[1].toDoubleOrNull() ?: return
+        val y = coords.groupValues[2].toDoubleOrNull() ?: return
+        val z = coords.groupValues[3].toDoubleOrNull() ?: return
+        val now = System.currentTimeMillis()
+        val uuid = UUID.nameUUIDFromBytes("diana-party:$name:$x:$y:$z".toByteArray())
+        rareMobTargets[uuid] = RareMobWaypoint(uuid, name, Vec3(x, y, z), now, now, shared = true)
+    }
+
+    private fun maybeHandleRareDrop(message: String) {
+        val drop = RARE_DROP_NAMES.firstOrNull { message.contains(it, ignoreCase = true) } ?: return
+        if (!message.contains("RARE DROP", ignoreCase = true) && drop != "Mythological Dye") return
+        val mf = MAGIC_FIND_PATTERN.find(message)?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 0
+        rareDropCounts[drop] = (rareDropCounts[drop] ?: 0) + 1
+        for (name in RARE_DROP_NAMES) {
+            rareDropSince[name] = if (name.equals(drop, ignoreCase = true)) 0 else (rareDropSince[name] ?: 0) + 1
+        }
+        if (mf > (highestMagicFind[drop] ?: 0)) highestMagicFind[drop] = mf
+
+        val count = rareDropCounts[drop] ?: 1
+        val text = if (drop == "Chimera") {
+            customChimMessage.value.replace("{mf}", mf.toString()).replace("{amount}", count.toString())
+        } else {
+            "[SBO] RARE DROP! $drop!${if (mf > 0) " +$mf Magic Find" else ""} #$count"
+        }
+        if (rareDropChatAnnouncer.value) ChatUtils.sendMessage(text)
+        if (rareDropScreenAnnouncer.value && drop in TITLE_DROPS) {
+            mc.gui.setTitle(Component.literal(drop).withStyle(ChatFormatting.LIGHT_PURPLE))
+            mc.gui.setSubtitle(Component.literal(if (mf > 0) "+$mf Magic Find" else "Rare Diana drop").withStyle(ChatFormatting.GOLD))
+            NotificationManager.queue("Diana Rare Drop", drop, 4500L)
+        }
+        if (rareDropPartyAnnouncer.value && drop in PARTY_DROPS) {
+            mc.player?.connection?.sendCommand("pc $text")
+        }
+    }
+
+    private fun buildSboStatsRows(): List<String> {
+        val rows = ArrayList<String>()
+        if (statsTracker.value) {
+            for (name in listOf("Minos Inquisitor", "Chimera", "Daedalus Stick", "Minos Relic", "Manti-core", "Brain Food", "Shimmering Wool")) {
+                val since = if (name in RARE_MOBS) creatureSince[name] else rareDropSince[name]
+                if (since != null) rows += "Since $name: $since"
+            }
+        }
+        if (magicFindTracker.value) {
+            highestMagicFind.entries.sortedByDescending { it.value }.take(4).forEach { (drop, mf) ->
+                rows += "Best MF $drop: $mf"
+            }
+        }
+        return rows
     }
 
     private fun alert(title: String, body: String, color: ChatFormatting) {
@@ -971,6 +1166,9 @@ object DianaHelperModule : Module("Diana Helper") {
 
     private const val RARE_MOB_GLOW_SCOPE = "diana_rare_mobs"
     private const val RARE_MOB_GLOW_PRIORITY = 20
-    private const val RARE_MOB_COLOR = 0xFFFF55FF.toInt()
     private const val RARE_MOB_EXPIRE_MS = 75_000L
+    private val COORD_PATTERN = Regex("""(?:x[:= ]\s*|@?\s)(-?\d{1,4})(?:[, ]+\s*y[:= ]\s*|[, ]+)(-?\d{1,4})(?:[, ]+\s*z[:= ]\s*|[, ]+)(-?\d{1,4})""", RegexOption.IGNORE_CASE)
+    private val MAGIC_FIND_PATTERN = Regex("""\+(\d+)\s*(?:✯|Magic Find)""", RegexOption.IGNORE_CASE)
+    private val TITLE_DROPS = setOf("Chimera", "Daedalus Stick", "Minos Relic", "Manti-core", "Fateful Stinger", "Brain Food", "Shimmering Wool", "Mythological Dye")
+    private val PARTY_DROPS = TITLE_DROPS
 }

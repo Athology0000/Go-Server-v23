@@ -8,6 +8,7 @@
 #include <limits>
 #include <queue>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace v5pf {
 
@@ -111,18 +112,37 @@ void anglesBetween(double ex, double ey, double ez,
 
 struct AotvOffset { int dx, dy, dz; double dist; };
 
-// Built once. Longest hops first so a forward scan naturally prefers covering
-// the most distance per cast (fewer hops, less mana, faster traversal).
+// Built once. Instant transmission fires along the full 3D look vector, so the
+// candidate set is a sphere of yaw x pitch directions at several distances —
+// NOT a flat dx/dz box. This lets the planner climb, dive, and arc in true 3D.
+// Longest hops first so a forward scan covers the most distance per cast.
 const std::vector<AotvOffset>& aotvOffsetTable() {
   static const std::vector<AotvOffset> table = [] {
     std::vector<AotvOffset> t;
-    for (int dx = -AOTV_OFFSET_MAX; dx <= AOTV_OFFSET_MAX; dx += 2) {
-      for (int dz = -AOTV_OFFSET_MAX; dz <= AOTV_OFFSET_MAX; dz += 2) {
-        for (int dy = -6; dy <= 6; dy++) {
-          const double d = std::sqrt(double(dx) * dx + double(dy) * dy +
-                                     double(dz) * dz);
-          if (d < 4.0 || d > AOTV_OFFSET_MAX) continue;
-          t.push_back(AotvOffset{dx, dy, dz, d});
+    std::unordered_set<long long> seen;
+    static const int dists[] = {16, 13, 11, 9, 7, 5};
+    for (int yawDeg = 0; yawDeg < 360; yawDeg += 12) {
+      const double yr = yawDeg * (PI / 180.0);
+      const double hx = -std::sin(yr);
+      const double hz = std::cos(yr);
+      for (int pitchDeg = -78; pitchDeg <= 78; pitchDeg += 9) {
+        const double pr = pitchDeg * (PI / 180.0);
+        const double cp = std::cos(pr);
+        const double dirX = hx * cp;
+        const double dirY = -std::sin(pr);
+        const double dirZ = hz * cp;
+        for (const int d : dists) {
+          const int ox = static_cast<int>(std::llround(dirX * d));
+          const int oy = static_cast<int>(std::llround(dirY * d));
+          const int oz = static_cast<int>(std::llround(dirZ * d));
+          const double dist = std::sqrt(double(ox) * ox + double(oy) * oy +
+                                        double(oz) * oz);
+          if (dist < 4.0 || dist > AOTV_OFFSET_MAX) continue;
+          const long long key = (static_cast<long long>(ox + 64) << 20) |
+                                (static_cast<long long>(oy + 64) << 10) |
+                                static_cast<long long>(oz + 64);
+          if (!seen.insert(key).second) continue;
+          t.push_back(AotvOffset{ox, oy, oz, dist});
         }
       }
     }
@@ -142,6 +162,7 @@ struct Edge {
   double cost;
   float yaw;
   float pitch;
+  bool airborne; // landing is mid-air (AOTV sky chain), no ground under it
 };
 
 struct SearchNode {
@@ -153,6 +174,7 @@ struct SearchNode {
   int manaSpent;
   float yaw;
   float pitch;
+  bool airborne;
 };
 
 struct HeapItem {
@@ -166,6 +188,7 @@ void neighbours(
   const TeleportFirstParams& p,
   const Int3& from,
   const Int3& goal,
+  bool fromAirborne,
   std::vector<Edge>& out
 ) {
   out.clear();
@@ -194,29 +217,46 @@ void neighbours(
         if (dot < -0.15) continue; // moving away from the goal
       }
 
+      // Instant transmission needs NO target block — it sends you ~range
+      // blocks along your look vector. The aim point itself only has to be
+      // open space and reachable through a clear corridor.
       Int3 aim{from.x + o.dx, from.y + o.dy, from.z + o.dz};
       if (!isPassable(w, aim.x, aim.y, aim.z) ||
           !isPassable(w, aim.x, aim.y + 1, aim.z)) {
         continue;
       }
+      if (!teleportCorridorClear(w, from, aim)) continue;
+
+      // Where the player ends up: fall to ground if there is some within a
+      // long drop, otherwise the hop is airborne (a sky chain) and the next
+      // hop must be another instant transmission.
       Int3 landing;
-      if (!settleByGravity(w, aim, 12, landing)) continue;
-      if (!teleportCorridorClear(w, from, landing)) continue;
+      bool airborne = false;
+      if (!settleByGravity(w, aim, 28, landing)) {
+        landing = aim;
+        airborne = true;
+      }
 
       const double landDist = dist3D(landing, goal);
-      // Must make meaningful progress (or essentially reach the goal).
-      if (landDist > p.goalReachedRadius &&
+      // Ground hops must make real forward progress (avoids many tiny shuffle
+      // hops). Airborne maneuvering hops (climb a wall, arc over terrain) are
+      // exempt — they often don't reduce distance yet but enable the route.
+      if (!airborne && landDist > p.goalReachedRadius &&
           toGoal - landDist < MIN_AOTV_GAIN) {
         continue;
       }
+      // Never accept a hop that moves substantially AWAY from the goal.
+      if (landDist > toGoal + 4.0 && landDist > p.goalReachedRadius) continue;
 
+      // Aim where the teleport actually sends you (the aim point), so the
+      // executor looks along the travel direction.
       float yaw, pitch;
       anglesBetween(ex, ey, ez,
-                    landing.x + 0.5, landing.y + 0.9, landing.z + 0.5,
-                    yaw, pitch);
+                    aim.x + 0.5, aim.y + 1.0, aim.z + 0.5, yaw, pitch);
       const double gravityPen = std::max(0, aim.y - landing.y) * 0.03;
+      const double airPen = airborne ? 0.6 : 0.0;
       out.push_back(Edge{landing, TfHopType::AOTV, p.transmissionMana,
-                         1.85 + gravityPen, yaw, pitch});
+                         1.85 + gravityPen + airPen, yaw, pitch, airborne});
       aotvCount++;
       hasTeleportExit = true;
     }
@@ -226,7 +266,7 @@ void neighbours(
   // burrow is already within a single etherwarp, and (below) only hops that
   // land essentially on the burrow are kept. Instant transmission handles all
   // long-distance traversal. ----
-  if (p.etherwarpEnabled && toGoal <= p.etherwarpRange) {
+  if (!fromAirborne && p.etherwarpEnabled && toGoal <= p.etherwarpRange) {
     for (int yawDeg = 0; yawDeg < 360 && etherCount < MAX_ETHER_NEIGHBOURS;
          yawDeg += 20) {
       const double yr = yawDeg * (PI / 180.0);
@@ -268,18 +308,19 @@ void neighbours(
         anglesBetween(ex, ey, ez,
                       hit.x + 0.5, hit.y + 1.0, hit.z + 0.5, yaw, pitch);
         out.push_back(Edge{landing, TfHopType::ETHERWARP, p.etherwarpMana,
-                           2.5, yaw, pitch});
+                           2.5, yaw, pitch, false});
         etherCount++;
         hasTeleportExit = true;
       }
     }
   }
 
-  // ---- Walk: expensive when teleports exist, cheap bridge when boxed in ----
+  // ---- Walk: expensive when teleports exist, cheap bridge when boxed in.
+  // Not available from an airborne node (you're falling, not standing). ----
   const double walkCost = hasTeleportExit ? 8.0 : 1.5;
   static constexpr int WX[8] = {1, -1, 0, 0, 1, 1, -1, -1};
   static constexpr int WZ[8] = {0, 0, 1, -1, 1, -1, 1, -1};
-  for (int i = 0; i < 8; i++) {
+  for (int i = 0; !fromAirborne && i < 8; i++) {
     for (int dy = -1; dy <= 1; dy++) {
       Int3 c{from.x + WX[i], from.y + dy, from.z + WZ[i]};
       if (!isSafeStand(w, c.x, c.y, c.z)) continue;
@@ -291,7 +332,7 @@ void neighbours(
         if (!sideX || !sideZ) continue;
       }
       out.push_back(Edge{c, TfHopType::WALK, 0,
-                         walkCost + (dy > 0 ? 0.15 : 0.0), 0.0f, 0.0f});
+                         walkCost + (dy > 0 ? 0.15 : 0.0), 0.0f, 0.0f, false});
     }
   }
 }
@@ -330,7 +371,7 @@ std::optional<TeleportFirstResult> findTeleportFirstPath(
   };
 
   nodes.push_back(SearchNode{
-    start, -1, TfHopType::WALK, 0.0, heuristic(start), 0, 0.0f, 0.0f});
+    start, -1, TfHopType::WALK, 0.0, heuristic(start), 0, 0.0f, 0.0f, false});
   visited.emplace(coordKey(start.x, start.y, start.z), 0);
 
   std::priority_queue<HeapItem, std::vector<HeapItem>, std::greater<HeapItem>> open;
@@ -356,7 +397,7 @@ std::optional<TeleportFirstResult> findTeleportFirstPath(
     if (curDist <= reachR) { bestIdx = curIdx; bestDist = curDist; break; }
     if (static_cast<int>(nodes.size()) >= maxNodes) continue;
 
-    neighbours(world, params, cur.pos, goal, edges);
+    neighbours(world, params, cur.pos, goal, cur.airborne, edges);
     for (const Edge& e : edges) {
       const int nextMana = cur.manaSpent + e.manaCost;
       if (e.type != TfHopType::WALK && params.availableMana > 0 &&
@@ -377,12 +418,13 @@ std::optional<TeleportFirstResult> findTeleportFirstPath(
         n.manaSpent = nextMana;
         n.yaw = e.yaw;
         n.pitch = e.pitch;
+        n.airborne = e.airborne;
         open.push(HeapItem{n.f, ni});
       } else {
         const int ni = static_cast<int>(nodes.size());
         const double nf = ng + heuristic(e.to);
         nodes.push_back(SearchNode{
-          e.to, curIdx, e.type, ng, nf, nextMana, e.yaw, e.pitch});
+          e.to, curIdx, e.type, ng, nf, nextMana, e.yaw, e.pitch, e.airborne});
         visited.emplace(key, ni);
         open.push(HeapItem{nf, ni});
       }
@@ -404,7 +446,11 @@ std::optional<TeleportFirstResult> findTeleportFirstPath(
   for (const int idx : chain) {
     const SearchNode& n = nodes[static_cast<size_t>(idx)];
     result.points.push_back(n.pos);
-    result.hopTypes.push_back(static_cast<int>(n.type));
+    // Code 3 = airborne instant transmission (sky chain) so the executor can
+    // use fast mid-air cast timing and not treat "not on ground" as overshoot.
+    int code = static_cast<int>(n.type);
+    if (n.type == TfHopType::AOTV && n.airborne) code = 3;
+    result.hopTypes.push_back(code);
     result.yaw.push_back(n.yaw);
     result.pitch.push_back(n.pitch);
   }

@@ -27,12 +27,22 @@ object CachedWorld {
         }
     }
 
-    @Volatile private var chunks = ConcurrentHashMap<Long, CachedChunk>(512)
-    private val chunkInsertionOrder = ArrayDeque<Long>(512)
+    private const val RUNTIME_WORLD_KEY = "runtime_memory"
+
+    private class WorldCacheState {
+        val chunks = ConcurrentHashMap<Long, CachedChunk>(512)
+        val chunkInsertionOrder = ArrayDeque<Long>(512)
+        @Volatile var dirty = false
+        @Volatile var diskLoadStarted = false
+    }
+
+    private val worldCaches = ConcurrentHashMap<String, WorldCacheState>()
+    @Volatile private var activeCache = worldCaches.computeIfAbsent(RUNTIME_WORLD_KEY) { WorldCacheState() }
+    @Volatile private var chunks = activeCache.chunks
+    private var chunkInsertionOrder = activeCache.chunkInsertionOrder
     private val pendingChunks = ConcurrentLinkedQueue<LevelChunk>()
     private val pendingNativeUpdates = ConcurrentHashMap<Long, Int>(256)
 
-    private const val RUNTIME_WORLD_KEY = "runtime_memory"
     @Volatile private var worldKey: String = RUNTIME_WORLD_KEY
     @Volatile private var worldDisplayName: String = "Runtime"
     @Volatile private var nativeWorldToken: String = ""
@@ -55,6 +65,33 @@ object CachedWorld {
         val packedY = (y.toLong() + 2_048L) and 0xFFFL
         val packedZ = (z.toLong() + 33_554_432L) and 0x3FFFFFFL
         return (packedX shl 38) or (packedY shl 26) or packedZ
+    }
+
+    private fun cacheFor(key: String): WorldCacheState =
+        worldCaches.computeIfAbsent(key) { WorldCacheState() }
+
+    private fun activateCache(key: String) {
+        activeCache = cacheFor(key)
+        chunks = activeCache.chunks
+        chunkInsertionOrder = activeCache.chunkInsertionOrder
+        dirty = activeCache.dirty
+        pendingChunks.clear()
+        pendingNativeUpdates.clear()
+        cacheKey = Long.MIN_VALUE
+        cacheChunk = null
+        pendingNativeResync = true
+        nativeWorldToken = ""
+        NativePathfinderBridge.clearWorld()
+    }
+
+    private fun markDirty() {
+        dirty = true
+        activeCache.dirty = true
+    }
+
+    private fun markClean(cache: WorldCacheState = activeCache) {
+        cache.dirty = false
+        if (cache === activeCache) dirty = false
     }
 
     private fun unpackBlockX(key: Long): Int = ((key ushr 38) and 0x3FFFFFFL).toInt() - 33_554_432
@@ -98,7 +135,7 @@ object CachedWorld {
         }
         ClientPlayConnectionEvents.DISCONNECT.register { _, _ ->
             val key = worldKey
-            if (key != RUNTIME_WORLD_KEY) saveAndClear(key) else clear()
+            if (key != RUNTIME_WORLD_KEY) saveAndClear(key) else markDirty()
             setWorldKey(null)
         }
     }
@@ -123,7 +160,7 @@ object CachedWorld {
             // Low 16 bits = flags; bits 16-19 = snow layers (native unpacks).
             queueNativeUpdate(pos.x, pos.y, pos.z, (flags.toInt() and 0xFFFF) or ((snow and 0xF) shl 16))
             if (cacheKey == key) cacheChunk = chunk
-            dirty = true
+            markDirty()
         }
     }
 
@@ -176,7 +213,7 @@ object CachedWorld {
             if (!chunks.containsKey(key)) chunkInsertionOrder.addLast(key)
             chunks[key] = cached
             if (cacheKey == key) cacheChunk = cached
-            dirty = true
+            markDirty()
             syncChunkToNative(chunkX, chunkZ, cached)
         }
 
@@ -199,13 +236,11 @@ object CachedWorld {
     }
 
     private fun resetState() {
-        chunks = ConcurrentHashMap(512)
-        chunkInsertionOrder.clear()
         pendingChunks.clear()
         pendingNativeUpdates.clear()
         cacheKey = Long.MIN_VALUE
         cacheChunk = null
-        dirty = false
+        markDirty()
         pendingNativeResync = true
         nativeWorldToken = ""
         NativePathfinderBridge.clearWorld()
@@ -221,36 +256,34 @@ object CachedWorld {
     }
 
     fun saveAndClear(lobbyName: String) {
-        val mapToSave = chunks
-        resetState()
-        if (mapToSave.isNotEmpty()) {
-            executor.submit {
-                try {
-                    WorldSerializer.save(lobbyName, mapToSave)
-                } catch (e: Exception) { e.printStackTrace() }
-            }
-        }
+        save(lobbyName)
+        invalidateNativeWorld()
     }
 
     fun load(lobbyName: String, notify: Boolean = true) {
-        resetState()
-        val sessionMap = chunks
+        val targetCache = cacheFor(lobbyName)
+        if (targetCache.diskLoadStarted) {
+            if (worldKey == lobbyName) {
+                pendingNativeResync = true
+                syncAllCachedChunksToNative()
+            }
+            return
+        }
+        targetCache.diskLoadStarted = true
         executor.submit {
             try {
                 val loaded = WorldSerializer.load(lobbyName)
-                if (loaded != null && chunks === sessionMap) {
-                    for ((key, chunk) in loaded) sessionMap.putIfAbsent(key, chunk)
-                    dirty = false
-                    // Push disk-loaded chunks to the native pathfinder directly.
-                    // The first onTick after resetState clears pendingNativeResync
-                    // before the async disk read finishes, so disk chunks would
-                    // otherwise never reach the native side — findPath then sees
-                    // a world of solid walls and returns null on every long path.
-                    syncAllCachedChunksToNative()
+                if (loaded != null && worldCaches[lobbyName] === targetCache) {
+                    for ((key, chunk) in loaded) targetCache.chunks.putIfAbsent(key, chunk)
+                    if (!targetCache.dirty) markClean(targetCache)
+                    // Push disk-loaded chunks to the native pathfinder directly
+                    // when this cache is active; otherwise they stay warm until
+                    // their world key is activated.
+                    if (worldKey == lobbyName) syncAllCachedChunksToNative()
                     if (notify) {
                         sendCacheMessage("World cache: ${getWorldDisplayName()} loaded ${loaded.values.count { it.ready }} chunks.")
                     }
-                } else if (loaded == null && chunks === sessionMap) {
+                } else if (loaded == null && worldCaches[lobbyName] === targetCache) {
                     if (notify) {
                         sendCacheMessage("World cache: ${getWorldDisplayName()} started fresh.")
                     }
@@ -293,27 +326,28 @@ object CachedWorld {
             return
         }
         val previous = worldKey
-        if (previous != RUNTIME_WORLD_KEY && dirty) {
+        if (previous != RUNTIME_WORLD_KEY && activeCache.dirty) {
             save(previous)
         }
         worldKey = normalized
         worldDisplayName = normalizedDisplayName
-        nativeWorldToken = ""
-        pendingNativeResync = true
-        NativePathfinderBridge.clearWorld()
+        activateCache(normalized)
+        if (normalized != RUNTIME_WORLD_KEY) load(normalized, notify = false)
     }
 
     fun save(lobbyName: String = worldKey) {
         if (lobbyName == RUNTIME_WORLD_KEY) return
-        val snapshot = ConcurrentHashMap(chunks)
+        val cache = if (lobbyName == worldKey) activeCache else worldCaches[lobbyName] ?: return
+        val snapshot = ConcurrentHashMap(cache.chunks)
         val count = snapshot.values.count { it.ready }
         if (count == 0) return
-        dirty = false
+        markClean(cache)
         executor.submit {
             try {
                 WorldSerializer.save(lobbyName, snapshot)
             } catch (e: Exception) {
-                dirty = true
+                cache.dirty = true
+                if (cache === activeCache) dirty = true
                 e.printStackTrace()
             }
         }
