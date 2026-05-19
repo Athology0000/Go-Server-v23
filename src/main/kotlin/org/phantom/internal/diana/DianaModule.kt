@@ -98,6 +98,17 @@ object DianaMacroModule : Module("Diana Macro") {
     private var lastAimPitch = Float.NaN
     private var noProgressTicks = 0
     private var lastProgressDistSq = Double.MAX_VALUE
+    // Fast per-airborne-hop watchdog. AOTV travels a fixed ~11 blocks along
+    // the look vector, so each sky-chain hop has ~0.3–2 blocks of drift from
+    // the planner's idealised landing once the player has fallen between casts;
+    // a few hops of accumulated drift make `player.position().distanceTo(standPos) <= 2.0`
+    // unreachable and the chain stalls. The slow no-progress watchdog (~1.75 s)
+    // is far too late when you're falling 4+ blocks/tick. These fields detect
+    // a single airborne hop failing to complete within ~300 ms and trigger an
+    // immediate resetHopState() so the planner replans from the current
+    // position before the chain drifts further.
+    private var airHopTrackedIndex = -1
+    private var airHopStartMs = 0L
     private var castRestoreSlot = -1
     private var nativeWalkTarget: Vec3? = null
     private var nativeWalkRadius = 0.0
@@ -486,6 +497,8 @@ object DianaMacroModule : Module("Diana Macro") {
         hopIndex = 0
         noProgressTicks = 0
         lastProgressDistSq = Double.MAX_VALUE
+        airHopTrackedIndex = -1
+        airHopStartMs = 0L
         resetAimSettle()
     }
 
@@ -1421,11 +1434,25 @@ object DianaMacroModule : Module("Diana Macro") {
                             val live = AngleUtils.getRotation(player.eyePosition, aimTarget)
                             castYaw = live.yaw
                             castPitch = live.pitch
+                            // SNAP mid-air. Bezier (used by smoothAim) rotates
+                            // slower than gravity changes the required pitch:
+                            // as the player falls below a fixed target, the
+                            // pitch needed to look at it shifts every tick, the
+                            // smooth swing never catches up, the aim-error gate
+                            // resets aimStableSinceMs, and fireCast is never
+                            // reached — the chain hangs entirely. Stop any
+                            // active rotation strategy so it doesn't overwrite
+                            // the snap on the next render frame, then write
+                            // yaw/pitch directly so the very next fireCast uses
+                            // exactly these angles.
+                            RotationExecutor.stopIfUsing(rotationStrategy)
+                            player.yRot = castYaw
+                            player.xRot = castPitch
                         } else {
                             castYaw = hop.yaw
                             castPitch = hop.pitch
+                            aimAt(Rotation(castYaw, castPitch))
                         }
-                        aimAt(Rotation(castYaw, castPitch))
 
                         if (player.position().distanceTo(standPos) <= 2.0) {
                             hopIndex++
@@ -1444,17 +1471,48 @@ object DianaMacroModule : Module("Diana Macro") {
                         }
 
                         val now = System.currentTimeMillis()
+
+                        // Fast off-course watchdog for airborne hops. Drift
+                        // between planner-ideal landings and real AOTV landings
+                        // accumulates ~0.3–2 blocks/hop once the player has
+                        // fallen between casts (AOTV travels a fixed ~11
+                        // blocks along the look vector, not TO a point) — past
+                        // ~2 blocks of drift the `<=2.0` proximity-advance can
+                        // never fire and the slow no-progress watchdog (~1.75 s)
+                        // is far too late mid-fall. If a single airborne hop
+                        // hasn't advanced within ~300 ms (~6 ticks), the chain
+                        // is off course: blow it away and let PATHFINDING
+                        // submit a fresh plan from where we actually are.
+                        if (air) {
+                            if (airHopTrackedIndex != hopIndex) {
+                                airHopTrackedIndex = hopIndex
+                                airHopStartMs = now
+                            } else if (now - airHopStartMs > 300L) {
+                                debugTravel("air hop $hopIndex off-course (>300ms) — replanning")
+                                releaseTravelInputs()
+                                resetHopState()
+                                return
+                            }
+                        }
+
                         val cd = if (air) aerialCastCooldownSetting.value.toLong() else castCooldownMs
                         if (now - lastCastMs < cd) return
 
-                        val yawErr = abs(AngleUtils.getRotationDelta(player.yRot, castYaw))
-                        val pitchErr = abs(player.xRot - castPitch)
-                        if (yawErr > AIM_ERROR_DEG || ((isEther || air) && pitchErr > AIM_ERROR_DEG)) {
-                            aimStableSinceMs = now
-                            return
+                        // Airborne hops have already SNAPPED above, so the
+                        // error is 0 by construction and the convergence gate /
+                        // settle just add a frame of latency during which the
+                        // player falls further. Ground hops keep the gate so
+                        // smooth-aim still settles on the planner's stored
+                        // angles before firing.
+                        if (!air) {
+                            val yawErr = abs(AngleUtils.getRotationDelta(player.yRot, castYaw))
+                            val pitchErr = abs(player.xRot - castPitch)
+                            if (yawErr > AIM_ERROR_DEG || (isEther && pitchErr > AIM_ERROR_DEG)) {
+                                aimStableSinceMs = now
+                                return
+                            }
+                            if (now - aimStableSinceMs < aimSettleMs()) return
                         }
-                        val settleMs = if (air) 0L else aimSettleMs()
-                        if (now - aimStableSinceMs < settleMs) return
 
                         fireCast(isEther, aotvSlot)
                         lastCastMs = now
