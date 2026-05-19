@@ -1399,7 +1399,33 @@ object DianaMacroModule : Module("Diana Macro") {
                         // (fireCast handles the sneak). Air chains must fire
                         // fast and tolerate pitch since they travel vertically.
                         val air = hop.airborne
-                        aimAt(Rotation(hop.yaw, hop.pitch))
+                        // Sky-chain hops: the planner stored yaw/pitch computed
+                        // against an idealised eye at (from.x+0.5, from.y+1.62,
+                        // from.z+0.5). The instant the previous AOTV lands you
+                        // airborne you start falling, so by the time aerialCastCooldown
+                        // elapses + the rotation strategy settles, your eye is
+                        // several blocks below where the planner assumed — and
+                        // the same look angles from a lower origin send AOTV in
+                        // a different absolute direction, missing the intended
+                        // landing and breaking the chain. Recompute the aim
+                        // every tick from the player's CURRENT eye toward the
+                        // planner's aim point (the same point anglesBetween()
+                        // used in the planner: standPos centre, +1y top face),
+                        // and use those live angles for both the rotation
+                        // target and the aim-error gate. Ground hops keep the
+                        // stored angles (no fall between cast attempts).
+                        val castYaw: Float
+                        val castPitch: Float
+                        if (air) {
+                            val aimTarget = Vec3(hop.x + 0.5, hop.y + 1.0, hop.z + 0.5)
+                            val live = AngleUtils.getRotation(player.eyePosition, aimTarget)
+                            castYaw = live.yaw
+                            castPitch = live.pitch
+                        } else {
+                            castYaw = hop.yaw
+                            castPitch = hop.pitch
+                        }
+                        aimAt(Rotation(castYaw, castPitch))
 
                         if (player.position().distanceTo(standPos) <= 2.0) {
                             hopIndex++
@@ -1421,8 +1447,8 @@ object DianaMacroModule : Module("Diana Macro") {
                         val cd = if (air) aerialCastCooldownSetting.value.toLong() else castCooldownMs
                         if (now - lastCastMs < cd) return
 
-                        val yawErr = abs(AngleUtils.getRotationDelta(player.yRot, hop.yaw))
-                        val pitchErr = abs(player.xRot - hop.pitch)
+                        val yawErr = abs(AngleUtils.getRotationDelta(player.yRot, castYaw))
+                        val pitchErr = abs(player.xRot - castPitch)
                         if (yawErr > AIM_ERROR_DEG || ((isEther || air) && pitchErr > AIM_ERROR_DEG)) {
                             aimStableSinceMs = now
                             return

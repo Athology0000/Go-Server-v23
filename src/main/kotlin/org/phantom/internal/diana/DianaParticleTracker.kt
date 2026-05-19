@@ -14,6 +14,7 @@ import org.phantom.api.event.impl.client.ChatEvent
 import org.phantom.api.event.impl.client.PacketEvent
 import org.phantom.internal.pathfinding.OverlayRenderEngine.Color
 import kotlin.math.abs
+import kotlin.math.floor
 import kotlin.math.roundToInt
 
 /**
@@ -77,9 +78,16 @@ object DianaParticleTracker {
         val player = mc.player ?: return
         if (activationPos == null) activationPos = player.position()
 
-        val bx = pkt.x.roundToInt()
-        val by = pkt.y.roundToInt() - 1
-        val bz = pkt.z.roundToInt()
+        // Burrow particle packets originate at the block CENTRE
+        // (blockX + 0.5, blockZ + 0.5) — this is why markerFor() matches an
+        // xDist/zDist spread of ~0.5. roundToInt() (== floor(v + 0.5)) turns a
+        // centre coordinate into blockX + 1, a consistent diagonal +1/+1 error,
+        // and packet-to-packet jitter around .5 scatters ONE real burrow across
+        // up to four columns. Floor the origin to its block, matching the
+        // SkyHanni reference (GriffinBurrowParticleFinder roundLocationToBlock).
+        val bx = floor(pkt.x).toInt()
+        val by = floor(pkt.y).toInt() - 1
+        val bz = floor(pkt.z).toInt()
         val key = (bx.toLong() shl 32) or (bz.toLong() and 0xFFFFFFFFL)
 
         val now = System.currentTimeMillis()
