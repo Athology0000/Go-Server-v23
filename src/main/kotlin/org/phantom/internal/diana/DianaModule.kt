@@ -399,6 +399,23 @@ object DianaMacroModule : Module("Diana Macro") {
         minScaleProvider = { RotationsModule.bezierMinScale.value.toFloat() },
     )
 
+    // Sky-chain rotation: must keep up with a live target whose required pitch
+    // shifts ~2-3°/tick while the player falls between airborne AOTV hops, yet
+    // still look human (Bezier ease) and finish precise. The default
+    // rotationStrategy is combat-tuned (small step, minScale ~0.18) and slows
+    // to a crawl near the target, so the gate never closes before the next fall
+    // tick moves it again. Here: large per-frame cap (brisk swing), high
+    // minScale floor (no late ease-out — would lose tracking), and a tight
+    // snap so the last fraction of a degree doesn't drift.
+    private val airborneRotationStrategy = BezierTrackingRotationStrategy(
+        maxYawStep = 20f,
+        maxPitchStep = 20f,
+        curveIn = 0.25f,
+        curveOut = 0.75f,
+        minScale = 0.55f,
+        snapThreshold = 0.5f,
+    )
+
     private val combatRotationStrategy = BezierTrackingRotationStrategy(
         yawStepSampler = {
             val base = combatAimSpeedSetting.value
