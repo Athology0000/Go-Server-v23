@@ -609,7 +609,8 @@ JNIEXPORT jobject JNICALL Java_org_phantom_api_pathfinder_jni_NativePathfinderJN
   jboolean aotvEnabled,
   jboolean etherwarpEnabled,
   jint maxIterations,
-  jint maxNodes
+  jint maxNodes,
+  jdouble flyTriggerDistance
 ) {
   try {
     v5pf::TeleportFirstParams params;
@@ -625,6 +626,7 @@ JNIEXPORT jobject JNICALL Java_org_phantom_api_pathfinder_jni_NativePathfinderJN
     params.etherwarpEnabled = etherwarpEnabled == JNI_TRUE;
     params.maxIterations = static_cast<int>(maxIterations);
     params.maxNodes = static_cast<int>(maxNodes);
+    params.flyTriggerDistance = static_cast<double>(flyTriggerDistance);
 
     g_cancelSearch.store(false);
     const auto worldSnapshot = g_worldState.snapshot();

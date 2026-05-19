@@ -20,7 +20,6 @@ constexpr double PI = 3.14159265358979323846;
 // quickly. Without these the macro waits forever for a plan that never lands.
 constexpr int HARD_MAX_ITERATIONS = 18000;
 constexpr int HARD_MAX_NODES = 9000;
-constexpr int AOTV_OFFSET_MAX = 16;     // precompute table radius
 constexpr int MAX_AOTV_NEIGHBOURS = 14; // per-node branching cap
 constexpr int MAX_ETHER_NEIGHBOURS = 8;
 // Each instant-transmission hop must cut at least this much distance to the
@@ -31,6 +30,38 @@ constexpr double MIN_AOTV_GAIN = 6.0;
 // burrow is already within one etherwarp, and only hops that land essentially
 // on the burrow are accepted.
 constexpr double ETHER_FINISH_RADIUS = 4.0;
+
+// ---- Cooperative walk + instant-transmission tuning ----
+// Realistic per-block walk time cost. The old planner forced this to 8.0
+// whenever any teleport edge existed, which suppressed walking to near-zero
+// and stopped the two from cooperating. With a true cost A* blends them: a
+// single ~range-long AOTV hop (~1.85) beats walking that distance, but short
+// gaps / obstacle threading / the final approach are cheaper walked.
+constexpr double WALK_STEP_COST = 1.0;
+constexpr double WALK_UPHILL_ADD = 0.15;
+// Inside this radius of the goal we prefer a precise walk onto the burrow
+// over an overshooting teleport: AOTV forward-cone leniency is dropped.
+constexpr double FINISH_WALK_RADIUS = 12.0;
+
+// ---- Climb-and-fly tuning ----
+// Blocks of clearance kept above the tallest solid in the start->goal
+// corridor when flying across at altitude.
+constexpr int FLY_CLEARANCE = 5;
+// Corridor terrain scan: horizontal sample spacing (blocks).
+constexpr double FLY_SCAN_STEP = 2.0;
+// Self-contained fly state, computed once per plan and threaded read-only
+// into the node generator + heuristic. Private to this translation unit.
+struct FlyContext {
+  bool enabled = false;
+  int flyY = 0;     // target cruise altitude (block Y)
+  Int3 goal{0, 0, 0};
+};
+
+// AOTV look-direction sampling for the new max-reach node generator.
+constexpr int AOTV_YAW_STEP_DEG = 18;
+// Pitch rows, degrees (negative = upward). Extra steep-up rows feed the
+// climb leg of the fly route; the rest cover diving / level traverse.
+constexpr int AOTV_PITCH_ROWS[] = {-80, -68, -54, -40, -26, -12, 0, 14, 30, 48};
 
 inline uint16_t flagsAt(const WorldSnapshot& w, int x, int y, int z) {
   return w.getFlags(x, y, z);
@@ -110,49 +141,49 @@ void anglesBetween(double ex, double ey, double ez,
   pitch = static_cast<float>(-(std::atan2(dy, xz) * (180.0 / PI)));
 }
 
-struct AotvOffset { int dx, dy, dz; double dist; };
+// Tallest solid block Y in a column, within the snapshot's vertical extent.
+// Returns INT_MIN when the column is empty (no terrain to clear).
+int columnTopSolid(const WorldSnapshot& w, int x, int z) {
+  for (int y = w.maxY - 1; y >= w.minY; y--) {
+    if (isSolid(w, x, y, z)) return y;
+  }
+  return std::numeric_limits<int>::min();
+}
 
-// Built once. Instant transmission fires along the full 3D look vector, so the
-// candidate set is a sphere of yaw x pitch directions at several distances —
-// NOT a flat dx/dz box. This lets the planner climb, dive, and arc in true 3D.
-// Longest hops first so a forward scan covers the most distance per cast.
-const std::vector<AotvOffset>& aotvOffsetTable() {
-  static const std::vector<AotvOffset> table = [] {
-    std::vector<AotvOffset> t;
-    std::unordered_set<long long> seen;
-    static const int dists[] = {16, 13, 11, 9, 7, 5};
-    for (int yawDeg = 0; yawDeg < 360; yawDeg += 12) {
-      const double yr = yawDeg * (PI / 180.0);
-      const double hx = -std::sin(yr);
-      const double hz = std::cos(yr);
-      for (int pitchDeg = -78; pitchDeg <= 78; pitchDeg += 9) {
-        const double pr = pitchDeg * (PI / 180.0);
-        const double cp = std::cos(pr);
-        const double dirX = hx * cp;
-        const double dirY = -std::sin(pr);
-        const double dirZ = hz * cp;
-        for (const int d : dists) {
-          const int ox = static_cast<int>(std::llround(dirX * d));
-          const int oy = static_cast<int>(std::llround(dirY * d));
-          const int oz = static_cast<int>(std::llround(dirZ * d));
-          const double dist = std::sqrt(double(ox) * ox + double(oy) * oy +
-                                        double(oz) * oz);
-          if (dist < 4.0 || dist > AOTV_OFFSET_MAX) continue;
-          const long long key = (static_cast<long long>(ox + 64) << 20) |
-                                (static_cast<long long>(oy + 64) << 10) |
-                                static_cast<long long>(oz + 64);
-          if (!seen.insert(key).second) continue;
-          t.push_back(AotvOffset{ox, oy, oz, dist});
-        }
-      }
+// Decide whether this plan flies, and at what altitude. The cruise height
+// clears the tallest solid sampled along the start->goal XZ corridor, never
+// dips below either endpoint, and is clamped into the snapshot. Self-contained
+// — nothing outside this file needs to know fly mode exists.
+FlyContext computeFlyContext(
+  const WorldSnapshot& w, const TeleportFirstParams& p,
+  const Int3& start, const Int3& goal
+) {
+  FlyContext fc;
+  fc.goal = goal;
+  if (p.flyTriggerDistance <= 0.0) return fc;
+
+  const double hdx = goal.x - start.x, hdz = goal.z - start.z;
+  const double horiz = std::sqrt(hdx * hdx + hdz * hdz);
+  if (horiz <= p.flyTriggerDistance) return fc;
+
+  int topSolid = std::max(start.y, goal.y);
+  const int samples =
+    std::max(2, static_cast<int>(horiz / FLY_SCAN_STEP) + 1);
+  for (int i = 0; i <= samples; i++) {
+    const double t = static_cast<double>(i) / static_cast<double>(samples);
+    const int sx = static_cast<int>(std::floor(start.x + hdx * t));
+    const int sz = static_cast<int>(std::floor(start.z + hdz * t));
+    const int top = columnTopSolid(w, sx, sz);
+    if (top != std::numeric_limits<int>::min() && top > topSolid) {
+      topSolid = top;
     }
-    std::sort(t.begin(), t.end(),
-              [](const AotvOffset& a, const AotvOffset& b) {
-                return a.dist > b.dist;
-              });
-    return t;
-  }();
-  return table;
+  }
+
+  fc.enabled = true;
+  fc.flyY = topSolid + FLY_CLEARANCE;
+  fc.flyY = std::max(fc.flyY, std::max(start.y, goal.y));
+  fc.flyY = std::min(fc.flyY, w.maxY - 2);
+  return fc;
 }
 
 struct Edge {
@@ -183,9 +214,169 @@ struct HeapItem {
   bool operator>(const HeapItem& o) const { return f > o.f; }
 };
 
+// New instant-transmission node generator.
+//
+// Instant transmission needs NO target block — it carries you as far along
+// your exact look vector as that vector stays clear, up to AOTV range. So
+// instead of snapping to a fixed offset-sphere table, each candidate is a
+// look DIRECTION that we ray-march to its real maximum clear reach. That
+// models the mechanic faithfully (open lanes → long hops, tight lanes →
+// short hops) and is what makes a stringed upward chain "fly": with no
+// ground under the aim point the landing is airborne and the next hop is
+// another transmission.
+void appendAotvNodes(
+  const WorldSnapshot& w,
+  const TeleportFirstParams& p,
+  const FlyContext& fc,
+  const Int3& from,
+  const Int3& goal,
+  double gDirX, double gDirZ, double gLen, double toGoal,
+  bool inFinish,
+  std::vector<Edge>& out
+) {
+  const double ex = from.x + 0.5, ey = from.y + 1.62, ez = from.z + 0.5;
+  const bool climbing = fc.enabled && from.y < fc.flyY;
+
+  // Build the look-direction set: a yaw x pitch sweep plus forced directions
+  // (straight at the goal, and a steep climb toward the goal while flying)
+  // so the key moves are always offered regardless of angular sampling.
+  struct Dir { double x, y, z; };
+  std::vector<Dir> dirs;
+  dirs.reserve(64);
+
+  // Forced: dead-on toward the goal in true 3D.
+  {
+    const double dx = goal.x - from.x, dy = goal.y - from.y,
+                 dz = goal.z - from.z;
+    const double l = std::sqrt(dx * dx + dy * dy + dz * dz);
+    if (l > 1e-6) dirs.push_back(Dir{dx / l, dy / l, dz / l});
+  }
+  // Forced: steep climb along the goal's heading — the fly route's lift leg.
+  if (climbing && gLen > 1e-6) {
+    for (const double pdeg : {-72.0, -55.0}) {
+      const double pr = pdeg * (PI / 180.0);
+      const double cp = std::cos(pr);
+      dirs.push_back(Dir{gDirX * cp, -std::sin(pr), gDirZ * cp});
+    }
+  }
+  // Sweep.
+  for (int yawDeg = 0; yawDeg < 360; yawDeg += AOTV_YAW_STEP_DEG) {
+    const double yr = yawDeg * (PI / 180.0);
+    const double hx = -std::sin(yr), hz = std::cos(yr);
+    for (const int pd : AOTV_PITCH_ROWS) {
+      const double pr = pd * (PI / 180.0);
+      const double cp = std::cos(pr);
+      dirs.push_back(Dir{hx * cp, -std::sin(pr), hz * cp});
+    }
+  }
+
+  int aotvCount = 0;
+  std::unordered_set<uint64_t> landed;
+  const int maxSteps = static_cast<int>(p.transmissionRange / 0.5) + 1;
+
+  for (const Dir& d : dirs) {
+    if (aotvCount >= MAX_AOTV_NEIGHBOURS) break;
+
+    // Forward-cone prune before the expensive march. Tightened near the
+    // burrow so the finish is walked precisely rather than overshot.
+    const double dHoriz = std::sqrt(d.x * d.x + d.z * d.z);
+    if (dHoriz > 1e-6 && gLen > 1e-6) {
+      const double dot = (gDirX * d.x + gDirZ * d.z) / dHoriz;
+      const double minDot = inFinish ? 0.35 : -0.15;
+      // While climbing, near-vertical lift hops barely move horizontally —
+      // exempt them from the cone so the chain can gain altitude.
+      const bool liftExempt = climbing && d.y < -0.55;
+      if (dot < minDot && !liftExempt) continue;
+    }
+
+    // March the look vector to its farthest fully-clear voxel (feet + head).
+    int bestStep = -1;
+    for (int s = 1; s <= maxSteps; s++) {
+      const double t = s * 0.5;
+      if (t > p.transmissionRange) break;
+      const int vx = static_cast<int>(std::floor(ex + d.x * t));
+      const int vy = static_cast<int>(std::floor(ey + d.y * t));
+      const int vz = static_cast<int>(std::floor(ez + d.z * t));
+      if (!isTeleportClear(w, vx, vy, vz) ||
+          !isTeleportClear(w, vx, vy + 1, vz)) {
+        break;
+      }
+      if (t >= 4.0) bestStep = s;
+    }
+    if (bestStep < 0) continue; // nothing reachable >= 4 blocks this way
+
+    const double bt = bestStep * 0.5;
+    Int3 aim{static_cast<int>(std::floor(ex + d.x * bt)),
+             static_cast<int>(std::floor(ey + d.y * bt)),
+             static_cast<int>(std::floor(ez + d.z * bt))};
+    if (!isPassable(w, aim.x, aim.y, aim.z) ||
+        !isPassable(w, aim.x, aim.y + 1, aim.z)) {
+      continue;
+    }
+
+    // Where the player ends up: settle to ground if there is some within a
+    // long drop, otherwise the hop is airborne (a sky chain) and the next
+    // hop must be another instant transmission.
+    Int3 landing;
+    bool airborne = false;
+    if (!settleByGravity(w, aim, 28, landing)) {
+      landing = aim;
+      airborne = true;
+    }
+
+    const uint64_t lkey = coordKey(landing.x, landing.y, landing.z);
+    if (!landed.insert(lkey).second) continue;
+
+    const double landDist = dist3D(landing, goal);
+    // Ground hops must make real forward progress (avoids tiny shuffle hops).
+    // Airborne maneuvering hops (climb, arc over terrain) are exempt — they
+    // often don't reduce distance yet but enable the route. While flying,
+    // any airborne hop toward cruise altitude is also exempt.
+    const bool progressExempt =
+      airborne || (climbing && landing.y > from.y);
+    if (!progressExempt && landDist > p.goalReachedRadius &&
+        toGoal - landDist < MIN_AOTV_GAIN) {
+      continue;
+    }
+    // Never accept a hop that moves substantially AWAY from the goal —
+    // unless it is a lift hop trading horizontal distance for altitude.
+    const bool liftAway = climbing && landing.y > from.y;
+    if (!liftAway && landDist > toGoal + 4.0 &&
+        landDist > p.goalReachedRadius) {
+      continue;
+    }
+
+    float yaw, pitch;
+    anglesBetween(ex, ey, ez,
+                  aim.x + 0.5, aim.y + 1.0, aim.z + 0.5, yaw, pitch);
+    const double gravityPen = std::max(0, aim.y - landing.y) * 0.03;
+    // Fly-aware air penalty: a normal sky chain is mildly discouraged, but
+    // an altitude-gaining hop while below cruise height is encouraged (~0),
+    // and dropping well below cruise before nearing the goal is penalised.
+    double airPen;
+    if (!airborne) {
+      airPen = 0.0;
+    } else if (fc.enabled) {
+      if (landing.y >= from.y && from.y < fc.flyY) {
+        airPen = 0.0;                       // lift leg
+      } else if (landing.y < fc.flyY - FLY_CLEARANCE && !inFinish) {
+        airPen = 0.9;                       // sinking out of the lane early
+      } else {
+        airPen = 0.15;                      // level cruise
+      }
+    } else {
+      airPen = 0.6;
+    }
+    out.push_back(Edge{landing, TfHopType::AOTV, p.transmissionMana,
+                       1.85 + gravityPen + airPen, yaw, pitch, airborne});
+    aotvCount++;
+  }
+}
+
 void neighbours(
   const WorldSnapshot& w,
   const TeleportFirstParams& p,
+  const FlyContext& fc,
   const Int3& from,
   const Int3& goal,
   bool fromAirborne,
@@ -198,69 +389,18 @@ void neighbours(
   const double gLen = std::sqrt(gdx * gdx + gdz * gdz);
   const double gDirX = gLen > 1e-6 ? gdx / gLen : 0.0;
   const double gDirZ = gLen > 1e-6 ? gdz / gLen : 0.0;
+  const bool inFinish = toGoal <= FINISH_WALK_RADIUS;
 
   const double ex = from.x + 0.5, ey = from.y + 1.62, ez = from.z + 0.5;
-  int aotvCount = 0;
   int etherCount = 0;
-  bool hasTeleportExit = false;
+  const size_t aotvStart = out.size();
 
-  // ---- AOTV (short, no sneak) ----
+  // ---- AOTV (short, no sneak) — new max-reach ray-march generator ----
   if (p.aotvEnabled) {
-    for (const AotvOffset& o : aotvOffsetTable()) {
-      if (aotvCount >= MAX_AOTV_NEIGHBOURS) break;
-      if (o.dist > p.transmissionRange) continue;
-
-      // Forward-cone prune BEFORE any voxel work (the expensive part).
-      const double oLen = std::sqrt(double(o.dx) * o.dx + double(o.dz) * o.dz);
-      if (oLen > 1e-6 && gLen > 1e-6) {
-        const double dot = (gDirX * o.dx + gDirZ * o.dz) / oLen;
-        if (dot < -0.15) continue; // moving away from the goal
-      }
-
-      // Instant transmission needs NO target block — it sends you ~range
-      // blocks along your look vector. The aim point itself only has to be
-      // open space and reachable through a clear corridor.
-      Int3 aim{from.x + o.dx, from.y + o.dy, from.z + o.dz};
-      if (!isPassable(w, aim.x, aim.y, aim.z) ||
-          !isPassable(w, aim.x, aim.y + 1, aim.z)) {
-        continue;
-      }
-      if (!teleportCorridorClear(w, from, aim)) continue;
-
-      // Where the player ends up: fall to ground if there is some within a
-      // long drop, otherwise the hop is airborne (a sky chain) and the next
-      // hop must be another instant transmission.
-      Int3 landing;
-      bool airborne = false;
-      if (!settleByGravity(w, aim, 28, landing)) {
-        landing = aim;
-        airborne = true;
-      }
-
-      const double landDist = dist3D(landing, goal);
-      // Ground hops must make real forward progress (avoids many tiny shuffle
-      // hops). Airborne maneuvering hops (climb a wall, arc over terrain) are
-      // exempt — they often don't reduce distance yet but enable the route.
-      if (!airborne && landDist > p.goalReachedRadius &&
-          toGoal - landDist < MIN_AOTV_GAIN) {
-        continue;
-      }
-      // Never accept a hop that moves substantially AWAY from the goal.
-      if (landDist > toGoal + 4.0 && landDist > p.goalReachedRadius) continue;
-
-      // Aim where the teleport actually sends you (the aim point), so the
-      // executor looks along the travel direction.
-      float yaw, pitch;
-      anglesBetween(ex, ey, ez,
-                    aim.x + 0.5, aim.y + 1.0, aim.z + 0.5, yaw, pitch);
-      const double gravityPen = std::max(0, aim.y - landing.y) * 0.03;
-      const double airPen = airborne ? 0.6 : 0.0;
-      out.push_back(Edge{landing, TfHopType::AOTV, p.transmissionMana,
-                         1.85 + gravityPen + airPen, yaw, pitch, airborne});
-      aotvCount++;
-      hasTeleportExit = true;
-    }
+    appendAotvNodes(w, p, fc, from, goal, gDirX, gDirZ, gLen, toGoal,
+                    inFinish, out);
   }
+  const bool hasAotvExit = out.size() > aotvStart;
 
   // ---- Etherwarp (sneak) — finishing move ONLY. Offered solely when the
   // burrow is already within a single etherwarp, and (below) only hops that
@@ -310,14 +450,16 @@ void neighbours(
         out.push_back(Edge{landing, TfHopType::ETHERWARP, p.etherwarpMana,
                            2.5, yaw, pitch, false});
         etherCount++;
-        hasTeleportExit = true;
       }
     }
   }
 
-  // ---- Walk: expensive when teleports exist, cheap bridge when boxed in.
-  // Not available from an airborne node (you're falling, not standing). ----
-  const double walkCost = hasTeleportExit ? 8.0 : 1.5;
+  // ---- Walk: a true per-block time cost so it cooperates with teleports
+  // instead of being suppressed. A* now mixes them by real cost — long gaps
+  // fly, short gaps / threading / the precise finish are walked. Not
+  // available from an airborne node (you're falling, not standing). ----
+  (void)hasAotvExit;
+  const double walkCost = WALK_STEP_COST;
   static constexpr int WX[8] = {1, -1, 0, 0, 1, 1, -1, -1};
   static constexpr int WZ[8] = {0, 0, 1, -1, 1, -1, 1, -1};
   for (int i = 0; !fromAirborne && i < 8; i++) {
@@ -332,7 +474,8 @@ void neighbours(
         if (!sideX || !sideZ) continue;
       }
       out.push_back(Edge{c, TfHopType::WALK, 0,
-                         walkCost + (dy > 0 ? 0.15 : 0.0), 0.0f, 0.0f, false});
+                         walkCost + (dy > 0 ? WALK_UPHILL_ADD : 0.0),
+                         0.0f, 0.0f, false});
     }
   }
 }
@@ -362,12 +505,29 @@ std::optional<TeleportFirstResult> findTeleportFirstPath(
   std::unordered_map<uint64_t, int> visited;
   visited.reserve(static_cast<size_t>(maxNodes));
 
+  // Decide once whether this plan flies, and at what cruise altitude.
+  const FlyContext fly = computeFlyContext(world, params, start, goal);
+
   // Greedy heuristic in cost units: ~one AOTV hop per transmissionRange of
   // remaining distance, weighted > 1 so A* beelines to the goal instead of
-  // flood-filling (the bug that made the old planner never return).
+  // flood-filling (the bug that made the old planner never return). In fly
+  // mode the estimate is the three-leg route — climb to cruise, traverse at
+  // cruise, descend onto the burrow — so the upward airborne chain registers
+  // as real progress instead of looking like wasted distance and being
+  // pruned away (the reason a naive search never climbs).
   const double hopLen = std::max(4.0, params.transmissionRange);
   auto heuristic = [&](const Int3& n) {
-    return dist3D(n, goal) / hopLen * 1.85 * 1.7;
+    double remaining;
+    if (fly.enabled) {
+      const double hdx = goal.x - n.x, hdz = goal.z - n.z;
+      const double horiz = std::sqrt(hdx * hdx + hdz * hdz);
+      const double climb = n.y < fly.flyY ? (fly.flyY - n.y) : 0.0;
+      const double descent = std::max(0, fly.flyY - goal.y);
+      remaining = climb + horiz + descent;
+    } else {
+      remaining = dist3D(n, goal);
+    }
+    return remaining / hopLen * 1.85 * 1.7;
   };
 
   nodes.push_back(SearchNode{
@@ -397,7 +557,7 @@ std::optional<TeleportFirstResult> findTeleportFirstPath(
     if (curDist <= reachR) { bestIdx = curIdx; bestDist = curDist; break; }
     if (static_cast<int>(nodes.size()) >= maxNodes) continue;
 
-    neighbours(world, params, cur.pos, goal, cur.airborne, edges);
+    neighbours(world, params, fly, cur.pos, goal, cur.airborne, edges);
     for (const Edge& e : edges) {
       const int nextMana = cur.manaSpent + e.manaCost;
       if (e.type != TfHopType::WALK && params.availableMana > 0 &&

@@ -37,6 +37,7 @@ object DianaParticleTracker {
         MOB("Mob", 0xFF5555),
         TREASURE("Treasure", 0xFFAA00),
         GUESS("Guess", 0xFFFFFF),
+        SUB_GUESS("Sub Guess", 0xAAAAAA),
         UNKNOWN("Burrow", 0xFFD700);
 
         fun toColor(alpha: Int): Color {

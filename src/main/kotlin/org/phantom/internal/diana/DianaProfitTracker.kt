@@ -14,18 +14,31 @@ import java.util.Locale
 import kotlin.math.roundToLong
 
 object DianaProfitTracker {
+  data class DropSummary(
+    val name: String,
+    val count: Int,
+    val unitValue: Long,
+    val totalValue: Long,
+  )
+
   data class Snapshot(
     val runtimeMs: Long,
     val coins: Long,
     val coinsPerHour: Long,
+    val burrowsPerHour: Long,
+    val mobsPerHour: Long,
+    val rareMobRate: Double,
     val burrows: Int,
     val chains: Int,
     val mobs: Int,
     val rareMobs: Int,
     val drops: List<Pair<String, Int>>,
+    val topDrops: List<DropSummary>,
+    val recentDrops: List<String>,
     val avgDetectMs: Long,
     val avgTravelMs: Long,
     val avgDigMs: Long,
+    val avgMobSpawnMs: Long,
     val avgCombatMs: Long,
     val avgLoopMs: Long,
   )
@@ -40,6 +53,8 @@ object DianaProfitTracker {
   @Volatile private var rareMobs = 0
 
   private val drops = linkedMapOf<String, Int>()
+  private val dropValues = linkedMapOf<String, Long>()
+  private val recentDrops = ArrayDeque<String>()
   private val timingSamples = linkedMapOf<String, MutableList<Long>>()
 
   private var current = Cycle()
@@ -58,6 +73,8 @@ object DianaProfitTracker {
     mobs = 0
     rareMobs = 0
     drops.clear()
+    dropValues.clear()
+    recentDrops.clear()
     timingSamples.clear()
     current = Cycle()
     lastDetectedKey = null
@@ -68,18 +85,31 @@ object DianaProfitTracker {
     ensureStarted()
     val runtime = runtimeMs()
     val cph = if (runtime < 1_000L) 0L else (sessionCoins * 3_600_000.0 / runtime.toDouble()).roundToLong()
+    val bph = ratePerHour(burrows, runtime)
+    val mph = ratePerHour(mobs, runtime)
+    val rareRate = if (mobs <= 0) 0.0 else rareMobs.toDouble() * 100.0 / mobs.toDouble()
+    val top = drops.entries.map { (name, count) ->
+      val unit = dropValues[name] ?: 0L
+      DropSummary(name, count, unit, unit * count)
+    }.sortedWith(compareByDescending<DropSummary> { it.totalValue }.thenByDescending { it.count })
     return Snapshot(
       runtimeMs = runtime,
       coins = sessionCoins,
       coinsPerHour = cph,
+      burrowsPerHour = bph,
+      mobsPerHour = mph,
+      rareMobRate = rareRate,
       burrows = burrows,
       chains = chains,
       mobs = mobs,
       rareMobs = rareMobs,
-      drops = drops.entries.map { it.key to it.value },
+      drops = drops.entries.sortedByDescending { it.value }.map { it.key to it.value },
+      topDrops = top,
+      recentDrops = recentDrops.toList().asReversed(),
       avgDetectMs = avg("detect"),
       avgTravelMs = avg("travel"),
       avgDigMs = avg("dig"),
+      avgMobSpawnMs = avg("mobSpawn"),
       avgCombatMs = avg("combat"),
       avgLoopMs = avg("loop"),
     )
@@ -182,10 +212,16 @@ object DianaProfitTracker {
   }
 
   private fun addDrop(name: String) {
-    drops[name] = (drops[name] ?: 0) + 1
-    val id = DROP_IDS[name.lowercase(Locale.US)]
-    val value = id?.let(::priceFor) ?: FALLBACK_DROP_PRICES[name.lowercase(Locale.US)] ?: 0.0
-    if (value > 0.0) addCoins(value.roundToLong())
+    val normalized = normalizeDropName(name)
+    drops[normalized] = (drops[normalized] ?: 0) + 1
+    recentDrops += normalized
+    while (recentDrops.size > 8) recentDrops.removeFirst()
+    val id = DROP_IDS[normalized.lowercase(Locale.US)]
+    val value = (id?.let(::priceFor) ?: FALLBACK_DROP_PRICES[normalized.lowercase(Locale.US)] ?: 0.0).roundToLong()
+    if (value > 0L) {
+      dropValues[normalized] = value
+      addCoins(value)
+    }
   }
 
   private fun priceFor(id: String): Double? {
@@ -223,6 +259,10 @@ object DianaProfitTracker {
     return (list.sum().toDouble() / list.size.toDouble()).roundToLong()
   }
 
+  private fun ratePerHour(amount: Int, runtimeMs: Long): Long {
+    return if (runtimeMs < 1_000L) 0L else (amount * 3_600_000.0 / runtimeMs.toDouble()).roundToLong()
+  }
+
   private fun ensureStarted() {
     if (sessionStartMs == 0L) reset()
   }
@@ -248,6 +288,16 @@ object DianaProfitTracker {
 
   private fun normalizeName(raw: String): String =
     raw.replace(Regex("""\s+"""), " ").trim().removePrefix("a ").trim()
+
+  private fun normalizeDropName(raw: String): String {
+    val name = normalizeName(raw)
+    return when {
+      name.contains("Chimera", ignoreCase = true) -> "Chimera I"
+      name.contains("Manti-core", ignoreCase = true) -> "Manti-core"
+      name.contains("Fateful Stinger", ignoreCase = true) -> "Fateful Stinger"
+      else -> name
+    }
+  }
 
   private fun parseCoins(raw: String): Long =
     raw.replace(",", "").replace(".", "").trim().toLongOrNull() ?: 0L
@@ -288,6 +338,13 @@ object DianaProfitTracker {
     "chimera i" to "ENCHANTMENT_CHIMERA_1",
     "chimera 1" to "ENCHANTMENT_CHIMERA_1",
     "mythos fragment" to "MYTHOS_FRAGMENT",
+    "braided griffin feather" to "BRAIDED_GRIFFIN_FEATHER",
+    "manti-core" to "MANTI_CORE",
+    "fateful stinger" to "FATEFUL_STINGER",
+    "brain food" to "BRAIN_FOOD",
+    "shimmering wool" to "SHIMMERING_WOOL",
+    "hilt of revelations" to "HILT_OF_REVELATIONS",
+    "mythological dye" to "DYE_MYTHOLOGICAL",
   )
   private val FALLBACK_DROP_PRICES = mapOf(
     "griffin feather" to 50_000.0,

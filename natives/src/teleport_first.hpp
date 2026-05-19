@@ -35,6 +35,12 @@ struct TeleportFirstParams {
 
   int maxIterations = 120000;
   int maxNodes = 60000;
+
+  // Climb-and-fly: when the horizontal start->goal distance exceeds this many
+  // blocks, the planner gains altitude with chained airborne instant
+  // transmissions, flies across at a terrain-clearing height, then descends
+  // onto the goal. <= 0 disables it (plain ground/teleport blend).
+  double flyTriggerDistance = 0.0;
 };
 
 struct TeleportFirstResult {

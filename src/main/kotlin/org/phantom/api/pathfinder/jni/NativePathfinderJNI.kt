@@ -69,7 +69,8 @@ object NativePathfinderJNI {
         aotvEnabled: Boolean,
         etherwarpEnabled: Boolean,
         maxIterations: Int,
-        maxNodes: Int
+        maxNodes: Int,
+        flyTriggerDistance: Double
     ): NativeTeleportPathResult?
 
     /**

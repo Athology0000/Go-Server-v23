@@ -39,6 +39,11 @@ object DianaTeleportPlanner {
         val reachedGoal: Boolean,
         val timeMs: Long,
         val nodesExplored: Int,
+        val rawHopCount: Int,
+        val walkNodes: Int,
+        val teleportNodes: Int,
+        val etherwarpNodes: Int,
+        val totalDistance: Double,
     )
 
     private val executor: ExecutorService = Executors.newSingleThreadExecutor { r ->
@@ -60,6 +65,16 @@ object DianaTeleportPlanner {
         availableMana: Int,
         aotvEnabled: Boolean,
         etherwarpEnabled: Boolean,
+        maxIterations: Int = MAX_ITERATIONS,
+        maxNodes: Int = MAX_NODES,
+        simplify: Boolean = true,
+        /**
+         * Horizontal start->goal distance (blocks) past which the native
+         * planner climbs with chained airborne instant transmissions, flies
+         * across at a terrain-clearing altitude, then descends onto the goal.
+         * <= 0 disables it (plain ground/teleport blend).
+         */
+        flyTriggerDistance: Double = 0.0,
     ) {
         future?.cancel(false)
         val sx = Math.floor(start.x).toInt()
@@ -80,12 +95,13 @@ object DianaTeleportPlanner {
                 ETHERWARP_MANA,
                 aotvEnabled,
                 etherwarpEnabled,
-                MAX_ITERATIONS,
-                MAX_NODES,
+                maxIterations.coerceIn(1_000, HARD_MAX_ITERATIONS),
+                maxNodes.coerceIn(1_000, HARD_MAX_NODES),
+                flyTriggerDistance,
             ) ?: return@submit null
 
             val count = res.hopTypes.size
-            val hops = ArrayList<Hop>(count)
+            val rawHops = ArrayList<Hop>(count)
             for (i in 0 until count) {
                 val px = res.path[i * 3]
                 val py = res.path[i * 3 + 1]
@@ -96,9 +112,20 @@ object DianaTeleportPlanner {
                     2 -> HopType.ETHERWARP
                     else -> HopType.WALK
                 }
-                hops.add(Hop(px, py, pz, type, res.yaw[i], res.pitch[i], code == 3))
+                rawHops.add(Hop(px, py, pz, type, res.yaw[i], res.pitch[i], code == 3))
             }
-            Plan(hops, res.reachedGoal, res.timeMs, res.nodesExplored)
+            val hops = if (simplify) simplifyHops(rawHops) else rawHops
+            Plan(
+                hops = hops,
+                reachedGoal = res.reachedGoal,
+                timeMs = res.timeMs,
+                nodesExplored = res.nodesExplored,
+                rawHopCount = rawHops.size,
+                walkNodes = hops.count { it.type == HopType.WALK },
+                teleportNodes = hops.count { it.type == HopType.AOTV },
+                etherwarpNodes = hops.count { it.type == HopType.ETHERWARP },
+                totalDistance = totalDistance(hops),
+            )
         }
     }
 
@@ -122,6 +149,61 @@ object DianaTeleportPlanner {
         future = null
     }
 
+    private fun simplifyHops(raw: List<Hop>): List<Hop> {
+        if (raw.size <= 2) return raw
+        val deduped = ArrayList<Hop>(raw.size)
+        for (hop in raw) {
+            val last = deduped.lastOrNull()
+            if (last != null && last.x == hop.x && last.y == hop.y && last.z == hop.z && last.type == hop.type) continue
+            deduped += hop
+        }
+        if (deduped.size <= 2) return deduped
+
+        val simplified = ArrayList<Hop>(deduped.size)
+        simplified += deduped.first()
+        for (i in 1 until deduped.lastIndex) {
+            val prev = simplified.last()
+            val cur = deduped[i]
+            val next = deduped[i + 1]
+            val sameWalkLine = cur.type == HopType.WALK &&
+                prev.type == HopType.WALK &&
+                next.type == HopType.WALK &&
+                isCollinear(prev, cur, next) &&
+                distanceSq(prev, next) <= 16.0
+            if (!sameWalkLine) simplified += cur
+        }
+        simplified += deduped.last()
+        return simplified
+    }
+
+    private fun isCollinear(a: Hop, b: Hop, c: Hop): Boolean {
+        val abx = (b.x - a.x).toDouble()
+        val aby = (b.y - a.y).toDouble()
+        val abz = (b.z - a.z).toDouble()
+        val acx = (c.x - a.x).toDouble()
+        val acy = (c.y - a.y).toDouble()
+        val acz = (c.z - a.z).toDouble()
+        val crossX = aby * acz - abz * acy
+        val crossY = abz * acx - abx * acz
+        val crossZ = abx * acy - aby * acx
+        return crossX * crossX + crossY * crossY + crossZ * crossZ <= 0.0001
+    }
+
+    private fun totalDistance(hops: List<Hop>): Double {
+        var total = 0.0
+        for (i in 0 until hops.lastIndex) {
+            total += hops[i].standPos().distanceTo(hops[i + 1].standPos())
+        }
+        return total
+    }
+
+    private fun distanceSq(a: Hop, b: Hop): Double {
+        val dx = (a.x - b.x).toDouble()
+        val dy = (a.y - b.y).toDouble()
+        val dz = (a.z - b.z).toDouble()
+        return dx * dx + dy * dy + dz * dz
+    }
+
     // Maxed-AOTV mana costs (matches the reference + native defaults).
     private const val TRANSMISSION_MANA = 27
     private const val ETHERWARP_MANA = 108
@@ -129,4 +211,6 @@ object DianaTeleportPlanner {
     // few ms instead of flood-filling forever (the original stall bug).
     private const val MAX_ITERATIONS = 16_000
     private const val MAX_NODES = 8_000
+    private const val HARD_MAX_ITERATIONS = 18_000
+    private const val HARD_MAX_NODES = 12_000
 }
