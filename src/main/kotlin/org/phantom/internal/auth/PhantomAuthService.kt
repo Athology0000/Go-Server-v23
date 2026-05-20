@@ -2,15 +2,12 @@ package org.phantom.internal.auth
 
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
-import java.io.File
 import java.net.URI
+import java.net.URLEncoder
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.nio.charset.StandardCharsets
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.Paths
 import java.security.KeyFactory
 import java.security.MessageDigest
 import java.security.Signature
@@ -20,13 +17,18 @@ import java.util.*
 import kotlin.concurrent.thread
 import net.fabricmc.loader.api.FabricLoader
 import org.phantom.api.module.ModuleManager
+import org.phantom.internal.helper.Config
 import org.phantom.internal.loader.AddonLoader
 import org.slf4j.LoggerFactory
 
 object PhantomAuthService {
 
-  private const val MANIFEST_PUBLIC_KEY_B64 = "REPLACE_ME_WITH_32_BYTE_BASE64_ED25519_PUBLIC_KEY"
-  private const val SERVER_BASE_URL = "http://localhost:8080/"
+  private const val DEFAULT_MANIFEST_PUBLIC_KEY_B64 = "REPLACE_ME_WITH_32_BYTE_BASE64_ED25519_PUBLIC_KEY"
+  private const val DEFAULT_SERVER_BASE_URL = "http://localhost:8080/"
+  private const val AUTH_BASE_URL_PROPERTY = "phantom.authBaseUrl"
+  private const val AUTH_BASE_URL_ENV = "PHANTOM_AUTH_BASE_URL"
+  private const val MANIFEST_PUBLIC_KEY_PROPERTY = "phantom.manifestPublicKey"
+  private const val MANIFEST_PUBLIC_KEY_ENV = "PHANTOM_MANIFEST_PUBLIC_KEY"
 
   private const val DEV_MOCK_AUTH_PROPERTY = "phantom.devMockAuth"
   private const val DEV_MOCK_AUTH_ENV = "PHANTOM_DEV_MOCK_AUTH"
@@ -37,8 +39,6 @@ object PhantomAuthService {
   private val httpClient = HttpClient.newBuilder()
     .connectTimeout(Duration.ofSeconds(15))
     .build()
-
-  private val cacheDir: Path = Paths.get("config/phantom/cache/payloads")
 
   private val ED25519_ASN1_HEADER = byteArrayOf(
     0x30, 0x2A, 0x30, 0x05, 0x06, 0x03, 0x2B, 0x65, 0x70, 0x03, 0x21, 0x00
@@ -180,18 +180,21 @@ object PhantomAuthService {
       Auth.modulesTotal = toLoad.size
       Auth.modulesLoaded = 0
 
-      Files.createDirectories(cacheDir)
-
-      for (module in toLoad) {
+      for (module in toLoad.sortedBy { it.initOrder }) {
         Auth.statusMessage = "Loading ${module.name}... (${Auth.modulesLoaded + 1}/${Auth.modulesTotal})"
 
-        val jarPath = ensureModule(session.sessionToken, module)
+        val jarBytes = downloadModuleBytes(session.sessionToken, module)
           ?: return fail("Failed to load ${module.name}")
 
-        AddonLoader.loadFromPath(jarPath)
+        val loadedAddons = AddonLoader.loadFromBytes("${module.name}.jar", jarBytes, activate = true)
+        if (loadedAddons.isEmpty()) {
+          return fail("Failed to initialize ${module.name}")
+        }
+
         Auth.modulesLoaded++
       }
 
+      Config.loadModulesConfig()
       markReady("Ready")
     } catch (e: Exception) {
       logger.error("Auth failed with exception", e)
@@ -212,7 +215,7 @@ object PhantomAuthService {
     )
 
     val req = HttpRequest.newBuilder(
-      URI.create("${SERVER_BASE_URL.trimEnd('/')}/auth/verify-session")
+      trustedUri("${serverBaseUrl().trimEnd('/')}/auth/verify-session")
     )
       .timeout(Duration.ofSeconds(20))
       .header("Content-Type", "application/json")
@@ -246,7 +249,9 @@ object PhantomAuthService {
   }
 
   private fun fetchManifest(sessionToken: String, url: String): ManifestResponse? {
-    val req = HttpRequest.newBuilder(URI.create(url))
+    val uri = trustedUri(url)
+
+    val req = HttpRequest.newBuilder(uri)
       .timeout(Duration.ofSeconds(20))
       .header("Authorization", "Bearer $sessionToken")
       .GET()
@@ -267,17 +272,18 @@ object PhantomAuthService {
     }
   }
 
-  private fun ensureModule(sessionToken: String, module: ManifestModule): Path? {
-    val safeName = module.name.replace("/", "_").replace("\\", "_")
-    val dest = cacheDir.resolve("$safeName.jar")
-
-    if (Files.exists(dest) && sha256Hex(dest.toFile()) == module.sha256) {
-      return dest
+  private fun downloadModuleBytes(sessionToken: String, module: ManifestModule): ByteArray? {
+    if (module.name.isBlank()) {
+      logger.error("Manifest contained a module with no name")
+      return null
     }
 
-    val downloadUrl = "${SERVER_BASE_URL.trimEnd('/')}/content/module/${module.name}"
+    val downloadUrl = module.url.ifBlank {
+      val encodedName = URLEncoder.encode(module.name, StandardCharsets.UTF_8)
+      "${serverBaseUrl().trimEnd('/')}/content/module/$encodedName"
+    }
 
-    val req = HttpRequest.newBuilder(URI.create(downloadUrl))
+    val req = HttpRequest.newBuilder(trustedUri(downloadUrl))
       .timeout(Duration.ofSeconds(60))
       .header("Authorization", "Bearer $sessionToken")
       .GET()
@@ -291,17 +297,15 @@ object PhantomAuthService {
         return null
       }
 
-      Files.createDirectories(cacheDir)
-      Files.write(dest, resp.body())
+      val body = resp.body()
 
-      val actual = sha256Hex(dest.toFile())
+      val actual = sha256Hex(body)
       if (actual != module.sha256) {
         logger.error("Module {} digest mismatch: expected {} got {}", module.name, module.sha256, actual)
-        Files.deleteIfExists(dest)
         return null
       }
 
-      dest
+      body
     } catch (e: Exception) {
       logger.error("Module {} download failed", module.name, e)
       null
@@ -326,7 +330,13 @@ object PhantomAuthService {
 
       val payloadJson = gson.toJson(payload).toByteArray(StandardCharsets.UTF_8)
       val sigBytes = Base64.getDecoder().decode(sigBase64)
-      val rawKey = Base64.getDecoder().decode(MANIFEST_PUBLIC_KEY_B64)
+      val keyB64 = manifestPublicKeyB64()
+      if (keyB64.isBlank() || keyB64 == DEFAULT_MANIFEST_PUBLIC_KEY_B64) {
+        logger.error("Manifest public key is not configured")
+        return false
+      }
+
+      val rawKey = Base64.getDecoder().decode(keyB64)
 
       verifyEd25519(rawKey, payloadJson, sigBytes)
     } catch (e: Exception) {
@@ -348,19 +358,43 @@ object PhantomAuthService {
     return verifier.verify(sig)
   }
 
-  private fun sha256Hex(file: File): String {
+  private fun sha256Hex(bytes: ByteArray): String {
     val digest = MessageDigest.getInstance("SHA-256")
+    return digest.digest(bytes).joinToString("") { "%02x".format(it) }
+  }
 
-    file.inputStream().use { stream ->
-      val buf = ByteArray(8192)
-      var n: Int
+  private fun serverBaseUrl(): String {
+    return System.getProperty(AUTH_BASE_URL_PROPERTY)
+      ?.takeIf { it.isNotBlank() }
+      ?: System.getenv(AUTH_BASE_URL_ENV)
+        ?.takeIf { it.isNotBlank() }
+      ?: DEFAULT_SERVER_BASE_URL
+  }
 
-      while (stream.read(buf).also { n = it } != -1) {
-        digest.update(buf, 0, n)
-      }
+  private fun manifestPublicKeyB64(): String {
+    return System.getProperty(MANIFEST_PUBLIC_KEY_PROPERTY)
+      ?.takeIf { it.isNotBlank() }
+      ?: System.getenv(MANIFEST_PUBLIC_KEY_ENV)
+        ?.takeIf { it.isNotBlank() }
+      ?: DEFAULT_MANIFEST_PUBLIC_KEY_B64
+  }
+
+  private fun trustedUri(raw: String): URI {
+    val uri = URI.create(raw)
+    val scheme = uri.scheme?.lowercase(Locale.US)
+    val host = uri.host?.lowercase(Locale.US).orEmpty()
+
+    if (scheme == "https") return uri
+
+    val localHttpAllowed = FabricLoader.getInstance().isDevelopmentEnvironment &&
+      scheme == "http" &&
+      (host == "localhost" || host == "127.0.0.1" || host == "::1")
+
+    require(localHttpAllowed) {
+      "Refusing non-HTTPS auth/content URL: $raw"
     }
 
-    return digest.digest().joinToString("") { "%02x".format(it) }
+    return uri
   }
 
   private data class VerifySessionRequest(

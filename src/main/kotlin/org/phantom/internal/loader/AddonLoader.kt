@@ -9,15 +9,18 @@ import net.fabricmc.loader.api.FabricLoader
 import net.fabricmc.loader.impl.launch.FabricLauncherBase
 import org.phantom.api.addon.Addon
 import org.phantom.api.addon.AddonMetadata
+import org.phantom.api.module.ModuleManager
 import org.phantom.api.util.ui.NVGRenderer
 import org.phantom.api.util.ui.helper.Image
 import org.spongepowered.asm.mixin.Mixins
 
 object AddonLoader {
 
+  private const val LOCAL_ADDONS_PROPERTY = "phantom.localAddons"
   private val addonsDir: Path = Paths.get("config/phantom/addons/")
   private val addons = mutableListOf<Pair<AddonMetadata, Addon>>()
   private val addonsById = mutableMapOf<String, AddonMetadata>()
+  private val activatedAddons = mutableSetOf<Int>()
   private val gson = Gson()
 
   fun findAddons() {
@@ -43,6 +46,10 @@ object AddonLoader {
       }
     }
 
+    if (!allowLocalAddons()) {
+      return
+    }
+
     if (!Files.isDirectory(addonsDir)) {
       Files.createDirectories(addonsDir)
       return
@@ -52,8 +59,7 @@ object AddonLoader {
       Files.newDirectoryStream(addonsDir, "*.jar").use { stream ->
         for (jarPath in stream) {
           try {
-            FabricLauncherBase.getLauncher().addToClassPath(jarPath)
-            loadAddon(jarPath)
+            loadFromPath(jarPath, activate = false)
           } catch (e: Exception) {
             e.printStackTrace()
           }
@@ -64,7 +70,7 @@ object AddonLoader {
     }
   }
 
-  private fun loadAddon(jarPath: Path): AddonMetadata {
+  private fun loadAddon(jarPath: Path): List<Pair<AddonMetadata, Addon>> {
     ZipFile(jarPath.toFile()).use { zip ->
       val jsonEntry = zip.getEntry("phantom.addon.json")
         ?: throw IllegalStateException("Missing phantom.addon.json in $jarPath")
@@ -83,6 +89,8 @@ object AddonLoader {
         }
       }
 
+      val loaded = mutableListOf<Pair<AddonMetadata, Addon>>()
+
       for (entrypoint in metadata.entrypoints) {
         val classPath = entrypoint.replace('.', '/') + ".class"
         checkNotNull(zip.getEntry(classPath)) { "Entrypoint class '$entrypoint' does not exist inside ${jarPath.fileName}" }
@@ -98,20 +106,95 @@ object AddonLoader {
         }
 
         check(instance is Addon) { "Entrypoint '$entrypoint' must implement Addon" }
-        addons += metadata to instance
+        loaded += metadata to instance
       }
 
-      addonsById[metadata.id] = metadata
-      return metadata
+      registerLoadedAddons(metadata, loaded)
+      return loaded
     }
   }
 
-  fun loadFromPath(jarPath: java.nio.file.Path) {
-    try {
+  private fun loadAddon(sourceName: String, jarBytes: ByteArray): List<Pair<AddonMetadata, Addon>> {
+    val classLoader = InMemoryAddonClassLoader(
+      sourceName = sourceName,
+      jarBytes = jarBytes,
+      parent = javaClass.classLoader
+    )
+
+    val metadataJson = classLoader.getEntryBytes("phantom.addon.json")
+      ?: throw IllegalStateException("Missing phantom.addon.json in $sourceName")
+
+    val metadata = gson.fromJson(metadataJson.inputStream().reader(), AddonMetadata::class.java)
+
+    require(metadata.entrypoints.isNotEmpty()) {
+      "Addon ${metadata.id} has no entrypoints defined"
+    }
+
+    require(metadata.mixins.isEmpty()) {
+      "Remote in-memory addon ${metadata.id} declares mixins. Remote mixin configs must be packaged locally at pre-launch."
+    }
+
+    val loaded = mutableListOf<Pair<AddonMetadata, Addon>>()
+
+    for (entrypoint in metadata.entrypoints) {
+      val classPath = entrypoint.replace('.', '/') + ".class"
+      checkNotNull(classLoader.getEntryBytes(classPath)) {
+        "Entrypoint class '$entrypoint' does not exist inside $sourceName"
+      }
+
+      val instance = Class.forName(entrypoint, true, classLoader).let {
+        try {
+          it.getField("INSTANCE").get(null)
+        } catch (_: NoSuchFieldException) {
+          val constructor = it.getDeclaredConstructor()
+          constructor.isAccessible = true
+          constructor.newInstance()
+        }
+      }
+
+      check(instance is Addon) { "Entrypoint '$entrypoint' must implement Addon" }
+      loaded += metadata to instance
+    }
+
+    registerLoadedAddons(metadata, loaded)
+    return loaded
+  }
+
+  private fun registerLoadedAddons(metadata: AddonMetadata, loaded: List<Pair<AddonMetadata, Addon>>) {
+    addons += loaded
+    addonsById[metadata.id] = metadata
+  }
+
+  fun loadFromPath(jarPath: java.nio.file.Path, activate: Boolean = true): List<Pair<AddonMetadata, Addon>> {
+    return try {
       FabricLauncherBase.getLauncher().addToClassPath(jarPath)
-      loadAddon(jarPath)
+      loadAddon(jarPath).also {
+        if (activate) activateLoadedAddons()
+      }
     } catch (e: Exception) {
       e.printStackTrace()
+      emptyList()
+    }
+  }
+
+  fun loadFromBytes(sourceName: String, jarBytes: ByteArray, activate: Boolean = true): List<Pair<AddonMetadata, Addon>> {
+    return try {
+      loadAddon(sourceName, jarBytes).also {
+        if (activate) activateLoadedAddons()
+      }
+    } catch (e: Exception) {
+      e.printStackTrace()
+      emptyList()
+    }
+  }
+
+  fun activateLoadedAddons() {
+    addons.forEach { (_, addon) ->
+      val identity = System.identityHashCode(addon)
+      if (activatedAddons.add(identity)) {
+        addon.onLoad()
+        ModuleManager.addModules(addon.getModules())
+      }
     }
   }
 
@@ -123,6 +206,15 @@ object AddonLoader {
     return NVGRenderer.createImage(
       addonsById[addonId]?.icon ?: return null
     )
+  }
+
+  private fun allowLocalAddons(): Boolean {
+    if (FabricLoader.getInstance().isDevelopmentEnvironment) return true
+
+    return System.getProperty(LOCAL_ADDONS_PROPERTY)
+      ?.trim()
+      ?.lowercase()
+      in setOf("1", "true", "yes", "on")
   }
 
 }

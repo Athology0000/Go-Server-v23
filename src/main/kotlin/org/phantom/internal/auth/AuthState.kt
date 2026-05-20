@@ -9,8 +9,8 @@ enum class AuthState {
 }
 
 object Auth {
-  @Volatile var state: AuthState = AuthState.READY
-  @Volatile var statusMessage: String = "Ready (auth disabled)"
+  @Volatile var state: AuthState = AuthState.PENDING
+  @Volatile var statusMessage: String = "Waiting for Cobalt account verification..."
   @Volatile var failureReason: String = ""
 
   @Volatile var modulesLoaded: Int = 0
@@ -32,13 +32,13 @@ object Auth {
   }
 
   fun isModuleEntitled(idOrName: String): Boolean {
-    val entitled = entitledModules ?: return true
+    val entitled = entitledModules ?: return false
     return "*" in entitled || idOrName in entitled
   }
 
   fun reset() {
-    state = AuthState.READY
-    statusMessage = "Ready (auth disabled)"
+    state = AuthState.PENDING
+    statusMessage = "Waiting for Cobalt account verification..."
     failureReason = ""
 
     modulesLoaded = 0
