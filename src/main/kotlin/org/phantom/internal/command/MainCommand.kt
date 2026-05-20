@@ -1,6 +1,13 @@
 package org.phantom.internal.command
 
+import java.util.Locale
+import kotlin.math.sqrt
 import kotlin.random.Random
+import net.minecraft.ChatFormatting
+import net.minecraft.core.registries.BuiltInRegistries
+import net.minecraft.world.entity.Entity
+import net.minecraft.world.entity.LivingEntity
+import net.minecraft.world.entity.item.ItemEntity
 import org.phantom.api.command.Command
 import org.phantom.api.command.annotation.DefaultHandler
 import org.phantom.api.command.annotation.SubCommand
@@ -167,11 +174,7 @@ internal object MainCommand : Command(name = "phantom", aliases = arrayOf("phant
       if (distSq > rangeSq) continue
       count++
 
-      val name = entity.name.string
-      ChatUtils.sendMessage(
-        "[EntityScan] ${entity.type.descriptionId} \"$name\" @ " +
-          "${"%.1f".format(entity.x)}, ${"%.1f".format(entity.y)}, ${"%.1f".format(entity.z)}"
-      )
+      sendEntityScanResult(entity, sqrt(distSq), dx, dy, dz)
     }
 
     ChatUtils.sendMessage("[EntityScan] Found $count entities within $range blocks.")
@@ -200,6 +203,72 @@ internal object MainCommand : Command(name = "phantom", aliases = arrayOf("phant
   fun craftclear() {
     CraftHelperModule.clearTarget()
   }
+
+  private fun sendEntityScanResult(entity: Entity, distance: Double, dx: Double, dy: Double, dz: Double) {
+    val registryId = BuiltInRegistries.ENTITY_TYPE.getKey(entity.type).toString()
+    val shortUuid = entity.uuid.toString().take(8)
+    val flags = entityScanFlags(entity)
+    val customName = cleanEntityScanText(entity.customName?.string)
+    val displayName = cleanEntityScanText(entity.displayName.string)
+    val normalName = cleanEntityScanText(entity.name.string)
+    val scoreboardName = cleanEntityScanText(entity.scoreboardName)
+    val extra = entityScanExtra(entity)
+
+    ChatUtils.sendMessage(
+      "[EntityScan] #${entity.id} $registryId ${entity.javaClass.simpleName} " +
+        "dist=${fmt(distance)} uuid=$shortUuid"
+    )
+    ChatUtils.sendMessage(
+      "  names: name=${quote(normalName)} display=${quote(displayName)} " +
+        "custom=${quote(customName)} scoreboard=${quote(scoreboardName)}"
+    )
+    ChatUtils.sendMessage(
+      "  pos=(${fmt(entity.x)}, ${fmt(entity.y)}, ${fmt(entity.z)}) " +
+        "rel=(${fmt(dx)}, ${fmt(dy)}, ${fmt(dz)}) " +
+        "rot=(${fmt(entity.yRot.toDouble())}, ${fmt(entity.xRot.toDouble())}) " +
+        "box=${fmt(entity.bbWidth.toDouble())}x${fmt(entity.bbHeight.toDouble())} flags=$flags"
+    )
+    if (extra.isNotEmpty()) ChatUtils.sendMessage("  $extra")
+  }
+
+  private fun entityScanFlags(entity: Entity): String {
+    val flags = ArrayList<String>()
+    if (entity.isAlive) flags += "alive" else flags += "dead"
+    if (entity.isRemoved) flags += "removed"
+    if (entity.isInvisible) flags += "invisible"
+    if (entity.isNoGravity) flags += "noGravity"
+    if (entity.onGround()) flags += "ground"
+    return flags.joinToString(",")
+  }
+
+  private fun entityScanExtra(entity: Entity): String {
+    return when (entity) {
+      is LivingEntity -> {
+        val held = entity.mainHandItem
+        val heldName = if (held.isEmpty) "empty" else "${held.count}x ${cleanEntityScanText(held.hoverName.string)}"
+        "living: hp=${fmt(entity.health.toDouble())}/${fmt(entity.maxHealth.toDouble())} " +
+          "absorb=${fmt(entity.absorptionAmount.toDouble())} armor=${entity.armorValue} " +
+          "mainHand=${quote(heldName)}"
+      }
+      is ItemEntity -> {
+        val stack = entity.item
+        "item: count=${stack.count} name=${quote(cleanEntityScanText(stack.hoverName.string))} " +
+          "id=${BuiltInRegistries.ITEM.getKey(stack.item)}"
+      }
+      else -> ""
+    }
+  }
+
+  private fun cleanEntityScanText(text: String?): String {
+    return ChatFormatting.stripFormatting(text.orEmpty())
+      ?.replace(Regex("""\s+"""), " ")
+      ?.trim()
+      .orEmpty()
+  }
+
+  private fun quote(value: String): String = if (value.isBlank()) "\"\"" else "\"$value\""
+
+  private fun fmt(value: Double): String = String.format(Locale.US, "%.2f", value)
 
   private fun emitBreakdown(title: String, durations: List<MacroTimeTracker.MacroDuration>) {
     if (durations.isEmpty()) {

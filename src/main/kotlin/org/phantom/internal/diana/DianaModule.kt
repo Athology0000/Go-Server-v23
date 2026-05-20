@@ -26,6 +26,7 @@ import org.phantom.api.module.setting.impl.CheckboxSetting
 import org.phantom.api.module.setting.impl.KeyBindSetting
 import org.phantom.api.module.setting.impl.SliderSetting
 import org.phantom.api.pathfinder.jni.NativePathfinder
+import org.phantom.api.pathfinder.jni.PathExecutorState
 import org.phantom.api.pathfinder.jni.PathStatus
 import org.phantom.api.rotation.RotationExecutor
 import org.phantom.api.rotation.strategy.BezierTrackingRotationStrategy
@@ -41,6 +42,7 @@ import org.phantom.api.util.player.MovementManager
 import org.phantom.api.util.ui.NVGRenderer
 import org.phantom.internal.etherwarp.EtherwarpLogic
 import org.phantom.internal.pathfinding.OverlayRenderEngine
+import org.phantom.internal.rotation.PhantomRotation
 import org.phantom.internal.rotation.RotationsModule
 
 object DianaMacroModule : Module("Diana Macro") {
@@ -303,13 +305,13 @@ object DianaMacroModule : Module("Diana Macro") {
         320.0, 80.0, 800.0, step = 10.0
     )
     private val combatMoveStartSetting = SliderSetting(
-        "Combat Move Start", "Start walking toward a Diana mob past this distance.", 5.0, 2.0, 10.0, step = 0.25
+        "Combat Move Start", "Start walking toward a Diana mob past this distance.", 8.0, 2.0, 14.0, step = 0.25
     )
     private val combatMoveStopSetting = SliderSetting(
-        "Combat Move Stop", "Stop walking once back inside this distance.", 3.0, 1.0, 8.0, step = 0.25
+        "Combat Move Stop", "Stop walking once back inside this distance.", 6.0, 1.0, 12.0, step = 0.25
     )
     private val combatAttackRangeSetting = SliderSetting(
-        "Combat Attack Range", "Attack Diana mobs within this distance.", 4.0, 2.0, 6.0, step = 0.25
+        "Combat Attack Range", "Attack Diana mobs within this distance. Hypixel resolves hit/miss server-side, so a wide range lets the macro spam from where it stands.", 10.0, 2.0, 14.0, step = 0.25
     )
     private val combatSmoothAimSetting = CheckboxSetting(
         "Combat Smooth Aim", "Use Diana-specific smooth target tracking during combat.", true
@@ -333,7 +335,7 @@ object DianaMacroModule : Module("Diana Macro") {
         "Combat Aim Tolerance", "Max yaw/pitch error before the macro attacks.", 5.0, 1.0, 15.0, step = 0.25
     )
     private val combatAttackIntervalSetting = SliderSetting(
-        "Combat Attack Interval", "Ticks between attack presses while fighting.", 2.0, 1.0, 10.0, step = 1.0
+        "Combat Attack Interval", "Ticks between attack presses while fighting. 3 ≈ 6.7 CPS, 4 ≈ 5 CPS.", 3.0, 1.0, 10.0, step = 1.0
     )
     private val combatReacquireTicksSetting = SliderSetting(
         "Combat Reacquire Ticks", "Ticks to keep searching before treating a missing mob as killed.", 12.0, 1.0, 60.0, step = 1.0
@@ -618,6 +620,17 @@ object DianaMacroModule : Module("Diana Macro") {
         nativeWalkTarget = null
         nativeWalkRadius = 0.0
         collisionStuckTicks = 0
+        // NativePathfinder.stop() doesn't release the block rotation
+        // controller — only PathCommand.applyToPlayer does, and applyToPlayer
+        // never runs once the macro switches state (combat / dig / wait). The
+        // controller keeps writing the LAST path aim into rotation every
+        // frame, which fights combatRotationStrategy and prevents the macro
+        // from actually looking at the mob.
+        if (PathExecutorState.blockRotationOwned) {
+            PhantomRotation.blockController.releaseWhenSettled(maxFrames = 12)
+            PathExecutorState.blockRotationOwned = false
+            PathExecutorState.blockRotationLastTarget = null
+        }
     }
 
     private fun resetAimSettle() {

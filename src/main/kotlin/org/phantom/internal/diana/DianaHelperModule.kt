@@ -51,7 +51,6 @@ import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.pow
-import kotlin.math.roundToInt
 import kotlin.math.sign
 import kotlin.math.sin
 import kotlin.math.sqrt
@@ -163,6 +162,7 @@ object DianaHelperModule : Module("Diana Helper") {
     private val creatureCounts = linkedMapOf<String, Int>()
     private val creatureSince = linkedMapOf<String, Int>()
     private var lastSpadeUseMs = 0L
+    private var lastLavaParticleMs = 0L
     private var lastParticleFailWarnMs = 0L
     private var lastPetWarnMs = 0L
     private var tickCounter = 0
@@ -170,7 +170,7 @@ object DianaHelperModule : Module("Diana Helper") {
     private var lastPreciseGuess: Vec3? = null
     private val arrowPoints = ArrayList<Vec3>()
     private val arrowGuessEntries = ArrayList<ArrowGuessEntry>()
-    private val recentArrowKeys = linkedSetOf<String>()
+    private val recentArrowParticles = LinkedHashMap<String, Long>()
     private var lastInteractedBlock: Vec3? = null
     private var lastInteractedBlockMs = 0L
     private var lastDugBlock: Vec3? = null
@@ -357,13 +357,13 @@ object DianaHelperModule : Module("Diana Helper") {
 
         when (val packet = event.packet) {
             is ServerboundUseItemPacket -> {
-                if (!isDianaSpade(player.getItemInHand(packet.hand))) return
-                beginSpadeGuess()
+                if (!isSpadeNamed(player.getItemInHand(packet.hand))) return
+                beginSpadeGuess(event)
             }
             is ServerboundUseItemOnPacket -> {
-                if (!isDianaSpade(player.getItemInHand(packet.hand))) return
+                if (!isSpadeNamed(player.getItemInHand(packet.hand))) return
                 rememberInteractedBlock(packet.hitResult.blockPos)
-                beginSpadeGuess()
+                beginSpadeGuess(event)
             }
             is ServerboundPlayerActionPacket -> {
                 if (packet.action == ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK) {
@@ -374,8 +374,13 @@ object DianaHelperModule : Module("Diana Helper") {
         }
     }
 
-    private fun beginSpadeGuess() {
-        lastSpadeUseMs = System.currentTimeMillis()
+    private fun beginSpadeGuess(event: PacketEvent.Outgoing) {
+        val now = System.currentTimeMillis()
+        if (now - lastLavaParticleMs < PRECISE_LAVA_CANCEL_MS) {
+            event.setCancelled(true)
+            return
+        }
+        lastSpadeUseMs = now
         preciseTrail.clear()
         lastPreciseGuess = null
     }
@@ -389,8 +394,8 @@ object DianaHelperModule : Module("Diana Helper") {
         if (!isPreciseSpadeParticle(packet)) return
 
         val now = System.currentTimeMillis()
+        lastLavaParticleMs = now
         if (lastSpadeUseMs == 0L || now - lastSpadeUseMs > 1_000L) return
-        val player = mc.player ?: return
 
         val point = Vec3(packet.x, packet.y, packet.z)
         val last = preciseTrail.lastOrNull()
@@ -400,7 +405,6 @@ object DianaHelperModule : Module("Diana Helper") {
         }
 
         preciseTrail += point
-        if (preciseTrail.size > 18) preciseTrail.removeAt(0)
 
         val guess = solvePreciseGuess() ?: return
         val blockGuess = guess.down(0.5).floorToBlockVec()
@@ -469,8 +473,8 @@ object DianaHelperModule : Module("Diana Helper") {
 
         if (current != max) {
             arrowPoints.clear()
-            recentArrowKeys.clear()
         }
+        if (current == 1) return
 
         val completedEntries = arrowGuessEntries.filter { entry ->
             entry.guesses.any { it.distanceTo(dug) <= 3.0 }
@@ -483,7 +487,7 @@ object DianaHelperModule : Module("Diana Helper") {
         arrowPoints.clear()
         arrowGuessEntries.forEach { it.removeAll() }
         arrowGuessEntries.clear()
-        recentArrowKeys.clear()
+        recentArrowParticles.clear()
         lastDugBlock = null
     }
 
@@ -502,27 +506,35 @@ object DianaHelperModule : Module("Diana Helper") {
         if (location.distanceTo(anchor) >= 5.0) return false
         val range = arrowRange(packet.xDist, packet.yDist) ?: return false
 
-        if (arrowPoints.any { it.distanceToSqr(location) < 1.0e-10 }) return true
+        val now = System.currentTimeMillis()
+        pruneRecentArrowParticles(now)
+        val particleKey = "${packet.x}:${packet.y}:${packet.z}"
+        if (recentArrowParticles.containsKey(particleKey)) return true
+        recentArrowParticles[particleKey] = now
+
         arrowPoints += location
-        if (arrowPoints.size > 80) arrowPoints.removeAt(0)
 
         val ray = detectArrowRay() ?: return true
-        val key = "${ray.origin.x.roundToInt()}:${ray.origin.y.roundToInt()}:${ray.origin.z.roundToInt()}:${ray.direction.x}:${ray.direction.y}:${ray.direction.z}"
-        if (!recentArrowKeys.add(key)) return true
-        while (recentArrowKeys.size > 10) recentArrowKeys.remove(recentArrowKeys.first())
         arrowPoints.clear()
         lastWarpMs = System.currentTimeMillis()
         addArrowGuess(ray, range)
         return true
     }
 
+    private fun pruneRecentArrowParticles(now: Long) {
+        val iterator = recentArrowParticles.entries.iterator()
+        while (iterator.hasNext()) {
+            if (now - iterator.next().value > ARROW_PARTICLE_EXPIRE_MS) iterator.remove()
+        }
+    }
+
     private data class Ray(val origin: Vec3, val direction: Vec3)
 
     private fun arrowRange(xOffset: Float, yOffset: Float): IntRange? {
         return when {
-            close(yOffset, 128f) -> 0..117
-            close(yOffset, 255f) && close(xOffset, 255f) -> 112..282
-            close(xOffset, 255f) -> 281..600
+            yOffset == 128f -> 0..117
+            yOffset == 255f && xOffset == 255f -> 112..282
+            xOffset == 255f -> 281..600
             else -> null
         }
     }
@@ -676,7 +688,7 @@ object DianaHelperModule : Module("Diana Helper") {
 
     private fun advanceArrowGuesses(level: net.minecraft.world.level.Level, player: net.minecraft.world.entity.player.Player) {
         if (arrowGuessEntries.isEmpty()) return
-        val hasSpade = isDianaSpade(player.mainHandItem)
+        val hasSpade = isSpadeNamed(player.mainHandItem)
         val confirmedBurrows = DianaParticleTracker.getBurrowRecords(level, expireSeconds.value.toLong() * 1000L)
             .filter { (_, type) -> type != DianaParticleTracker.BurrowType.GUESS && type != DianaParticleTracker.BurrowType.SUB_GUESS }
             .map { it.first }
@@ -708,7 +720,7 @@ object DianaHelperModule : Module("Diana Helper") {
         val derivative = Vec3(coeffX.getOrElse(1) { 0.0 }, coeffY.getOrElse(1) { 0.0 }, coeffZ.getOrElse(1) { 0.0 })
         val len = derivative.length()
         if (!len.isFinite() || len < 1.0e-6) return null
-        val t = (3.0 * computePitchWeight(derivative) / len).coerceIn(0.0, 120.0)
+        val t = 3.0 * computePitchWeight(derivative) / len
         val guess = Vec3(evalPolynomial(coeffX, t), evalPolynomial(coeffY, t), evalPolynomial(coeffZ, t))
         if (!guess.x.isFinite() || !guess.y.isFinite() || !guess.z.isFinite()) return null
         return guess
@@ -1534,6 +1546,12 @@ object DianaHelperModule : Module("Diana Helper") {
             ?.contains("spade", ignoreCase = true) == true
     }
 
+    private fun isSpadeNamed(stack: net.minecraft.world.item.ItemStack): Boolean {
+        if (stack.isEmpty) return false
+        return ChatFormatting.stripFormatting(stack.hoverName.string)
+            ?.contains("Spade") == true
+    }
+
     private fun cleanEntityName(entity: LivingEntity): String {
         val raw = entity.customName?.string ?: entity.displayName.string
         return ChatFormatting.stripFormatting(raw)?.trim().orEmpty()
@@ -1669,6 +1687,8 @@ object DianaHelperModule : Module("Diana Helper") {
     private const val RARE_MOB_GLOW_SCOPE = "diana_rare_mobs"
     private const val RARE_MOB_GLOW_PRIORITY = 20
     private const val RARE_MOB_EXPIRE_MS = 75_000L
+    private const val PRECISE_LAVA_CANCEL_MS = 200L
+    private const val ARROW_PARTICLE_EXPIRE_MS = 60_000L
     private const val RAY_EPSILON = 1.0e-12
     private val HUB_BOUNDS = AABB(-296.0, 0.0, -272.0, 207.0, 256.0, 223.0)
     private val COORD_PATTERN = Regex("""(?:x[:= ]\s*|@?\s)(-?\d{1,4})(?:[, ]+\s*y[:= ]\s*|[, ]+)(-?\d{1,4})(?:[, ]+\s*z[:= ]\s*|[, ]+)(-?\d{1,4})""", RegexOption.IGNORE_CASE)
