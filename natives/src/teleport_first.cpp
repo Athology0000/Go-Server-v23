@@ -20,7 +20,12 @@ constexpr double PI = 3.14159265358979323846;
 // quickly. Without these the macro waits forever for a plan that never lands.
 constexpr int HARD_MAX_ITERATIONS = 18000;
 constexpr int HARD_MAX_NODES = 9000;
-constexpr int MAX_AOTV_NEIGHBOURS = 14; // per-node branching cap
+// Per-node branching cap. Back to 14 after a 18 experiment made the search
+// pick more sideways branches per node and produced visibly worse plans —
+// the cap pruning the SWEEP entries actually helped focus the search on
+// strong candidates. With forced goal-direction pitches already represented
+// (3 of them queued before the sweep, so always tried first), 14 is enough.
+constexpr int MAX_AOTV_NEIGHBOURS = 14;
 constexpr int MAX_ETHER_NEIGHBOURS = 8;
 // Each instant-transmission hop must cut at least this much distance to the
 // goal, otherwise it is rejected. Forces a few long hops instead of many
@@ -58,10 +63,17 @@ struct FlyContext {
 };
 
 // AOTV look-direction sampling for the new max-reach node generator.
+// Back to 18 after a 12 experiment over-saturated the candidate pool: the
+// cap dropped sweep diversity that the search needed for indirect routes.
 constexpr int AOTV_YAW_STEP_DEG = 18;
 // Pitch rows, degrees (negative = upward). Extra steep-up rows feed the
 // climb leg of the fly route; the rest cover diving / level traverse.
 constexpr int AOTV_PITCH_ROWS[] = {-80, -68, -54, -40, -26, -12, 0, 14, 30, 48};
+// Forced pitches along the goal heading queued ahead of the angular sweep,
+// so the "aim straight at the burrow at one of these pitches" hop is always
+// offered. Trimmed 6 -> 3 entries: more was wasting cap slots on near-
+// duplicate hops when the goal direction was free, and starving the sweep.
+constexpr int AOTV_FORCED_GOAL_PITCHES[] = {-25, -5, 18};
 
 inline uint16_t flagsAt(const WorldSnapshot& w, int x, int y, int z) {
   return w.getFlags(x, y, z);
@@ -232,8 +244,18 @@ void appendAotvNodes(
   const Int3& goal,
   double gDirX, double gDirZ, double gLen, double toGoal,
   bool inFinish,
+  bool fromAirborne,
   std::vector<Edge>& out
 ) {
+  // Refuse AOTV inside the finish zone when we're already on the ground:
+  // close-range AOTV from a ground node systematically overshoots the
+  // burrow (fixed 12-block travel always lands you past it) and produces
+  // the "macro instant-transmissions on flat ground next to the goal then
+  // walks back" oscillation the user reported. Etherwarp is offered
+  // immediately below for the precision finish, and walking handles
+  // anything inside etherwarp's minimum distance. Airborne nodes still get
+  // AOTV (a sky chain needs to keep transmitting to land).
+  if (inFinish && !fromAirborne) return;
   const double ex = from.x + 0.5, ey = from.y + 1.62, ez = from.z + 0.5;
   const bool climbing = fc.enabled && from.y < fc.flyY;
 
@@ -250,6 +272,18 @@ void appendAotvNodes(
                  dz = goal.z - from.z;
     const double l = std::sqrt(dx * dx + dy * dy + dz * dz);
     if (l > 1e-6) dirs.push_back(Dir{dx / l, dy / l, dz / l});
+  }
+  // Forced: the goal's HORIZONTAL heading at several pitches. Picks up the
+  // direct route when the planner's pure 3D-to-goal vector is blocked but a
+  // slightly different pitch threads the gap — the most common "obvious
+  // straight route ignored" case (burrow up a hill, doorway above a step,
+  // ledge dropping into a pit).
+  if (gLen > 1e-6) {
+    for (const int pd : AOTV_FORCED_GOAL_PITCHES) {
+      const double pr = pd * (PI / 180.0);
+      const double cp = std::cos(pr);
+      dirs.push_back(Dir{gDirX * cp, -std::sin(pr), gDirZ * cp});
+    }
   }
   // Forced: steep climb along the goal's heading — the fly route's lift leg.
   if (climbing && gLen > 1e-6) {
@@ -289,21 +323,33 @@ void appendAotvNodes(
       if (dot < minDot && !liftExempt) continue;
     }
 
-    // March the look vector to its farthest fully-clear voxel (feet + head).
+    // March the look vector to its farthest fully-clear voxel.
     // Hypixel blocks AOTV "instant transmission" whenever the player's
     // crosshair has a solid block in standard pick range (~4.5 m): the cast
     // becomes a no-op silently. So we require the look ray be clear for at
     // least 5 m before accepting an aim — guarantees the cast will actually
     // fire when the player executes the hop, with a small margin over the
     // pick range so jitter / fall doesn't push a near-solid into reach.
+    //
+    // Voxel coverage: vy is the EYE voxel along the ray. The player's body
+    // also occupies vy - 1 (feet, since feet sit ~1.62 below eye) and we
+    // keep vy + 1 as a head-ceiling margin. The old check only tested vy
+    // and vy + 1, which skipped the feet voxel entirely — that's the
+    // "planner approves a hop, player teleports straight into a wall and
+    // falls" bug: a foot-height wall is invisible to a corridor scan that
+    // only looks at the eye and above. Step size is halved (0.5 → 0.25)
+    // so the ray cannot thread a diagonal corner between samples.
     int bestStep = -1;
-    for (int s = 1; s <= maxSteps; s++) {
-      const double t = s * 0.5;
+    const double STEP = 0.25;
+    const int rayMaxSteps = static_cast<int>(p.transmissionRange / STEP) + 1;
+    for (int s = 1; s <= rayMaxSteps; s++) {
+      const double t = s * STEP;
       if (t > p.transmissionRange) break;
       const int vx = static_cast<int>(std::floor(ex + d.x * t));
       const int vy = static_cast<int>(std::floor(ey + d.y * t));
       const int vz = static_cast<int>(std::floor(ez + d.z * t));
-      if (!isTeleportClear(w, vx, vy, vz) ||
+      if (!isTeleportClear(w, vx, vy - 1, vz) ||
+          !isTeleportClear(w, vx, vy, vz) ||
           !isTeleportClear(w, vx, vy + 1, vz)) {
         break;
       }
@@ -311,7 +357,7 @@ void appendAotvNodes(
     }
     if (bestStep < 0) continue; // nothing reachable past block-pick reach this way
 
-    const double bt = bestStep * 0.5;
+    const double bt = bestStep * STEP;
     Int3 aim{static_cast<int>(std::floor(ex + d.x * bt)),
              static_cast<int>(std::floor(ey + d.y * bt)),
              static_cast<int>(std::floor(ez + d.z * bt))};
@@ -404,7 +450,7 @@ void neighbours(
   // ---- AOTV (short, no sneak) — new max-reach ray-march generator ----
   if (p.aotvEnabled) {
     appendAotvNodes(w, p, fc, from, goal, gDirX, gDirZ, gLen, toGoal,
-                    inFinish, out);
+                    inFinish, fromAirborne, out);
   }
   const bool hasAotvExit = out.size() > aotvStart;
 
@@ -543,7 +589,11 @@ std::optional<TeleportFirstResult> findTeleportFirstPath(
     } else {
       remaining = dist3D(n, goal);
     }
-    return remaining / hopLen * 1.85 * 1.7;
+    // Greedy weight: 1.7 stable, 2.1 too greedy (picked first-path wins
+    // that were demonstrably bad routes). 1.85 sits between — still
+    // greedier than the original to keep startup latency low, but not
+    // greedy enough to pick obviously-wrong-direction first hops.
+    return remaining / hopLen * 1.85 * 1.85;
   };
 
   nodes.push_back(SearchNode{

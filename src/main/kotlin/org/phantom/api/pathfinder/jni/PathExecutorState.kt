@@ -288,6 +288,19 @@ object PathExecutorState {
     private const val TURN_HARD_CURVATURE = 1.0
     private const val TURN_MIN_LOOKAHEAD = 3.0
 
+    // Ledge cap â€” independent of dropAhead/precision. dropAhead only fires
+    // for slope > STAIR_MAX_SLOPE (1.5), so a ~1-block lip at the end of a
+    // flat run never trips it; lookahead stays at ~7+ blocks and the aim
+    // points past the drop. The rotation then sweeps wide across the descent
+    // and the player drifts off the spline into the ledge corner, stalling.
+    // This cap activates the moment ANY adjacent-sample step >= LEDGE_STEP_DROP
+    // is within LEDGE_SCAN_DISTANCE, without engaging sneak/precision (the
+    // descent is still planner-trusted â€” we just refuse to aim past it).
+    private const val LEDGE_SCAN_DISTANCE = 5.5
+    private const val LEDGE_SCAN_STEP = 0.6
+    private const val LEDGE_STEP_DROP = 0.8
+    private const val LEDGE_LOOKAHEAD_CAP = 3.8
+
     // =========================================================================
     // Public API
     // =========================================================================
@@ -553,8 +566,10 @@ object PathExecutorState {
                 spline.totalLength - currentSplineDistance <= arrivalBrake
         shouldUsePrecisionSneak = safety.shouldSneak
         val remainingPathForLookahead = spline.totalLength - currentSplineDistance
+        val ledgeAhead = hasLedgeAhead(spline)
         val safetyLookaheadCap = when {
             dropAhead || safety.ledgeRisk || safety.corridorUnsafe -> PRECISION_LOOKAHEAD
+            ledgeAhead -> minOf(adaptiveLookahead, LEDGE_LOOKAHEAD_CAP)
             pathCurvature >= TURN_BRAKE_CURVATURE -> {
                 // Firm turn cap, independent of lookaheadShrinkStrength (that
                 // slider governs off-path deviation, not cornering). Without a
@@ -636,7 +651,7 @@ object PathExecutorState {
         // chosen sample is â‰¥ lookaheadDistanceFar (and LOS stays clear). Only
         // runs in the spline-aim branch â€” the keynote aim already has a known
         // geometry.
-        if (!inclineKeynoteActive && level != null) {
+        if (!inclineKeynoteActive && !ledgeAhead && level != null) {
             targetPoint = extendToMinWorldDistance(eye, spline, targetPoint, level, lookaheadDistanceFar)
         }
         currentLookaheadSplinePoint = targetPoint
@@ -678,7 +693,7 @@ object PathExecutorState {
         // along [lookahead, lookahead + window]. Falls back to single-point aim
         // when safety/precision is active or when the blend has no visible
         // samples â€” keeps the existing safe behavior in tight spots.
-        val safeForBlend = !requiresPrecisionMovement && !dropAhead && targetVisible && !inclineKeynoteActive
+        val safeForBlend = !requiresPrecisionMovement && !dropAhead && !ledgeAhead && targetVisible && !inclineKeynoteActive
         val blended = if (safeForBlend) blendedAimRotation(
             eye = eye,
             sample = { d -> spline.sample(minOf(spline.totalLength, d)) },
@@ -1548,6 +1563,27 @@ object PathExecutorState {
         val curr = spline.sample(currentSplineDistance)
         val ahead = spline.sample(minOf(spline.totalLength, currentSplineDistance + 2.0))
         return curr.y - ahead.y > 0.8
+    }
+
+    /**
+     * Lookahead-shrinking ledge detector. Looser than [hasDropAhead]: any
+     * adjacent-sample step of >= [LEDGE_STEP_DROP] anywhere within
+     * [LEDGE_SCAN_DISTANCE] counts. Intentionally catches 1-block lips that
+     * dropAhead misses (slope < STAIR_MAX_SLOPE). Used only to cap lookahead
+     * and disable forward-window blending â€” NOT to engage precision/sneak.
+     */
+    private fun hasLedgeAhead(spline: SplinePath): Boolean {
+        val maxScan = minOf(LEDGE_SCAN_DISTANCE, spline.totalLength - currentSplineDistance)
+        if (maxScan <= 0.0) return false
+        var step = LEDGE_SCAN_STEP
+        var prev = spline.sample(currentSplineDistance)
+        while (step <= maxScan) {
+            val ahead = spline.sample(minOf(spline.totalLength, currentSplineDistance + step))
+            if (prev.y - ahead.y >= LEDGE_STEP_DROP) return true
+            prev = ahead
+            step += LEDGE_SCAN_STEP
+        }
+        return false
     }
 
     private fun hasDropAhead(spline: SplinePath, distance: Double, threshold: Double): Boolean {

@@ -92,6 +92,7 @@ object DianaParticleTracker {
 
         val now = System.currentTimeMillis()
         synchronized(seenBurrows) {
+            pruneStale(now)
             val rec = seenBurrows.getOrPut(key) { BurrowRecord(bx, by, bz, lastSeenMs = now) }
             when (marker) {
                 ParticleMarker.ENCHANT -> rec.hasEnchant = true
@@ -99,12 +100,37 @@ object DianaParticleTracker {
                 ParticleMarker.MOB -> rec.type = BurrowType.MOB
                 ParticleMarker.TREASURE -> rec.type = BurrowType.TREASURE
             }
-            rec.found = rec.hasEnchant && rec.type != BurrowType.UNKNOWN
+            // Old gate required BOTH a typed marker AND an ENCHANT marker
+            // before exposing the burrow. The typed signatures already filter
+            // combat-noise CRIT particles (count/speed/offset triple is
+            // burrow-specific), and waiting for the second packet costs ~one
+            // particle tick (≥100 ms, longer when ENCHANT loses the race) of
+            // detection latency the macro stands around doing nothing. Trust
+            // a typed marker alone, treat ENCHANT as confidence-boosting but
+            // not required.
+            rec.found = rec.type != BurrowType.UNKNOWN ||
+                (rec.hasEnchant && rec.type == BurrowType.UNKNOWN)
             rec.lastSeenMs = now
         }
         lastParticleMs = now
         packetCount++
     }
+
+    /**
+     * Drop records that haven't seen a packet in BURROW_TTL_MS. Without this
+     * the map grows for the entire session — every dug, expired, or chunk-
+     * unloaded burrow stays until reset(), eventually slowing every read.
+     */
+    private fun pruneStale(now: Long) {
+        if (seenBurrows.size < 32) return
+        val cutoff = now - BURROW_TTL_MS
+        val it = seenBurrows.entries.iterator()
+        while (it.hasNext()) {
+            if (it.next().value.lastSeenMs < cutoff) it.remove()
+        }
+    }
+
+    private const val BURROW_TTL_MS = 5L * 60L * 1000L
 
     @SubscribeEvent
     fun onChat(event: ChatEvent.Receive) {
@@ -128,6 +154,20 @@ object DianaParticleTracker {
     fun removeBurrow(bx: Int, bz: Int) {
         val key = (bx.toLong() shl 32) or (bz.toLong() and 0xFFFFFFFFL)
         synchronized(seenBurrows) { seenBurrows.remove(key) }
+    }
+
+    /**
+     * Milliseconds since the most recent particle packet that updated the
+     * record at this column, or Long.MAX_VALUE when no such record exists.
+     * The Diana macro consults this just before digging: a burrow that hasn't
+     * emitted particles in a few seconds is either already dug, expired, or
+     * never existed (server desync / a stale entry), and starting a dig there
+     * just wastes the spade and gets the macro stuck.
+     */
+    fun msSinceLastSeen(bx: Int, bz: Int): Long {
+        val key = (bx.toLong() shl 32) or (bz.toLong() and 0xFFFFFFFFL)
+        val rec = synchronized(seenBurrows) { seenBurrows[key] } ?: return Long.MAX_VALUE
+        return System.currentTimeMillis() - rec.lastSeenMs
     }
 
     fun addGuess(pos: Vec3, type: BurrowType = BurrowType.GUESS) {

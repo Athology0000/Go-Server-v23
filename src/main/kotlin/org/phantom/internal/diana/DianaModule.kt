@@ -16,6 +16,7 @@ import kotlin.math.min
 import kotlin.random.Random
 import org.phantom.api.event.EventBus
 import org.phantom.api.event.annotation.SubscribeEvent
+import org.phantom.api.event.impl.client.ChatEvent
 import org.phantom.api.event.impl.client.TickEvent
 import org.phantom.api.event.impl.render.WorldRenderEvent
 import org.phantom.api.hud.HudAnchor
@@ -88,6 +89,28 @@ object DianaMacroModule : Module("Diana Macro") {
     private var burrowPos: Vec3?   = null
     private var burrowType: DianaParticleTracker.BurrowType = DianaParticleTracker.BurrowType.UNKNOWN
     private var targetEntityId: Int = -1
+    // Hypixel emits "Defeat all the burrow defenders in order to dig it!" when
+    // a defender mob spawns during a dig. The burrow can NOT be dug until that
+    // defender is dead. Without this gate, the DIGGING handler's per-tick
+    // findDianaMob() would jump straight to COMBAT for any Diana mob roaming
+    // within 14 blocks (leftover from a neighbouring burrow, a rare wandering
+    // by, etc.) and leave the current burrow undug — the user-reported "goes
+    // straight to combat without checking the burrow was mined". This flag is
+    // the authoritative signal that defender combat is required; only after
+    // it fires (or "You dug out" fires) does DIGGING allow the COMBAT switch.
+    // Reset on entering DIGGING fresh.
+    private var defendersRequired = false
+    // True while we are fighting a defender that interrupted DIGGING. When the
+    // defender dies, COMBAT routes back to DIGGING on the SAME burrow instead
+    // of WAITING — otherwise the spade-held burrow is abandoned and the next
+    // cycle starts holding the weapon (the "wrong tool in hand" symptom).
+    private var combatBlockedDig = false
+    // Set true once Hypixel confirms the burrow physically broke ("You dug out
+    // a Griffin Burrow!"). After this, a small grace window lets a post-dig
+    // mob spawn and be detected before moving on to WAITING.
+    private var burrowDugConfirmed = false
+    private var burrowDugConfirmedAtTick = 0
+    private val POST_DUG_MOB_GRACE_TICKS = 10
 
     // -- Teleport-first hop executor state -------------------------------------
     private var planSubmitted = false
@@ -130,9 +153,40 @@ object DianaMacroModule : Module("Diana Macro") {
     // background replan doesn't disturb execution until we choose to swap.
     private var lastReplanSubmittedMs = 0L
     private var replanInFlight = false
+    // Cooldown after a successful plan SWAP. Stops the macro from flipping
+    // between two near-equal plans every replan tick — the user-reported
+    // "warps to a spot and warps back" oscillation.
+    private var lastReplanCommittedMs = 0L
     private var castRestoreSlot = -1
     private var nativeWalkTarget: Vec3? = null
     private var nativeWalkRadius = 0.0
+    // Counts ticks spent at a GUESS waiting for particles to confirm the real
+    // burrow location nearby. Diana's compass guess is often a few blocks off
+    // the actual burrow — mining the guess directly usually swings the spade
+    // at empty ground. SkyBlock Overhaul's flow is: arrive at the guess, see
+    // if particles tick in, mine the confirmed spot. We replicate that here.
+    private var guessConfirmTicks = 0
+    // Auto-heal pacing. Last time-millis we right-clicked a heal item, plus
+    // a transient "restore weapon slot in N ticks" so the macro doesn't keep
+    // holding the wand after the cast.
+    private var lastHealUseMs = 0L
+    private var healRestoreSlot = -1
+    private var healRestoreInTicks = 0
+    // Burst-and-lull combat click cadence. A real player doesn't click at a
+    // perfect 5 CPS metronome; they spam in short clusters, take a beat,
+    // spam again. nextClickIntervalTicks holds the gap before the next
+    // click; burstClicksRemaining counts how many fast clicks are left in
+    // the current cluster. When the cluster ends, the cadence widens for
+    // one or two clicks before a new cluster starts. Re-rolled per click.
+    private var burstClicksRemaining = 0
+    private var nextClickIntervalTicks = 3
+    // Burst-and-lull cadence for AOTV / etherwarp cast cooldown. A real
+    // chain looks like 2-4 quick taps then a tiny pause; the old uniform
+    // random between min/max didn't have any of that texture. The counter
+    // ticks down per cast — while > 0, the next cooldown is near the floor;
+    // when it hits 0, one cast gets a long-end cooldown and the counter
+    // re-rolls for the next cluster.
+    private var castBurstRemaining = 0
     // Hysteresis for the "running into a wall, hop over it" fallback. The
     // native path executor's JumpDetector already handles real obstacles from
     // cached path nodes; this counter exists only to catch live-world cases
@@ -147,6 +201,12 @@ object DianaMacroModule : Module("Diana Macro") {
     private var warpTicksElapsed = 0
     private var warpAttemptedFor: Vec3? = null
     private var preGuessMoveTarget: Vec3? = null
+    // Set at warp completion when the landing spot has a ceiling within
+    // POST_WARP_CEILING_CHECK_Y blocks. While this is set, PATHFINDING walks
+    // toward the target with no fly mode — the macro is required to leave
+    // the enclosure (Hub Crypts is the worst case) before climbing, so the
+    // planner doesn't keep trying to AOTV through stone walls.
+    private var postWarpWalkUntilMs = 0L
 
     // -- Settings --------------------------------------------------------------
 
@@ -203,19 +263,20 @@ object DianaMacroModule : Module("Diana Macro") {
         "Travel Timeout", "Max ticks to travel to a burrow before retrying.", 600.0, 120.0, 1200.0, step = 20.0
     )
     private val digTimeoutSetting = SliderSetting(
-        "Dig Timeout", "Max ticks to dig a mob/guess burrow before continuing.", 70.0, 20.0, 160.0, step = 5.0
+        "Dig Timeout", "Safety cap on ticks per burrow before forcibly continuing — the macro already advances on the 'You dug out a Griffin Burrow!' chat line, so this only fires when chat is missed (rare).",
+        40.0, 20.0, 160.0, step = 5.0
     )
     private val digApproachTimeoutSetting = SliderSetting(
-        "Dig Approach Timeout", "Max ticks to walk onto a burrow after travel.", 70.0, 20.0, 160.0, step = 5.0
+        "Dig Approach Timeout", "Max ticks to walk onto a burrow after travel.", 50.0, 20.0, 160.0, step = 5.0
     )
     private val digRadiusSetting = SliderSetting(
         "Dig Radius", "How close the macro must stand before digging a burrow.", 1.55, 1.0, 2.3, step = 0.05
     )
     private val fastTreasureDigTicksSetting = SliderSetting(
-        "Fast Treasure Dig Ticks", "Use ticks before finishing non-mob burrows in Max Burrows/Hour mode.", 5.0, 3.0, 14.0, step = 1.0
+        "Fast Treasure Dig Ticks", "Use ticks before finishing non-mob burrows in Max Burrows/Hour mode.", 4.0, 3.0, 14.0, step = 1.0
     )
     private val treasureSecondDigDelaySetting = SliderSetting(
-        "Treasure Second Dig Delay", "Ticks to wait before mining the same treasure burrow spot again.", 20.0, 5.0, 60.0, step = 1.0
+        "Treasure Second Dig Delay", "Ticks to wait before mining the same treasure burrow spot again.", 12.0, 5.0, 60.0, step = 1.0
     )
     private val stuckReplanTicksSetting = SliderSetting(
         "Stuck Replan Ticks", "Ticks without travel progress before replanning.", 80.0, 20.0, 200.0, step = 5.0
@@ -273,7 +334,10 @@ object DianaMacroModule : Module("Diana Macro") {
         "Status HUD", "Show the Diana macro state HUD.", true
     )
     private val showNodeMapSetting = CheckboxSetting(
-        "Show Node Map", "Render the planned hop path (walk/AOTV/etherwarp) while travelling.", true
+        "Render Path Nodes", "Draw a thin beam through the planned AOTV / etherwarp / walk hops while travelling.", true
+    )
+    private val showBurrowMarkerSetting = CheckboxSetting(
+        "Render Burrow", "Draw a marker on the current target burrow.", true
     )
     private val simplifyNodesSetting = CheckboxSetting(
         "Simplify Nodes", "Clean up duplicate/collinear generated Diana route nodes.", true
@@ -282,7 +346,7 @@ object DianaMacroModule : Module("Diana Macro") {
         "Planner Goal Radius", "How close generated nodes need to get to the burrow.", 2.0, 1.0, 4.0, step = 0.25
     )
     private val transmissionRangeSetting = SliderSetting(
-        "Transmission Range", "Instant Transmission range used for generated Diana nodes.", 11.0, 6.0, 15.0, step = 0.5
+        "Transmission Range", "Instant Transmission range per cast (Hypixel: 12 blocks).", 12.0, 6.0, 15.0, step = 0.5
     )
     private val plannerIterationsSetting = SliderSetting(
         "Planner Iterations", "Maximum native planner iterations for generated Diana nodes.", 16_000.0, 4_000.0, 18_000.0, step = 500.0
@@ -295,35 +359,35 @@ object DianaMacroModule : Module("Diana Macro") {
     )
     private val aimSettleSetting = SliderSetting(
         "Aim Settle (ms)", "How long the aim must stay on-target before a teleport fires.",
-        110.0, 0.0, 400.0, step = 10.0
+        55.0, 0.0, 400.0, step = 10.0
     )
     private val castCdMinSetting = SliderSetting(
-        "Cast Cooldown Min (ms)", "Minimum delay between teleport casts.", 240.0, 80.0, 600.0, step = 10.0
+        "Cast Cooldown Min (ms)", "Minimum delay between teleport casts.", 165.0, 80.0, 600.0, step = 5.0
     )
     private val castCdMaxSetting = SliderSetting(
         "Cast Cooldown Max (ms)", "Maximum delay between teleport casts (randomised with min).",
-        320.0, 80.0, 800.0, step = 10.0
+        235.0, 80.0, 800.0, step = 5.0
     )
     private val combatMoveStartSetting = SliderSetting(
-        "Combat Move Start", "Start walking toward a Diana mob past this distance.", 8.0, 2.0, 14.0, step = 0.25
+        "Combat Move Start", "Start walking toward a Diana mob past this distance.", 5.5, 2.0, 14.0, step = 0.25
     )
     private val combatMoveStopSetting = SliderSetting(
-        "Combat Move Stop", "Stop walking once back inside this distance.", 6.0, 1.0, 12.0, step = 0.25
+        "Combat Move Stop", "Stop walking once back inside this distance.", 4.0, 1.0, 12.0, step = 0.25
     )
     private val combatAttackRangeSetting = SliderSetting(
-        "Combat Attack Range", "Attack Diana mobs within this distance. Hypixel resolves hit/miss server-side, so a wide range lets the macro spam from where it stands.", 10.0, 2.0, 14.0, step = 0.25
+        "Combat Attack Range", "Attack Diana mobs within this distance. Hypixel resolves hits server-side based on the WEAPON's reach (~6 blocks for melee); a wider setting still spams clicks but they miss the hitbox so damage never lands.", 6.0, 2.0, 14.0, step = 0.25
     )
     private val combatSmoothAimSetting = CheckboxSetting(
         "Combat Smooth Aim", "Use Diana-specific smooth target tracking during combat.", true
     )
     private val combatAimSpeedSetting = SliderSetting(
-        "Combat Aim Speed", "Max combat yaw degrees per frame before Bezier easing.", 8.5, 2.0, 22.0, step = 0.25
+        "Combat Aim Speed", "Max combat yaw degrees per frame before Bezier easing.", 13.5, 2.0, 22.0, step = 0.25
     )
     private val combatPitchSpeedSetting = SliderSetting(
-        "Combat Pitch Speed", "Max combat pitch degrees per frame before Bezier easing.", 6.5, 2.0, 18.0, step = 0.25
+        "Combat Pitch Speed", "Max combat pitch degrees per frame before Bezier easing.", 10.0, 2.0, 18.0, step = 0.25
     )
     private val combatAimSmoothingSetting = SliderSetting(
-        "Combat Aim Smoothing", "How quickly the tracked aim point follows mob movement. Higher = snappier.", 0.46, 0.10, 1.0, step = 0.02
+        "Combat Aim Smoothing", "How quickly the tracked aim point follows mob movement. Higher = snappier.", 0.62, 0.10, 1.0, step = 0.02
     )
     private val combatPredictTicksSetting = SliderSetting(
         "Combat Prediction", "Ticks of mob velocity to lead while aiming.", 1.25, 0.0, 4.0, step = 0.25
@@ -332,10 +396,16 @@ object DianaMacroModule : Module("Diana Macro") {
         "Combat Aim Height", "Fraction of mob height to aim at.", 0.78, 0.35, 0.95, step = 0.01
     )
     private val combatAimToleranceSetting = SliderSetting(
-        "Combat Aim Tolerance", "Max yaw/pitch error before the macro attacks.", 5.0, 1.0, 15.0, step = 0.25
+        "Combat Aim Tolerance", "Max yaw/pitch error before the macro attacks.", 3.5, 1.0, 15.0, step = 0.25
     )
     private val combatAttackIntervalSetting = SliderSetting(
         "Combat Attack Interval", "Ticks between attack presses while fighting. 3 ≈ 6.7 CPS, 4 ≈ 5 CPS.", 3.0, 1.0, 10.0, step = 1.0
+    )
+    private val autoHealSetting = CheckboxSetting(
+        "Auto Heal", "Auto-use a healing item (Wand of Atonement / Healing) when HP drops below the threshold during combat.", true
+    )
+    private val healThresholdPctSetting = SliderSetting(
+        "Heal Threshold %", "Use the heal item once effective HP (health + absorption) drops below this percent of max.", 60.0, 10.0, 95.0, step = 5.0
     )
     private val combatReacquireTicksSetting = SliderSetting(
         "Combat Reacquire Ticks", "Ticks to keep searching before treating a missing mob as killed.", 12.0, 1.0, 60.0, step = 1.0
@@ -400,6 +470,25 @@ object DianaMacroModule : Module("Diana Macro") {
     )
     private val RARE_MOB_NAMES = setOf("Minos Inquisitor", "Sphinx", "King Minos", "Manticore")
     private val DIANA_SPADE_IDS = setOf("ANCESTRAL_SPADE", "ANCESTRAL_SPADE_2", "DEIFIC_SPADE", "DWARVEN_METAL_DETECTOR")
+    // Healing-item name fragments. The macro scans the hotbar for an item
+    // whose display name contains any of these and right-clicks it when HP
+    // drops below the threshold during a Diana mob fight.
+    private val HEAL_NAME_FRAGMENTS = listOf(
+        "wand of atonement",
+        "wand of healing",
+        "wand of restoration",
+        "wand of strength",
+        "blood vampire",
+        "healing potion",
+    )
+    // Min gap between auto-heal right-clicks so we don't spam the wand and
+    // waste mana. Wand of Atonement's cooldown is ~5 s server-side; this is
+    // a client-side soft cap on top of that.
+    private const val AUTO_HEAL_COOLDOWN_MS = 1_500L
+    // How many combat ticks after a heal cast before we swap back to the
+    // weapon slot. ~6 ticks (300 ms) is enough for the use packet to reach
+    // the server and for the heal animation to register.
+    private const val HEAL_RESTORE_TICKS = 6
     private val WEAPON_ID_HINTS = listOf(
         "SWORD", "DAGGER", "KATANA", "CLAYMORE", "BLADE", "AXE", "STAFF", "WAND", "SCYTHE", "BOW", "SHORTBOW"
     )
@@ -425,6 +514,48 @@ object DianaMacroModule : Module("Diana Macro") {
     // obstacle from re-firing on the landing tick.
     private const val STUCK_HOP_TICKS = 6
     private const val FALLBACK_HOP_COOLDOWN_MS = 450L
+    // Spade reach: once horizontally within this many blocks of a burrow,
+    // start holding USE while approaching so the dig fires the instant the
+    // crosshair lands on the block (and on Hypixel's wider hit-resolve).
+    private const val DIG_REACH = 5.0
+    // Confirmed-burrow particle staleness budget on DIGGING entry: anything
+    // older than this is treated as expired and dropped before we waste a
+    // dig on it.
+    private const val BURROW_STALENESS_MS = 5_000L
+    // Post-warp anti-clipping tuning. After a warp lands, if any solid block
+    // sits within POST_WARP_CEILING_CHECK_Y blocks above the player's head,
+    // we consider the landing "covered" and walk for up to POST_WARP_WALK_MS
+    // before any teleport plan is submitted. Tuned to Hub Crypts: ceilings
+    // there are ~4 blocks above the warp landing, exits are ~15 blocks of
+    // walking away, so 4 s buys plenty of time to clear the enclosure.
+    private const val POST_WARP_CEILING_CHECK_Y = 6
+    private const val POST_WARP_WALK_MS = 4_000L
+    // Guess-confirmation phase tuning. After arriving at a GUESS / SUB_GUESS
+    // burrow we hold position and look for confirming particles within this
+    // radius for up to GUESS_CONFIRM_TICKS ticks. Particles only emit when
+    // the player is in render range of the burrow, so the wait has to be
+    // long enough for ~1-2 particle ticks to arrive (Hypixel particle pings
+    // are ~10 Hz) but short enough that an actually-wrong guess gets dropped
+    // before the macro burns more time than it would have just digging.
+    private const val GUESS_CONFIRM_RADIUS = 8.0
+    private const val GUESS_CONFIRM_TICKS = 35
+    // Fallback Diana mob detection: how close a non-ArmorStand LivingEntity
+    // must be to a named Diana ArmorStand for the two to count as "the same
+    // mob". 2.5 is loose enough to handle the stand drifting slightly above
+    // the mob and tight enough to never glue onto a random other entity.
+    private const val MOB_PROXIMITY_BLOCKS = 2.5
+    // Approach-aim transition: above this horizontal distance the macro
+    // looks forward at eye height while walking in; below it, the aim
+    // pitches down onto the burrow block. Smaller = more human (later tilt-
+    // down) but increases the risk the spade fires a frame or two too early
+    // if rotation lags behind walking — 2.5 keeps the dig accurate while
+    // covering the visible "stares at the ground from 5 blocks out" tell.
+    private const val BURROW_AIM_DOWN_DIST = 2.5
+    // After a successful mid-chain plan swap, lock out further swaps for this
+    // long. Without it, two near-equal plans could ping-pong every 1.5 s
+    // (each replan briefly satisfies the strict-improvement check from a
+    // different player position), producing the warp-forward-warp-back loop.
+    private const val REPLAN_SWAP_COOLDOWN_MS = 6_000L
 
     private val rotationStrategy = BezierTrackingRotationStrategy(
         yawStepSampler   = { (RotationsModule.sample(RotationsModule.combatYawStep.value)   * COMBAT_ROTATION_STEP_SCALE).toFloat() },
@@ -444,29 +575,59 @@ object DianaMacroModule : Module("Diana Macro") {
     // doesn't lose the moving target. A small snap closes the final fraction
     // of a degree without leaving precision-killing drift behind.
     private val airborneRotationStrategy = BezierTrackingRotationStrategy(
-        maxYawStep = 14f,
-        maxPitchStep = 14f,
-        curveIn = 0.35f,
-        curveOut = 0.78f,
-        minScale = 0.42f,
-        snapThreshold = 0.6f,
+        maxYawStep = 9f,
+        maxPitchStep = 9f,
+        curveIn = 0.38f,
+        curveOut = 0.82f,
+        minScale = 0.34f,
+        // No snap — user wants the camera to ease all the way in instead of
+        // closing the last fraction of a degree in a single frame. The fire
+        // gate (1.5°) tolerates this; the rotation just glides into target.
+        snapThreshold = 0.0f,
+    )
+
+    /**
+     * Dedicated approach-aim strategy used while walking onto a burrow.
+     * Distinct from rotationStrategy / combatRotationStrategy: this one is
+     * deliberately slow and never snaps, because the visible un-human tell
+     * on the approach was the rotation finishing each correction in a
+     * single frame. Slow max step + low minScale + zero snap = the camera
+     * eases continuously throughout the whole walk-in instead of locking on
+     * and freezing.
+     */
+    private val approachRotationStrategy = BezierTrackingRotationStrategy(
+        maxYawStep = 4.2f,
+        maxPitchStep = 3.2f,
+        curveIn = 0.32f,
+        curveOut = 0.88f,
+        minScale = 0.18f,
+        snapThreshold = 0.0f,
     )
 
     private val combatRotationStrategy = BezierTrackingRotationStrategy(
         yawStepSampler = {
             val base = combatAimSpeedSetting.value
-            val capped = if (maxBurrowsPerHourSetting.value) base.coerceAtLeast(10.0) else base
-            RotationsModule.sample(Pair(capped * 0.82, capped * 1.14)).toFloat()
+            val capped = if (maxBurrowsPerHourSetting.value) base.coerceAtLeast(13.0) else base
+            RotationsModule.sample(Pair(capped * 0.88, capped * 1.12)).toFloat()
         },
         pitchStepSampler = {
             val base = combatPitchSpeedSetting.value
-            val capped = if (maxBurrowsPerHourSetting.value) base.coerceAtLeast(8.0) else base
-            RotationsModule.sample(Pair(capped * 0.82, capped * 1.14)).toFloat()
+            val capped = if (maxBurrowsPerHourSetting.value) base.coerceAtLeast(10.0) else base
+            RotationsModule.sample(Pair(capped * 0.88, capped * 1.12)).toFloat()
         },
-        curveInProvider = { 0.18f },
+        // Bezier shape: low curveIn = aggressive snap toward target, high
+        // curveOut = soft tail so the camera doesn't overshoot at settle.
+        // minScale prevents the easing from collapsing per-frame movement to
+        // a crawl when error is small — keeps the rotation responsive even
+        // a few degrees off the target instead of asymptoting in slowly.
+        // snapThreshold (0.6°) closes the last fraction of a degree in a
+        // single frame so the aim lands exactly on the mob's hitbox instead
+        // of asymptoting in for several ticks — the visible "almost on
+        // target" wobble that was costing hits.
+        curveInProvider = { 0.10f },
         curveOutProvider = { 0.92f },
-        minScaleProvider = { 0.24f },
-        snapThresholdProvider = { 0.0f },
+        minScaleProvider = { 0.40f },
+        snapThresholdProvider = { 0.6f },
     )
 
     // -- Init ------------------------------------------------------------------
@@ -484,7 +645,7 @@ object DianaMacroModule : Module("Diana Macro") {
             useEtherwarpSetting, useAotvSetting, walkFallbackSetting,
             closeGuessWalkDistanceSetting, autoHubWarpSetting, aerialChainSetting,
             aerialChainMinDistanceSetting, aerialChainNodesSetting, aerialChainPitchSetting, aerialCastCooldownSetting,
-            smoothAimSetting, statusHudSetting, showNodeMapSetting, travelDebugSetting,
+            smoothAimSetting, statusHudSetting, showNodeMapSetting, showBurrowMarkerSetting, travelDebugSetting,
             simplifyNodesSetting, plannerGoalRadiusSetting, transmissionRangeSetting,
             plannerIterationsSetting, plannerNodesSetting, aimSettleSetting,
             castCdMinSetting, castCdMaxSetting, combatMoveStartSetting,
@@ -538,6 +699,12 @@ object DianaMacroModule : Module("Diana Macro") {
         warpTicksElapsed = 0
         warpAttemptedFor = null
         preGuessMoveTarget = null
+        postWarpWalkUntilMs = 0L
+        guessConfirmTicks = 0
+        defendersRequired = false
+        combatBlockedDig = false
+        burrowDugConfirmed = false
+        burrowDugConfirmedAtTick = 0
     }
 
     private fun stop() { cleanup() }
@@ -556,6 +723,9 @@ object DianaMacroModule : Module("Diana Macro") {
         castedAtMs = 0L
         lastReplanSubmittedMs = 0L
         replanInFlight = false
+        // Prime a fresh burst so the very first cast of a new chain fires
+        // quickly (engagement reaction), not on a slow opener.
+        castBurstRemaining = Random.nextInt(2, 5)
         resetAimSettle()
     }
 
@@ -699,6 +869,60 @@ object DianaMacroModule : Module("Diana Macro") {
             return false
         }
         return player.position().distanceTo(target) <= radius
+    }
+
+    /**
+     * Raycast from the player's eye to the burrow block centre. Returns true
+     * when something (grass, fern, flower, sapling, vines) sits in the way
+     * before the burrow's column — i.e., would steal a right-click. The
+     * pick-ray uses OUTLINE because most plants have empty COLLIDER shapes
+     * but non-empty OUTLINE / interaction shapes (which is exactly what
+     * Hypixel's spade hit-resolve sees).
+     */
+    private fun isFoliageBlocking(
+        level: net.minecraft.world.level.Level,
+        player: net.minecraft.client.player.LocalPlayer,
+        burrowBlock: Vec3,
+    ): Boolean {
+        val eye = player.eyePosition
+        val hit = level.clip(
+            ClipContext(eye, burrowBlock, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, player)
+        )
+        if (hit.type != HitResult.Type.BLOCK) return false
+        val pos = (hit as net.minecraft.world.phys.BlockHitResult).blockPos
+        // If the ray hit the burrow's column at the burrow's Y, we're good.
+        if (pos.x == floor(burrowBlock.x).toInt() &&
+            pos.z == floor(burrowBlock.z).toInt() &&
+            pos.y == floor(burrowBlock.y).toInt()
+        ) {
+            return false
+        }
+        // Foliage signature: OUTLINE stopped the ray (we got here) but
+        // COLLIDER is empty — i.e., the block is pickable but you can walk
+        // through it. Tall grass, ferns, flowers, saplings, vines, bushes
+        // all match. Solid blocks (grass_block, dirt, stone) have non-empty
+        // colliders and never trigger the clear pass.
+        val state = level.getBlockState(pos)
+        return state.getCollisionShape(level, pos).isEmpty
+    }
+
+    /**
+     * True when there's a solid block within POST_WARP_CEILING_CHECK_Y blocks
+     * above the player's eye — i.e., we're under a ceiling. Used to decide
+     * whether a freshly-landed warp should walk out before the planner is
+     * allowed to schedule airborne hops.
+     */
+    private fun hasCeilingOverhead(player: net.minecraft.client.player.LocalPlayer): Boolean {
+        val level = mc.level ?: return false
+        val px = floor(player.x).toInt()
+        val pz = floor(player.z).toInt()
+        val eyeY = floor(player.eyeY).toInt()
+        for (dy in 1..POST_WARP_CEILING_CHECK_Y) {
+            val pos = BlockPos(px, eyeY + dy, pz)
+            val state = level.getBlockState(pos)
+            if (!state.getCollisionShape(level, pos).isEmpty) return true
+        }
+        return false
     }
 
     /** Native ground approach while the teleport planner has nothing usable. */
@@ -870,6 +1094,63 @@ object DianaMacroModule : Module("Diana Macro") {
         return true
     }
 
+    /**
+     * Drop hops whose stand position lands inside a solid block (foot or head
+     * column occupied) — the player cannot stand there, and trusting them
+     * makes the chain visibly clip into walls. Keeps the very first node
+     * unconditionally (it's the player's current position, used by the
+     * renderer/executor as a reference point). Always preserves the LAST node
+     * since it's the burrow target and we want the chain to point at it even
+     * if the final stand-pos voxel is occupied — the dig walk will route in.
+     */
+    private fun sanitizePlannerHops(
+        level: net.minecraft.world.level.Level,
+        raw: List<DianaTeleportPlanner.Hop>,
+    ): List<DianaTeleportPlanner.Hop> {
+        if (raw.size <= 2) return raw
+        val out = ArrayList<DianaTeleportPlanner.Hop>(raw.size)
+        out += raw.first()
+        for (i in 1 until raw.lastIndex) {
+            val hop = raw[i]
+            // WALK landings are validated by the native walker on the fly;
+            // teleport landings are the ones that occasionally land inside a
+            // wall when the planner's AOTV/etherwarp endpoint sampling missed
+            // a column block.
+            if (hop.type == DianaTeleportPlanner.HopType.WALK ||
+                isStandable(level, hop.x, hop.y, hop.z)
+            ) {
+                out += hop
+            }
+        }
+        out += raw.last()
+        return out
+    }
+
+    /**
+     * True if a player can stand at (x, y, z): the foot voxel and head voxel
+     * are both passable. Walking on a non-empty block is fine (steps, slabs).
+     */
+    private fun isStandable(level: net.minecraft.world.level.Level, x: Int, y: Int, z: Int): Boolean {
+        val foot = level.getBlockState(BlockPos(x, y, z))
+        val head = level.getBlockState(BlockPos(x, y + 1, z))
+        return foot.getCollisionShape(level, BlockPos(x, y, z)).isEmpty &&
+            head.getCollisionShape(level, BlockPos(x, y + 1, z)).isEmpty
+    }
+
+    /**
+     * Raycast from `from` to `to` against world collision. If a solid block
+     * sits between them, returns the hit position (the visible end of the
+     * beam segment); otherwise returns `to`. Used by the node-map renderer to
+     * clip beams at walls instead of drawing straight through stone.
+     */
+    private fun firstWallHit(level: net.minecraft.world.level.Level, from: Vec3, to: Vec3): Vec3 {
+        val player = mc.player ?: return to
+        val hit = level.clip(
+            ClipContext(from, to, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player)
+        )
+        return if (hit.type == HitResult.Type.BLOCK) hit.location else to
+    }
+
     private fun buildAerialAotvChain(player: net.minecraft.client.player.LocalPlayer, target: Vec3): List<DianaTeleportPlanner.Hop> {
         val count = aerialChainNodesSetting.value.toInt().coerceIn(3, 14)
         val start = player.position()
@@ -998,25 +1279,69 @@ object DianaMacroModule : Module("Diana Macro") {
 
     private fun findDianaMob(center: Vec3, range: Double): LivingEntity? {
         val level = mc.level ?: return null
-        return level.getEntitiesOfClass(
-            LivingEntity::class.java,
-            AABB(center, center).inflate(range)
-        )
-            .filter { it.isAlive && dianaMobName(it) != null }
+        val box = AABB(center, center).inflate(range)
+        val living = level.getEntitiesOfClass(LivingEntity::class.java, box)
+        // Primary path: the mob's own name (or its vehicle / passenger
+        // ArmorStand label, via dianaMobName's tree walk) matches a Diana
+        // species. Skip ArmorStands as combat targets — they're name tags,
+        // not the real hitbox.
+        val direct = living
+            .filter { it.isAlive && it !is net.minecraft.world.entity.decoration.ArmorStand && dianaMobName(it) != null }
             .minWithOrNull(
                 compareByDescending<LivingEntity> { if (dianaMobName(it) in RARE_MOB_NAMES) 1 else 0 }
                     .thenBy { it.position().distanceToSqr(center) }
             )
+        if (direct != null) return direct
+        // Fallback: some Hypixel Diana mobs render the name tag on a
+        // standalone ArmorStand floating right next to the mob rather than
+        // riding it. The mob entity itself has no Diana name on its tree, so
+        // the primary path misses it. Find any named ArmorStand in range
+        // whose label matches a Diana species, then pick the nearest non-
+        // stand LivingEntity within MOB_PROXIMITY_BLOCKS of it.
+        return matchByProximityStand(level, living, box)
     }
 
     private fun findRareDianaMob(center: Vec3, range: Double): LivingEntity? {
         val level = mc.level ?: return null
-        return level.getEntitiesOfClass(
-            LivingEntity::class.java,
-            AABB(center, center).inflate(range)
-        )
-            .filter { it.isAlive && dianaMobName(it) in RARE_MOB_NAMES }
+        val box = AABB(center, center).inflate(range)
+        val living = level.getEntitiesOfClass(LivingEntity::class.java, box)
+        val direct = living
+            .filter { it.isAlive && it !is net.minecraft.world.entity.decoration.ArmorStand && dianaMobName(it) in RARE_MOB_NAMES }
             .minByOrNull { it.position().distanceToSqr(center) }
+        if (direct != null) return direct
+        return matchByProximityStand(level, living, box, rareOnly = true)
+    }
+
+    private fun matchByProximityStand(
+        level: net.minecraft.world.level.Level,
+        living: List<LivingEntity>,
+        box: AABB,
+        rareOnly: Boolean = false,
+    ): LivingEntity? {
+        val stands = level.getEntitiesOfClass(
+            net.minecraft.world.entity.decoration.ArmorStand::class.java, box
+        ).filter {
+            val name = ChatFormatting.stripFormatting(
+                it.customName?.string ?: it.displayName.string
+            ).orEmpty()
+            val match = DIANA_MOB_NAMES.firstOrNull { n -> name.contains(n, ignoreCase = true) }
+            match != null && (!rareOnly || match in RARE_MOB_NAMES)
+        }
+        if (stands.isEmpty()) return null
+        var best: LivingEntity? = null
+        var bestDistSq = MOB_PROXIMITY_BLOCKS * MOB_PROXIMITY_BLOCKS
+        for (stand in stands) {
+            for (e in living) {
+                if (e is net.minecraft.world.entity.decoration.ArmorStand) continue
+                if (!e.isAlive) continue
+                val dSq = e.position().distanceToSqr(stand.position())
+                if (dSq < bestDistSq) {
+                    bestDistSq = dSq
+                    best = e
+                }
+            }
+        }
+        return best
     }
 
     private fun startCombat(target: LivingEntity, rare: Boolean) {
@@ -1032,6 +1357,33 @@ object DianaMacroModule : Module("Diana Macro") {
         resetCombatTracking()
         combatIsRareMob = rare
         state = State.COMBAT
+    }
+
+    /**
+     * Called when COMBAT ends (target dead or timed out). If a defender
+     * interrupted DIGGING (combatBlockedDig), resume digging the SAME burrow
+     * with the spade back in hand — the burrow is still intact and waiting for
+     * the player. Otherwise fall through to the normal post-kill WAITING.
+     */
+    private fun resumeAfterCombat() {
+        targetEntityId = -1
+        combatIsRareMob = false
+        if (combatBlockedDig && burrowPos != null && !burrowDugConfirmed) {
+            combatBlockedDig = false
+            defendersRequired = false
+            holdSpadeSlot()
+            // Reset per-burrow dig progress so the dig timeout / treasure
+            // stage starts fresh now that the defender is dead.
+            digTicksElapsed = 0
+            digApproachTicks = 0
+            treasureDigStage = 0
+            treasureWaitTicks = 0
+            state = State.DIGGING
+            return
+        }
+        combatBlockedDig = false
+        waitTicksElapsed = 0
+        state = State.WAITING
     }
 
     private fun waitAtRareAnchor(player: net.minecraft.client.player.LocalPlayer): Boolean {
@@ -1118,7 +1470,43 @@ object DianaMacroModule : Module("Diana Macro") {
         targetLostTicks = 0
         lastAttackTick = 0
         smoothedCombatAim = null
+        healRestoreInTicks = 0
+        healRestoreSlot = -1
+        // Seed the cadence so the very first cluster of clicks on a fresh
+        // mob is a burst (engagement reaction) rather than a slow opener.
+        burstClicksRemaining = Random.nextInt(3, 7)
+        nextClickIntervalTicks = burstIntervalTicks()
         RotationExecutor.stopIfUsing(combatRotationStrategy)
+    }
+
+    /**
+     * Re-roll the next-click interval after a click fires. While
+     * burstClicksRemaining > 0 we stay tight (2-3 ticks ≈ 7-10 CPS); when
+     * the burst empties we sample a wider gap (5-9 ticks ≈ 2-4 CPS) and
+     * queue a fresh burst behind it. Result: short clusters of quick
+     * clicks separated by a noticeable beat, which is what a person
+     * actually does when mashing.
+     */
+    private fun rollNextClickInterval() {
+        if (burstClicksRemaining > 0) {
+            burstClicksRemaining--
+            nextClickIntervalTicks = burstIntervalTicks()
+        } else {
+            // End of cluster: one slower "settle" interval, then prime the
+            // next burst (re-roll count).
+            nextClickIntervalTicks = Random.nextInt(5, 10)
+            burstClicksRemaining = Random.nextInt(3, 7)
+        }
+    }
+
+    /**
+     * Per-click interval inside a burst. Uses combatAttackIntervalSetting as
+     * the FLOOR (so a user who explicitly slows the cps still sees their
+     * floor respected) and adds a small ±1-tick jitter above it.
+     */
+    private fun burstIntervalTicks(): Int {
+        val floor = combatAttackIntervalSetting.value.toInt().coerceAtLeast(2)
+        return floor + Random.nextInt(0, 2)
     }
 
     private fun combatAimPoint(target: LivingEntity): Vec3 {
@@ -1126,8 +1514,16 @@ object DianaMacroModule : Module("Diana Macro") {
         val bb = target.bbHeight.toDouble()
         val height = if (bb < 0.35) bb * 0.5
                      else (bb * combatAimHeightSetting.value).coerceIn(0.35, min(1.85, bb))
+        // Lead horizontal motion only. The Cretan Bull and a few other
+        // Diana mobs hop continuously — their deltaMovement.y swings between
+        // +0.4 (jump start) and -1.0+ (falling) every couple of ticks. With
+        // the old `.scale(prediction)` that fed straight into the Y aim, the
+        // pitch whipped up and down a degree per tick and combat looked like
+        // a seizure. Y velocity is short-lived (jumps last <1s) and the
+        // height offset already covers the body, so ignore it entirely.
+        val dv = target.deltaMovement
         val raw = target.position()
-            .add(target.deltaMovement.scale(prediction))
+            .add(dv.x * prediction, 0.0, dv.z * prediction)
             .add(0.0, height, 0.0)
         if (!combatSmoothAimSetting.value) {
             smoothedCombatAim = raw
@@ -1135,10 +1531,21 @@ object DianaMacroModule : Module("Diana Macro") {
         }
         val previous = smoothedCombatAim
         val alpha = combatAimSmoothingSetting.value.coerceIn(0.10, 1.0)
+        // Per-axis smoothing. Horizontal (XZ) tracks at the configured alpha
+        // so leading a strafing mob still feels responsive. Vertical (Y) is
+        // capped at a much slower rate when the target is airborne so a
+        // jumping mob's feet-Y bouncing doesn't translate into pitch whip.
+        // Once the mob lands the Y alpha goes back to normal and the aim
+        // catches up smoothly.
+        val airborne = !target.onGround()
+        val alphaY = if (airborne) alpha.coerceAtMost(0.12) else alpha
         val smoothed = if (previous == null || previous.distanceToSqr(raw) > 16.0) {
             raw
         } else {
-            previous.add(raw.subtract(previous).scale(alpha))
+            val dx = (raw.x - previous.x) * alpha
+            val dy = (raw.y - previous.y) * alphaY
+            val dz = (raw.z - previous.z) * alpha
+            Vec3(previous.x + dx, previous.y + dy, previous.z + dz)
         }
         smoothedCombatAim = smoothed
         return smoothed
@@ -1150,8 +1557,27 @@ object DianaMacroModule : Module("Diana Macro") {
     }
 
     private fun dianaMobName(entity: LivingEntity): String? {
-        val name = ChatFormatting.stripFormatting(entity.displayName.string).orEmpty()
-        return DIANA_MOB_NAMES.firstOrNull { n -> name.contains(n, ignoreCase = true) }
+        // Hypixel renders Diana mobs as a vanilla creature (Husk, Skeleton, etc.)
+        // with a name-tagged armor stand passenger carrying the "✦ Minos
+        // Inquisitor"-style label. The entity's own displayName is the vanilla
+        // mob name, so the macro was never recognising any mob as a Diana
+        // target and the COMBAT state never fired. Scan the entity, every
+        // passenger (recursively), and the vehicle it's riding so we catch
+        // the label no matter which slot Hypixel parks it on.
+        val candidates = ArrayDeque<net.minecraft.world.entity.Entity>()
+        candidates += entity
+        entity.vehicle?.let { candidates += it }
+        val seen = HashSet<Int>()
+        while (candidates.isNotEmpty()) {
+            val e = candidates.removeFirst()
+            if (!seen.add(e.id)) continue
+            val raw = e.customName?.string ?: e.displayName.string
+            val name = ChatFormatting.stripFormatting(raw).orEmpty()
+            val match = DIANA_MOB_NAMES.firstOrNull { n -> name.contains(n, ignoreCase = true) }
+            if (match != null) return match
+            for (p in e.passengers) candidates += p
+        }
+        return null
     }
 
     private fun isDianaSpade(stack: net.minecraft.world.item.ItemStack): Boolean {
@@ -1196,6 +1622,55 @@ object DianaMacroModule : Module("Diana Macro") {
         return slot
     }
 
+    private fun findHealHotbarSlot(player: net.minecraft.client.player.LocalPlayer): Int {
+        for (i in 0..8) {
+            val stack = player.inventory.getItem(i)
+            if (stack.isEmpty) continue
+            val name = ChatFormatting.stripFormatting(stack.hoverName.string).orEmpty().lowercase()
+            if (HEAL_NAME_FRAGMENTS.any { it in name }) return i
+        }
+        return -1
+    }
+
+    /**
+     * Run once per combat tick. When effective HP (health + absorption)
+     * drops below the configured percent of max HP, swap to a heal item,
+     * right-click it, and schedule a swap back to the weapon a few ticks
+     * later. Gated by AUTO_HEAL_COOLDOWN_MS so a brief HP dip can't burn
+     * five wand casts in a row.
+     */
+    private fun tryAutoHeal(player: net.minecraft.client.player.LocalPlayer) {
+        // Cooldown ticks down regardless so the slot restore always fires
+        // even if HP came back above the threshold before the heal completed.
+        if (healRestoreInTicks > 0) {
+            healRestoreInTicks--
+            if (healRestoreInTicks == 0 && healRestoreSlot in 0..8) {
+                InventoryUtils.holdHotbarSlot(healRestoreSlot)
+                healRestoreSlot = -1
+                MovementManager.forcedUse = false
+            }
+            return
+        }
+        if (!autoHealSetting.value) return
+        val effectiveHp = player.health + player.absorptionAmount
+        val maxHp = player.maxHealth.coerceAtLeast(1f)
+        val pct = effectiveHp / maxHp * 100f
+        if (pct >= healThresholdPctSetting.value) return
+        val now = System.currentTimeMillis()
+        if (now - lastHealUseMs < AUTO_HEAL_COOLDOWN_MS) return
+        val healSlot = findHealHotbarSlot(player)
+        if (healSlot !in 0..8) return
+        val previousSlot = player.inventory.selectedSlot
+        if (previousSlot != healSlot) {
+            healRestoreSlot = previousSlot
+            InventoryUtils.holdHotbarSlot(healSlot)
+        }
+        MovementManager.forcedActionsEnabled = true
+        MovementManager.forcedUse = true
+        lastHealUseMs = now
+        healRestoreInTicks = HEAL_RESTORE_TICKS
+    }
+
     private fun randomCastCooldown(): Long {
         val lo = if (maxBurrowsPerHourSetting.value) {
             castCdMinSetting.value.toLong().coerceAtMost(150L)
@@ -1208,7 +1683,22 @@ object DianaMacroModule : Module("Diana Macro") {
             castCdMaxSetting.value.toLong()
         }
         val hi = configuredHi.coerceAtLeast(lo)
-        return if (hi <= lo) lo else lo + Random.nextLong(hi - lo + 1)
+        if (hi <= lo) return lo
+        val span = hi - lo
+        return if (castBurstRemaining > 0) {
+            // Inside a burst: sit in the bottom 35 % of the range so the
+            // next cast fires quickly. Plus a tiny randomised jitter so
+            // back-to-back bursts aren't identical.
+            castBurstRemaining--
+            val burstHi = lo + (span * 35 / 100).coerceAtLeast(5)
+            lo + Random.nextLong(burstHi - lo + 1)
+        } else {
+            // Cluster ended: one slower cast in the upper 60-100 % of the
+            // range, then re-seed a fresh burst behind it.
+            castBurstRemaining = Random.nextInt(2, 5)  // next cluster size
+            val lullLo = lo + (span * 60 / 100)
+            lullLo + Random.nextLong(hi - lullLo + 1)
+        }
     }
 
     private fun fireCast(isEtherwarp: Boolean, aotvSlot: Int) {
@@ -1412,6 +1902,10 @@ object DianaMacroModule : Module("Diana Macro") {
                     digApproachTicks = 0
                     treasureDigStage = 0
                     treasureWaitTicks = 0
+                    guessConfirmTicks = 0
+                    defendersRequired = false
+                    burrowDugConfirmed = false
+                    burrowDugConfirmedAtTick = 0
                     state = State.DIGGING
                     return
                 }
@@ -1483,6 +1977,22 @@ object DianaMacroModule : Module("Diana Macro") {
                     return
                 }
 
+                // Post-warp lockout: just landed under a ceiling. Walk toward
+                // the target instead of submitting a teleport plan so the
+                // native walker leaves the enclosure first. Releases as soon
+                // as the timer elapses OR the player no longer has a ceiling
+                // overhead (already exited).
+                if (postWarpWalkUntilMs != 0L) {
+                    val nowWarp = System.currentTimeMillis()
+                    if (nowWarp < postWarpWalkUntilMs && hasCeilingOverhead(player)) {
+                        debugTravel("post-warp: walking out before fly")
+                        directApproach(player, target)
+                        return
+                    } else {
+                        postWarpWalkUntilMs = 0L
+                    }
+                }
+
                 if (!planSubmitted) {
                     // Climb-and-fly only for far guesses with the aerial chain
                     // enabled — reuses the existing Aerial Chain Min Distance
@@ -1547,14 +2057,16 @@ object DianaMacroModule : Module("Diana Macro") {
                         planSubmitted = false
                         return
                     }
-                    hops = plan.hops
+                    hops = sanitizePlannerHops(level, plan.hops)
                     hopIndex = 1 // node 0 is the start position
                     noProgressTicks = 0
                     lastProgressDistSq = Double.MAX_VALUE
                     stopNativeWalk()
                     // Visible "plan committed" line so the user sees exactly
                     // how many nodes the macro is about to traverse.
-                    debugTravel("plan committed: ${plan.hops.size} nodes (${plan.teleportNodes} aotv / ${plan.etherwarpNodes} ether / ${plan.walkNodes} walk)")
+                    val dropped = plan.hops.size - hops.size
+                    val droppedNote = if (dropped > 0) ", $dropped invalid dropped" else ""
+                    debugTravel("plan committed: ${hops.size} nodes (${plan.teleportNodes} aotv / ${plan.etherwarpNodes} ether / ${plan.walkNodes} walk$droppedNote)")
                 }
 
                 // No-progress watchdog -> replan from current position.
@@ -1588,7 +2100,8 @@ object DianaMacroModule : Module("Diana Macro") {
                 // single-shot direct-etherwarps or the final approach hop.
                 val nowReplan = System.currentTimeMillis()
                 if (wantsTeleports && aotvSlot >= 0 && hops.size > 2 && hopIndex < hops.size - 1 &&
-                    nowReplan - lastCastMs > 200L
+                    nowReplan - lastCastMs > 200L &&
+                    nowReplan - lastReplanCommittedMs > REPLAN_SWAP_COOLDOWN_MS
                 ) {
                     if (!replanInFlight && nowReplan - lastReplanSubmittedMs > 1500L) {
                         DianaTeleportPlanner.submit(
@@ -1611,17 +2124,52 @@ object DianaMacroModule : Module("Diana Macro") {
                         if (newPlan != null) {
                             replanInFlight = false
                             val remaining = hops.size - hopIndex
-                            // Strict improvement only (≥2 fewer hops) to
-                            // prevent oscillating between two near-equal
-                            // candidate plans every 1.5 s.
-                            if (newPlan.hops.size >= 2 && newPlan.hops.size + 1 < remaining) {
+                            // Stricter swap gate — the old "≥2 fewer hops"
+                            // sometimes accepted a shorter plan whose FIRST
+                            // hop moved backward, producing the visible
+                            // "warps forward, then warps back" loop the user
+                            // reported. All four conditions must hold:
+                            //   1. New plan has ≥2 hops (real teleport route).
+                            //   2. ≥3 fewer hops than what's left of the
+                            //      current plan (was 2 — too easy to flip).
+                            //   3. New plan's first travel hop is at least
+                            //      ~2 blocks CLOSER to the goal than where
+                            //      the player stands right now. Prevents a
+                            //      shorter loopy plan from winning by
+                            //      taking us backward first.
+                            //   4. New plan's first hop is roughly toward
+                            //      the goal in the horizontal plane (cosine
+                            //      of the angle between (first hop - player)
+                            //      and (goal - player) > 0). Catches the
+                            //      "shorter route in absolute hops but it
+                            //      circles back" case.
+                            val playerPos = player.position()
+                            val curDistToGoal = playerPos.distanceTo(target)
+                            val swapOk = run {
+                                if (newPlan.hops.size < 2) return@run false
+                                if (newPlan.hops.size + 2 >= remaining) return@run false
+                                val firstHop = newPlan.hops[1].standPos()
+                                val firstDistToGoal = firstHop.distanceTo(target)
+                                if (firstDistToGoal > curDistToGoal - 2.0) return@run false
+                                val hx = firstHop.x - playerPos.x
+                                val hz = firstHop.z - playerPos.z
+                                val gx = target.x - playerPos.x
+                                val gz = target.z - playerPos.z
+                                val hopLen = kotlin.math.hypot(hx, hz)
+                                val goalLen = kotlin.math.hypot(gx, gz)
+                                if (hopLen < 1e-3 || goalLen < 1e-3) return@run true
+                                val cosAngle = (hx * gx + hz * gz) / (hopLen * goalLen)
+                                cosAngle > 0.0
+                            }
+                            if (swapOk) {
                                 debugTravel("better aotv route: ${newPlan.hops.size} nodes vs $remaining remaining — switching")
-                                hops = newPlan.hops
+                                hops = sanitizePlannerHops(level, newPlan.hops)
                                 hopIndex = 1
                                 noProgressTicks = 0
                                 lastProgressDistSq = Double.MAX_VALUE
                                 airHopTrackedIndex = -1
                                 castedHopIndex = -1
+                                lastReplanCommittedMs = nowReplan
                                 return
                             }
                         }
@@ -1630,6 +2178,38 @@ object DianaMacroModule : Module("Diana Macro") {
 
                 val hop = hops[hopIndex]
                 val standPos = hop.standPos()
+
+                // "Let the player fall onto the burrow" gate. Once the player
+                // is airborne and the burrow is within horizontal fall-reach
+                // (the player will land at or near it just by falling), the
+                // chain has done its job — any further AOTV cast would either
+                // teleport the player past the burrow or send them downward
+                // unnecessarily. Stop casting, let gravity finish the trip,
+                // and let the PATHFINDING arrival check (player.distanceTo(target)
+                // <= arrivalRadius) close out the travel. This kills the
+                // user-reported "TPs downward while floating above the burrow"
+                // when the planner schedules one last descent hop the player
+                // doesn't actually need.
+                if ((hop.type == DianaTeleportPlanner.HopType.AOTV ||
+                        hop.type == DianaTeleportPlanner.HopType.ETHERWARP) &&
+                    !player.onGround()
+                ) {
+                    val horizDist = kotlin.math.hypot(player.x - target.x, player.z - target.z)
+                    val aboveTarget = player.y > target.y + 0.5
+                    // 6 blocks is the natural fall radius from a typical AOTV
+                    // chain altitude (~6-12 blocks above target). Anything in
+                    // that arc the player will reach by gravity alone.
+                    val withinFallReach = horizDist <= 6.0
+                    val descendingHop = standPos.y < player.y - 0.5
+                    if (withinFallReach && aboveTarget && descendingHop) {
+                        debugTravel("above burrow (~${horizDist.toInt()}m) — letting fall")
+                        // End the chain so PATHFINDING's arrival check / native
+                        // walk takes over the moment the player touches ground.
+                        releaseTravelInputs()
+                        resetHopState()
+                        return
+                    }
+                }
 
                 when (hop.type) {
                     DianaTeleportPlanner.HopType.WALK -> {
@@ -1831,13 +2411,33 @@ object DianaMacroModule : Module("Diana Macro") {
                     releaseTravelInputs()
                     resetHopState()
                     burrowPos = target
+                    // Probe the column above the player: if a solid block sits
+                    // within POST_WARP_CEILING_CHECK_Y blocks of the eye, we
+                    // landed under a ceiling (Crypt warp is the worst case).
+                    // Lock the macro into ground/teleport mode for a few
+                    // seconds so it walks out of the enclosure before any
+                    // climb-and-fly plan gets submitted — otherwise the
+                    // planner happily generates AOTV hops that clip stone.
+                    postWarpWalkUntilMs = if (hasCeilingOverhead(player)) {
+                        System.currentTimeMillis() + POST_WARP_WALK_MS
+                    } else {
+                        0L
+                    }
                     state = State.PATHFINDING
                 }
             }
 
             State.DIGGING -> {
-                var bp = burrowPos ?: run { state = State.IDLE; return }
-                promoteNearbyConfirmedBurrow(level, bp, radius = 8.0)?.let { bp = it.first }
+                val bp = burrowPos ?: run { state = State.IDLE; return }
+                // Don't re-promote here. Promotion runs once on the
+                // PATHFINDING -> DIGGING transition; running it every tick
+                // makes the target hop between confirmed burrows in dense
+                // burrow chains (multiple records inside the 8-block radius),
+                // and each hop restarts the native walker at a slightly
+                // different point. That's the "runs in circles around the
+                // burrow" symptom — the macro is chasing a target that keeps
+                // moving 1-3 blocks per tick. Once we've decided to dig a
+                // specific burrow, stay committed to it.
                 // bp.y is the burrow block's coordinate (it spans world Y
                 // bp.y..bp.y+1). Aim at its CENTRE, not its bottom face, or the
                 // look-ray passes into the block below it (the off-by-one).
@@ -1856,17 +2456,74 @@ object DianaMacroModule : Module("Diana Macro") {
                     return
                 }
                 holdSpadeSlot()
-                // Always look down at the burrow block so the use actually digs it.
-                aimAt(AngleUtils.getRotation(player.eyePosition, burrowBlock))
+                // Compute onBurrow up front so the aim decision can branch on
+                // it. The aim MUST be at the burrow block whenever we're
+                // committed to digging (onBurrow == true) — otherwise the
+                // forward-look humanisation aims at eye height and Hypixel's
+                // hit-resolve lands the right-click either on empty air or on
+                // the block directly underneath the player, producing the
+                // "spams spade but never mines" and "mines block under, not
+                // the burrow" symptoms. Forward look only applies while the
+                // player is still walking up (not yet committed to dig).
+                val approachDistFlat = kotlin.math.hypot(player.x - bp.x, player.z - bp.z)
+                val verticalOkAim = abs(player.y - (bp.y + 1.0)) <= 3.0
+                val committedToDig = approachDistFlat <= DIG_REACH && verticalOkAim
+                val aimTarget = if (committedToDig || approachDistFlat <= BURROW_AIM_DOWN_DIST) {
+                    burrowBlock
+                } else {
+                    Vec3(bp.x, player.eyeY, bp.z)
+                }
+                val desiredAim = AngleUtils.getRotation(player.eyePosition, aimTarget)
+                if (smoothAimSetting.value) {
+                    RotationExecutor.rotateTo(desiredAim, approachRotationStrategy)
+                } else {
+                    player.yRot = desiredAim.yaw
+                    player.xRot = desiredAim.pitch
+                }
+
+                // Particle freshness check on DIGGING entry. Skyblock
+                // Overhaul does this: a real burrow keeps emitting particle
+                // packets until you actually break it, so a record that hasn't
+                // ticked in >5 s is either already dug, expired, or a stale
+                // entry the server stopped echoing. Digging there just burns
+                // spade swings and gets the macro stuck. Guesses don't emit
+                // particles by definition, so they bypass the check.
+                if (digTicksElapsed == 0 &&
+                    burrowType != DianaParticleTracker.BurrowType.GUESS &&
+                    burrowType != DianaParticleTracker.BurrowType.SUB_GUESS &&
+                    burrowType != DianaParticleTracker.BurrowType.UNKNOWN
+                ) {
+                    val staleness = DianaParticleTracker.msSinceLastSeen(
+                        floor(bp.x).toInt(), floor(bp.z).toInt()
+                    )
+                    if (staleness > BURROW_STALENESS_MS) {
+                        DianaParticleTracker.removeBurrow(floor(bp.x).toInt(), floor(bp.z).toInt())
+                        ChatUtils.sendMessage("Diana: burrow stale (no particles for ${staleness}ms), skipping.")
+                        MovementManager.clearForcedMovement()
+                        MovementManager.setMovementLock(false)
+                        state = State.IDLE
+                        return
+                    }
+                }
 
                 val flatDist = kotlin.math.hypot(player.x - bp.x, player.z - bp.z)
-                val onBurrow = flatDist <= digRadiusSetting.value && abs(player.y - (bp.y + 1.0)) <= 2.0
+                val verticalOk = abs(player.y - (bp.y + 1.0)) <= 3.0
+                // Spade has long reach. If we're within DIG_REACH horizontal
+                // blocks and roughly at the burrow's elevation, treat it as
+                // "close enough to dig" — stop walking and commit. The old
+                // strict 1.55-block radius made the macro stall whenever the
+                // last walk step was blocked by terrain (fences, partial
+                // blocks, a tombstone) even though Hypixel would happily
+                // resolve a dig from 4-5 blocks away.
+                val onBurrow = flatDist <= DIG_REACH && verticalOk
+                // Inner radius is used purely as the native walker's arrival
+                // target so the player still positions reasonably on top of
+                // the burrow when nothing's in the way.
+                val walkRadius = digRadiusSetting.value
 
                 if (!onBurrow) {
-                    // Teleport landings are up to ~2 blocks off — walk onto the
-                    // burrow before digging instead of using into thin air.
+                    nativeWalkTo(player, Vec3(bp.x, bp.y + 1.0, bp.z), walkRadius)
                     MovementManager.forcedUse = false
-                    nativeWalkTo(player, Vec3(bp.x, bp.y + 1.0, bp.z), digRadiusSetting.value)
                     digApproachTicks++
                     if (digApproachTicks > digApproachTimeoutSetting.value.toInt()) {
                         stopNativeWalk()
@@ -1879,21 +2536,113 @@ object DianaMacroModule : Module("Diana Macro") {
                     return
                 }
 
+                // Guess confirmation: arrived at a guessed burrow — hold
+                // position and wait for particles to confirm the actual spot
+                // before swinging the spade. Diana's compass guess is often a
+                // few blocks off, and digging the guess directly usually digs
+                // empty ground. promoteNearbyConfirmedBurrow swaps to the
+                // particle-confirmed location the instant one arrives, which
+                // also flips burrowType off GUESS so this block stops running.
+                // If we wait the full window without seeing particles, drop
+                // the guess and look for the next target — that's the
+                // SkyBlock Overhaul "mine if particles, proceed if not" rule.
+                if (isGuessTarget() && digTicksElapsed == 0) {
+                    stopNativeWalk()
+                    MovementManager.setMovementLock(true)
+                    MovementManager.setForcedMovement(false, false, false, false, false, false, false)
+                    MovementManager.forcedUse = false
+                    setStatus("Confirming guess (${guessConfirmTicks}t)")
+                    val confirmed = promoteNearbyConfirmedBurrow(level, bp, radius = GUESS_CONFIRM_RADIUS)
+                    if (confirmed != null) {
+                        // Promotion mutated burrowPos / burrowType to the real
+                        // burrow. Reset the approach timer so the dig walk
+                        // restarts toward the new coords cleanly.
+                        guessConfirmTicks = 0
+                        digApproachTicks = 0
+                        ChatUtils.sendMessage("Diana: guess confirmed → particle burrow at (${floor(confirmed.first.x).toInt()}, ${floor(confirmed.first.z).toInt()}).")
+                        return
+                    }
+                    guessConfirmTicks++
+                    if (guessConfirmTicks >= GUESS_CONFIRM_TICKS) {
+                        DianaParticleTracker.removeBurrow(floor(bp.x).toInt(), floor(bp.z).toInt())
+                        ChatUtils.sendMessage("Diana: no particles at guess after ${guessConfirmTicks}t, skipping.")
+                        MovementManager.clearForcedMovement()
+                        MovementManager.setMovementLock(false)
+                        guessConfirmTicks = 0
+                        state = State.IDLE
+                    }
+                    return
+                }
+
                 // Positioned on the burrow — stop and dig.
                 stopNativeWalk()
                 MovementManager.setMovementLock(true)
                 MovementManager.setForcedMovement(false, false, false, false, false, false, false)
+
+                // Post-dig scan: the burrow physically broke (onBurrowDugChat
+                // fired and set burrowDugConfirmed). Stop swinging the spade
+                // — there's nothing left to break — and spend up to
+                // POST_DUG_MOB_GRACE_TICKS (10) scanning for a mob that may
+                // have spawned. If one appears, engage. If the window expires
+                // without a mob, proceed to the next burrow.
+                if (burrowDugConfirmed) {
+                    MovementManager.forcedUse = false
+                    MovementManager.forcedAttack = false
+                    val scanTick = digTicksElapsed - burrowDugConfirmedAtTick
+                    val remaining = (POST_DUG_MOB_GRACE_TICKS - scanTick).coerceAtLeast(0)
+                    setStatus("Scanning for mob (${remaining}t)")
+                    val mob = findDianaMob(bp, mobSearchRangeSetting.value)
+                    if (mob != null) {
+                        DianaProfitTracker.onMacroDug()
+                        DianaProfitTracker.onMacroMobFound()
+                        startCombat(mob, rare = dianaMobName(mob) in RARE_MOB_NAMES)
+                        return
+                    }
+                    digTicksElapsed++
+                    if (scanTick >= POST_DUG_MOB_GRACE_TICKS) {
+                        DianaParticleTracker.removeBurrow(floor(bp.x).toInt(), floor(bp.z).toInt())
+                        DianaProfitTracker.onMacroDug()
+                        waitTicksElapsed = 0
+                        state = State.WAITING
+                    }
+                    return
+                }
+
+                // Clear any tall grass / fern / flower between the player's
+                // eye and the burrow block. Hypixel's spade pick-ray hits
+                // foliage's outline shape before reaching the dirt
+                // underneath, so the right-click resolves on the plant and
+                // the burrow never breaks. Left-click breaks the plant in
+                // one swing; then the next tick the ray reaches the burrow
+                // and the normal spade USE goes through. Only USE while
+                // attack-clearing is OFF so the two inputs don't fight.
+                if (isFoliageBlocking(level, player, burrowBlock)) {
+                    MovementManager.forcedActionsEnabled = true
+                    MovementManager.forcedAttack = true
+                    MovementManager.forcedUse = false
+                    return
+                } else {
+                    MovementManager.forcedAttack = false
+                }
                 MovementManager.forcedUse = true
                 digTicksElapsed++
 
-                // A mob can spawn from ANY burrow, including guesses/inquisitors.
-                val mob = findDianaMob(bp, mobSearchRangeSetting.value)
-                if (mob != null) {
-                    MovementManager.forcedUse = false
-                    DianaProfitTracker.onMacroDug()
-                    DianaProfitTracker.onMacroMobFound()
-                    startCombat(mob, rare = dianaMobName(mob) in RARE_MOB_NAMES)
-                    return
+                // Defender combat: Hypixel's "Defeat all the burrow defenders
+                // in order to dig it!" chat sets defendersRequired. The
+                // burrow can't break until the defender is dead, so engage
+                // and resume the same burrow afterwards via combatBlockedDig.
+                if (defendersRequired) {
+                    val mob = findDianaMob(bp, mobSearchRangeSetting.value)
+                    if (mob != null) {
+                        MovementManager.forcedUse = false
+                        DianaProfitTracker.onMacroMobFound()
+                        combatBlockedDig = true
+                        startCombat(mob, rare = dianaMobName(mob) in RARE_MOB_NAMES)
+                        return
+                    }
+                    // Defender chat fired but the mob hasn't materialised in
+                    // entity-tracking range yet — keep digging (the server
+                    // still won't let the burrow break), spade is held.
                 }
 
                 if (isTreasureTarget()) {
@@ -1952,10 +2701,14 @@ object DianaMacroModule : Module("Diana Macro") {
 
             State.COMBAT -> {
                 castRestoreSlot = -1
-                holdWeaponSlot()
+                // Hold the weapon by default, unless tryAutoHeal swapped in
+                // the wand this tick — its scheduled restore puts the
+                // weapon back N ticks later.
+                if (healRestoreInTicks == 0) holdWeaponSlot()
                 MovementManager.forcedActionsEnabled = true
                 MovementManager.forcedUse = false
                 MovementManager.forcedAttack = false
+                tryAutoHeal(player)
                 combatTicksElapsed++
                 val protectedRareFight = combatIsRareMob && (rareMobFocusActive() || cocoonHoldActive())
                 if (!protectedRareFight && combatTicksElapsed > combatTimeoutSetting.value.toInt()) {
@@ -1963,8 +2716,7 @@ object DianaMacroModule : Module("Diana Macro") {
                     MovementManager.setMovementLock(false)
                     RotationExecutor.stopIfUsing(combatRotationStrategy)
                     ChatUtils.sendMessage("Diana: combat timed out, continuing.")
-                    waitTicksElapsed = 0
-                    state = State.WAITING
+                    resumeAfterCombat()
                     return
                 }
 
@@ -1992,8 +2744,7 @@ object DianaMacroModule : Module("Diana Macro") {
                         RotationExecutor.stopIfUsing(combatRotationStrategy)
                         DianaProfitTracker.onMacroKill()
                         loopsCompleted++
-                        waitTicksElapsed = 0
-                        state = State.WAITING
+                        resumeAfterCombat()
                     }
                     return
                 }
@@ -2031,11 +2782,13 @@ object DianaMacroModule : Module("Diana Macro") {
                 )
                 val (yawErr, pitchErr) = combatRotationError(player, aimPoint)
                 val aimed = yawErr <= combatAimToleranceSetting.value && pitchErr <= combatAimToleranceSetting.value
-                val attackInterval = combatAttackIntervalSetting.value.toInt().coerceAtLeast(1)
-                val canAttackThisTick = combatTicksElapsed - lastAttackTick >= attackInterval
+                val canAttackThisTick = combatTicksElapsed - lastAttackTick >= nextClickIntervalTicks
                 val shouldAttack = tdist <= combatAttackRangeSetting.value && aimed && canAttackThisTick
                 MovementManager.forcedAttack = shouldAttack
-                if (shouldAttack) lastAttackTick = combatTicksElapsed
+                if (shouldAttack) {
+                    lastAttackTick = combatTicksElapsed
+                    rollNextClickInterval()
+                }
             }
 
             State.WAITING -> {
@@ -2080,89 +2833,107 @@ object DianaMacroModule : Module("Diana Macro") {
         }
     }
 
+    /**
+     * Cut the dig short the moment Hypixel confirms the burrow broke. Without
+     * this the macro keeps spamming USE for the full digTimeout window even
+     * though the block is gone — wasted seconds per burrow that translate
+     * directly into a lower burrows/hour ceiling. Chat is the authoritative
+     * "this burrow is done" signal: react on it, drop the burrow from the
+     * tracker, and jump straight to the post-loot wait.
+     */
+    @SubscribeEvent
+    fun onBurrowDugChat(event: ChatEvent.Receive) {
+        if (state != State.DIGGING && state != State.COMBAT) return
+        val msg = ChatFormatting.stripFormatting(event.message ?: return) ?: return
+
+        // Defender chat: a mob must be killed before the burrow can break.
+        // Flag the dig as defender-gated so the DIGGING handler is allowed to
+        // transition to COMBAT — and so COMBAT routes back to DIGGING (same
+        // burrow) instead of WAITING when the defender dies.
+        if (msg.startsWith("Defeat all the burrow defenders")) {
+            if (state == State.DIGGING) defendersRequired = true
+            return
+        }
+
+        if (!msg.startsWith("You dug out a Griffin Burrow!") &&
+            !msg.startsWith("You finished the Griffin burrow chain!")
+        ) return
+        val bp = burrowPos
+        if (bp != null) DianaParticleTracker.removeBurrow(floor(bp.x).toInt(), floor(bp.z).toInt())
+        MovementManager.forcedUse = false
+        // The burrow physically broke. Defender combat (if any) is finished by
+        // definition. Don't jump to WAITING yet — give the DIGGING handler a
+        // short grace window to spot a post-dig spawn (gaia construct, etc.).
+        // The grace check (POST_DUG_MOB_GRACE_TICKS) in DIGGING will move us
+        // to WAITING if no mob appears.
+        burrowDugConfirmed = true
+        burrowDugConfirmedAtTick = digTicksElapsed
+        defendersRequired = false
+        combatBlockedDig = false
+    }
+
     @SubscribeEvent
     fun onRender(@Suppress("UNUSED_PARAMETER") event: WorldRenderEvent.Last) {
         if (state != State.PATHFINDING && state != State.DIGGING && state != State.COMBAT) return
         val level = mc.level ?: return
         val bp = burrowPos ?: return
-        OverlayRenderEngine.addBox(
-            level,
-            bp.x - 0.5, bp.y, bp.z - 0.5,
-            bp.x + 0.5, bp.y + 1.0, bp.z + 0.5,
-            fill    = OverlayRenderEngine.Color(255, 220, 0, 60),
-            outline = OverlayRenderEngine.Color(255, 220, 0, 255),
-            durationTicks = 10,
-            tag = "diana-macro-burrow"
-        )
 
-        // Node map: planned hop path, visible through walls while travelling.
-        //   cyan  = instant transmission   (lighter = mid-air sky chain)
-        //   magenta = etherwarp (near-burrow finisher)
-        //   grey  = walk bridge
+        // Burrow marker: a single subtle yellow box on the target. Toggled
+        // by Render Burrow.
+        if (showBurrowMarkerSetting.value) {
+            OverlayRenderEngine.addBox(
+                level,
+                bp.x - 0.5, bp.y, bp.z - 0.5,
+                bp.x + 0.5, bp.y + 1.0, bp.z + 0.5,
+                fill    = OverlayRenderEngine.Color(255, 215, 0, 55),
+                outline = OverlayRenderEngine.Color(255, 215, 0, 220),
+                durationTicks = 10,
+                tag = "diana-macro-burrow"
+            )
+        }
+
+        // Path nodes: a single thin beam tracing the planned hop chain plus
+        // a small dot at each node. No per-hop colours, no full-block
+        // beacons, no end-marker — just enough to see the route. Toggled by
+        // Render Path Nodes.
         if (showNodeMapSetting.value && state == State.PATHFINDING && hops.isNotEmpty()) {
+            val beam = OverlayRenderEngine.Color(120, 220, 255, 220)
+            val node = OverlayRenderEngine.Color(120, 220, 255, 200)
             val player = mc.player
             var prev = player?.let { Vec3(it.x, it.y + 0.9, it.z) }
                 ?: hops.first().standPos()
-            hops.forEachIndexed { i, h ->
+            hops.forEach { h ->
                 val c = h.standPos()
-                val col = when (h.type) {
-                    DianaTeleportPlanner.HopType.WALK ->
-                        OverlayRenderEngine.Color(160, 160, 170, 255)
-                    DianaTeleportPlanner.HopType.AOTV ->
-                        if (h.airborne) OverlayRenderEngine.Color(120, 235, 255, 255)
-                        else OverlayRenderEngine.Color(0, 200, 255, 255)
-                    DianaTeleportPlanner.HopType.ETHERWARP ->
-                        OverlayRenderEngine.Color(255, 60, 230, 255)
-                }
-                // Connecting beam between hop points (cast trajectory).
+                val cTop = Vec3(c.x, c.y + 0.9, c.z)
+                // Clip the beam at the first solid block along its path so
+                // the route never appears to draw straight through stone /
+                // walls. If the player is currently inside a block (e.g.,
+                // standing in the foot voxel of a step), the clip starts
+                // failing — fall back to a non-clipped draw so we don't lose
+                // the segment entirely.
+                val visibleEnd = firstWallHit(level, prev, cTop)
                 OverlayRenderEngine.addLine(
-                    level,
-                    prev.x, prev.y, prev.z,
-                    c.x, c.y + 0.9, c.z,
-                    col, 3.0f, 10, "diana-node-map", true
+                    level, prev.x, prev.y, prev.z, visibleEnd.x, visibleEnd.y, visibleEnd.z,
+                    beam, 1.6f, 10, "diana-node-map", true
                 )
-                if (h.airborne) {
-                    // Air node: small marker at the sky point.
+                // Only draw the node marker if the node's stand position is
+                // not buried in a wall — that's the "node map goes through
+                // walls" symptom. sanitizePlannerHops already drops these
+                // from the executor list, but a final visual gate makes the
+                // route render clean even if a stale plan slipped through.
+                val nodeVisible = visibleEnd.distanceToSqr(cTop) < 0.04
+                if (nodeVisible) {
                     OverlayRenderEngine.addBox(
                         level,
-                        c.x - 0.2, c.y - 0.2, c.z - 0.2,
-                        c.x + 0.2, c.y + 0.2, c.z + 0.2,
-                        fill = OverlayRenderEngine.Color(col.r, col.g, col.b, 90),
-                        outline = col, lineWidth = 1.5f,
+                        c.x - 0.15, cTop.y - 0.15, c.z - 0.15,
+                        c.x + 0.15, cTop.y + 0.15, c.z + 0.15,
+                        fill = OverlayRenderEngine.Color(node.r, node.g, node.b, 80),
+                        outline = node, lineWidth = 1.2f,
                         durationTicks = 10, tag = "diana-node-map",
                         forceRender = true
                     )
-                } else {
-                    // Ground node: full standing block + a beacon so it's easy
-                    // to spot which blocks the route lands on.
-                    OverlayRenderEngine.addBox(
-                        level,
-                        c.x - 0.5, c.y, c.z - 0.5,
-                        c.x + 0.5, c.y + 1.0, c.z + 0.5,
-                        fill = OverlayRenderEngine.Color(col.r, col.g, col.b, 55),
-                        outline = col, lineWidth = 2.0f,
-                        durationTicks = 10, tag = "diana-node-map",
-                        forceRender = true
-                    )
-                    OverlayRenderEngine.addLine(
-                        level,
-                        c.x, c.y, c.z, c.x, c.y + 2.5, c.z,
-                        col, 2.0f, 10, "diana-node-map", true
-                    )
                 }
-                if (i == hops.lastIndex) {
-                    // Final hop: bright marker on the burrow approach.
-                    OverlayRenderEngine.addBox(
-                        level,
-                        c.x - 0.5, c.y, c.z - 0.5,
-                        c.x + 0.5, c.y + 1.0, c.z + 0.5,
-                        fill = OverlayRenderEngine.Color(255, 255, 255, 70),
-                        outline = OverlayRenderEngine.Color(255, 255, 255, 255),
-                        lineWidth = 2.5f, durationTicks = 10,
-                        tag = "diana-node-map", forceRender = true
-                    )
-                }
-                prev = Vec3(c.x, c.y + 0.9, c.z)
+                prev = cTop
             }
         }
     }
