@@ -109,6 +109,15 @@ object DianaMacroModule : Module("Diana Macro") {
     // position before the chain drifts further.
     private var airHopTrackedIndex = -1
     private var airHopStartMs = 0L
+    // Track which hopIndex we last cast for. AOTV's fixed-11-block travel can
+    // land the player 2-4 blocks from the planner's standPos when the eye has
+    // fallen between casts — the `<=2.0` proximity advance silently misses it,
+    // the chain looks like it "didn't pass the node", and the off-course
+    // watchdog only catches it 500 ms later. After firing, we advance on the
+    // very next tick (the teleport is essentially instant) instead of waiting
+    // for a proximity check that may never fire.
+    private var castedHopIndex = -1
+    private var castedAtMs = 0L
     private var castRestoreSlot = -1
     private var nativeWalkTarget: Vec3? = null
     private var nativeWalkRadius = 0.0
@@ -401,19 +410,20 @@ object DianaMacroModule : Module("Diana Macro") {
 
     // Sky-chain rotation: must keep up with a live target whose required pitch
     // shifts ~2-3°/tick while the player falls between airborne AOTV hops, yet
-    // still look human (Bezier ease) and finish precise. The default
-    // rotationStrategy is combat-tuned (small step, minScale ~0.18) and slows
-    // to a crawl near the target, so the gate never closes before the next fall
-    // tick moves it again. Here: large per-frame cap (brisk swing), high
-    // minScale floor (no late ease-out — would lose tracking), and a tight
-    // snap so the last fraction of a degree doesn't drift.
+    // still look human (Bezier ease). The default rotationStrategy is combat
+    // tuned (small step, minScale ~0.18) and slows to a crawl near the target,
+    // so the gate never closes before the next fall tick moves it again.
+    // Here: moderate per-frame cap and a soft eased curve so the camera swing
+    // is visibly smooth, with a minScale floor that's high enough the ease-out
+    // doesn't lose the moving target. A small snap closes the final fraction
+    // of a degree without leaving precision-killing drift behind.
     private val airborneRotationStrategy = BezierTrackingRotationStrategy(
-        maxYawStep = 20f,
-        maxPitchStep = 20f,
-        curveIn = 0.25f,
-        curveOut = 0.75f,
-        minScale = 0.55f,
-        snapThreshold = 0.5f,
+        maxYawStep = 14f,
+        maxPitchStep = 14f,
+        curveIn = 0.35f,
+        curveOut = 0.78f,
+        minScale = 0.42f,
+        snapThreshold = 0.6f,
     )
 
     private val combatRotationStrategy = BezierTrackingRotationStrategy(
@@ -516,7 +526,61 @@ object DianaMacroModule : Module("Diana Macro") {
         lastProgressDistSq = Double.MAX_VALUE
         airHopTrackedIndex = -1
         airHopStartMs = 0L
+        castedHopIndex = -1
+        castedAtMs = 0L
         resetAimSettle()
+    }
+
+    /**
+     * For the direct-etherwarp shortcut: pick a SOLID block ~2 blocks away
+     * from the burrow with clear stand on top, so the player lands on it
+     * and is then a short walk from the burrow. Prefers the side closest to
+     * the player so the etherwarp aim doesn't sweep across the burrow itself.
+     * Returns null if no valid stand block exists or the player is out of
+     * etherwarp reach of every candidate (fall through to planner).
+     */
+    private fun findEtherwarpStandBlock(
+        level: net.minecraft.world.level.Level,
+        burrow: Vec3,
+        playerEye: Vec3,
+        maxReach: Double,
+    ): net.minecraft.core.BlockPos? {
+        val bx = floor(burrow.x).toInt()
+        val by = floor(burrow.y).toInt()
+        val bz = floor(burrow.z).toInt()
+
+        // Order candidates by which side of the burrow the player is on, so
+        // the etherwarp picks the side facing the player (shorter aim swing,
+        // less chance of the look-ray clipping the burrow column).
+        val pdx = playerEye.x - burrow.x
+        val pdz = playerEye.z - burrow.z
+        val primary: Pair<Int, Int>
+        val secondary: Pair<Int, Int>
+        if (abs(pdx) >= abs(pdz)) {
+            primary = (if (pdx > 0) 2 else -2) to 0
+            secondary = 0 to (if (pdz > 0) 2 else -2)
+        } else {
+            primary = 0 to (if (pdz > 0) 2 else -2)
+            secondary = (if (pdx > 0) 2 else -2) to 0
+        }
+        val candidates = listOf(primary, secondary, -primary.first to -primary.second, -secondary.first to -secondary.second)
+
+        for ((dx, dz) in candidates) {
+            val cx = bx + dx
+            val cy = by
+            val cz = bz + dz
+            val standState = level.getBlockState(net.minecraft.core.BlockPos(cx, cy, cz))
+            if (standState.isAir) continue
+            // Head + body clearance for the player to stand here.
+            if (!level.getBlockState(net.minecraft.core.BlockPos(cx, cy + 1, cz)).isAir) continue
+            if (!level.getBlockState(net.minecraft.core.BlockPos(cx, cy + 2, cz)).isAir) continue
+            // Etherwarp aims at the block's top face — that's where the
+            // server's ray-trace will hit and what we measure distance to.
+            val standTop = Vec3(cx + 0.5, cy + 1.0, cz + 0.5)
+            if (playerEye.distanceTo(standTop) > maxReach) continue
+            return net.minecraft.core.BlockPos(cx, cy, cz)
+        }
+        return null
     }
 
     private fun nativeWalkActive(): Boolean =
@@ -1310,6 +1374,43 @@ object DianaMacroModule : Module("Diana Macro") {
                     // route at all.
                 }
 
+                // Direct-etherwarp fast-path: if the burrow is within direct
+                // etherwarp reach AND a clean stand block exists ~2 blocks
+                // from it, inject a single-hop "plan" that lands the player
+                // on that stand block in one shot. Bypasses the planner
+                // entirely — both faster and free of the planner thrash that
+                // produces the "back and forth between two spots" oscillation
+                // near the goal. Gate on dist > 4 so we don't re-fire after
+                // landing (the arrival check / walk handles the final 2-4 m).
+                if (!planSubmitted && hops.isEmpty() && useEtherwarpSetting.value && aotvSlot >= 0) {
+                    val ewRange = EtherwarpLogic.getEtherwarpRange().toDouble()
+                    val distToBurrow = player.eyePosition.distanceTo(target)
+                    if (distToBurrow in 4.0..ewRange) {
+                        val standBlock = findEtherwarpStandBlock(level, Vec3(bp.x, bp.y, bp.z), player.eyePosition, ewRange)
+                        if (standBlock != null) {
+                            val standCenter = Vec3(standBlock.x + 0.5, standBlock.y + 0.5, standBlock.z + 0.5)
+                            val rot = AngleUtils.getRotation(player.eyePosition, standCenter)
+                            val startHop = DianaTeleportPlanner.Hop(
+                                floor(player.x).toInt(), floor(player.y).toInt(), floor(player.z).toInt(),
+                                DianaTeleportPlanner.HopType.WALK, 0f, 0f, false
+                            )
+                            val ewHop = DianaTeleportPlanner.Hop(
+                                standBlock.x, standBlock.y + 1, standBlock.z,
+                                DianaTeleportPlanner.HopType.ETHERWARP, rot.yaw, rot.pitch, false
+                            )
+                            hops = listOf(startHop, ewHop)
+                            hopIndex = 1
+                            planSubmitted = true
+                            noProgressTicks = 0
+                            lastProgressDistSq = Double.MAX_VALUE
+                            debugTravel("direct etherwarp: stand @ (${standBlock.x},${standBlock.y},${standBlock.z}), ${distToBurrow.toInt()}m to burrow, plan has 1 cast")
+                            MovementManager.setMovementLock(true)
+                            MovementManager.setForcedMovement(false, false, false, false, false, false, false)
+                            return
+                        }
+                    }
+                }
+
                 // Request a hybrid teleport-first plan and wait for it.
                 if (!wantsTeleports || aotvSlot < 0) {
                     debugTravel("walking fallback")
@@ -1386,6 +1487,9 @@ object DianaMacroModule : Module("Diana Macro") {
                     noProgressTicks = 0
                     lastProgressDistSq = Double.MAX_VALUE
                     stopNativeWalk()
+                    // Visible "plan committed" line so the user sees exactly
+                    // how many nodes the macro is about to traverse.
+                    debugTravel("plan committed: ${plan.hops.size} nodes (${plan.teleportNodes} aotv / ${plan.etherwarpNodes} ether / ${plan.walkNodes} walk)")
                 }
 
                 // No-progress watchdog -> replan from current position.
@@ -1413,6 +1517,7 @@ object DianaMacroModule : Module("Diana Macro") {
                 when (hop.type) {
                     DianaTeleportPlanner.HopType.WALK -> {
                         if (nativeWalkTo(player, standPos, 1.15)) {
+                            debugTravel("node $hopIndex complete @ (${hop.x},${hop.y},${hop.z}) walk")
                             hopIndex++
                             resetAimSettle()
                         }
@@ -1424,6 +1529,27 @@ object DianaMacroModule : Module("Diana Macro") {
                         MovementManager.setMovementLock(true)
                         MovementManager.setForcedMovement(false, false, false, false, false, false, false)
                         val isEther = hop.type == DianaTeleportPlanner.HopType.ETHERWARP
+
+                        // Post-cast quick advance: AOTV/etherwarp teleport is
+                        // essentially instant on the server, so once we've
+                        // fired for THIS hop, the next tick the player is at
+                        // (or near) the landing. The slow proximity check
+                        // (<=2.0) can miss the landing when AOTV's fixed
+                        // 11-block travel from a fallen eye drops the player
+                        // a few blocks short of standPos — the chain looks
+                        // like "didn't pass the node" and the watchdog has
+                        // to clean up 500 ms later. Trust the cast: advance
+                        // ~60 ms after firing regardless of proximity, and
+                        // let the next hop's live aim self-correct from the
+                        // actual landing position.
+                        val nowEarly = System.currentTimeMillis()
+                        if (castedHopIndex == hopIndex && nowEarly - castedAtMs > 60L) {
+                            debugTravel("node $hopIndex complete @ (${player.x.toInt()},${player.y.toInt()},${player.z.toInt()}) ${if (isEther) "etherwarp" else "aotv"}")
+                            hopIndex++
+                            castedHopIndex = -1
+                            resetAimSettle()
+                            return
+                        }
                         // Instant transmission needs no target block and can be
                         // chained mid-air; etherwarp needs a block + crouch
                         // (fireCast handles the sneak). Air chains must fire
@@ -1478,6 +1604,7 @@ object DianaMacroModule : Module("Diana Macro") {
                         }
 
                         if (player.position().distanceTo(standPos) <= 2.0) {
+                            debugTravel("node $hopIndex complete @ (${hop.x},${hop.y},${hop.z}) proximity")
                             hopIndex++
                             resetAimSettle()
                             return
@@ -1488,6 +1615,7 @@ object DianaMacroModule : Module("Diana Macro") {
                         if (!air && !player.onGround() && player.deltaMovement.y < -0.08 &&
                             player.y < standPos.y - 1.1
                         ) {
+                            debugTravel("node $hopIndex complete @ (${hop.x},${hop.y},${hop.z}) falling-past")
                             hopIndex++
                             resetAimSettle()
                             return
@@ -1495,23 +1623,25 @@ object DianaMacroModule : Module("Diana Macro") {
 
                         val now = System.currentTimeMillis()
 
-                        // Fast off-course watchdog for airborne hops. Drift
-                        // between planner-ideal landings and real AOTV landings
-                        // accumulates ~0.3–2 blocks/hop once the player has
-                        // fallen between casts (AOTV travels a fixed ~11
-                        // blocks along the look vector, not TO a point) — past
-                        // ~2 blocks of drift the `<=2.0` proximity-advance can
-                        // never fire and the slow no-progress watchdog (~1.75 s)
-                        // is far too late mid-fall. If a single airborne hop
-                        // hasn't advanced within ~300 ms (~6 ticks), the chain
-                        // is off course: blow it away and let PATHFINDING
-                        // submit a fresh plan from where we actually are.
+                        // Fast off-course watchdog for airborne hops. AOTV
+                        // travels a fixed ~11 blocks along the look vector, so
+                        // each sky hop carries ~0.3-2 blocks of drift from the
+                        // planner's ideal landing once the player has fallen
+                        // between casts; past ~2 blocks the `<=2.0` proximity
+                        // advance never fires and the slow no-progress
+                        // watchdog (~1.75 s) is far too late mid-fall. 500 ms
+                        // is enough for the smooth airborne rotation to land
+                        // within the 1.5° gate, the cast to fire, AOTV to
+                        // teleport, and proximity to advance the hop — about
+                        // 8-10 ticks — and short enough that a stuck hop
+                        // triggers a fresh plan before the player has fallen
+                        // more than 4-5 blocks.
                         if (air) {
                             if (airHopTrackedIndex != hopIndex) {
                                 airHopTrackedIndex = hopIndex
                                 airHopStartMs = now
-                            } else if (now - airHopStartMs > 300L) {
-                                debugTravel("air hop $hopIndex off-course (>300ms) — replanning")
+                            } else if (now - airHopStartMs > 500L) {
+                                debugTravel("air hop $hopIndex off-course (>500ms) — replanning")
                                 releaseTravelInputs()
                                 resetHopState()
                                 return
@@ -1521,25 +1651,35 @@ object DianaMacroModule : Module("Diana Macro") {
                         val cd = if (air) aerialCastCooldownSetting.value.toLong() else castCooldownMs
                         if (now - lastCastMs < cd) return
 
-                        // Airborne hops have already SNAPPED above, so the
-                        // error is 0 by construction and the convergence gate /
-                        // settle just add a frame of latency during which the
-                        // player falls further. Ground hops keep the gate so
-                        // smooth-aim still settles on the planner's stored
-                        // angles before firing.
-                        if (!air) {
-                            val yawErr = abs(AngleUtils.getRotationDelta(player.yRot, castYaw))
-                            val pitchErr = abs(player.xRot - castPitch)
-                            if (yawErr > AIM_ERROR_DEG || (isEther && pitchErr > AIM_ERROR_DEG)) {
-                                aimStableSinceMs = now
-                                return
-                            }
-                            if (now - aimStableSinceMs < aimSettleMs()) return
+                        // Precision gate. Airborne hops use a tight 1.5°
+                        // tolerance — at AOTV's ~11-block reach, 1.5° of
+                        // angular error is ~0.3 blocks of landing error, which
+                        // keeps the chain on the planner's intended track.
+                        // Ground hops keep the 3.5° tolerance + smooth settle
+                        // so human-like aim has time to land on stored angles.
+                        // Settle is 0 for airborne — once the smooth swing has
+                        // converged within 1.5°, fire immediately; any extra
+                        // wait costs altitude as the player keeps falling.
+                        val airTol = 1.5f
+                        val yawErr = abs(AngleUtils.getRotationDelta(player.yRot, castYaw))
+                        val pitchErr = abs(player.xRot - castPitch)
+                        val tol = if (air) airTol else AIM_ERROR_DEG
+                        if (yawErr > tol || ((isEther || air) && pitchErr > tol)) {
+                            aimStableSinceMs = now
+                            return
                         }
+                        if (!air && now - aimStableSinceMs < aimSettleMs()) return
 
                         fireCast(isEther, aotvSlot)
                         lastCastMs = now
                         castCooldownMs = if (air) aerialCastCooldownSetting.value.toLong() else randomCastCooldown()
+                        // Mark THIS hop as already-cast so the post-cast quick
+                        // advance fires on the next tick instead of waiting on
+                        // the proximity check (which AOTV's fixed-11-block
+                        // travel from a fallen eye routinely misses by 2-4
+                        // blocks).
+                        castedHopIndex = hopIndex
+                        castedAtMs = now
                     }
                 }
             }

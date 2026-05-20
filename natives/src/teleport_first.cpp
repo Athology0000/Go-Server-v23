@@ -290,6 +290,12 @@ void appendAotvNodes(
     }
 
     // March the look vector to its farthest fully-clear voxel (feet + head).
+    // Hypixel blocks AOTV "instant transmission" whenever the player's
+    // crosshair has a solid block in standard pick range (~4.5 m): the cast
+    // becomes a no-op silently. So we require the look ray be clear for at
+    // least 5 m before accepting an aim — guarantees the cast will actually
+    // fire when the player executes the hop, with a small margin over the
+    // pick range so jitter / fall doesn't push a near-solid into reach.
     int bestStep = -1;
     for (int s = 1; s <= maxSteps; s++) {
       const double t = s * 0.5;
@@ -301,9 +307,9 @@ void appendAotvNodes(
           !isTeleportClear(w, vx, vy + 1, vz)) {
         break;
       }
-      if (t >= 4.0) bestStep = s;
+      if (t >= 5.0) bestStep = s;
     }
-    if (bestStep < 0) continue; // nothing reachable >= 4 blocks this way
+    if (bestStep < 0) continue; // nothing reachable past block-pick reach this way
 
     const double bt = bestStep * 0.5;
     Int3 aim{static_cast<int>(std::floor(ex + d.x * bt)),
@@ -402,11 +408,15 @@ void neighbours(
   }
   const bool hasAotvExit = out.size() > aotvStart;
 
-  // ---- Etherwarp (sneak) — finishing move ONLY. Offered solely when the
-  // burrow is already within a single etherwarp, and (below) only hops that
-  // land essentially on the burrow are kept. Instant transmission handles all
-  // long-distance traversal. ----
-  if (!fromAirborne && p.etherwarpEnabled && toGoal <= p.etherwarpRange) {
+  // ---- Etherwarp (sneak) — finishing move. Offered when the burrow is
+  // within a single etherwarp, and (below) only hops that land essentially on
+  // the burrow are kept. Available from BOTH ground and airborne nodes:
+  // sneak-right-click while still mid-chain lands the player directly on the
+  // burrow without descending — strictly faster and more precise than letting
+  // AOTV step down to the ground first, which was producing the "instant
+  // transmission nodes close to the ground" pattern. Pitch sweep is widened
+  // when airborne so the planner can aim sharply down at a burrow far below.
+  if (p.etherwarpEnabled && toGoal <= p.etherwarpRange) {
     for (int yawDeg = 0; yawDeg < 360 && etherCount < MAX_ETHER_NEIGHBOURS;
          yawDeg += 20) {
       const double yr = yawDeg * (PI / 180.0);
@@ -414,7 +424,13 @@ void neighbours(
       const double rdz = std::cos(yr);
       if (gLen > 1e-6 && (gDirX * rdx + gDirZ * rdz) < 0.0) continue;
 
-      for (int pitchDeg = -25; pitchDeg <= 25; pitchDeg += 25) {
+      // Ground finish: shallow pitches near eye-level (standing near burrow).
+      // Airborne finish: span the full downward range so a sky-chain end can
+      // aim straight down onto a burrow many blocks below the cruise altitude.
+      const int pitchLo = -25;
+      const int pitchHi = fromAirborne ? 85 : 25;
+      const int pitchStep = fromAirborne ? 15 : 25;
+      for (int pitchDeg = pitchLo; pitchDeg <= pitchHi; pitchDeg += pitchStep) {
         if (etherCount >= MAX_ETHER_NEIGHBOURS) break;
         const double pr = pitchDeg * (PI / 180.0);
         const double cp = std::cos(pr);
