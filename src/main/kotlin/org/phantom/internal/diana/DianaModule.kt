@@ -1447,24 +1447,30 @@ object DianaMacroModule : Module("Diana Macro") {
                         val castYaw: Float
                         val castPitch: Float
                         if (air) {
+                            // Live re-aim each tick: the planner stored angles
+                            // for an idealised eye at the airborne node's block
+                            // centre, but by the time we cast the player has
+                            // fallen — recompute from the current eye toward
+                            // the planner's aim point (same point anglesBetween
+                            // used in the planner) so AOTV's ~11-block fixed
+                            // reach along the look vector lands close to plan.
                             val aimTarget = Vec3(hop.x + 0.5, hop.y + 1.0, hop.z + 0.5)
                             val live = AngleUtils.getRotation(player.eyePosition, aimTarget)
                             castYaw = live.yaw
                             castPitch = live.pitch
-                            // SNAP mid-air. Bezier (used by smoothAim) rotates
-                            // slower than gravity changes the required pitch:
-                            // as the player falls below a fixed target, the
-                            // pitch needed to look at it shifts every tick, the
-                            // smooth swing never catches up, the aim-error gate
-                            // resets aimStableSinceMs, and fireCast is never
-                            // reached — the chain hangs entirely. Stop any
-                            // active rotation strategy so it doesn't overwrite
-                            // the snap on the next render frame, then write
-                            // yaw/pitch directly so the very next fireCast uses
-                            // exactly these angles.
-                            RotationExecutor.stopIfUsing(rotationStrategy)
-                            player.yRot = castYaw
-                            player.xRot = castPitch
+                            // Human-like fast Bezier (NOT snap): airborneRotationStrategy
+                            // is tuned with a brisk per-frame cap and a high
+                            // minScale floor so it eases naturally yet still
+                            // keeps up with the live target's pitch drift as
+                            // gravity pulls the player. The gate below holds
+                            // fireCast until the swing has actually landed
+                            // within 1.5° so the cast packet uses an accurate
+                            // angle. Stop any prior strategy first so it
+                            // doesn't fight this one.
+                            if (!RotationExecutor.isUsing(airborneRotationStrategy)) {
+                                RotationExecutor.stopIfUsing(rotationStrategy)
+                            }
+                            RotationExecutor.rotateTo(Rotation(castYaw, castPitch), airborneRotationStrategy)
                         } else {
                             castYaw = hop.yaw
                             castPitch = hop.pitch
