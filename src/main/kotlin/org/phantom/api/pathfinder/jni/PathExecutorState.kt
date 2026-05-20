@@ -84,6 +84,14 @@ object PathExecutorState {
     // â”€â”€ Per-update LOS cache â”€â”€
     private val losCache = HashMap<Long, Boolean>(64)
 
+    // â”€â”€ Last visible aim (recovery fallback) â”€â”€
+    // When the find loop bottoms out with no visible target, the rotation
+    // briefly holds the last point we *did* have visible LOS to instead of
+    // snapping to an invisible aim. Limited by LAST_VISIBLE_AIM_TTL_MS so we
+    // don't keep aiming at stale geometry forever.
+    private var lastVisibleAimPoint: Vec3? = null
+    private var lastVisibleAimMs: Long = 0L
+
     // â”€â”€ Keynode override state â”€â”€
     // Current keynode (rotation pin) â€” null when the override is disengaged.
     var currentKeynodePoint: Vec3? = null
@@ -262,7 +270,11 @@ object PathExecutorState {
     // (back off the aim) after N consecutive ticks of blocked walk-line, and
     // only allowed to *disengage* after N consecutive ticks of clear walk-line.
     // This kills tick-to-tick flicker that the rotation smoother can't absorb.
-    private const val KEYNODE_ENGAGE_HYSTERESIS = 2
+    // Engage hysteresis removed (was 2): the corner cap usually fires first, and
+    // when it doesn't the body-clear walk-line is cheap enough that a one-tick
+    // delay produced visible aim-through-wall flashes on sharp corners.
+    // Disengage still slow so brief openings don't drop the keynode prematurely.
+    private const val KEYNODE_ENGAGE_HYSTERESIS = 0
     private const val KEYNODE_DISENGAGE_HYSTERESIS = 4
 
     // Incline-end keynote aim â€” distinguishes a sustained climb/descent from
@@ -301,6 +313,19 @@ object PathExecutorState {
     private const val LEDGE_STEP_DROP = 0.8
     private const val LEDGE_LOOKAHEAD_CAP = 3.8
 
+    // Body-aware visibility. Mid-body ray catches "eye-only LOS clears a wall
+    // but the torso can't pass" cases â€” the primary source of aim-through-wall.
+    private const val BODY_PROBE_HIGH_Y = 1.0
+    // Corner cap: walk-line probes ahead from the player's body; effective
+    // lookahead is capped to the first probe that hits, minus a small margin
+    // so the aim sits well before the corner instead of at the wall.
+    private const val CORNER_CAP_PROBE_STEP = 0.4
+    private const val CORNER_CAP_MARGIN = 0.6
+    // Fallback aim TTL when the find loop bottoms out with no visible target.
+    // ~800 ms covers a humanlike "keep looking where you last saw the path"
+    // window while the player rounds a corner / occlusion clears.
+    private const val LAST_VISIBLE_AIM_TTL_MS = 800L
+
     // =========================================================================
     // Public API
     // =========================================================================
@@ -336,6 +361,8 @@ object PathExecutorState {
         nonChangeBestPathPosition = null
         nonChangeTicks = 0
         losCache.clear()
+        lastVisibleAimPoint = null
+        lastVisibleAimMs = 0L
         currentKeynodePoint = null
         keynodeBlockedTicks = 0
         keynodeClearTicks = 0
@@ -586,7 +613,13 @@ object PathExecutorState {
             }
             else -> adaptiveLookahead
         }
-        val effectiveLookahead = minOf(safetyLookaheadCap, remainingPathForLookahead.coerceAtLeast(0.1))
+        // Corner cap: walk-line probe ahead from the player's body. If the
+        // upcoming spline crosses a wall the body can't pass, cap the aim
+        // *before* the corner instead of letting the find loop pick a point
+        // past the wall and shrink back. Without this the lookahead would
+        // sit ~7 blocks out at every turn and get pulled into corners.
+        val cornerCap = if (level != null) cornerCapDistance(player, level, spline, safetyLookaheadCap) else safetyLookaheadCap
+        val effectiveLookahead = minOf(cornerCap, remainingPathForLookahead.coerceAtLeast(0.1))
         var findResult = if (level != null) {
             findVisibleSplineLookahead(eye, spline, effectiveLookahead, level)
         } else {
@@ -1150,6 +1183,9 @@ object PathExecutorState {
         val imm = getInterpolatedPoint(pts, immT)
         val immDx = imm.x - eye.x; val immDy = imm.y - eye.y; val immDz = imm.z - eye.z
 
+        val player = Minecraft.getInstance().player
+        val foot = if (player != null) Vec3(player.x, player.y, player.z) else eye
+
         val inRecovery = isInRecoveryMode()
         val effectiveMin = if (inRecovery) RECOVERY_MIN_LOOKAHEAD else MIN_LOOKAHEAD
         var lookahead = if (inRecovery) idealLookahead else maxOf(idealLookahead, MIN_LOOKAHEAD)
@@ -1173,7 +1209,32 @@ object PathExecutorState {
                 }
             }
 
-            return FindResult(point, lookahead, isPointVisible(eye, point, level))
+            // Body-aware LOS shrink (see spline-branch comment).
+            if (!isBodyPathClear(eye, foot, point, level)) {
+                lookahead -= LOOKAHEAD_STEP; continue
+            }
+
+            lastVisibleAimPoint = point
+            lastVisibleAimMs = System.currentTimeMillis()
+            return FindResult(point, lookahead, true)
+        }
+
+        // Short forward scan for any body-visible sample before fallback.
+        val scanEnd = minOf(MIN_LOOKAHEAD, pts.lastIndex.toDouble() - currentPathPosition)
+        var scan = 0.3
+        while (scan <= scanEnd) {
+            val sample = getInterpolatedPoint(pts, minOf(pts.lastIndex.toDouble(), currentPathPosition + scan))
+            if (isBodyPathClear(eye, foot, sample, level)) {
+                lastVisibleAimPoint = sample
+                lastVisibleAimMs = System.currentTimeMillis()
+                return FindResult(sample, scan, true)
+            }
+            scan += 0.2
+        }
+
+        val cached = lastVisibleAimPoint
+        if (cached != null && System.currentTimeMillis() - lastVisibleAimMs <= LAST_VISIBLE_AIM_TTL_MS) {
+            return FindResult(cached, MIN_LOOKAHEAD, true)
         }
 
         val close = maxOf(RECOVERY_MIN_LOOKAHEAD, MIN_LOOKAHEAD - 0.2)
@@ -1192,6 +1253,9 @@ object PathExecutorState {
         val immDx = imm.x - eye.x
         val immDy = imm.y - eye.y
         val immDz = imm.z - eye.z
+
+        val player = Minecraft.getInstance().player
+        val foot = if (player != null) Vec3(player.x, player.y, player.z) else eye
 
         val inRecovery = isInRecoveryMode()
         val effectiveMin = if (inRecovery) RECOVERY_MIN_LOOKAHEAD else minOf(MIN_LOOKAHEAD, idealLookahead)
@@ -1226,7 +1290,45 @@ object PathExecutorState {
                 }
             }
 
-            return FindResult(point, lookahead, isPointVisible(eye, point, level))
+            // Body-aware LOS: shrink on occlusion instead of returning an
+            // invisible aim. The previous loop only iterated on geometry
+            // failures, so the caller blindly aimed at occluded points until
+            // the 600 ms unseen-rollback fired â€” that's the "never recovers"
+            // path. Now any body-occluded sample shrinks the lookahead until
+            // we find one the body can actually reach.
+            if (!isBodyPathClear(eye, foot, point, level)) {
+                lookahead -= LOOKAHEAD_STEP
+                continue
+            }
+
+            lastVisibleAimPoint = point
+            lastVisibleAimMs = System.currentTimeMillis()
+            return FindResult(point, lookahead, true)
+        }
+
+        // Loop bottomed out: scan short distances forward for any
+        // body-visible sample before giving up. Catches "the long lookahead
+        // is occluded but a closer point is fine" cases the shrink loop skips
+        // when effectiveMin > 0.3 (the common in-recovery case).
+        val scanEnd = minOf(MIN_LOOKAHEAD, spline.totalLength - currentSplineDistance)
+        var scan = 0.3
+        while (scan <= scanEnd) {
+            val sample = spline.sample(currentSplineDistance + scan)
+            if (isBodyPathClear(eye, foot, sample, level)) {
+                lastVisibleAimPoint = sample
+                lastVisibleAimMs = System.currentTimeMillis()
+                return FindResult(sample, scan, true)
+            }
+            scan += 0.2
+        }
+
+        // Nothing visible anywhere ahead. Fall back to the last point we
+        // *did* see, while it's still fresh, so the rotation holds steady
+        // rather than snapping to an invisible aim. After TTL elapses we
+        // surrender with visible=false (existing unseen-rollback handles it).
+        val cached = lastVisibleAimPoint
+        if (cached != null && System.currentTimeMillis() - lastVisibleAimMs <= LAST_VISIBLE_AIM_TTL_MS) {
+            return FindResult(cached, MIN_LOOKAHEAD, true)
         }
 
         val close = maxOf(RECOVERY_MIN_LOOKAHEAD, MIN_LOOKAHEAD - 0.2)
@@ -1328,10 +1430,16 @@ object PathExecutorState {
         level: Level,
         minDist: Double,
     ): Vec3 {
+        // Curvature bail: extending the aim past a turn drags it through the
+        // outside wall. The corner cap upstream already pinned [current] to a
+        // safe distance â€” don't undo that by walking further along the spline.
+        if (pathCurvature > TURN_BRAKE_CURVATURE) return current
         val cdx = current.x - eye.x
         val cdy = current.y - eye.y
         val cdz = current.z - eye.z
         if (sqrt(cdx * cdx + cdy * cdy + cdz * cdz) >= minDist) return current
+        val player = Minecraft.getInstance().player
+        val foot = if (player != null) Vec3(player.x, player.y, player.z) else eye
         val step = 0.5
         val minDistSq = minDist * minDist
         var probe = currentSplineDistance + step
@@ -1341,7 +1449,9 @@ object PathExecutorState {
             val dy = sample.y - eye.y
             val dz = sample.z - eye.z
             if (dx * dx + dy * dy + dz * dz >= minDistSq) {
-                return if (isPointVisible(eye, sample, level)) sample else current
+                // Body-aware: eye-only LOS clears over walls the body can't
+                // pass, so the extended aim used to slip through wall tops.
+                return if (isBodyPathClear(eye, foot, sample, level)) sample else current
             }
             probe += step
         }
@@ -1452,6 +1562,60 @@ object PathExecutorState {
         // keynode if we had one (rotation freezes rather than flailing); the
         // movement layer's stuck-detector handles the actual recovery.
         return currentKeynodePoint ?: proposedAim
+    }
+
+    /**
+     * Body-aware visibility. Eye-only [isPointVisible] reports clear when a ray
+     * from the camera (y ~ +1.62) skims the top of a wall the body can't pass,
+     * which is the main "aim through wall" case. This casts two rays â€” eye and
+     * mid-body (foot + [BODY_PROBE_HIGH_Y]) â€” and requires both to clear.
+     *
+     * The mid-body cast targets the same x/z as [to] but at the player's chest
+     * height so it tests "is the corridor body-wide clear", not "is the gaze
+     * ray clear". Used by the lookahead shrink loop and [extendToMinWorldDistance].
+     */
+    private fun isBodyPathClear(eye: Vec3, foot: Vec3, to: Vec3, level: net.minecraft.world.level.Level): Boolean {
+        if (!isPointVisible(eye, to, level)) return false
+        val midFrom = Vec3(foot.x, foot.y + BODY_PROBE_HIGH_Y, foot.z)
+        val midTo = Vec3(to.x, foot.y + BODY_PROBE_HIGH_Y, to.z)
+        val dx = midTo.x - midFrom.x; val dz = midTo.z - midFrom.z
+        if (dx * dx + dz * dz < 0.04) return true
+        val player = Minecraft.getInstance().player ?: return true
+        return try {
+            val clip = level.clip(ClipContext(midFrom, midTo, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player))
+            clip.type == HitResult.Type.MISS ||
+                clip.location.distanceTo(midFrom) >= midFrom.distanceTo(midTo) - 0.5
+        } catch (_: Exception) { true }
+    }
+
+    /**
+     * Walk-line probe ahead along the spline. Returns the maximum lookahead
+     * distance for which the player's body can actually traverse to the sample.
+     * This caps the aim *before* it gets picked past a corner â€” the shrink
+     * loop in [findVisibleSplineLookahead] is then only a second line of
+     * defense for the cases this misses (e.g. drift-off-spline).
+     *
+     * Returns [idealLookahead] when nothing within range is blocked.
+     */
+    private fun cornerCapDistance(
+        player: LocalPlayer,
+        level: net.minecraft.world.level.Level,
+        spline: SplinePath,
+        idealLookahead: Double,
+    ): Double {
+        val playerFoot = Vec3(player.x, player.y, player.z)
+        val maxProbe = minOf(idealLookahead, spline.totalLength - currentSplineDistance)
+        if (maxProbe < KEYNODE_MIN_SPACING) return idealLookahead
+        var probe = KEYNODE_MIN_SPACING
+        while (probe <= maxProbe) {
+            val sample = spline.sample(currentSplineDistance + probe)
+            val sampleFoot = Vec3(sample.x, player.y, sample.z)
+            if (!isWalkLineClear(level, player, playerFoot, sampleFoot)) {
+                return (probe - CORNER_CAP_MARGIN).coerceAtLeast(MIN_LOOKAHEAD)
+            }
+            probe += CORNER_CAP_PROBE_STEP
+        }
+        return idealLookahead
     }
 
     private fun isPointVisible(from: Vec3, to: Vec3, level: net.minecraft.world.level.Level): Boolean {
