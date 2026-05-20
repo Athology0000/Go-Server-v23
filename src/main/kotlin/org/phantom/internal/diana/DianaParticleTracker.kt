@@ -137,6 +137,9 @@ object DianaParticleTracker {
         val key = (bx.toLong() shl 32) or (bz.toLong() and 0xFFFFFFFFL)
         val now = System.currentTimeMillis()
         synchronized(seenBurrows) {
+            if (type == BurrowType.GUESS) {
+                seenBurrows.values.removeIf { it.type == BurrowType.GUESS || it.type == BurrowType.SUB_GUESS }
+            }
             val rec = seenBurrows.getOrPut(key) { BurrowRecord(bx, by, bz, lastSeenMs = now) }
             rec.type = type
             rec.hasEnchant = true

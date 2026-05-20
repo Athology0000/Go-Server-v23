@@ -274,13 +274,8 @@ object DianaHelperModule : Module("Diana Helper") {
             particleFailHint,
             preciseGuess,
             arrowGuess,
-            multiGuesses,
             burrowsNearbyDetection,
-            renderSubGuesses,
             warnOnChainComplete,
-            maxGuessDistance,
-            guessSnapRadius,
-            arrowSubGuessLimit,
             nearestWarp,
             allowedWarps,
             dontWarpIfClose,
@@ -408,9 +403,7 @@ object DianaHelperModule : Module("Diana Helper") {
         if (preciseTrail.size > 18) preciseTrail.removeAt(0)
 
         val guess = solvePreciseGuess() ?: return
-        val activation = DianaParticleTracker.getActivationPos() ?: player.position()
-        if (activation.distanceTo(guess) > maxGuessDistance.value) return
-        val blockGuess = snapGuessToBurrowBlock(guess, activation) ?: return
+        val blockGuess = guess.down(0.5).floorToBlockVec()
         if (lastPreciseGuess == blockGuess) return
         lastPreciseGuess = blockGuess
         lastWarpMs = now
@@ -497,17 +490,17 @@ object DianaHelperModule : Module("Diana Helper") {
     private fun isPreciseSpadeParticle(packet: ClientboundLevelParticlesPacket): Boolean {
         return packet.particle.type == ParticleTypes.DRIPPING_LAVA &&
             packet.count == 2 &&
-            abs(packet.maxSpeed - -0.5f) <= 0.005f
+            packet.maxSpeed == -0.5f
     }
 
     private fun handleArrowParticle(packet: ClientboundLevelParticlesPacket): Boolean {
         if (packet.particle.type != ParticleTypes.DUST) return false
         if (packet.particle !is DustParticleOptions) return false
-        if (packet.count != 0 || abs(packet.maxSpeed - 1.0f) > 0.005f) return false
+        if (packet.count != 0 || packet.maxSpeed != 1.0f) return false
         val anchor = lastDugBlock ?: return false
         val location = Vec3(packet.x, packet.y, packet.z)
         if (location.distanceTo(anchor) >= 5.0) return false
-        val range = arrowRange(packet.xDist, packet.yDist, packet.zDist) ?: return false
+        val range = arrowRange(packet.xDist, packet.yDist) ?: return false
 
         if (arrowPoints.any { it.distanceToSqr(location) < 1.0e-10 }) return true
         arrowPoints += location
@@ -525,11 +518,11 @@ object DianaHelperModule : Module("Diana Helper") {
 
     private data class Ray(val origin: Vec3, val direction: Vec3)
 
-    private fun arrowRange(r: Float, g: Float, b: Float): IntRange? {
+    private fun arrowRange(xOffset: Float, yOffset: Float): IntRange? {
         return when {
-            close(r, 0f) && close(g, 128f) && close(b, 0f) -> 0..117
-            close(r, 255f) && close(g, 255f) && close(b, 0f) -> 112..282
-            close(r, 255f) && close(g, 0f) && close(b, 0f) -> 281..600
+            close(yOffset, 128f) -> 0..117
+            close(yOffset, 255f) && close(xOffset, 255f) -> 112..282
+            close(xOffset, 255f) -> 281..600
             else -> null
         }
     }
@@ -617,15 +610,11 @@ object DianaHelperModule : Module("Diana Helper") {
         val level = mc.level ?: return
         val candidates = findClosestValidBlocksToArrowRay(level, ray, range)
         if (candidates.isEmpty()) return
-        val limited = if (multiGuesses.value) {
-            candidates.take(arrowSubGuessLimit.value.toInt().coerceAtLeast(0) + 1)
-        } else {
-            candidates.take(1)
-        }
-        val entry = ArrowGuessEntry(limited)
+        arrowGuessEntries.forEach { it.removeAll() }
+        arrowGuessEntries.clear()
+        val entry = ArrowGuessEntry(candidates)
         arrowGuessEntries += entry
         entry.showCurrent()
-        if (renderSubGuesses.value) limited.drop(1).forEach { DianaParticleTracker.addGuess(it, DianaParticleTracker.BurrowType.SUB_GUESS) }
         playDianaSound(DianaSound.BURROW)
     }
 
@@ -683,33 +672,6 @@ object DianaHelperModule : Module("Diana Helper") {
         val block = level.getBlockState(pos).block
         val above = level.getBlockState(pos.above()).block
         return block == Blocks.GRASS_BLOCK && above in ALLOWED_BURROW_ABOVE
-    }
-
-    private fun snapGuessToBurrowBlock(guess: Vec3, activation: Vec3): Vec3? {
-        val level = mc.level ?: return null
-        val center = BlockPos(guess.x.roundToInt(), (guess.y - 0.5).roundToInt(), guess.z.roundToInt())
-        if (isValidBurrowBlock(level, center)) return Vec3(center.x.toDouble(), center.y.toDouble(), center.z.toDouble())
-
-        val radius = guessSnapRadius.value.toInt().coerceAtLeast(1)
-        var best: BlockPos? = null
-        var bestScore = Double.MAX_VALUE
-        for (dx in -radius..radius) {
-            for (dz in -radius..radius) {
-                val x = center.x + dx
-                val z = center.z + dz
-                val y = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, x, z) - 1
-                val pos = BlockPos(x, y, z)
-                if (!isValidBurrowBlock(level, pos)) continue
-                val asVec = Vec3(pos.x.toDouble(), pos.y.toDouble(), pos.z.toDouble())
-                if (activation.distanceTo(asVec) > maxGuessDistance.value) continue
-                val score = asVec.distanceToSqr(guess) + abs(dx).toDouble() * 0.15 + abs(dz).toDouble() * 0.15
-                if (score < bestScore) {
-                    bestScore = score
-                    best = pos
-                }
-            }
-        }
-        return best?.let { Vec3(it.x.toDouble(), it.y.toDouble(), it.z.toDouble()) }
     }
 
     private fun advanceArrowGuesses(level: net.minecraft.world.level.Level, player: net.minecraft.world.entity.player.Player) {
@@ -1342,7 +1304,7 @@ object DianaHelperModule : Module("Diana Helper") {
         }
 
         val nearbyGuess = records
-            .filter { (_, type) -> type == DianaParticleTracker.BurrowType.GUESS || (renderSubGuesses.value && type == DianaParticleTracker.BurrowType.SUB_GUESS) }
+            .filter { (_, type) -> type == DianaParticleTracker.BurrowType.GUESS }
             .minByOrNull { (pos, _) -> player.position().distanceToSqr(pos) }
             ?: return
         if (player.position().distanceTo(nearbyGuess.first) <= 10.0 && isValidBurrowBlock(
@@ -1662,6 +1624,10 @@ object DianaHelperModule : Module("Diana Helper") {
         return closestPoint.distanceTo(point)
     }
 
+    private fun Vec3.down(amount: Double): Vec3 = add(0.0, -amount, 0.0)
+
+    private fun Vec3.floorToBlockVec(): Vec3 = Vec3(floor(x), floor(y), floor(z))
+
     private fun Vec3.toArray(): DoubleArray = doubleArrayOf(x, y, z)
 
     private fun roundToDecimals(value: Double, decimals: Int): Double {
@@ -1671,17 +1637,15 @@ object DianaHelperModule : Module("Diana Helper") {
 
     private val ALLOWED_BURROW_ABOVE = setOf(
         Blocks.AIR,
-        Blocks.DANDELION,
-        Blocks.POPPY,
-        Blocks.SHORT_GRASS,
+        Blocks.SPRUCE_FENCE,
+        Blocks.WILDFLOWERS,
         Blocks.TALL_GRASS,
         Blocks.OAK_LEAVES,
-        Blocks.SPRUCE_LEAVES,
         Blocks.BIRCH_LEAVES,
         Blocks.JUNGLE_LEAVES,
         Blocks.ACACIA_LEAVES,
         Blocks.DARK_OAK_LEAVES,
-        Blocks.SPRUCE_FENCE,
+        Blocks.SPRUCE_LEAVES,
     )
 
     private data class WarpPoint(

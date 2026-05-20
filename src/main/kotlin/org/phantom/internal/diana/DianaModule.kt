@@ -131,6 +131,15 @@ object DianaMacroModule : Module("Diana Macro") {
     private var castRestoreSlot = -1
     private var nativeWalkTarget: Vec3? = null
     private var nativeWalkRadius = 0.0
+    // Hysteresis for the "running into a wall, hop over it" fallback. The
+    // native path executor's JumpDetector already handles real obstacles from
+    // cached path nodes; this counter exists only to catch live-world cases
+    // the planner missed (entity in the way, mid-cast stand-up against a
+    // partial block). One tick of horizontalCollision is meaningless —
+    // anything brushing a wall trips it — so we require sustained contact
+    // before firing, and cool down briefly after each hop.
+    private var collisionStuckTicks = 0
+    private var lastFallbackJumpMs = 0L
     private var pendingWarp: WarpPoint? = null
     private var warpTarget: Vec3? = null
     private var warpTicksElapsed = 0
@@ -409,6 +418,11 @@ object DianaMacroModule : Module("Diana Macro") {
     )
     private const val COMBAT_ROTATION_STEP_SCALE = 0.62
     private const val AIM_ERROR_DEG = 3.5f
+    // Sustained-collision fallback-hop tuning. 6 ticks ≈ 300 ms of contact
+    // before we override the path executor; 450 ms cooldown stops the same
+    // obstacle from re-firing on the landing tick.
+    private const val STUCK_HOP_TICKS = 6
+    private const val FALLBACK_HOP_COOLDOWN_MS = 450L
 
     private val rotationStrategy = BezierTrackingRotationStrategy(
         yawStepSampler   = { (RotationsModule.sample(RotationsModule.combatYawStep.value)   * COMBAT_ROTATION_STEP_SCALE).toFloat() },
@@ -603,6 +617,7 @@ object DianaMacroModule : Module("Diana Macro") {
         NativePathfinder.availabilityFlagsOverride = null
         nativeWalkTarget = null
         nativeWalkRadius = 0.0
+        collisionStuckTicks = 0
     }
 
     private fun resetAimSettle() {
@@ -677,12 +692,28 @@ object DianaMacroModule : Module("Diana Macro") {
     private fun directApproach(player: net.minecraft.client.player.LocalPlayer, target: Vec3) {
         MovementManager.setMovementLock(true)
         nativeWalkTo(player, target)
-        // Auto-hop on collision (same reasoning as the WALK hop branch). The
-        // direct-approach path is used both for the close-burrow walk and the
-        // walking fallback when teleports aren't available, and routinely
-        // bumps into single blocks the planner didn't predict.
+        maybeFallbackJump(player)
+    }
+
+    /**
+     * Sustained-collision hop fallback. Only fires after the player has been
+     * pressed against geometry on the ground for STUCK_HOP_TICKS in a row,
+     * with a cooldown so a single obstacle doesn't trigger a flurry of jumps.
+     * Without the hysteresis a glancing wall contact during normal pathing
+     * read as "must jump" and the macro hopped at every corner.
+     */
+    private fun maybeFallbackJump(player: net.minecraft.client.player.LocalPlayer) {
         if (player.horizontalCollision && player.onGround()) {
+            collisionStuckTicks++
+        } else {
+            collisionStuckTicks = 0
+            return
+        }
+        val now = System.currentTimeMillis()
+        if (collisionStuckTicks >= STUCK_HOP_TICKS && now - lastFallbackJumpMs > FALLBACK_HOP_COOLDOWN_MS) {
             MovementManager.forcedJump = true
+            lastFallbackJumpMs = now
+            collisionStuckTicks = 0
         }
     }
 
@@ -1079,7 +1110,9 @@ object DianaMacroModule : Module("Diana Macro") {
 
     private fun combatAimPoint(target: LivingEntity): Vec3 {
         val prediction = combatPredictTicksSetting.value
-        val height = (target.bbHeight * combatAimHeightSetting.value).coerceIn(0.35, min(1.85, target.bbHeight.toDouble()))
+        val bb = target.bbHeight.toDouble()
+        val height = if (bb < 0.35) bb * 0.5
+                     else (bb * combatAimHeightSetting.value).coerceIn(0.35, min(1.85, bb))
         val raw = target.position()
             .add(target.deltaMovement.scale(prediction))
             .add(0.0, height, 0.0)
@@ -1592,15 +1625,12 @@ object DianaMacroModule : Module("Diana Macro") {
                             hopIndex++
                             resetAimSettle()
                         }
-                        // Auto-hop on collision. JumpDetector decides from the
-                        // native pathfinder's CACHED nodes, but per-hop walk
-                        // targets give it sparse node lists with no upcoming
-                        // step/obstacle to detect. A simple "I'm running into
-                        // a wall, jump" override here gets the macro over
-                        // unexpected blocks the planner didn't predict.
-                        if (player.horizontalCollision && player.onGround()) {
-                            MovementManager.forcedJump = true
-                        }
+                        // Sustained-collision fallback hop. JumpDetector
+                        // already handles obstacles in the cached path; this
+                        // catches live-world surprises (mob in the way,
+                        // partial block off the route) only after several
+                        // ticks of real stuckness.
+                        maybeFallbackJump(player)
                     }
 
                     DianaTeleportPlanner.HopType.AOTV,
