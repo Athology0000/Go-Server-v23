@@ -3,14 +3,18 @@ package org.phantom.internal.diana
 import net.minecraft.ChatFormatting
 import net.minecraft.client.Minecraft
 import net.minecraft.core.BlockPos
+import net.minecraft.core.particles.DustParticleOptions
 import net.minecraft.core.particles.ParticleTypes
 import net.minecraft.network.chat.Component
 import net.minecraft.network.protocol.game.ClientboundLevelParticlesPacket
+import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket
 import net.minecraft.network.protocol.game.ServerboundUseItemPacket
+import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket
 import net.minecraft.sounds.SoundEvents
 import net.minecraft.sounds.SoundSource
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.level.block.Blocks
+import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import org.phantom.api.event.EventBus
 import org.phantom.api.event.annotation.SubscribeEvent
@@ -48,6 +52,7 @@ import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.pow
 import kotlin.math.roundToInt
+import kotlin.math.sign
 import kotlin.math.sin
 import kotlin.math.sqrt
 
@@ -164,7 +169,11 @@ object DianaHelperModule : Module("Diana Helper") {
     private val preciseTrail = ArrayList<Vec3>()
     private var lastPreciseGuess: Vec3? = null
     private val arrowPoints = ArrayList<Vec3>()
+    private val arrowGuessEntries = ArrayList<ArrowGuessEntry>()
     private val recentArrowKeys = linkedSetOf<String>()
+    private var lastInteractedBlock: Vec3? = null
+    private var lastInteractedBlockMs = 0L
+    private var lastDugBlock: Vec3? = null
     private var currentWarp: WarpPoint? = null
     private var lastWarpMs = 0L
     private val rareDropCounts = linkedMapOf<String, Int>()
@@ -177,6 +186,7 @@ object DianaHelperModule : Module("Diana Helper") {
         """^(?:Oh|Uh oh|Yikes|Oi|Good Grief|Danger|Woah)! You dug out (?:a )?(.+)!$""",
         RegexOption.IGNORE_CASE
     )
+    private val BURROW_DUG_PATTERN = Regex("""^You (?:dug out a Griffin Burrow!|finished the Griffin burrow chain!) \((\d+)/(\d+)\)""")
 
     private val DIANA_SPADE_IDS = setOf(
         "ANCESTRAL_SPADE",
@@ -335,6 +345,7 @@ object DianaHelperModule : Module("Diana Helper") {
 
         if (tickCounter % 5 == 0) {
             pruneCloseGuesses(level, player)
+            if (arrowGuess.value) advanceArrowGuesses(level, player)
             if (burrowsNearbyDetection.value) reconcileNearbyBurrows(level, player)
             syncRareMobs(level, player)
             maybeWarnPet()
@@ -347,9 +358,28 @@ object DianaHelperModule : Module("Diana Helper") {
     @SubscribeEvent
     fun onPacket(event: PacketEvent.Outgoing) {
         if (!enabled.value) return
-        val packet = event.packet as? ServerboundUseItemPacket ?: return
         val player = mc.player ?: return
-        if (!isDianaSpade(player.getItemInHand(packet.hand))) return
+
+        when (val packet = event.packet) {
+            is ServerboundUseItemPacket -> {
+                if (!isDianaSpade(player.getItemInHand(packet.hand))) return
+                beginSpadeGuess()
+            }
+            is ServerboundUseItemOnPacket -> {
+                if (!isDianaSpade(player.getItemInHand(packet.hand))) return
+                rememberInteractedBlock(packet.hitResult.blockPos)
+                beginSpadeGuess()
+            }
+            is ServerboundPlayerActionPacket -> {
+                if (packet.action == ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK) {
+                    rememberInteractedBlock(packet.pos)
+                }
+            }
+            else -> return
+        }
+    }
+
+    private fun beginSpadeGuess() {
         lastSpadeUseMs = System.currentTimeMillis()
         preciseTrail.clear()
         lastPreciseGuess = null
@@ -364,7 +394,7 @@ object DianaHelperModule : Module("Diana Helper") {
         if (!isPreciseSpadeParticle(packet)) return
 
         val now = System.currentTimeMillis()
-        if (lastSpadeUseMs == 0L || now - lastSpadeUseMs > 3_000L) return
+        if (lastSpadeUseMs == 0L || now - lastSpadeUseMs > 1_000L) return
         val player = mc.player ?: return
 
         val point = Vec3(packet.x, packet.y, packet.z)
@@ -415,15 +445,53 @@ object DianaHelperModule : Module("Diana Helper") {
         if (message.startsWith("You dug out a Griffin Burrow!") ||
             message.startsWith("You finished the Griffin burrow chain!")
         ) {
+            handleBurrowDug(message)
             lastSpadeUseMs = 0L
             if (warnOnChainComplete.value && message.startsWith("You finished the Griffin burrow chain!")) {
                 alert("Diana Chain", "Griffin burrow chain complete.", ChatFormatting.GOLD)
             }
         } else if (message == "Poof! You have cleared your griffin burrows!") {
             DianaParticleTracker.reset()
+            clearArrowGuessState()
             rareMobTargets.clear()
             ChatUtils.sendMessage("Diana burrow data cleared.")
         }
+    }
+
+    private fun rememberInteractedBlock(pos: BlockPos) {
+        lastInteractedBlock = Vec3(pos.x.toDouble(), pos.y.toDouble(), pos.z.toDouble())
+        lastInteractedBlockMs = System.currentTimeMillis()
+    }
+
+    private fun handleBurrowDug(message: String) {
+        val match = BURROW_DUG_PATTERN.find(message)
+        val recentClicked = lastInteractedBlock.takeIf { System.currentTimeMillis() - lastInteractedBlockMs <= 3_000L }
+        val fallbackPlayerBlock = mc.player?.blockPosition()?.let { Vec3(it.x.toDouble(), it.y.toDouble(), it.z.toDouble()) }
+        val dug = recentClicked ?: burrowPos ?: fallbackPlayerBlock ?: return
+        lastDugBlock = dug
+
+        match ?: return
+        val current = match.groupValues[1].toIntOrNull() ?: return
+        val max = match.groupValues[2].toIntOrNull() ?: return
+
+        if (current != max) {
+            arrowPoints.clear()
+            recentArrowKeys.clear()
+        }
+
+        val completedEntries = arrowGuessEntries.filter { entry ->
+            entry.guesses.any { it.distanceTo(dug) <= 3.0 }
+        }
+        completedEntries.forEach { it.removeAll() }
+        arrowGuessEntries.removeAll(completedEntries.toSet())
+    }
+
+    private fun clearArrowGuessState() {
+        arrowPoints.clear()
+        arrowGuessEntries.forEach { it.removeAll() }
+        arrowGuessEntries.clear()
+        recentArrowKeys.clear()
+        lastDugBlock = null
     }
 
     private fun isPreciseSpadeParticle(packet: ClientboundLevelParticlesPacket): Boolean {
@@ -433,13 +501,16 @@ object DianaHelperModule : Module("Diana Helper") {
     }
 
     private fun handleArrowParticle(packet: ClientboundLevelParticlesPacket): Boolean {
-        val player = mc.player ?: return false
         if (packet.particle.type != ParticleTypes.DUST) return false
+        if (packet.particle !is DustParticleOptions) return false
         if (packet.count != 0 || abs(packet.maxSpeed - 1.0f) > 0.005f) return false
-        if (player.position().distanceToSqr(packet.x, packet.y, packet.z) > 36.0) return false
+        val anchor = lastDugBlock ?: return false
+        val location = Vec3(packet.x, packet.y, packet.z)
+        if (location.distanceTo(anchor) >= 5.0) return false
         val range = arrowRange(packet.xDist, packet.yDist, packet.zDist) ?: return false
 
-        arrowPoints += Vec3(packet.x, packet.y, packet.z)
+        if (arrowPoints.any { it.distanceToSqr(location) < 1.0e-10 }) return true
+        arrowPoints += location
         if (arrowPoints.size > 80) arrowPoints.removeAt(0)
 
         val ray = detectArrowRay() ?: return true
@@ -544,27 +615,67 @@ object DianaHelperModule : Module("Diana Helper") {
 
     private fun addArrowGuess(ray: Ray, range: IntRange) {
         val level = mc.level ?: return
-        val candidates = ArrayList<Vec3>()
-        var distance = range.first.coerceAtLeast(1).toDouble()
-        while (distance <= range.last) {
-            val point = ray.origin.add(ray.direction.scale(distance))
-            val pos = BlockPos(point.x.roundToInt(), point.y.roundToInt(), point.z.roundToInt())
-            if (isValidBurrowBlock(level, pos)) {
-                val guess = Vec3(pos.x.toDouble(), pos.y.toDouble(), pos.z.toDouble())
-                if (candidates.none { it.distanceToSqr(guess) < 16.0 }) {
-                    candidates += guess
-                    if (!multiGuesses.value) break
-                    if (candidates.size >= arrowSubGuessLimit.value.toInt().coerceAtLeast(1) + 1) break
-                }
-            }
-            distance += 1.0
-        }
+        val candidates = findClosestValidBlocksToArrowRay(level, ray, range)
         if (candidates.isEmpty()) return
-        DianaParticleTracker.addGuess(candidates.first())
-        if (renderSubGuesses.value) {
-            candidates.drop(1).forEach { DianaParticleTracker.addGuess(it, DianaParticleTracker.BurrowType.SUB_GUESS) }
+        val limited = if (multiGuesses.value) {
+            candidates.take(arrowSubGuessLimit.value.toInt().coerceAtLeast(0) + 1)
+        } else {
+            candidates.take(1)
         }
+        val entry = ArrowGuessEntry(limited)
+        arrowGuessEntries += entry
+        entry.showCurrent()
+        if (renderSubGuesses.value) limited.drop(1).forEach { DianaParticleTracker.addGuess(it, DianaParticleTracker.BurrowType.SUB_GUESS) }
         playDianaSound(DianaSound.BURROW)
+    }
+
+    private fun findClosestValidBlocksToArrowRay(
+        level: net.minecraft.world.level.Level,
+        ray: Ray,
+        range: IntRange,
+    ): List<Vec3> {
+        if (!HUB_BOUNDS.containsStrict(ray.origin)) return emptyList()
+        val endPoint = intersectAabbWithRay(HUB_BOUNDS, ray)?.second ?: return emptyList()
+        val diff = doubleArrayOf(endPoint.x - ray.origin.x, endPoint.y - ray.origin.y, endPoint.z - ray.origin.z)
+        val axisIndex = diff.withIndex()
+            .filter { (_, value) -> abs(value) > 0.9 }
+            .minByOrNull { (_, value) -> abs(value) }
+            ?.index
+            ?: return emptyList()
+
+        val origin = ray.origin.toArray()
+        val direction = ray.direction.toArray()
+        if (abs(direction[axisIndex]) < RAY_EPSILON) return emptyList()
+
+        val candidates = LinkedHashMap<BlockPos, Pair<Double, Double>>()
+        val iterations = abs(diff[axisIndex]).toInt()
+        for (i in 1..iterations) {
+            val axisValue = origin[axisIndex] + i * sign(direction[axisIndex])
+            val candidatePoint = findPointOnRay(ray, axisIndex, axisValue) ?: continue
+            val candidateBlock = BlockPos(floor(candidatePoint.x).toInt(), floor(candidatePoint.y).toInt(), floor(candidatePoint.z).toInt())
+            if (!isValidArrowBurrowBlock(level, candidateBlock)) continue
+
+            val blockCenter = Vec3(candidateBlock.x + 0.5, candidateBlock.y + 0.5, candidateBlock.z + 0.5)
+            val distanceToRay = distanceToRay(ray, blockCenter)
+            val distanceFromOrigin = candidatePoint.distanceTo(ray.origin)
+            if (distanceFromOrigin <= RAY_EPSILON) continue
+
+            val scaledDistance = roundToDecimals(distanceToRay * 500000.0 / distanceFromOrigin, 5)
+            candidates[candidateBlock] = scaledDistance to distanceFromOrigin
+        }
+        if (candidates.isEmpty()) return emptyList()
+
+        val bestScore = candidates.values.minOf { it.first }
+        return candidates
+            .filterValues { (score, distance) -> score == bestScore && distance.toInt() in range }
+            .entries
+            .sortedBy { it.value.second }
+            .map { (pos, _) -> Vec3(pos.x.toDouble(), pos.y.toDouble(), pos.z.toDouble()) }
+    }
+
+    private fun isValidArrowBurrowBlock(level: net.minecraft.world.level.Level, pos: BlockPos): Boolean {
+        if (!level.isLoaded(pos)) return true
+        return isValidBurrowBlock(level, pos)
     }
 
     private fun isValidBurrowBlock(level: net.minecraft.world.level.Level, pos: BlockPos): Boolean {
@@ -599,6 +710,30 @@ object DianaHelperModule : Module("Diana Helper") {
             }
         }
         return best?.let { Vec3(it.x.toDouble(), it.y.toDouble(), it.z.toDouble()) }
+    }
+
+    private fun advanceArrowGuesses(level: net.minecraft.world.level.Level, player: net.minecraft.world.entity.player.Player) {
+        if (arrowGuessEntries.isEmpty()) return
+        val hasSpade = isDianaSpade(player.mainHandItem)
+        val confirmedBurrows = DianaParticleTracker.getBurrowRecords(level, expireSeconds.value.toLong() * 1000L)
+            .filter { (_, type) -> type != DianaParticleTracker.BurrowType.GUESS && type != DianaParticleTracker.BurrowType.SUB_GUESS }
+            .map { it.first }
+        val playerPos = player.position()
+
+        val iterator = arrowGuessEntries.iterator()
+        while (iterator.hasNext()) {
+            val entry = iterator.next()
+            val current = entry.current ?: run {
+                iterator.remove()
+                continue
+            }
+            val currentBlock = BlockPos(floor(current.x).toInt(), floor(current.y).toInt(), floor(current.z).toInt())
+            val knownBurrow = confirmedBurrows.any { it.distanceToSqr(current) < 1.0 }
+            val shouldAdvance = !isValidArrowBurrowBlock(level, currentBlock) ||
+                (hasSpade && !knownBurrow && current.distanceToSqr(playerPos) < 900.0)
+            if (!shouldAdvance) continue
+            if (!entry.moveToNext()) iterator.remove()
+        }
     }
 
     private fun solvePreciseGuess(): Vec3? {
@@ -1449,6 +1584,91 @@ object DianaHelperModule : Module("Diana Helper") {
             .trim()
     }
 
+    private data class ArrowGuessEntry(
+        val guesses: List<Vec3>,
+        var currentIndex: Int = 0,
+    ) {
+        val current: Vec3?
+            get() = guesses.getOrNull(currentIndex)
+
+        fun showCurrent() {
+            current?.let { DianaParticleTracker.addGuess(it) }
+        }
+
+        fun removeCurrent() {
+            current?.let { DianaParticleTracker.removeBurrow(floor(it.x).toInt(), floor(it.z).toInt()) }
+        }
+
+        fun removeAll() {
+            guesses.forEach { DianaParticleTracker.removeBurrow(floor(it.x).toInt(), floor(it.z).toInt()) }
+        }
+
+        fun moveToNext(): Boolean {
+            removeCurrent()
+            val nextIndex = currentIndex + 1
+            if (nextIndex !in guesses.indices) return false
+            currentIndex = nextIndex
+            showCurrent()
+            return true
+        }
+    }
+
+    private fun AABB.containsStrict(vec: Vec3): Boolean {
+        return vec.x > minX && vec.x <= maxX &&
+            vec.y > minY && vec.y <= maxY &&
+            vec.z > minZ && vec.z <= maxZ
+    }
+
+    private fun intersectAabbWithRay(aabb: AABB, ray: Ray): Pair<Vec3, Vec3>? {
+        val min = doubleArrayOf(aabb.minX, aabb.minY, aabb.minZ)
+        val max = doubleArrayOf(aabb.maxX, aabb.maxY, aabb.maxZ)
+        val origin = ray.origin.toArray()
+        val direction = ray.direction.toArray()
+
+        var tMin = -Double.MAX_VALUE
+        var tMax = Double.MAX_VALUE
+        for (axis in 0..2) {
+            if (abs(direction[axis]) < RAY_EPSILON) {
+                if (origin[axis] < min[axis] || origin[axis] > max[axis]) return null
+                continue
+            }
+
+            val inverse = 1.0 / direction[axis]
+            var near = (min[axis] - origin[axis]) * inverse
+            var far = (max[axis] - origin[axis]) * inverse
+            if (near > far) near = far.also { far = near }
+            tMin = kotlin.math.max(tMin, near)
+            tMax = kotlin.math.min(tMax, far)
+            if (tMin > tMax) return null
+        }
+
+        return ray.origin.add(ray.direction.scale(tMin)) to ray.origin.add(ray.direction.scale(tMax))
+    }
+
+    private fun findPointOnRay(ray: Ray, axis: Int, targetValue: Double): Vec3? {
+        val origin = ray.origin.toArray()
+        val direction = ray.direction.toArray()
+        if (abs(direction[axis]) < RAY_EPSILON) {
+            return if (abs(origin[axis] - targetValue) < RAY_EPSILON) ray.origin else null
+        }
+        val t = (targetValue - origin[axis]) / direction[axis]
+        return ray.origin.add(ray.direction.scale(t))
+    }
+
+    private fun distanceToRay(ray: Ray, point: Vec3): Double {
+        val projectedDistance = point.subtract(ray.origin).dot(ray.direction)
+        if (projectedDistance < 0.0) return Double.MAX_VALUE
+        val closestPoint = ray.origin.add(ray.direction.scale(projectedDistance))
+        return closestPoint.distanceTo(point)
+    }
+
+    private fun Vec3.toArray(): DoubleArray = doubleArrayOf(x, y, z)
+
+    private fun roundToDecimals(value: Double, decimals: Int): Double {
+        val factor = 10.0.pow(decimals)
+        return kotlin.math.round(value * factor) / factor
+    }
+
     private val ALLOWED_BURROW_ABOVE = setOf(
         Blocks.AIR,
         Blocks.DANDELION,
@@ -1485,6 +1705,8 @@ object DianaHelperModule : Module("Diana Helper") {
     private const val RARE_MOB_GLOW_SCOPE = "diana_rare_mobs"
     private const val RARE_MOB_GLOW_PRIORITY = 20
     private const val RARE_MOB_EXPIRE_MS = 75_000L
+    private const val RAY_EPSILON = 1.0e-12
+    private val HUB_BOUNDS = AABB(-296.0, 0.0, -272.0, 207.0, 256.0, 223.0)
     private val COORD_PATTERN = Regex("""(?:x[:= ]\s*|@?\s)(-?\d{1,4})(?:[, ]+\s*y[:= ]\s*|[, ]+)(-?\d{1,4})(?:[, ]+\s*z[:= ]\s*|[, ]+)(-?\d{1,4})""", RegexOption.IGNORE_CASE)
     private val MAGIC_FIND_PATTERN = Regex("""\+(\d+)\s*(?:✯|Magic Find)""", RegexOption.IGNORE_CASE)
     private val TITLE_DROPS = setOf("Chimera", "Daedalus Stick", "Minos Relic", "Manti-core", "Fateful Stinger", "Brain Food", "Shimmering Wool", "Mythological Dye")

@@ -118,6 +118,16 @@ object DianaMacroModule : Module("Diana Macro") {
     // for a proximity check that may never fire.
     private var castedHopIndex = -1
     private var castedAtMs = 0L
+    // Dynamic replan during chain execution: every REPLAN_INTERVAL_MS the
+    // executor submits a fresh plan from the player's CURRENT position. When
+    // it returns, if the new plan reaches the goal in strictly fewer hops
+    // than what's left of the active plan, we switch to it and announce the
+    // improvement in chat ("better aotv route: N vs M remaining"). The
+    // existing planner instance is reused — there's only one DianaTeleportPlanner.future
+    // at a time, but the active plan lives in `hops` independently, so a
+    // background replan doesn't disturb execution until we choose to swap.
+    private var lastReplanSubmittedMs = 0L
+    private var replanInFlight = false
     private var castRestoreSlot = -1
     private var nativeWalkTarget: Vec3? = null
     private var nativeWalkRadius = 0.0
@@ -528,6 +538,8 @@ object DianaMacroModule : Module("Diana Macro") {
         airHopStartMs = 0L
         castedHopIndex = -1
         castedAtMs = 0L
+        lastReplanSubmittedMs = 0L
+        replanInFlight = false
         resetAimSettle()
     }
 
@@ -665,6 +677,13 @@ object DianaMacroModule : Module("Diana Macro") {
     private fun directApproach(player: net.minecraft.client.player.LocalPlayer, target: Vec3) {
         MovementManager.setMovementLock(true)
         nativeWalkTo(player, target)
+        // Auto-hop on collision (same reasoning as the WALK hop branch). The
+        // direct-approach path is used both for the close-burrow walk and the
+        // walking fallback when teleports aren't available, and routinely
+        // bumps into single blocks the planner didn't predict.
+        if (player.horizontalCollision && player.onGround()) {
+            MovementManager.forcedJump = true
+        }
     }
 
     private fun debugTravel(msg: String) {
@@ -1511,6 +1530,58 @@ object DianaMacroModule : Module("Diana Macro") {
                     return
                 }
 
+                // Dynamic AOTV reoptimization: ask the planner periodically
+                // for a fresh route from where we ACTUALLY are. AOTV drift
+                // (fixed-11-block travel from a fallen eye) means the active
+                // plan's later hops were geometry-optimal for the original
+                // eye, not the current one. The replan checks if a shorter
+                // chain exists from here; on strict improvement (≥2 fewer
+                // hops to goal) we switch over and announce it. Gated on
+                // cast cooldown so we never swap mid-cast and double-fire,
+                // and on hops.size > 2 / hopIndex < last so we don't replan
+                // single-shot direct-etherwarps or the final approach hop.
+                val nowReplan = System.currentTimeMillis()
+                if (wantsTeleports && aotvSlot >= 0 && hops.size > 2 && hopIndex < hops.size - 1 &&
+                    nowReplan - lastCastMs > 200L
+                ) {
+                    if (!replanInFlight && nowReplan - lastReplanSubmittedMs > 1500L) {
+                        DianaTeleportPlanner.submit(
+                            start = player.position(),
+                            goal = target,
+                            goalReachedRadius = plannerGoalRadiusSetting.value,
+                            transmissionRange = transmissionRangeSetting.value,
+                            etherwarpRange = EtherwarpLogic.getEtherwarpRange().toDouble(),
+                            availableMana = -1,
+                            aotvEnabled = useAotvSetting.value,
+                            etherwarpEnabled = useEtherwarpSetting.value,
+                            maxIterations = plannerIterationsSetting.value.toInt(),
+                            maxNodes = plannerNodesSetting.value.toInt(),
+                            simplify = simplifyNodesSetting.value,
+                        )
+                        lastReplanSubmittedMs = nowReplan
+                        replanInFlight = true
+                    } else if (replanInFlight) {
+                        val newPlan = DianaTeleportPlanner.poll()
+                        if (newPlan != null) {
+                            replanInFlight = false
+                            val remaining = hops.size - hopIndex
+                            // Strict improvement only (≥2 fewer hops) to
+                            // prevent oscillating between two near-equal
+                            // candidate plans every 1.5 s.
+                            if (newPlan.hops.size >= 2 && newPlan.hops.size + 1 < remaining) {
+                                debugTravel("better aotv route: ${newPlan.hops.size} nodes vs $remaining remaining — switching")
+                                hops = newPlan.hops
+                                hopIndex = 1
+                                noProgressTicks = 0
+                                lastProgressDistSq = Double.MAX_VALUE
+                                airHopTrackedIndex = -1
+                                castedHopIndex = -1
+                                return
+                            }
+                        }
+                    }
+                }
+
                 val hop = hops[hopIndex]
                 val standPos = hop.standPos()
 
@@ -1520,6 +1591,15 @@ object DianaMacroModule : Module("Diana Macro") {
                             debugTravel("node $hopIndex complete @ (${hop.x},${hop.y},${hop.z}) walk")
                             hopIndex++
                             resetAimSettle()
+                        }
+                        // Auto-hop on collision. JumpDetector decides from the
+                        // native pathfinder's CACHED nodes, but per-hop walk
+                        // targets give it sparse node lists with no upcoming
+                        // step/obstacle to detect. A simple "I'm running into
+                        // a wall, jump" override here gets the macro over
+                        // unexpected blocks the planner didn't predict.
+                        if (player.horizontalCollision && player.onGround()) {
+                            MovementManager.forcedJump = true
                         }
                     }
 
