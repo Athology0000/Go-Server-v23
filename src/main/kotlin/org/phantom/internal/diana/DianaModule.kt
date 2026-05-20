@@ -307,7 +307,7 @@ object DianaMacroModule : Module("Diana Macro") {
         "Walk Fallback", "Walk directly to the burrow when AOTV is missing or the planner has no route.", true
     )
     private val closeGuessWalkDistanceSetting = SliderSetting(
-        "Close Guess Walk Distance", "Walk to guesses within this many blocks instead of starting a teleport plan.", 18.0, 4.0, 60.0, step = 1.0
+        "Close Walk Distance", "Walk to any burrow target within this many blocks instead of starting a teleport plan. Raise this to prefer walking over AOTV/etherwarp.", 32.0, 4.0, 80.0, step = 1.0
     )
     private val autoHubWarpSetting = CheckboxSetting(
         "Auto Hub Warp", "Use nearby hub warp spots before walking/AOTV when a far guess is much closer to a warp.", true
@@ -872,6 +872,53 @@ object DianaMacroModule : Module("Diana Macro") {
     }
 
     /**
+     * Straight-line "is walking out viable" probe. Raycasts from the player's
+     * eye toward the target position. Returns true if a real wall blocks the
+     * line — i.e., the native walker would have to find some non-obvious
+     * route around it. Foliage (leaves, tall grass, ferns) has empty
+     * collider shapes and does NOT count as blocking here, but tree TRUNKS,
+     * fences, and walls do. Used to suppress the walking bias when the
+     * planner's teleport hops are the only viable exit.
+     */
+    private fun isStraightLineBlocked(
+        level: net.minecraft.world.level.Level,
+        player: net.minecraft.client.player.LocalPlayer,
+        target: Vec3,
+    ): Boolean {
+        val eye = player.eyePosition
+        val aim = Vec3(target.x, target.y + 0.5, target.z)
+        val hit = level.clip(
+            ClipContext(eye, aim, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player)
+        )
+        return hit.type == HitResult.Type.BLOCK && hit.location.distanceTo(aim) > 1.5
+    }
+
+    /**
+     * Raycast from the player's eye to the burrow block centre, against the
+     * COLLIDER shape (solid walls only — foliage has empty colliders and is
+     * ignored). Returns true if a real wall stands between the player and
+     * the burrow, in which case the macro must walk around / closer before
+     * swinging — otherwise the spade attack just chips the wall block and
+     * the burrow itself never breaks.
+     */
+    private fun isSolidWallBlocking(
+        level: net.minecraft.world.level.Level,
+        player: net.minecraft.client.player.LocalPlayer,
+        burrowBlock: Vec3,
+    ): Boolean {
+        val eye = player.eyePosition
+        val hit = level.clip(
+            ClipContext(eye, burrowBlock, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player)
+        )
+        if (hit.type != HitResult.Type.BLOCK) return false
+        val pos = (hit as net.minecraft.world.phys.BlockHitResult).blockPos
+        // Hit landed on the burrow column itself — no wall between.
+        return !(pos.x == floor(burrowBlock.x).toInt() &&
+            pos.z == floor(burrowBlock.z).toInt() &&
+            pos.y == floor(burrowBlock.y).toInt())
+    }
+
+    /**
      * Raycast from the player's eye to the burrow block centre. Returns true
      * when something (grass, fern, flower, sapling, vines) sits in the way
      * before the burrow's column — i.e., would steal a right-click. The
@@ -1095,46 +1142,50 @@ object DianaMacroModule : Module("Diana Macro") {
     }
 
     /**
-     * Drop hops whose stand position lands inside a solid block (foot or head
-     * column occupied) — the player cannot stand there, and trusting them
-     * makes the chain visibly clip into walls. Keeps the very first node
-     * unconditionally (it's the player's current position, used by the
-     * renderer/executor as a reference point). Always preserves the LAST node
-     * since it's the burrow target and we want the chain to point at it even
-     * if the final stand-pos voxel is occupied — the dig walk will route in.
+     * Wall-clip-aware acceptance gate for planner output. Counts how many
+     * AOTV/etherwarp hops in the plan have a line-of-sight broken by a real
+     * wall (foliage is not counted — COLLIDER shapes only). If the plan is
+     * meaningfully wall-clip-heavy AND the target is within walking range,
+     * we return an empty list — the caller will fall back to native walking.
+     *
+     * Why the asymmetric rule:
+     *  • In Hub Crypts / Wizard Tower the player NEEDS wall-clipping AOTV
+     *    hops to escape the building. The target burrow is 100+ blocks
+     *    away, so the "within walking range" gate keeps that plan intact.
+     *  • In open terrain, the user-reported "uses too much instant and not
+     *    enough walking" came from the planner generating chains that hop
+     *    over short walls instead of going around. Those plans are now
+     *    rejected here and replaced by a direct walk.
      */
     private fun sanitizePlannerHops(
         level: net.minecraft.world.level.Level,
         raw: List<DianaTeleportPlanner.Hop>,
     ): List<DianaTeleportPlanner.Hop> {
         if (raw.size <= 2) return raw
-        val out = ArrayList<DianaTeleportPlanner.Hop>(raw.size)
-        out += raw.first()
-        for (i in 1 until raw.lastIndex) {
-            val hop = raw[i]
-            // WALK landings are validated by the native walker on the fly;
-            // teleport landings are the ones that occasionally land inside a
-            // wall when the planner's AOTV/etherwarp endpoint sampling missed
-            // a column block.
-            if (hop.type == DianaTeleportPlanner.HopType.WALK ||
-                isStandable(level, hop.x, hop.y, hop.z)
-            ) {
-                out += hop
+        val player = mc.player ?: return raw
+        // Total path length: if this is a long-range escape (Crypts → field),
+        // through-wall AOTV is the actual mechanism and we leave the plan be.
+        val first = raw.first().standPos()
+        val last = raw.last().standPos()
+        val pathSpan = first.distanceTo(last)
+        if (pathSpan > 60.0) return raw
+
+        var wallClipHops = 0
+        for (i in 1 until raw.size) {
+            val a = raw[i - 1].standPos().add(0.0, 0.9, 0.0)
+            val b = raw[i].standPos().add(0.0, 0.9, 0.0)
+            val type = raw[i].type
+            if (type != DianaTeleportPlanner.HopType.AOTV &&
+                type != DianaTeleportPlanner.HopType.ETHERWARP
+            ) continue
+            val hit = level.clip(
+                ClipContext(a, b, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player)
+            )
+            if (hit.type == HitResult.Type.BLOCK && hit.location.distanceTo(b) > 1.0) {
+                wallClipHops++
             }
         }
-        out += raw.last()
-        return out
-    }
-
-    /**
-     * True if a player can stand at (x, y, z): the foot voxel and head voxel
-     * are both passable. Walking on a non-empty block is fine (steps, slabs).
-     */
-    private fun isStandable(level: net.minecraft.world.level.Level, x: Int, y: Int, z: Int): Boolean {
-        val foot = level.getBlockState(BlockPos(x, y, z))
-        val head = level.getBlockState(BlockPos(x, y + 1, z))
-        return foot.getCollisionShape(level, BlockPos(x, y, z)).isEmpty &&
-            head.getCollisionShape(level, BlockPos(x, y + 1, z)).isEmpty
+        return if (wallClipHops > 0) emptyList() else raw
     }
 
     /**
@@ -1910,22 +1961,60 @@ object DianaMacroModule : Module("Diana Macro") {
                     return
                 }
 
-                if (isGuessTarget() && hops.isEmpty()) {
+                // Walk-first bias: ANY target within Close Walk Distance gets
+                // walked directly instead of submitting an AOTV/etherwarp
+                // plan — UNLESS walking is plainly not viable from here.
+                // Walking is suppressed when:
+                //   • the player is under a ceiling (just-warped into a hub
+                //     building like Wizard Tower or Hub Crypts — walking
+                //     can't navigate out, the planner's through-wall AOTV
+                //     hops are the actual exit), OR
+                //   • a real wall blocks the line from eye to target (the
+                //     walker would just hammer against stone).
+                // Without these escapes the walking bias keeps the macro
+                // stuck inside Wizard Tower / Crypts when the target burrow
+                // happens to be within Close Walk Distance.
+                if (hops.isEmpty()) {
                     val dist = player.position().distanceTo(target)
-                    if (dist <= closeGuessWalkDistanceSetting.value) {
-                        debugTravel("close guess: walking")
-                        directApproach(player, target)
-                        return
+                    val canWalkOut = !hasCeilingOverhead(player) &&
+                        !isStraightLineBlocked(level, player, target)
+                    if (canWalkOut && dist <= closeGuessWalkDistanceSetting.value) {
+                        // Stuck-walking escape: trees, fences, and small
+                        // obstructions can pin the native walker against
+                        // geometry it can't navigate around. Track approach
+                        // progress every tick; if the macro hasn't made any
+                        // forward distance for stuckReplanTicks, abandon the
+                        // walk and fall through to planning (AOTV/etherwarp
+                        // is the next thing the executor tries).
+                        val dSq = player.position().distanceToSqr(target)
+                        if (dSq < lastProgressDistSq - 1.0) {
+                            lastProgressDistSq = dSq
+                            noProgressTicks = 0
+                        } else {
+                            noProgressTicks++
+                        }
+                        if (noProgressTicks <= stuckReplanTicks()) {
+                            debugTravel("close target (${dist.toInt()}m): walking")
+                            directApproach(player, target)
+                            return
+                        }
+                        debugTravel("close walk stuck (${noProgressTicks}t) — planning")
+                        stopNativeWalk()
+                        noProgressTicks = 0
+                        lastProgressDistSq = Double.MAX_VALUE
+                        // Fall through to planning / warp / aerial fallback.
                     }
 
-                    val warp = bestWarpFor(player.position(), target)
-                    if (warp != null && warpAttemptedFor?.distanceToSqr(target)?.let { it < 4.0 } != true) {
-                        debugTravel("far guess: warping ${warp.displayName}")
-                        startWarpTo(warp, target)
-                        return
+                    if (isGuessTarget()) {
+                        val warp = bestWarpFor(player.position(), target)
+                        if (warp != null && warpAttemptedFor?.distanceToSqr(target)?.let { it < 4.0 } != true) {
+                            debugTravel("far guess: warping ${warp.displayName}")
+                            startWarpTo(warp, target)
+                            return
+                        }
                     }
 
-                    // Far guesses with no warp now climb-and-fly through the
+                    // Far targets with no warp now climb-and-fly through the
                     // native planner (terrain-aware), driven by the existing
                     // Aerial Chain Min Distance trigger below. The old blind
                     // Kotlin chain (buildAerialAotvChain) is kept only as a
@@ -2057,16 +2146,24 @@ object DianaMacroModule : Module("Diana Macro") {
                         planSubmitted = false
                         return
                     }
-                    hops = sanitizePlannerHops(level, plan.hops)
+                    val sanitized = sanitizePlannerHops(level, plan.hops)
+                    if (sanitized.isEmpty()) {
+                        // Plan was wall-clip-heavy in walking range — walk
+                        // around instead of teleporting through stone. The
+                        // next replan will try again from a closer position.
+                        debugTravel("plan rejected: wall-clip in walk range — walking")
+                        if (walkFallbackSetting.value) directApproach(player, target)
+                        planSubmitted = false
+                        return
+                    }
+                    hops = sanitized
                     hopIndex = 1 // node 0 is the start position
                     noProgressTicks = 0
                     lastProgressDistSq = Double.MAX_VALUE
                     stopNativeWalk()
                     // Visible "plan committed" line so the user sees exactly
                     // how many nodes the macro is about to traverse.
-                    val dropped = plan.hops.size - hops.size
-                    val droppedNote = if (dropped > 0) ", $dropped invalid dropped" else ""
-                    debugTravel("plan committed: ${hops.size} nodes (${plan.teleportNodes} aotv / ${plan.etherwarpNodes} ether / ${plan.walkNodes} walk$droppedNote)")
+                    debugTravel("plan committed: ${hops.size} nodes (${plan.teleportNodes} aotv / ${plan.etherwarpNodes} ether / ${plan.walkNodes} walk)")
                 }
 
                 // No-progress watchdog -> replan from current position.
@@ -2162,8 +2259,16 @@ object DianaMacroModule : Module("Diana Macro") {
                                 cosAngle > 0.0
                             }
                             if (swapOk) {
+                                val sanitizedSwap = sanitizePlannerHops(level, newPlan.hops)
+                                if (sanitizedSwap.isEmpty()) {
+                                    // Don't swap to a wall-clipping plan — keep
+                                    // the current chain executing and let the
+                                    // next replan reconsider from a new position.
+                                    lastReplanCommittedMs = nowReplan
+                                    return
+                                }
                                 debugTravel("better aotv route: ${newPlan.hops.size} nodes vs $remaining remaining — switching")
-                                hops = sanitizePlannerHops(level, newPlan.hops)
+                                hops = sanitizedSwap
                                 hopIndex = 1
                                 noProgressTicks = 0
                                 lastProgressDistSq = Double.MAX_VALUE
@@ -2608,23 +2713,39 @@ object DianaMacroModule : Module("Diana Macro") {
                     return
                 }
 
-                // Clear any tall grass / fern / flower between the player's
-                // eye and the burrow block. Hypixel's spade pick-ray hits
-                // foliage's outline shape before reaching the dirt
-                // underneath, so the right-click resolves on the plant and
-                // the burrow never breaks. Left-click breaks the plant in
-                // one swing; then the next tick the ray reaches the burrow
-                // and the normal spade USE goes through. Only USE while
-                // attack-clearing is OFF so the two inputs don't fight.
-                if (isFoliageBlocking(level, player, burrowBlock)) {
-                    MovementManager.forcedActionsEnabled = true
-                    MovementManager.forcedAttack = true
+                // Dig LOS check: before swinging, raycast eye -> burrow. If a
+                // SOLID wall blocks the line (foliage is OK; the attack will
+                // break it), the player is on the wrong side of the wall and
+                // needs to walk closer. Skipping this gate is what caused the
+                // user-reported "tries to mine burrows through walls".
+                if (isSolidWallBlocking(level, player, burrowBlock)) {
                     MovementManager.forcedUse = false
-                    return
-                } else {
                     MovementManager.forcedAttack = false
+                    setStatus("Walking around wall to burrow")
+                    nativeWalkTo(player, Vec3(bp.x, bp.y + 1.0, bp.z), digRadiusSetting.value)
+                    digApproachTicks++
+                    if (digApproachTicks > digApproachTimeoutSetting.value.toInt()) {
+                        stopNativeWalk()
+                        MovementManager.clearForcedMovement()
+                        MovementManager.setMovementLock(false)
+                        DianaParticleTracker.removeBurrow(floor(bp.x).toInt(), floor(bp.z).toInt())
+                        ChatUtils.sendMessage("Diana: wall blocks burrow LOS, retrying.")
+                        state = State.IDLE
+                    }
+                    return
                 }
-                MovementManager.forcedUse = true
+
+                // Diana burrows on Hypixel are MINED with left-click (attack
+                // / break-block), not right-click. The spade's right-click is
+                // for activating the compass guess; the actual dig is the
+                // attack input. Left-click also harmlessly breaks any
+                // foliage (tall grass, ferns, flowers) in front of the
+                // burrow on the way in — no separate foliage clearing pass
+                // is needed. forcedUse stays off so we don't accidentally
+                // re-trigger the compass-guess animation mid-dig.
+                MovementManager.forcedActionsEnabled = true
+                MovementManager.forcedUse = false
+                MovementManager.forcedAttack = true
                 digTicksElapsed++
 
                 // Defender combat: Hypixel's "Defeat all the burrow defenders
@@ -2649,14 +2770,14 @@ object DianaMacroModule : Module("Diana Macro") {
                     when (treasureDigStage) {
                         0 -> {
                             if (digTicksElapsed >= treasureDigTicks()) {
-                                MovementManager.forcedUse = false
+                                MovementManager.forcedAttack = false
                                 treasureDigStage = 1
                                 treasureWaitTicks = 0
                                 digTicksElapsed = 0
                             }
                         }
                         1 -> {
-                            MovementManager.forcedUse = false
+                            MovementManager.forcedAttack = false
                             treasureWaitTicks++
                             if (treasureWaitTicks >= treasureSecondDigDelaySetting.value.toInt()) {
                                 treasureDigStage = 2
@@ -2665,7 +2786,7 @@ object DianaMacroModule : Module("Diana Macro") {
                         }
                         else -> {
                             if (digTicksElapsed >= treasureDigTicks()) {
-                                MovementManager.forcedUse = false
+                                MovementManager.forcedAttack = false
                                 DianaParticleTracker.removeBurrow(floor(bp.x).toInt(), floor(bp.z).toInt())
                                 DianaProfitTracker.onMacroDug()
                                 waitTicksElapsed = 0
@@ -2682,7 +2803,7 @@ object DianaMacroModule : Module("Diana Macro") {
                 val mobLikely = burrowType == DianaParticleTracker.BurrowType.MOB ||
                     burrowType == DianaParticleTracker.BurrowType.GUESS
                 if (!mobLikely && digTicksElapsed >= treasureDigTicks()) {
-                    MovementManager.forcedUse = false
+                    MovementManager.forcedAttack = false
                     DianaParticleTracker.removeBurrow(floor(bp.x).toInt(), floor(bp.z).toInt())
                     DianaProfitTracker.onMacroDug()
                     waitTicksElapsed = 0
@@ -2690,7 +2811,7 @@ object DianaMacroModule : Module("Diana Macro") {
                     return
                 }
                 if (digTicksElapsed >= digTimeoutSetting.value.toInt()) {
-                    MovementManager.forcedUse = false
+                    MovementManager.forcedAttack = false
                     DianaParticleTracker.removeBurrow(floor(bp.x).toInt(), floor(bp.z).toInt())
                     DianaProfitTracker.onMacroDug()
                     ChatUtils.sendMessage("Diana: burrow dug (no mob), continuing.")
@@ -2794,6 +2915,24 @@ object DianaMacroModule : Module("Diana Macro") {
             State.WAITING -> {
                 if (waitTicksElapsed == 0) MovementManager.setMovementLock(false)
                 waitTicksElapsed++
+                // Late-spawn catch: some Diana mobs only show up several
+                // ticks after the burrow break — under ping or server lag
+                // they can miss the 10-tick post-dig scan and the macro
+                // would move on without fighting. While we're still hanging
+                // around the just-dug burrow in WAITING, keep looking for a
+                // mob within mobSearchRange of bp. burrowPos stays set
+                // until IDLE clears it, so this scan is anchored to the
+                // burrow we just mined — not a speculative "any Diana mob
+                // anywhere" check.
+                val bp = burrowPos
+                if (bp != null) {
+                    val mob = findDianaMob(bp, mobSearchRangeSetting.value)
+                    if (mob != null) {
+                        DianaProfitTracker.onMacroMobFound()
+                        startCombat(mob, rare = dianaMobName(mob) in RARE_MOB_NAMES)
+                        return
+                    }
+                }
                 if (waitTicksElapsed >= loopWaitTicks()) {
                     state = State.IDLE
                 }

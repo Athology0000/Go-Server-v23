@@ -96,6 +96,38 @@ inline bool isSafeStand(const WorldSnapshot& w, int x, int y, int z) {
          isSolid(w, x, y - 1, z);
 }
 
+// Wall-proximity penalty for an AOTV / etherwarp landing. Counts solid
+// neighbours in the 8 horizontal cells around the landing at body height
+// (foot + head voxels) plus the diagonal upper corners that "going up too
+// close to walls" exposes — the chain visibly hugs stone instead of taking
+// a wider, easier-to-follow arc. Each adjacency adds a small cost so A*
+// prefers landings with breathing room while still accepting tight finishes
+// when no open route exists. The penalty is intentionally small (~0.04 per
+// adjacency, capped) so it sways close ties without overriding genuinely
+// shorter routes.
+inline double wallProximityPenalty(const WorldSnapshot& w, const Int3& landing) {
+  int adj = 0;
+  for (int dy = 0; dy <= 1; dy++) {
+    for (int dx = -1; dx <= 1; dx++) {
+      for (int dz = -1; dz <= 1; dz++) {
+        if (dx == 0 && dz == 0) continue;
+        if (isSolid(w, landing.x + dx, landing.y + dy, landing.z + dz)) adj++;
+      }
+    }
+  }
+  // Bonus weight on upper-band adjacency: climbing routes pick landings
+  // pressed against a vertical surface; those hops are the worst to actually
+  // execute because the next aim has to dodge the same wall.
+  for (int dx = -1; dx <= 1; dx++) {
+    for (int dz = -1; dz <= 1; dz++) {
+      if (dx == 0 && dz == 0) continue;
+      if (isSolid(w, landing.x + dx, landing.y + 2, landing.z + dz)) adj++;
+    }
+  }
+  // Cap at ~0.6 so it never dominates the 1.85 base hop cost.
+  return std::min(0.6, adj * 0.04);
+}
+
 // Single-height teleport corridor sample. Branching is bounded now, so one
 // torso-height ray per candidate is enough and keeps per-node cost low.
 bool corridorClear(
