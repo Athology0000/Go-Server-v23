@@ -2,22 +2,10 @@ package org.phantom
 
 import net.fabricmc.api.ClientModInitializer
 import net.fabricmc.loader.api.FabricLoader
-import net.minecraft.network.protocol.game.ClientboundRespawnPacket
-import org.phantom.api.command.CommandManager
-import org.phantom.api.event.EventBus
-import org.phantom.api.event.annotation.SubscribeEvent
-import org.phantom.api.event.impl.client.PacketEvent
-import org.phantom.api.hud.HudModuleManager
 import org.phantom.api.hud.modules.InventoryHudModule
 import org.phantom.api.hud.modules.MiningHudModule
 import org.phantom.api.hud.modules.WatermarkModule
 import org.phantom.api.module.ModuleManager
-import org.phantom.api.notification.NotificationManager
-import org.phantom.api.pathfinder.jni.ChunkSerializer
-import org.phantom.api.pathfinder.jni.NativePathfinder
-import org.phantom.api.rotation.RotationExecutor
-import org.phantom.api.util.TickScheduler
-import org.phantom.api.util.WorldScanner
 import org.phantom.internal.auth.PhantomAuthService
 import org.phantom.internal.auth.PhantomSession
 import org.phantom.internal.chat.ChatFilterModule
@@ -26,7 +14,6 @@ import org.phantom.internal.combat.CombatHudModule
 import org.phantom.internal.combat.CombatMacroModule
 import org.phantom.internal.combat.CombatPatrolModule
 import org.phantom.internal.combat.slayer.*
-import org.phantom.internal.command.MainCommand
 import org.phantom.internal.diana.DianaHelperModule
 import org.phantom.internal.diana.DianaMacroModule
 import org.phantom.internal.dungeons.BloodCampHelperModule
@@ -46,7 +33,6 @@ import org.phantom.internal.garden.GardenHudModule
 import org.phantom.internal.garden.GardenMacroModule
 import org.phantom.internal.garden.PestWarningModule
 import org.phantom.internal.grotto.FairyGrottoModule
-import org.phantom.internal.helper.Config
 import org.phantom.internal.loader.AddonLoader
 import org.phantom.internal.mining.*
 import org.phantom.internal.mining.excavator.ExcavatorMacroModule
@@ -58,22 +44,13 @@ import org.phantom.internal.mining.powder.PowderMacroModule
 import org.phantom.internal.mining.scatha.ScathaMacroModule
 import org.phantom.internal.mining.tunnels.TunnelMinerModule
 import org.phantom.internal.pathfinding.PathfindingModule
-import org.phantom.internal.pathfinding.PathServiceTickBridge
 import org.phantom.internal.pathfinding.WorldCacheModule
 import org.phantom.internal.pathfinding.debug.PathPreviewRenderModule
-import org.phantom.internal.pathfinding.debug.PathRouteQuickAssignCommand
 import org.phantom.internal.pig.PigMacroModule
 import org.phantom.internal.qol.*
-import org.phantom.internal.rotation.PhantomRotation
-import org.phantom.internal.rotation.BlockRotationDebugRenderer
 import org.phantom.internal.rotation.RotationsModule
-import org.phantom.internal.routes.RouteEditMode
-import org.phantom.internal.routes.RouteStore
 import org.phantom.internal.seal.YearOfTheSealModule
-import org.phantom.internal.skyblock.HypixelManager
-import org.phantom.internal.skyblock.SkyblockEventManager
 import org.phantom.internal.spotify.SpotifyModule
-import org.phantom.internal.stats.MacroTimeTracker
 import org.phantom.internal.visual.*
 import org.phantom.internal.visual.MobEspModule as VisualMobEspModule
 import org.phantom.internal.wardrobe.WardrobeModule
@@ -89,18 +66,8 @@ object Phantom : ClientModInitializer {
     }
 
     loadAddons()
-    registerCommands()
-    registerCoreEventListeners()
+    PhantomPublicInit.init()
 
-    NativePathfinder.init()
-    ChunkSerializer.register()
-    HypixelManager.init()
-    WorldScanner
-
-    Config.loadModulesConfig()
-    RouteStore.migrate()
-    RouteStore.loadAssignments()
-    EventBus.register(this)
     println("Phantom Client Initialized")
   }
 
@@ -225,53 +192,5 @@ object Phantom : ClientModInitializer {
 
   private fun loadAddons() {
     AddonLoader.activateLoadedAddons()
-  }
-
-  private fun registerCommands() {
-    CommandManager.register(MainCommand)
-    PathRouteQuickAssignCommand.register()
-    CommandManager.dispatchAll()
-    MacroTimeTracker.load()
-  }
-
-  private fun registerCoreEventListeners() {
-    listOf(
-      TickScheduler,
-      MainCommand,
-      NotificationManager,
-      RotationExecutor,
-      PhantomRotation,
-      BlockRotationDebugRenderer,
-      HudModuleManager,
-      TitleScreenRenderer,
-      MacroTimeTracker,
-      RouteEditMode,
-      HypixelManager,
-      SkyblockEventManager,
-      PathServiceTickBridge,
-    ).forEach { EventBus.register(it) }
-  }
-
-  @SubscribeEvent
-  fun onRespawn(event: PacketEvent.Incoming) {
-    if (event.packet is ClientboundRespawnPacket) {
-      NativePathfinder.onLevelChange()
-      ChunkSerializer.invalidate()
-      RouteStore.clearAllLoaded()
-      RouteEditMode.onLevelChange()
-      notifyRemoteModuleLevelChange("org.phantom.internal.mining.CommissionMacroModule")
-      notifyRemoteModuleLevelChange("org.phantom.internal.mining.RoutesModule")
-      notifyRemoteModuleLevelChange("org.phantom.internal.mining.MiningMacroModule")
-      notifyRemoteModuleLevelChange("org.phantom.internal.mining.GemstoneMinerModule")
-      notifyRemoteModuleLevelChange("org.phantom.internal.seal.YearOfTheSealModule")
-    }
-  }
-
-  private fun notifyRemoteModuleLevelChange(className: String) {
-    runCatching {
-      val clazz = Class.forName(className)
-      val instance = clazz.getField("INSTANCE").get(null)
-      clazz.getMethod("onLevelChange").invoke(instance)
-    }
   }
 }
