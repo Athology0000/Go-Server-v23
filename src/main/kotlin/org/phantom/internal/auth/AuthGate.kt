@@ -1,17 +1,15 @@
 package org.phantom.internal.auth
 
 object AuthGate {
-  // DEV FIX:
-  // Never block title screen, multiplayer, server join, or GUI input.
   fun shouldBlockInput(): Boolean {
-    return false
+    return Auth.isGateLocked()
   }
 
   fun shouldShowOverlay(): Boolean {
-    return false
+    return Auth.isGateLocked()
   }
 
   fun canUseMenus(): Boolean {
-    return true
+    return !Auth.isGateLocked()
   }
 }

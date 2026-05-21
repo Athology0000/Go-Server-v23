@@ -24,7 +24,7 @@ import org.slf4j.LoggerFactory
 object PhantomAuthService {
 
   private const val DEFAULT_MANIFEST_PUBLIC_KEY_B64 = "REPLACE_ME_WITH_32_BYTE_BASE64_ED25519_PUBLIC_KEY"
-  private const val DEFAULT_SERVER_BASE_URL = "http://localhost:8080/"
+  private const val DEFAULT_SERVER_BASE_URL = "https://valiant-cooperation-production.up.railway.app/"
   private const val AUTH_BASE_URL_PROPERTY = "phantom.authBaseUrl"
   private const val AUTH_BASE_URL_ENV = "PHANTOM_AUTH_BASE_URL"
   private const val MANIFEST_PUBLIC_KEY_PROPERTY = "phantom.manifestPublicKey"

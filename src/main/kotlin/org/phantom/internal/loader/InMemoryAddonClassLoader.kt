@@ -7,6 +7,7 @@ import java.net.URLConnection
 import java.net.URLStreamHandler
 import java.security.CodeSource
 import java.security.ProtectionDomain
+import java.security.cert.Certificate
 import java.util.jar.JarInputStream
 
 internal class InMemoryAddonClassLoader(
@@ -16,7 +17,7 @@ internal class InMemoryAddonClassLoader(
 ) : ClassLoader(parent) {
 
   private val entries: Map<String, ByteArray> = readEntries(jarBytes)
-  private val protectionDomain = ProtectionDomain(CodeSource(null, emptyArray()), null, this, null)
+  private val protectionDomain = ProtectionDomain(CodeSource(null, emptyArray<Certificate>()), null, this, null)
 
   fun getEntryBytes(path: String): ByteArray? {
     return entries[path.trimStart('/')]

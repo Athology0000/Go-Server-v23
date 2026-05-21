@@ -211,10 +211,11 @@ object AddonLoader {
   private fun allowLocalAddons(): Boolean {
     if (FabricLoader.getInstance().isDevelopmentEnvironment) return true
 
-    return System.getProperty(LOCAL_ADDONS_PROPERTY)
+    return (System.getProperty(LOCAL_ADDONS_PROPERTY)
       ?.trim()
       ?.lowercase()
       in setOf("1", "true", "yes", "on")
+      )
   }
 
 }

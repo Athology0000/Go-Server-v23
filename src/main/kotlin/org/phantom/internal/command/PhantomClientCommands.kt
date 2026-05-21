@@ -2,8 +2,8 @@ package org.phantom.internal.commands
 
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback
+import org.phantom.internal.auth.Auth
 import org.phantom.internal.auth.PhantomAuthDebug
-import org.phantom.internal.auth.DevUnlock
 
 object PhantomClientCommands {
   fun register() {
@@ -12,8 +12,11 @@ object PhantomClientCommands {
         ClientCommandManager.literal("cb")
           .executes {
             PhantomAuthDebug.info("/cb command executed")
-            DevUnlock.apply("/cb dev unlock")
-            openClickGuiDev()
+            if (Auth.isGateLocked()) {
+              PhantomAuthDebug.warn("/cb blocked while auth is not ready: ${Auth.statusMessage}")
+            } else {
+              openClickGuiDev()
+            }
             1
           }
       )

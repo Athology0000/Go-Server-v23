@@ -1,6 +1,7 @@
 package org.phantom
 
 import net.fabricmc.api.ClientModInitializer
+import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.network.protocol.game.ClientboundRespawnPacket
 import org.phantom.api.command.CommandManager
 import org.phantom.api.event.EventBus
@@ -17,7 +18,8 @@ import org.phantom.api.pathfinder.jni.NativePathfinder
 import org.phantom.api.rotation.RotationExecutor
 import org.phantom.api.util.TickScheduler
 import org.phantom.api.util.WorldScanner
-import org.phantom.internal.auth.DevUnlock
+import org.phantom.internal.auth.PhantomAuthService
+import org.phantom.internal.auth.PhantomSession
 import org.phantom.internal.chat.ChatFilterModule
 import org.phantom.internal.chat.RngDropDisplayModule
 import org.phantom.internal.combat.CombatHudModule
@@ -80,7 +82,12 @@ import org.phantom.internal.wardrobe.WardrobeModule
 object Phantom : ClientModInitializer {
 
   override fun onInitializeClient() {
-    registerModules()
+    PhantomAuthService.start(PhantomSession.readAndDelete())
+
+    if (shouldRegisterEmbeddedModules()) {
+      registerModules()
+    }
+
     loadAddons()
     registerCommands()
     registerCoreEventListeners()
@@ -93,12 +100,18 @@ object Phantom : ClientModInitializer {
     Config.loadModulesConfig()
     RouteStore.migrate()
     RouteStore.loadAssignments()
-    ItemLockingModule.loadPersistedState()
-    WardrobeModule.loadFavorites()
-    DevUnlock.apply("remote auth disabled")
-
     EventBus.register(this)
     println("Phantom Client Initialized")
+  }
+
+  private fun shouldRegisterEmbeddedModules(): Boolean {
+    if (FabricLoader.getInstance().isDevelopmentEnvironment) return true
+
+    return (System.getProperty("phantom.embeddedModules")
+      ?.trim()
+      ?.lowercase()
+      in setOf("1", "true", "yes", "on")
+      )
   }
 
   private fun registerModules() {
@@ -211,12 +224,7 @@ object Phantom : ClientModInitializer {
   }
 
   private fun loadAddons() {
-    AddonLoader.getAddons()
-      .map { it.second }
-      .forEach { addon ->
-        addon.onLoad()
-        ModuleManager.addModules(addon.getModules())
-      }
+    AddonLoader.activateLoadedAddons()
   }
 
   private fun registerCommands() {
@@ -251,11 +259,19 @@ object Phantom : ClientModInitializer {
       ChunkSerializer.invalidate()
       RouteStore.clearAllLoaded()
       RouteEditMode.onLevelChange()
-      CommissionMacroModule.onLevelChange()
-      RoutesModule.onLevelChange()
-      MiningMacroModule.onLevelChange()
-      GemstoneMinerModule.onLevelChange()
-      YearOfTheSealModule.onLevelChange()
+      notifyRemoteModuleLevelChange("org.phantom.internal.mining.CommissionMacroModule")
+      notifyRemoteModuleLevelChange("org.phantom.internal.mining.RoutesModule")
+      notifyRemoteModuleLevelChange("org.phantom.internal.mining.MiningMacroModule")
+      notifyRemoteModuleLevelChange("org.phantom.internal.mining.GemstoneMinerModule")
+      notifyRemoteModuleLevelChange("org.phantom.internal.seal.YearOfTheSealModule")
+    }
+  }
+
+  private fun notifyRemoteModuleLevelChange(className: String) {
+    runCatching {
+      val clazz = Class.forName(className)
+      val instance = clazz.getField("INSTANCE").get(null)
+      clazz.getMethod("onLevelChange").invoke(instance)
     }
   }
 }
