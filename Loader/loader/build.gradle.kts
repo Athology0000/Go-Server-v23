@@ -4,8 +4,16 @@ plugins {
     kotlin("plugin.serialization")
 }
 
+version = property("mod_version") as String
+group = property("group") as String
+
 base {
-    archivesName.set("cobalt-loader")
+    archivesName.set("phantom")
+}
+
+val clientPublicLayer by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
 }
 
 java {
@@ -18,16 +26,33 @@ kotlin {
 
 dependencies {
     minecraft("com.mojang:minecraft:${property("minecraft_version")}")
-    mappings("net.fabricmc:yarn:${property("yarn_mappings")}:v2")
+    mappings(loom.officialMojangMappings())
     modImplementation("net.fabricmc:fabric-loader:${property("loader_version")}")
     modImplementation("net.fabricmc.fabric-api:fabric-api:${property("fabric_api_version")}")
     modImplementation("net.fabricmc:fabric-language-kotlin:${property("fabric_kotlin_version")}")
 
-    implementation(project(":shared-api"))
-    include(project(":shared-api"))
+    // Public-layer client mod (mixins + API + native), consumed from mavenLocal.
+    // Merged into phantom.jar so the loader owns the single Fabric mod id.
+    modImplementation("org.phantom:phantom-client-public:${property("phantom_client_version")}")
+    clientPublicLayer("org.phantom:phantom-client-public:${property("phantom_client_version")}")
 
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:${property("serialization_version")}")
     include("org.jetbrains.kotlinx:kotlinx-serialization-json:${property("serialization_version")}")
+}
+
+tasks.named<Jar>("jar") {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from({
+        clientPublicLayer.map { zipTree(it) }
+    }) {
+        exclude(
+            "fabric.mod.json",
+            "META-INF/MANIFEST.MF",
+            "META-INF/*.DSA",
+            "META-INF/*.RSA",
+            "META-INF/*.SF"
+        )
+    }
 }
 
 tasks.processResources {

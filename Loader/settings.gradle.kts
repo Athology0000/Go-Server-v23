@@ -19,10 +19,9 @@ dependencyResolutionManagement {
     repositories {
         maven("https://maven.fabricmc.net/")
         mavenCentral()
+        mavenLocal()
     }
 }
 
-rootProject.name = "CobaltLoaderProject"
-include("shared-api")
+rootProject.name = "PhantomLoaderProject"
 include("loader")
-include("sample-module")

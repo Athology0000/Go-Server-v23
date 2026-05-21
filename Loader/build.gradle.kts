@@ -7,4 +7,10 @@ plugins {
 allprojects {
     group = property("group") as String
     version = property("mod_version") as String
+
+    repositories {
+        mavenLocal()
+        maven("https://maven.fabricmc.net/")
+        mavenCentral()
+    }
 }

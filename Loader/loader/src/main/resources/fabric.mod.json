@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "id": "cobalt_loader",
+  "id": "phantom",
   "version": "${version}",
-  "name": "Cobalt Loader",
-  "description": "Small authenticated runtime-module loader.",
-  "authors": ["Cobalt"],
+  "name": "Phantom",
+  "description": "Authenticated runtime loader for the Phantom client.",
+  "authors": ["Phantom"],
   "contact": {},
   "license": "All-Rights-Reserved",
   "environment": "client",
@@ -12,13 +12,45 @@
     "client": [
       {
         "adapter": "kotlin",
-        "value": "org.cobalt.loader.CobaltLoaderClient"
+        "value": "org.phantom.loader.PhantomLoaderClient"
       }
+    ],
+    "preLaunch": [
+      "org.phantom.PreLaunch"
     ]
   },
+  "mixins": [
+    "phantom.mixins.json"
+  ],
   "depends": {
     "fabricloader": ">=0.18.1",
     "minecraft": "~1.21.11",
     "fabric-language-kotlin": ">=1.13.8+kotlin.2.3.0"
-  }
+  },
+  "jars": [
+    {
+      "file": "META-INF/jars/discord-ipc-1.1.jar"
+    },
+    {
+      "file": "META-INF/jars/lwjgl-nanovg-3.3.3-natives-linux.jar"
+    },
+    {
+      "file": "META-INF/jars/lwjgl-nanovg-3.3.3-natives-macos-arm64.jar"
+    },
+    {
+      "file": "META-INF/jars/lwjgl-nanovg-3.3.3-natives-macos.jar"
+    },
+    {
+      "file": "META-INF/jars/lwjgl-nanovg-3.3.3-natives-windows.jar"
+    },
+    {
+      "file": "META-INF/jars/lwjgl-nanovg-3.3.3.jar"
+    },
+    {
+      "file": "META-INF/jars/mod-api-1.0.1.jar"
+    },
+    {
+      "file": "META-INF/jars/reflections-0.10.2.jar"
+    }
+  ]
 }
