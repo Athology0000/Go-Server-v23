@@ -1,7 +1,7 @@
 # Phantom Client → Loader Integration & Hardening — Design
 
 Date: 2026-05-20
-Status: Approved design, pending implementation plan
+Status: Phases 1-2 implemented; Phase 3 partially scaffolded (obfuscator wiring + bundled-JRE stub)
 
 ## Goal
 
@@ -250,7 +250,8 @@ class is written to disk.
 - Wire the `Go-Server/obfuscator` pipeline into the protected-module build so
   `internal/**` bundles ship obfuscated.
 - Per-session / per-user watermarked modules; server-side build revocation
-  testing.
+  testing. See `docs/superpowers/specs/2026-05-21-module-watermarking.md` for the
+  watermarking + revocation design.
 
 ## Risks
 
