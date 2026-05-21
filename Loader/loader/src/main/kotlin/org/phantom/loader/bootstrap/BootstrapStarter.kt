@@ -9,7 +9,7 @@ import org.phantom.loader.LoaderLog
 import org.phantom.loader.PhantomSession
 
 object BootstrapStarter {
-    fun start(): BootstrapStartResult {
+    fun start() {
         val session = PhantomSession.read()
         if (!session.isValid) {
             return fail("Missing Phantom session token.")
@@ -18,7 +18,7 @@ object BootstrapStarter {
         Auth.state = AuthState.VERIFYING
         Auth.statusMessage = "Verifying Phantom session..."
 
-        return try {
+        try {
             val minecraftUsername = Minecraft.getInstance().user.name.trim()
             val auth = BootstrapAuthClient.verifySession(session.token, minecraftUsername)
             if (!auth.authorized) {
@@ -70,7 +70,6 @@ object BootstrapStarter {
             Auth.state = AuthState.READY
             Auth.statusMessage = "Phantom ready."
             LoaderLog.info("Bootstrap complete. Loaded ${modules.size} protected module bundle(s).")
-            BootstrapStartResult.Success
         } catch (t: Throwable) {
             fail("Bootstrap failed: ${t.message}", t)
         }
@@ -92,16 +91,10 @@ object BootstrapStarter {
         }
     }
 
-    private fun fail(message: String, throwable: Throwable? = null): BootstrapStartResult.Failure {
+    private fun fail(message: String, throwable: Throwable? = null) {
         Auth.state = AuthState.FAILED
         Auth.failureReason = message
         Auth.statusMessage = message
         LoaderLog.error(message, throwable)
-        return BootstrapStartResult.Failure(message)
     }
-}
-
-sealed interface BootstrapStartResult {
-    data object Success : BootstrapStartResult
-    data class Failure(val message: String) : BootstrapStartResult
 }

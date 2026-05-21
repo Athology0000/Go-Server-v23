@@ -2,6 +2,8 @@ package org.phantom.loader.bootstrap
 
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.phantom.internal.auth.Auth
+import org.phantom.internal.auth.AuthState
 import org.phantom.internal.loader.AddonLoader
 import org.phantom.loader.LoaderConfig
 import org.phantom.loader.LoaderLog
@@ -34,6 +36,9 @@ object BootstrapHeartbeatClient {
                     failures = 0
                 } else if (++failures >= LoaderConfig.heartbeatFailureLimit) {
                     LoaderLog.error("Heartbeat trust lost. Unloading protected modules.")
+                    Auth.state = AuthState.FAILED
+                    Auth.failureReason = "Heartbeat trust lost"
+                    Auth.statusMessage = "Phantom session revoked - heartbeat trust lost."
                     AddonLoader.unloadLoadedAddons()
                     Thread.currentThread().interrupt()
                 }
