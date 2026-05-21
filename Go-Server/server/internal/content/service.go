@@ -96,12 +96,15 @@ func (s *Service) ModuleBytes(ctx context.Context, accountID, name string) ([]by
 		return nil, "", err
 	}
 
-	bytecode, err := readModuleArtifact(path, s.moduleKey)
+	// Serve the artifact exactly as stored. Encrypted .enc bundles stay
+	// encrypted on the wire — the loader decrypts them in memory after
+	// verifying the signed manifest. Encryption is not stripped server-side.
+	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, "", err
 	}
 
-	return bytecode, moduleName + ".jar", nil
+	return raw, filepath.Base(path), nil
 }
 
 func (s *Service) NativePath(ctx context.Context, accountID, name string) (string, error) {
