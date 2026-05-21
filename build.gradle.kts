@@ -490,7 +490,7 @@ for (bundle in phantomBundles) {
   tasks.register<JavaExec>(bundle.obfuscateTask) {
     group = "build"
     description = "Obfuscates the ${bundle.addonId} bundle jar before encryption."
-    dependsOn(bundle.packageTask, "collectObfLibs")
+    dependsOn(bundle.packageTask)
     onlyIf { obfuscateProtectedModules.get() }
 
     val inputJar  = layout.buildDirectory.file("phantom-modules/plain/${bundle.addonId}.jar")
@@ -505,6 +505,12 @@ for (bundle in phantomBundles) {
     mainClass.set("com.obf.Main")
 
     doFirst {
+      if (!obfuscatorJar.exists()) {
+        throw GradleException(
+          "Obfuscator jar not found at ${obfuscatorJar.path}. " +
+            "Build it first: (cd Go-Server/obfuscator && ./gradlew build)."
+        )
+      }
       val inJar = inputJar.get().asFile
       if (!inJar.exists()) throw GradleException("Missing input jar for obfuscation: ${inJar.path}")
       outputJar.get().asFile.parentFile.mkdirs()
