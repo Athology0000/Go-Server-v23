@@ -1,6 +1,0 @@
-go.sum
-.env
-content/
-docker/
-admin/node_modules
-panel/node_modules
