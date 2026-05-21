@@ -1,0 +1,17 @@
+{
+  "issuedAt": 1777920000,
+  "expiresAt": 1777920900,
+  "userId": "dev-user-1",
+  "minecraftUsername": "PlayerName",
+  "modules": [
+    {
+      "id": "sample",
+      "version": "0.1.0",
+      "delivery": "jar",
+      "url": "sample-0.1.0.jar",
+      "sha256": "REPLACE_WITH_SHA256_OF_SAMPLE_MODULE_JAR",
+      "entrypoint": "org.cobalt.sample.SampleRuntimeModule",
+      "requiredRole": "standard"
+    }
+  ]
+}
