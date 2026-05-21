@@ -24,7 +24,7 @@ pub struct BootstrapConfig {
 }
 
 fn default_server_url() -> String {
-    "http://localhost:8080".to_string()
+    "https://valiant-cooperation-production.up.railway.app/".to_string()
 }
 
 fn default_mods_dir() -> String {
