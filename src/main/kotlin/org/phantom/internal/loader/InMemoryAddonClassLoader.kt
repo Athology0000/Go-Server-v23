@@ -12,12 +12,17 @@ import java.util.jar.JarInputStream
 
 internal class InMemoryAddonClassLoader(
   private val sourceName: String,
-  jarBytes: ByteArray,
+  jarBytes: ByteArray? = null,
   parent: ClassLoader,
 ) : ClassLoader(parent) {
 
-  private val entries: Map<String, ByteArray> = readEntries(jarBytes)
+  private val entries: MutableMap<String, ByteArray> =
+    jarBytes?.let { readEntries(it).toMutableMap() } ?: linkedMapOf()
   private val protectionDomain = ProtectionDomain(CodeSource(null, emptyArray<Certificate>()), null, this, null)
+
+  fun addJar(jarBytes: ByteArray) {
+    entries.putAll(readEntries(jarBytes))
+  }
 
   fun getEntryBytes(path: String): ByteArray? {
     return entries[path.trimStart('/')]

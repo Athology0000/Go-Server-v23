@@ -22,6 +22,12 @@ object AddonLoader {
   private val addonsById = mutableMapOf<String, AddonMetadata>()
   private val activatedAddons = mutableSetOf<Int>()
   private val gson = Gson()
+  private val remoteClassLoader by lazy {
+    InMemoryAddonClassLoader(
+      sourceName = "remote-phantom-modules",
+      parent = javaClass.classLoader
+    )
+  }
 
   fun findAddons() {
     if (FabricLauncherBase.getLauncher().isDevelopment) {
@@ -115,11 +121,8 @@ object AddonLoader {
   }
 
   private fun loadAddon(sourceName: String, jarBytes: ByteArray): List<Pair<AddonMetadata, Addon>> {
-    val classLoader = InMemoryAddonClassLoader(
-      sourceName = sourceName,
-      jarBytes = jarBytes,
-      parent = javaClass.classLoader
-    )
+    val classLoader = remoteClassLoader
+    classLoader.addJar(jarBytes)
 
     val metadataJson = classLoader.getEntryBytes("phantom.addon.json")
       ?: throw IllegalStateException("Missing phantom.addon.json in $sourceName")

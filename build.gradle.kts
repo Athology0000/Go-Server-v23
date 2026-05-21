@@ -157,8 +157,12 @@ java {
 // â”€â”€ Native DLL build (Windows, requires VS2026 + CMake) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 val phantomRemoteAddonId = "phantom"
 val phantomRemoteAddonEntrypoint = "org.phantom.internal.remote.PhantomRemoteAddon"
+val phantomCoreAddonId = "phantom-core"
+val phantomCoreAddonEntrypoint = "org.phantom.internal.remote.PhantomCoreAddon"
 val phantomMiningAddonId = "phantom-mining"
 val phantomMiningAddonEntrypoint = "org.phantom.internal.remote.PhantomMiningAddon"
+val phantomSlayerAddonId = "phantom-slayer"
+val phantomSlayerAddonEntrypoint = "org.phantom.internal.remote.PhantomSlayerAddon"
 val phantomDianaAddonId = "phantom-diana"
 val phantomDianaAddonEntrypoint = "org.phantom.internal.remote.PhantomDianaAddon"
 val phantomProtectedIncludes = listOf(
@@ -182,13 +186,35 @@ val phantomProtectedIncludes = listOf(
   "org/phantom/internal/spotify/**",
   "org/phantom/internal/wardrobe/**",
 )
+val phantomCoreIncludes = listOf(
+  "org/phantom/internal/remote/PhantomCoreAddon.class",
+  "org/phantom/internal/account/**",
+  "org/phantom/internal/debug/**",
+  "org/phantom/internal/helper/**",
+  "org/phantom/internal/pathfinding/**",
+  "org/phantom/internal/performance/**",
+  "org/phantom/internal/qol/**",
+  "org/phantom/internal/rotation/**",
+  "org/phantom/internal/routes/**",
+  "org/phantom/internal/scheduler/**",
+  "org/phantom/internal/skyblock/**",
+  "org/phantom/internal/stats/**",
+  "org/phantom/internal/ui/**",
+  "org/phantom/internal/visual/**",
+  "org/phantom/internal/wardrobe/**",
+)
 val phantomMiningIncludes = listOf(
   "org/phantom/internal/remote/PhantomMiningAddon.class",
-  "org/phantom/internal/combat/**",
+  "org/phantom/internal/combat/*.class",
   "org/phantom/internal/etherwarp/**",
   "org/phantom/internal/grotto/**",
   "org/phantom/internal/mining/**",
   "org/cobalt/internal/mining/**",
+)
+val phantomSlayerIncludes = listOf(
+  "org/phantom/internal/remote/PhantomSlayerAddon.class",
+  "org/phantom/internal/combat/*.class",
+  "org/phantom/internal/combat/slayer/**",
 )
 val phantomDianaIncludes = listOf(
   "org/phantom/internal/remote/PhantomDianaAddon.class",
@@ -300,6 +326,48 @@ val generatePhantomMiningRemoteManifest = tasks.register("generatePhantomMiningR
   }
 }
 
+val generatePhantomCoreRemoteManifest = tasks.register("generatePhantomCoreRemoteManifest") {
+  val outputDir = layout.buildDirectory.dir("generated/phantom-remote-manifest/$phantomCoreAddonId")
+  outputs.dir(outputDir)
+
+  doLast {
+    val dir = outputDir.get().asFile
+    dir.mkdirs()
+    dir.resolve("phantom.addon.json").writeText(
+      """
+      {
+        "id": "$phantomCoreAddonId",
+        "name": "Phantom Core",
+        "version": "${project.version}",
+        "entrypoints": ["$phantomCoreAddonEntrypoint"],
+        "mixins": []
+      }
+      """.trimIndent()
+    )
+  }
+}
+
+val generatePhantomSlayerRemoteManifest = tasks.register("generatePhantomSlayerRemoteManifest") {
+  val outputDir = layout.buildDirectory.dir("generated/phantom-remote-manifest/$phantomSlayerAddonId")
+  outputs.dir(outputDir)
+
+  doLast {
+    val dir = outputDir.get().asFile
+    dir.mkdirs()
+    dir.resolve("phantom.addon.json").writeText(
+      """
+      {
+        "id": "$phantomSlayerAddonId",
+        "name": "Phantom Slayer",
+        "version": "${project.version}",
+        "entrypoints": ["$phantomSlayerAddonEntrypoint"],
+        "mixins": []
+      }
+      """.trimIndent()
+    )
+  }
+}
+
 val generatePhantomDianaRemoteManifest = tasks.register("generatePhantomDianaRemoteManifest") {
   val outputDir = layout.buildDirectory.dir("generated/phantom-remote-manifest/$phantomDianaAddonId")
   outputs.dir(outputDir)
@@ -319,6 +387,21 @@ val generatePhantomDianaRemoteManifest = tasks.register("generatePhantomDianaRem
       """.trimIndent()
     )
   }
+}
+
+tasks.register<Jar>("packagePhantomCoreModuleJar") {
+  group = "build"
+  description = "Packages Phantom's protected core helper bytecode as a remote addon JAR."
+  dependsOn("classes", generatePhantomCoreRemoteManifest)
+
+  archiveFileName.set("$phantomCoreAddonId.jar")
+  destinationDirectory.set(layout.buildDirectory.dir("phantom-modules/plain"))
+  duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+  from(sourceSets.main.get().output) {
+    phantomCoreIncludes.forEach { include(it) }
+  }
+  from(layout.buildDirectory.dir("generated/phantom-remote-manifest/$phantomCoreAddonId"))
 }
 
 tasks.register<Jar>("packagePhantomModuleJar") {
@@ -349,6 +432,21 @@ tasks.register<Jar>("packagePhantomMiningModuleJar") {
     phantomMiningIncludes.forEach { include(it) }
   }
   from(layout.buildDirectory.dir("generated/phantom-remote-manifest/$phantomMiningAddonId"))
+}
+
+tasks.register<Jar>("packagePhantomSlayerModuleJar") {
+  group = "build"
+  description = "Packages Phantom's protected Slayer module bytecode as a remote addon JAR."
+  dependsOn("classes", generatePhantomSlayerRemoteManifest)
+
+  archiveFileName.set("$phantomSlayerAddonId.jar")
+  destinationDirectory.set(layout.buildDirectory.dir("phantom-modules/plain"))
+  duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+  from(sourceSets.main.get().output) {
+    phantomSlayerIncludes.forEach { include(it) }
+  }
+  from(layout.buildDirectory.dir("generated/phantom-remote-manifest/$phantomSlayerAddonId"))
 }
 
 tasks.register<Jar>("packagePhantomDianaModuleJar") {
@@ -406,6 +504,24 @@ tasks.register("encryptPhantomModule") {
   }
 }
 
+tasks.register("encryptPhantomCoreModule") {
+  group = "build"
+  description = "Encrypts the protected Phantom core bundle into phantom-core.enc."
+  dependsOn("packagePhantomCoreModuleJar")
+
+  val plainJar = layout.buildDirectory.file("phantom-modules/plain/$phantomCoreAddonId.jar")
+  val encryptedFile = layout.buildDirectory.file("phantom-modules/encrypted/$phantomCoreAddonId.enc")
+
+  inputs.file(plainJar)
+  outputs.file(encryptedFile)
+
+  doLast {
+    val output = encryptedFile.get().asFile
+    output.parentFile.mkdirs()
+    output.writeBytes(encryptAesGcm(moduleEncryptionKey(), plainJar.get().asFile.readBytes()))
+  }
+}
+
 tasks.register("encryptPhantomMiningModule") {
   group = "build"
   description = "Encrypts the protected Phantom mining module bundle into phantom-mining.enc."
@@ -413,6 +529,24 @@ tasks.register("encryptPhantomMiningModule") {
 
   val plainJar = layout.buildDirectory.file("phantom-modules/plain/$phantomMiningAddonId.jar")
   val encryptedFile = layout.buildDirectory.file("phantom-modules/encrypted/$phantomMiningAddonId.enc")
+
+  inputs.file(plainJar)
+  outputs.file(encryptedFile)
+
+  doLast {
+    val output = encryptedFile.get().asFile
+    output.parentFile.mkdirs()
+    output.writeBytes(encryptAesGcm(moduleEncryptionKey(), plainJar.get().asFile.readBytes()))
+  }
+}
+
+tasks.register("encryptPhantomSlayerModule") {
+  group = "build"
+  description = "Encrypts the protected Phantom Slayer module bundle into phantom-slayer.enc."
+  dependsOn("packagePhantomSlayerModuleJar")
+
+  val plainJar = layout.buildDirectory.file("phantom-modules/plain/$phantomSlayerAddonId.jar")
+  val encryptedFile = layout.buildDirectory.file("phantom-modules/encrypted/$phantomSlayerAddonId.enc")
 
   inputs.file(plainJar)
   outputs.file(encryptedFile)
@@ -445,21 +579,41 @@ tasks.register("encryptPhantomDianaModule") {
 tasks.register("packagePhantomModules") {
   group = "build"
   description = "Packages Phantom's protected module bundles."
-  dependsOn("packagePhantomModuleJar", "packagePhantomMiningModuleJar", "packagePhantomDianaModuleJar")
+  dependsOn(
+    "packagePhantomCoreModuleJar",
+    "packagePhantomMiningModuleJar",
+    "packagePhantomSlayerModuleJar",
+    "packagePhantomDianaModuleJar"
+  )
 }
 
 tasks.register("encryptPhantomModules") {
   group = "build"
   description = "Packages and encrypts Phantom's protected module bundles."
-  dependsOn("encryptPhantomModule", "encryptPhantomMiningModule", "encryptPhantomDianaModule")
+  dependsOn(
+    "encryptPhantomCoreModule",
+    "encryptPhantomMiningModule",
+    "encryptPhantomSlayerModule",
+    "encryptPhantomDianaModule"
+  )
+}
+
+tasks.register<Copy>("syncPhantomNativeToServer") {
+  group = "build"
+  description = "Copies Phantom native components into the Go server content/native directory."
+  from(layout.projectDirectory.file("src/main/resources/natives/windows/phantom_pathfinder.dll"))
+  into(layout.projectDirectory.dir("Go-Server/server/content/native"))
 }
 
 tasks.register<Copy>("syncPhantomModulesToServer") {
   group = "build"
   description = "Copies encrypted Phantom module bundles into the Go server content/modules directory."
-  dependsOn("encryptPhantomModules")
+  dependsOn("encryptPhantomModules", "syncPhantomNativeToServer")
   from(layout.buildDirectory.dir("phantom-modules/encrypted")) {
-    include("*.enc")
+    include("$phantomCoreAddonId.enc")
+    include("$phantomMiningAddonId.enc")
+    include("$phantomSlayerAddonId.enc")
+    include("$phantomDianaAddonId.enc")
   }
   into(layout.projectDirectory.dir("Go-Server/server/content/modules"))
 }

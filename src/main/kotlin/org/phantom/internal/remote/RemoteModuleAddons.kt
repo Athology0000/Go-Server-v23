@@ -4,6 +4,14 @@ import org.phantom.api.addon.Addon
 import org.phantom.api.hud.modules.MiningHudModule
 import org.phantom.api.module.Module
 import org.phantom.internal.BuiltinModules
+import org.phantom.internal.combat.slayer.BlazeSlayerMacroModule
+import org.phantom.internal.combat.slayer.CocoonAlertModule
+import org.phantom.internal.combat.slayer.EndermanSlayerMacroModule
+import org.phantom.internal.combat.slayer.MinibossAlertModule
+import org.phantom.internal.combat.slayer.SpiderSlayerMacroModule
+import org.phantom.internal.combat.slayer.VampireSlayerMacroModule
+import org.phantom.internal.combat.slayer.WolfSlayerMacroModule
+import org.phantom.internal.combat.slayer.ZombieSlayerMacroModule
 import org.phantom.internal.diana.DianaHelperModule
 import org.phantom.internal.diana.DianaMacroModule
 import org.phantom.internal.mining.AutoForgeModule
@@ -30,6 +38,15 @@ import org.phantom.internal.mining.scatha.ScathaMacroModule
 import org.phantom.internal.mining.tunnels.TunnelMinerModule
 import org.phantom.internal.qol.ItemLockingModule
 import org.phantom.internal.wardrobe.WardrobeModule
+
+class PhantomCoreAddon : Addon() {
+  override fun onLoad() {
+    ItemLockingModule.loadPersistedState()
+    WardrobeModule.loadFavorites()
+  }
+
+  override fun onUnload() {}
+}
 
 class PhantomRemoteAddon : Addon() {
   override fun onLoad() {
@@ -82,5 +99,22 @@ class PhantomDianaAddon : Addon() {
   override fun getModules(): List<Module> = listOf(
     DianaMacroModule,
     DianaHelperModule,
+  ).distinctBy { it.name.trim().lowercase() }
+}
+
+class PhantomSlayerAddon : Addon() {
+  override fun onLoad() {}
+
+  override fun onUnload() {}
+
+  override fun getModules(): List<Module> = listOf(
+    ZombieSlayerMacroModule,
+    SpiderSlayerMacroModule,
+    WolfSlayerMacroModule,
+    EndermanSlayerMacroModule,
+    BlazeSlayerMacroModule,
+    VampireSlayerMacroModule,
+    CocoonAlertModule,
+    MinibossAlertModule,
   ).distinctBy { it.name.trim().lowercase() }
 }

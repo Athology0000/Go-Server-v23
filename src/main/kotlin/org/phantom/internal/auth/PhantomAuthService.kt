@@ -19,6 +19,7 @@ import net.fabricmc.loader.api.FabricLoader
 import org.phantom.api.module.ModuleManager
 import org.phantom.internal.helper.Config
 import org.phantom.internal.loader.AddonLoader
+import org.phantom.pathfinder.NativeLoader
 import org.slf4j.LoggerFactory
 
 object PhantomAuthService {
@@ -171,10 +172,14 @@ object PhantomAuthService {
         return fail("Manifest signature invalid")
       }
 
+      if (!downloadNativeComponents(session.sessionToken, manifest.nativeComponents)) {
+        return fail("Failed to load native components")
+      }
+
       val entitled = Auth.entitledModules ?: emptySet()
 
       val toLoad = manifest.modules.filter { module ->
-        "*" in entitled || module.name in entitled
+        module.required || "*" in entitled || module.name in entitled
       }
 
       Auth.modulesTotal = toLoad.size
@@ -310,6 +315,53 @@ object PhantomAuthService {
       logger.error("Module {} download failed", module.name, e)
       null
     }
+  }
+
+  private fun downloadNativeComponents(sessionToken: String, natives: List<ManifestNative>): Boolean {
+    if (natives.isEmpty()) return true
+
+    for (native in natives.filter { it.required }) {
+      if (native.name.isBlank()) {
+        logger.error("Manifest contained a native component with no name")
+        return false
+      }
+
+      Auth.statusMessage = "Loading native ${native.name}..."
+
+      val downloadUrl = native.url.ifBlank {
+        val encodedName = URLEncoder.encode(native.name, StandardCharsets.UTF_8)
+        "${serverBaseUrl().trimEnd('/')}/content/native/$encodedName"
+      }
+
+      val req = HttpRequest.newBuilder(trustedUri(downloadUrl))
+        .timeout(Duration.ofSeconds(60))
+        .header("Authorization", "Bearer $sessionToken")
+        .GET()
+        .build()
+
+      try {
+        val resp = httpClient.send(req, HttpResponse.BodyHandlers.ofByteArray())
+
+        if (resp.statusCode() !in 200..299) {
+          logger.error("Native component {} download returned {}", native.name, resp.statusCode())
+          return false
+        }
+
+        val body = resp.body()
+        val actual = sha256Hex(body)
+        if (actual != native.sha256) {
+          logger.error("Native component {} digest mismatch: expected {} got {}", native.name, native.sha256, actual)
+          return false
+        }
+
+        NativeLoader.installDownloaded(native.name, body)
+      } catch (e: Exception) {
+        logger.error("Native component {} download failed", native.name, e)
+        return false
+      }
+    }
+
+    return true
   }
 
   private fun verifyManifestSignature(manifest: ManifestResponse, sigBase64: String): Boolean {
