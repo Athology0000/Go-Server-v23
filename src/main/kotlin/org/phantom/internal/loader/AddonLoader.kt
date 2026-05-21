@@ -201,6 +201,18 @@ object AddonLoader {
     }
   }
 
+  fun unloadLoadedAddons() {
+    addons.asReversed().forEach { (_, addon) ->
+      runCatching {
+        ModuleManager.removeModules(addon.getModules())
+        addon.onUnload()
+      }.onFailure { it.printStackTrace() }
+      activatedAddons.remove(System.identityHashCode(addon))
+    }
+    addons.clear()
+    addonsById.clear()
+  }
+
   fun getAddons(): List<Pair<AddonMetadata, Addon>> {
     return addons.toList()
   }

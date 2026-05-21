@@ -29,4 +29,9 @@ object ModuleManager {
     }
   }
 
+  internal fun removeModules(modules: List<Module>) {
+    val removedNames = modules.map { it.name.trim().lowercase() }.toSet()
+    moduleList.removeAll { it.name.trim().lowercase() in removedNames }
+  }
+
 }

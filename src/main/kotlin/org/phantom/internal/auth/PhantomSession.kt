@@ -17,7 +17,7 @@ data class PhantomSession(
     get() = alias.trim().lowercase(Locale.US)
 
   fun isTempAliasBypass(): Boolean {
-    return normalizedAlias == TEMP_BYPASS_ALIAS.lowercase(Locale.US)
+    return false
   }
 
   companion object {
@@ -26,7 +26,6 @@ data class PhantomSession(
     private val logger = LoggerFactory.getLogger("Phantom/PhantomSession")
     private val gson = Gson()
 
-    private const val TEMP_BYPASS_ALIAS = "Iamaperson2004"
     private const val CREDS_PATH = "config/phantom/creds.json"
     private const val SESSION_TOKEN_PATH = "config/phantom/session.token"
 
@@ -38,11 +37,6 @@ data class PhantomSession(
       PhantomAuthDebug.info(
         "fallback alias present=${fallbackAlias.isNotBlank()} alias=$fallbackAlias"
       )
-
-      if (fallbackAlias.equals(TEMP_BYPASS_ALIAS, ignoreCase = true)) {
-        PhantomAuthDebug.warn("dev bypass alias detected, returning alias-only session")
-        return PhantomSession("", fallbackAlias)
-      }
 
       val propValue = System.getProperty("phantom.session")?.trim()
 

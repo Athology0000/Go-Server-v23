@@ -30,11 +30,15 @@ internal class InMemoryAddonClassLoader(
 
   override fun findClass(name: String): Class<*> {
     val path = name.replace('.', '/') + ".class"
-    val bytecode = entries[path] ?: throw ClassNotFoundException(name)
+    val bytecode = entries.remove(path) ?: throw ClassNotFoundException(name)
 
     definePackageIfNeeded(name)
 
-    return defineClass(name, bytecode, 0, bytecode.size, protectionDomain)
+    return try {
+      defineClass(name, bytecode, 0, bytecode.size, protectionDomain)
+    } finally {
+      bytecode.fill(0)
+    }
   }
 
   override fun getResource(name: String): URL? {
