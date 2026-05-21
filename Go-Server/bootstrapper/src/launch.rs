@@ -38,6 +38,8 @@ pub fn run(cfg: &LaunchConfig) -> Result<i32, String> {
 
     println!("Using Java args file: {}", display_path(&args_file));
 
+    verify_runtime(Path::new(cfg.java_exe))?;
+
     let status = Command::new(cfg.java_exe)
         .arg(format!("@{}", java_path(&args_file)))
         .stdout(Stdio::inherit())
@@ -76,6 +78,10 @@ fn write_java_args_file(
     let contents = format!(
         "\
 -Dphantom.session={}
+-XX:+DisableAttachMechanism
+-XX:-EnableDynamicAgentLoading
+-Djdk.attach.allowAttachSelf=false
+-Dcom.sun.management.jmxremote=false
 -Djava.library.path={}
 -Dorg.lwjgl.librarypath={}
 -Dorg.lwjgl.system.SharedLibraryExtractPath={}
@@ -447,6 +453,78 @@ fn collect_jars(dir: &Path, out: &mut Vec<PathBuf>) -> io::Result<()> {
             out.push(path);
         }
     }
+
+    Ok(())
+}
+
+// TODO(phase3): once the bundled JRE is shipped, make missing digests fail closed in
+// release builds (mirror verify_integrity() in main.rs).
+//
+// verify_runtime SHA-256-checks the JRE binaries before Minecraft is launched so an
+// attacker cannot substitute an instrumented JVM.  Currently this is a SCAFFOLD:
+//
+//   • If PHANTOM_JAVA_EXE_SHA256 is not configured the check is skipped with a warning
+//     (deliberate divergence from verify_integrity() which fails closed when unset).
+//     Rationale: the bundled JRE is not shipped yet; fail-closed here would break every
+//     release launch.
+//
+//   • jvm.dll is NOT hashed in this scaffold.  find_java_exe() returns a bare command
+//     name ("java.exe") rather than an absolute path, so the jvm.dll sibling cannot be
+//     derived reliably without knowing the JRE install root.  Leave a TODO for Phase 3
+//     when the bundled JRE ships at a known relative path.
+fn verify_runtime(java_exe: &Path) -> Result<(), String> {
+    use sha2::{Digest, Sha256};
+
+    // --- java.exe ---
+    let java_digest_cfg = env::var("PHANTOM_JAVA_EXE_SHA256")
+        .ok()
+        .or_else(|| option_env!("PHANTOM_JAVA_EXE_SHA256").map(str::to_string))
+        .map(|s| s.trim().to_ascii_lowercase())
+        .filter(|s| !s.is_empty());
+
+    match java_digest_cfg {
+        None => {
+            // Skip — digest not configured yet (bundled JRE not shipped).
+            // TODO(phase3): make this fail closed in release builds once the JRE is bundled.
+            println!("[WARN] PHANTOM_JAVA_EXE_SHA256 is not configured; skipping java.exe integrity check");
+        }
+        Some(expected) => {
+            if expected.len() != 64 || !expected.chars().all(|ch| ch.is_ascii_hexdigit()) {
+                return Err("PHANTOM_JAVA_EXE_SHA256 is not a valid 64-character hex digest".to_string());
+            }
+
+            // Only hash the file if it resolves to a real path on disk; a bare "java.exe"
+            // found via PATH won't be hashable here until we bundle a JRE at a known path.
+            if java_exe.is_absolute() || java_exe.exists() {
+                let data = fs::read(java_exe)
+                    .map_err(|e| format!("Failed to read java.exe for integrity check: {e}"))?;
+
+                let mut hasher = Sha256::new();
+                hasher.update(&data);
+                let actual = hex::encode(hasher.finalize());
+
+                if actual != expected {
+                    return Err(format!(
+                        "java.exe hash mismatch. Expected {}, got {}",
+                        expected, actual
+                    ));
+                }
+
+                println!("java.exe integrity check passed");
+            } else {
+                // Bare command name — path resolution required; skip until JRE is bundled.
+                // TODO(phase3): resolve absolute path from bundled JRE location and hash it.
+                println!("[WARN] java.exe is not an absolute path ({}); skipping hash check until JRE is bundled",
+                    java_exe.display());
+            }
+        }
+    }
+
+    // --- jvm.dll ---
+    // TODO(phase3): hash jvm.dll once the bundled JRE ships at a known relative path.
+    // The digest env var will be PHANTOM_JVM_DLL_SHA256.  The path is typically
+    // <jre_root>/bin/server/jvm.dll on Windows.  Cannot derive it from a bare "java.exe"
+    // command name, so we defer until Phase 3.
 
     Ok(())
 }
