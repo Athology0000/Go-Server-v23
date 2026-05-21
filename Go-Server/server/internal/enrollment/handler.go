@@ -1,0 +1,105 @@
+package enrollment
+
+import (
+	"errors"
+	"time"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/redis/go-redis/v9"
+	"github.com/phantom/server/internal/middleware"
+)
+
+type redeemRequest struct {
+	LicenseKey string `json:"license_key"`
+	AccountID  string `json:"account_id"`
+	// Optional: if provided, the server will bind the HWID and return the device_secret immediately
+	// (so the bootstrapper can complete setup without prompting for username/password).
+	HWID       string `json:"hwid"`
+}
+
+type handshakeRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+	HWID     string `json:"hwid"`
+}
+
+func RegisterRoutes(app *fiber.App, svc *Service, rdb *redis.Client) {
+	// 5 attempts per minute per IP — enrollment is a one-time operation
+	enrollLimit := middleware.RateLimit(rdb, 5, time.Minute, middleware.IPKey("enroll"))
+
+	app.Post("/enroll/redeem", enrollLimit, handleRedeem(svc))
+	app.Post("/enroll/handshake", enrollLimit, handleHandshake(svc))
+}
+
+func handleRedeem(svc *Service) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var req redeemRequest
+		if err := c.BodyParser(&req); err != nil || req.LicenseKey == "" || req.AccountID == "" {
+			return c.Status(400).JSON(fiber.Map{"error": "enrollment_failed"})
+		}
+		ip := middleware.GetRealIP(c)
+
+		// Bootstrapper "mode 2": redeem + bind HWID + return device secret.
+		if req.HWID != "" {
+			username, secret, planTier, expiresAt, err := svc.RedeemWithHWID(c.Context(), req.LicenseKey, req.AccountID, req.HWID, ip)
+			if errors.Is(err, ErrKeyNotFound) || errors.Is(err, ErrKeyNotAvailable) || errors.Is(err, ErrAlreadyEnrolled) {
+				reason := "key_invalid"
+				if errors.Is(err, ErrKeyNotFound) {
+					reason = "key_not_found"
+				} else if errors.Is(err, ErrKeyNotAvailable) {
+					reason = "key_not_available"
+				} else if errors.Is(err, ErrAlreadyEnrolled) {
+					reason = "already_enrolled"
+				}
+				return c.Status(400).JSON(fiber.Map{"error": "enrollment_failed", "reason": reason})
+			}
+			if errors.Is(err, ErrBadCredentials) || errors.Is(err, ErrIPMismatch) {
+				return c.Status(401).JSON(fiber.Map{"error": "enrollment_failed"})
+			}
+			if err != nil {
+				return c.Status(500).JSON(fiber.Map{"error": "enrollment_failed"})
+			}
+			return c.Status(200).JSON(fiber.Map{
+				"status":        "redeemed",
+				"username":      username,
+				"device_secret": secret,
+				"plan_tier":     planTier,
+				"expires_at":    expiresAt,
+			})
+		}
+
+		// Legacy flow: redeem only; client will then call /enroll/handshake.
+		err := svc.Redeem(c.Context(), req.LicenseKey, req.AccountID, ip)
+		if errors.Is(err, ErrKeyNotFound) || errors.Is(err, ErrKeyNotAvailable) {
+			reason := "key_invalid"
+			if errors.Is(err, ErrKeyNotFound) {
+				reason = "key_not_found"
+			} else if errors.Is(err, ErrKeyNotAvailable) {
+				reason = "key_not_available"
+			}
+			return c.Status(400).JSON(fiber.Map{"error": "enrollment_failed", "reason": reason})
+		}
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "enrollment_failed"})
+		}
+		return c.Status(200).JSON(fiber.Map{"status": "redeemed"})
+	}
+}
+
+func handleHandshake(svc *Service) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var req handshakeRequest
+		if err := c.BodyParser(&req); err != nil || req.Username == "" || req.Password == "" || req.HWID == "" {
+			return c.Status(400).JSON(fiber.Map{"error": "enrollment_failed"})
+		}
+		ip := middleware.GetRealIP(c)
+		secret, err := svc.Handshake(c.Context(), req.Username, req.Password, req.HWID, ip)
+		if errors.Is(err, ErrIPMismatch) || errors.Is(err, ErrBadCredentials) {
+			return c.Status(401).JSON(fiber.Map{"error": "enrollment_failed"})
+		}
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "enrollment_failed"})
+		}
+		return c.Status(200).JSON(fiber.Map{"device_secret": secret})
+	}
+}

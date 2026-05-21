@@ -1,0 +1,78 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: phantom
+      POSTGRES_PASSWORD: phantom
+      POSTGRES_DB: phantom
+    volumes:
+      - phantom_pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U phantom"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - phantom_redisdata:/data
+    ports:
+      - "6379:6379"
+
+  migrate:
+    image: postgres:16-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://phantom:phantom@postgres:5432/phantom?sslmode=disable
+      MIGRATIONS_DIR: /migrations
+    volumes:
+      - ./migrations:/migrations:ro
+      - ./docker/migrate.sh:/migrate.sh:ro
+    entrypoint: ["/bin/sh", "/migrate.sh"]
+    restart: on-failure
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    env_file: .env
+    environment:
+      DB_URL: postgres://phantom:phantom@postgres:5432/phantom?sslmode=disable
+      REDIS_URL: redis://redis:6379
+      PUBLIC_PORT: "8080"
+      ADMIN_PORT: "8081"
+      STRICT_SESSION_IP: "false"
+      CONTENT_DIR: /content
+    volumes:
+      - ./content:/content
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+
+  nginx-admin:
+    image: nginx:alpine
+    volumes:
+      - ./admin/dist:/usr/share/nginx/html:ro
+      - ./docker/nginx-admin.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "3001:80"
+
+  nginx-panel:
+    image: nginx:alpine
+    volumes:
+      - ./panel/dist:/usr/share/nginx/html:ro
+      - ./docker/nginx-panel.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "3002:80"
+
+volumes:
+  phantom_pgdata:
+  phantom_redisdata:
