@@ -460,6 +460,64 @@ tasks.register<Jar>("packagePhantomDianaModuleJar") {
   from(layout.buildDirectory.dir("generated/phantom-remote-manifest/$phantomDianaAddonId"))
 }
 
+// ── Obfuscation gate (opt-in, off by default) ─────────────────────────────────
+// Pass -PphantomObfuscate=true to enable.  The obfuscator toolchain (JVM jar at
+// Go-Server/obfuscator/build/libs/obfuscator-1.0.jar) cannot be validated in
+// this environment, so the default is false.
+// TODO: flip the orElse default to `!isDevBuild` once validated on a machine
+//       that has the obfuscator toolchain installed and tested end-to-end.
+val obfuscateProtectedModules =
+  providers.gradleProperty("phantomObfuscate")
+    .map { it.equals("true", ignoreCase = true) }
+    .orElse(false)
+
+val obfuscatorJar = rootProject.file("Go-Server/obfuscator/build/libs/obfuscator-1.0.jar")
+// The module bundles contain no DLL; we pass a non-existent sentinel path so the
+// 4-positional-arg CLI contract is satisfied.  Pipeline.java:56 guards the DLL
+// copy with Files.exists(inputDll), so a missing path is handled gracefully.
+val obfNoDllSentinel = layout.buildDirectory.file("phantom-modules/no-dll-sentinel.dll")
+
+data class PhantomBundle(val addonId: String, val packageTask: String, val obfuscateTask: String)
+
+val phantomBundles = listOf(
+  PhantomBundle(phantomCoreAddonId,   "packagePhantomCoreModuleJar",   "obfuscatePhantomCoreModule"),
+  PhantomBundle(phantomMiningAddonId, "packagePhantomMiningModuleJar", "obfuscatePhantomMiningModule"),
+  PhantomBundle(phantomSlayerAddonId, "packagePhantomSlayerModuleJar", "obfuscatePhantomSlayerModule"),
+  PhantomBundle(phantomDianaAddonId,  "packagePhantomDianaModuleJar",  "obfuscatePhantomDianaModule"),
+)
+
+for (bundle in phantomBundles) {
+  tasks.register<JavaExec>(bundle.obfuscateTask) {
+    group = "build"
+    description = "Obfuscates the ${bundle.addonId} bundle jar before encryption."
+    dependsOn(bundle.packageTask, "collectObfLibs")
+    onlyIf { obfuscateProtectedModules.get() }
+
+    val inputJar  = layout.buildDirectory.file("phantom-modules/plain/${bundle.addonId}.jar")
+    val outputJar = layout.buildDirectory.file("phantom-modules/obfuscated/${bundle.addonId}.jar")
+    val inputDll  = obfNoDllSentinel
+    val outputDll = layout.buildDirectory.file("phantom-modules/obfuscated/${bundle.addonId}-no.dll")
+
+    inputs.file(inputJar)
+    outputs.file(outputJar)
+
+    classpath = files(obfuscatorJar)
+    mainClass.set("com.obf.Main")
+
+    doFirst {
+      val inJar = inputJar.get().asFile
+      if (!inJar.exists()) throw GradleException("Missing input jar for obfuscation: ${inJar.path}")
+      outputJar.get().asFile.parentFile.mkdirs()
+      args(
+        inJar.absolutePath,
+        inputDll.get().asFile.absolutePath,
+        outputJar.get().asFile.absolutePath,
+        outputDll.get().asFile.absolutePath,
+      )
+    }
+  }
+}
+
 fun moduleEncryptionKey(): ByteArray {
   val raw = System.getenv("MODULE_ENCRYPTION_KEY")
     ?: System.getenv("MASTER_KEY")
@@ -503,9 +561,16 @@ tasks.register("encryptPhantomModule") {
 tasks.register("encryptPhantomCoreModule") {
   group = "build"
   description = "Encrypts the protected Phantom core bundle into phantom-core.enc."
-  dependsOn("packagePhantomCoreModuleJar")
 
-  val plainJar = layout.buildDirectory.file("phantom-modules/plain/$phantomCoreAddonId.jar")
+  val useObfuscated = obfuscateProtectedModules.get()
+  if (useObfuscated) {
+    dependsOn("obfuscatePhantomCoreModule")
+  } else {
+    dependsOn("packagePhantomCoreModuleJar")
+  }
+
+  val sourceDir = if (useObfuscated) "obfuscated" else "plain"
+  val plainJar = layout.buildDirectory.file("phantom-modules/$sourceDir/$phantomCoreAddonId.jar")
   val encryptedFile = layout.buildDirectory.file("phantom-modules/encrypted/$phantomCoreAddonId.enc")
 
   inputs.file(plainJar)
@@ -521,9 +586,16 @@ tasks.register("encryptPhantomCoreModule") {
 tasks.register("encryptPhantomMiningModule") {
   group = "build"
   description = "Encrypts the protected Phantom mining module bundle into phantom-mining.enc."
-  dependsOn("packagePhantomMiningModuleJar")
 
-  val plainJar = layout.buildDirectory.file("phantom-modules/plain/$phantomMiningAddonId.jar")
+  val useObfuscated = obfuscateProtectedModules.get()
+  if (useObfuscated) {
+    dependsOn("obfuscatePhantomMiningModule")
+  } else {
+    dependsOn("packagePhantomMiningModuleJar")
+  }
+
+  val sourceDir = if (useObfuscated) "obfuscated" else "plain"
+  val plainJar = layout.buildDirectory.file("phantom-modules/$sourceDir/$phantomMiningAddonId.jar")
   val encryptedFile = layout.buildDirectory.file("phantom-modules/encrypted/$phantomMiningAddonId.enc")
 
   inputs.file(plainJar)
@@ -539,9 +611,16 @@ tasks.register("encryptPhantomMiningModule") {
 tasks.register("encryptPhantomSlayerModule") {
   group = "build"
   description = "Encrypts the protected Phantom Slayer module bundle into phantom-slayer.enc."
-  dependsOn("packagePhantomSlayerModuleJar")
 
-  val plainJar = layout.buildDirectory.file("phantom-modules/plain/$phantomSlayerAddonId.jar")
+  val useObfuscated = obfuscateProtectedModules.get()
+  if (useObfuscated) {
+    dependsOn("obfuscatePhantomSlayerModule")
+  } else {
+    dependsOn("packagePhantomSlayerModuleJar")
+  }
+
+  val sourceDir = if (useObfuscated) "obfuscated" else "plain"
+  val plainJar = layout.buildDirectory.file("phantom-modules/$sourceDir/$phantomSlayerAddonId.jar")
   val encryptedFile = layout.buildDirectory.file("phantom-modules/encrypted/$phantomSlayerAddonId.enc")
 
   inputs.file(plainJar)
@@ -557,9 +636,16 @@ tasks.register("encryptPhantomSlayerModule") {
 tasks.register("encryptPhantomDianaModule") {
   group = "build"
   description = "Encrypts the protected Phantom Diana module bundle into phantom-diana.enc."
-  dependsOn("packagePhantomDianaModuleJar")
 
-  val plainJar = layout.buildDirectory.file("phantom-modules/plain/$phantomDianaAddonId.jar")
+  val useObfuscated = obfuscateProtectedModules.get()
+  if (useObfuscated) {
+    dependsOn("obfuscatePhantomDianaModule")
+  } else {
+    dependsOn("packagePhantomDianaModuleJar")
+  }
+
+  val sourceDir = if (useObfuscated) "obfuscated" else "plain"
+  val plainJar = layout.buildDirectory.file("phantom-modules/$sourceDir/$phantomDianaAddonId.jar")
   val encryptedFile = layout.buildDirectory.file("phantom-modules/encrypted/$phantomDianaAddonId.enc")
 
   inputs.file(plainJar)
@@ -597,8 +683,8 @@ tasks.register("encryptPhantomModules") {
 // ── Public-layer artifact for the loader (phantom.jar) ──────────────────────
 // Produces phantom-client-public-<version>.jar: the full client mod jar with
 // the protected internal/** packages removed. The separate Loader project
-// consumes this from mavenLocal (modImplementation) and jar-in-jars it into
-// phantom.jar, so the public layer's mixins still load as a real Fabric mod.
+// consumes this from mavenLocal and merges it into phantom.jar, so the loader
+// owns the only Fabric mod metadata while public mixins remain available.
 val clientPublicApiJar = tasks.register<Jar>("clientPublicApiJar") {
   group = "build"
   description = "Public-layer client jar consumed by the loader (no protected internal/** classes)."
@@ -655,16 +741,27 @@ tasks.register<Copy>("syncPhantomModulesToServer") {
 val nativesDir = file("natives")
 val dllReleasePath = file("natives/build/Release/phantom_pathfinder.dll")
 val dllResourceDest = file("src/main/resources/natives/windows")
+val nativeSourceFiles = fileTree(nativesDir) {
+  include("CMakeLists.txt")
+  include("include/**")
+  include("src/**")
+}
 
 tasks.register<Exec>("buildNative") {
   group = "build"
   description = "Compiles phantom_pathfinder.dll via CMake."
   workingDir = nativesDir
+  inputs.files(nativeSourceFiles).withPropertyName("nativeSources")
+  outputs.file(dllReleasePath).withPropertyName("nativeDll")
   commandLine(
-    "cmd", "/c",
-    "cmake --build build --config Release"
+    "cmake", "--build", "build", "--config", "Release"
   )
-  onlyIf { nativesDir.resolve("build").exists() }
+  onlyIf {
+    val nativeBuildDir = nativesDir.resolve("build")
+    val nativeDll = dllReleasePath
+    nativeBuildDir.exists() &&
+      (!nativeDll.exists() || nativeSourceFiles.files.any { it.lastModified() > nativeDll.lastModified() })
+  }
 }
 
 tasks.register<Copy>("copyNativeDll") {
