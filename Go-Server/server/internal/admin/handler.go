@@ -399,6 +399,7 @@ func handleCreateManifest(pool *pgxpool.Pool, signingKey []byte, auditSvc *audit
 			BuildID          string              `json:"build_id"`
 			Channel          string              `json:"channel"`
 			MinLoaderVersion string              `json:"minimum_loader_version"`
+			ModuleKey        string              `json:"module_key"`
 			Modules          []db.ManifestModule `json:"modules"`
 			NativeComponents []db.ManifestNative `json:"native_components"`
 			ExpiresIn        int                 `json:"expires_in_hours"`
@@ -414,9 +415,10 @@ func handleCreateManifest(pool *pgxpool.Pool, signingKey []byte, auditSvc *audit
 			BuildID          string              `json:"build_id"`
 			Channel          string              `json:"channel"`
 			MinLoaderVersion string              `json:"minimum_loader_version"`
+			ModuleKey        string              `json:"module_key,omitempty"`
 			Modules          []db.ManifestModule `json:"modules"`
 			NativeComponents []db.ManifestNative `json:"native_components"`
-		}{body.BuildID, body.Channel, body.MinLoaderVersion, body.Modules, body.NativeComponents}
+		}{body.BuildID, body.Channel, body.MinLoaderVersion, body.ModuleKey, body.Modules, body.NativeComponents}
 
 		sig, err := crypto.SignManifest(signingKey, payload)
 		if err != nil {
@@ -427,6 +429,7 @@ func handleCreateManifest(pool *pgxpool.Pool, signingKey []byte, auditSvc *audit
 			BuildID:          body.BuildID,
 			Channel:          body.Channel,
 			MinLoaderVersion: body.MinLoaderVersion,
+			ModuleKey:        body.ModuleKey,
 			Modules:          body.Modules,
 			NativeComponents: body.NativeComponents,
 			Signature:        sig,

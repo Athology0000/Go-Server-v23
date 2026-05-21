@@ -3,6 +3,7 @@ package content
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"net/url"
@@ -20,6 +21,7 @@ type signedManifestPayload struct {
 	BuildID          string              `json:"build_id"`
 	Channel          string              `json:"channel"`
 	MinLoaderVersion string              `json:"minimum_loader_version"`
+	ModuleKey        string              `json:"module_key,omitempty"`
 	Modules          []db.ManifestModule `json:"modules"`
 	NativeComponents []db.ManifestNative `json:"native_components"`
 }
@@ -80,6 +82,7 @@ func BuildStableManifest(_ context.Context, contentDir, baseURL, channel string,
 		BuildID:          "stable-filesystem",
 		Channel:          channel,
 		MinLoaderVersion: "1",
+		ModuleKey:        base64.StdEncoding.EncodeToString(moduleKey),
 		Modules:          modules,
 		NativeComponents: natives,
 	}
@@ -94,6 +97,7 @@ func BuildStableManifest(_ context.Context, contentDir, baseURL, channel string,
 		BuildID:          payload.BuildID,
 		Channel:          payload.Channel,
 		MinLoaderVersion: payload.MinLoaderVersion,
+		ModuleKey:        payload.ModuleKey,
 		Modules:          payload.Modules,
 		NativeComponents: payload.NativeComponents,
 		Signature:        signature,
