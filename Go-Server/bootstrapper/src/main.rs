@@ -342,14 +342,34 @@ fn verify_integrity() -> Result<(), String> {
     let hash = hasher.finalize();
     let hash_hex = hex::encode(hash);
 
-    // Expected hash should be embedded at build time or checked against a known good value
-    // For now, we just ensure the file is readable and has a valid hash
-    if hash_hex.is_empty() {
-        return Err("Executable hash is empty".to_string());
+    let expected = env::var("PHANTOM_BOOTSTRAPPER_SHA256")
+        .ok()
+        .or_else(|| option_env!("PHANTOM_BOOTSTRAPPER_SHA256").map(str::to_string))
+        .map(|s| s.trim().to_ascii_lowercase())
+        .filter(|s| !s.is_empty());
+
+    let Some(expected) = expected else {
+        if cfg!(debug_assertions) {
+            return Ok(());
+        }
+
+        return Err(
+            "No expected bootstrapper SHA-256 configured. Set PHANTOM_BOOTSTRAPPER_SHA256 for release builds."
+                .to_string(),
+        );
+    };
+
+    if expected.len() != 64 || !expected.chars().all(|ch| ch.is_ascii_hexdigit()) {
+        return Err("Configured bootstrapper SHA-256 is not a 64-character hex digest".to_string());
     }
 
-    // In production, you would compare against a known good hash
-    // For now, this just ensures the file hasn't been corrupted during read
+    if hash_hex != expected {
+        return Err(format!(
+            "Executable hash mismatch. Expected {}, got {}",
+            expected, hash_hex
+        ));
+    }
+
     Ok(())
 }
 

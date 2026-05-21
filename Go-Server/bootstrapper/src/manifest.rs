@@ -38,6 +38,9 @@ pub struct ContentManifest {
     pub minimum_loader_version: String,
 
     #[serde(default)]
+    pub module_key: String,
+
+    #[serde(default)]
     pub modules: Vec<ManifestModule>,
 
     #[serde(default)]
@@ -69,6 +72,8 @@ struct SignedPayload<'a> {
     build_id: &'a str,
     channel: &'a str,
     minimum_loader_version: &'a str,
+    #[serde(skip_serializing_if = "str::is_empty")]
+    module_key: &'a str,
     modules: Vec<SignedModule<'a>>,
     native_components: Vec<SignedNative<'a>>,
 }
@@ -178,6 +183,7 @@ fn parse_manifest_body(body: &str) -> Result<ContentManifest, String> {
             build_id: addon_manifest.build_id,
             channel: addon_manifest.channel,
             minimum_loader_version: default_minimum_loader_version(),
+            module_key: String::new(),
             modules: addon_manifest
                 .addons
                 .into_iter()
@@ -224,6 +230,7 @@ fn verify_signature(manifest: &ContentManifest, sig_b64: &str) -> Result<(), Str
         build_id: &manifest.build_id,
         channel: &manifest.channel,
         minimum_loader_version: &manifest.minimum_loader_version,
+        module_key: &manifest.module_key,
         modules: manifest
             .modules
             .iter()
