@@ -16,23 +16,23 @@ pub fn ensure(
     fs::create_dir_all(&mods_dir)
         .map_err(|e| format!("Failed to create mods folder {}: {e}", mods_dir.display()))?;
 
-    let jar_path = mods_dir.join("cobalt.jar");
-    let tmp_path = mods_dir.join("cobalt.jar.tmp");
+    let jar_path = mods_dir.join("phantom.jar");
+    let tmp_path = mods_dir.join("phantom.jar.tmp");
 
     if jar_path.exists() {
-        println!("cobalt.jar: found in mods folder, verifying");
+        println!("phantom.jar: found in mods folder, verifying");
 
         let existing_hash = file_sha256(&jar_path)?;
         if existing_hash.eq_ignore_ascii_case(expected_sha256) {
-            println!("cobalt.jar: verified");
+            println!("phantom.jar: verified");
             return Ok(jar_path);
         }
 
-        println!("cobalt.jar: hash mismatch, redownloading");
+        println!("phantom.jar: hash mismatch, redownloading");
         fs::remove_file(&jar_path)
-            .map_err(|e| format!("Failed to remove old cobalt.jar: {e}"))?;
+            .map_err(|e| format!("Failed to remove old phantom.jar: {e}"))?;
     } else {
-        println!("cobalt.jar: not found in mods folder — downloading");
+        println!("phantom.jar: not found in mods folder — downloading");
     }
 
     if tmp_path.exists() {
@@ -40,10 +40,10 @@ pub fn ensure(
             .map_err(|e| format!("Failed to remove old temp jar: {e}"))?;
     }
 
-    let url = format!("{}/content/module/cobalt", server_url.trim_end_matches('/'));
+    let url = format!("{}/content/module/phantom", server_url.trim_end_matches('/'));
 
-    println!("cobalt.jar: downloading from {}", url);
-    println!("cobalt.jar: saving to {}", jar_path.display());
+    println!("phantom.jar: downloading from {}", url);
+    println!("phantom.jar: saving to {}", jar_path.display());
 
     let mut resp = client
         .get(&url)
@@ -89,8 +89,8 @@ pub fn ensure(
         return Err("JAR download completed but file was empty".to_string());
     }
 
-    println!("cobalt.jar: downloaded {} bytes", downloaded);
-    println!("cobalt.jar: verifying sha256");
+    println!("phantom.jar: downloaded {} bytes", downloaded);
+    println!("phantom.jar: verifying sha256");
 
     let downloaded_hash = file_sha256(&tmp_path)?;
 
@@ -105,9 +105,9 @@ pub fn ensure(
     }
 
     fs::rename(&tmp_path, &jar_path)
-        .map_err(|e| format!("Failed to finalize cobalt.jar into mods folder: {e}"))?;
+        .map_err(|e| format!("Failed to finalize phantom.jar into mods folder: {e}"))?;
 
-    println!("cobalt.jar: downloaded and verified in mods folder");
+    println!("phantom.jar: downloaded and verified in mods folder");
 
     Ok(jar_path)
 }

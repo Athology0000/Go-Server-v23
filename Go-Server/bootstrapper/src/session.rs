@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::os::unix::fs::OpenOptionsExt;
 
 pub fn write(session_token: &str, game_dir: &str) -> Result<PathBuf, String> {
-    let dir = Path::new(game_dir).join("config").join("cobalt");
+    let dir = Path::new(game_dir).join("config").join("phantom");
 
     fs::create_dir_all(&dir)
         .map_err(|e| format!("Failed to create session dir {}: {e}", dir.display()))?;
@@ -56,7 +56,7 @@ pub fn write(session_token: &str, game_dir: &str) -> Result<PathBuf, String> {
 pub fn delete(game_dir: &str) {
     let path = Path::new(game_dir)
         .join("config")
-        .join("cobalt")
+        .join("phantom")
         .join("session.token");
 
     let _ = fs::remove_file(&path);

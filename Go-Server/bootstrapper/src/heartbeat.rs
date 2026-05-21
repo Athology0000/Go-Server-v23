@@ -50,7 +50,7 @@ fn heartbeat_loop(client: Client, server_url: &str, session_token: &str, game_di
                     new_pos += line.len() as u64 + 1; // +1 for newline
 
                     // Check for module activity indicators
-                    if line.contains("[Cobalt]") ||
+                    if line.contains("[Phantom]") ||
                        line.contains("is actively running") ||
                        line.contains("module loaded") ||
                        line.contains("injecting") ||

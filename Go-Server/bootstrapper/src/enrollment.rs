@@ -40,7 +40,7 @@ pub struct EnrollmentResult {
 }
 
 pub fn run(client: &Client, server_url: &str, hwid: &str) -> Result<EnrollmentResult, String> {
-    println!("\n=== Cobalt First-Time Setup ===\n");
+    println!("\n=== Phantom First-Time Setup ===\n");
 
     println!("Select setup method:");
     println!("  1) Username + password");
@@ -49,8 +49,8 @@ pub fn run(client: &Client, server_url: &str, hwid: &str) -> Result<EnrollmentRe
 
     match mode.trim() {
         "1" => {
-            let username = prompt("Enter your Cobalt username: ")?;
-            let password = prompt_hidden("Enter your Cobalt password: ")?;
+            let username = prompt("Enter your Phantom username: ")?;
+            let password = prompt_hidden("Enter your Phantom password: ")?;
 
             println!("\nBinding device...");
 
@@ -104,7 +104,7 @@ pub fn run(client: &Client, server_url: &str, hwid: &str) -> Result<EnrollmentRe
             Ok(EnrollmentResult { username, device_secret: secret_bytes })
         }
         "2" => {
-            let account_id = prompt("Enter your Cobalt account ID (from dashboard): ")?;
+            let account_id = prompt("Enter your Phantom account ID (from dashboard): ")?;
             let license_key = prompt("Enter your license key: ")?;
 
             println!("\nRedeeming license key...");
@@ -125,8 +125,8 @@ pub fn run(client: &Client, server_url: &str, hwid: &str) -> Result<EnrollmentRe
             let body = redeem_resp.text().unwrap_or_else(|_| "".to_string());
 
             if !status.is_success() {
-                let key_hint = if !license_key.trim().to_uppercase().starts_with("COBALT-") {
-                    "\n\nHint: paste the FULL key (starts with COBALT-...), not the key ID/hash prefix."
+                let key_hint = if !license_key.trim().to_uppercase().starts_with("PHANTOM-") {
+                    "\n\nHint: paste the FULL key (starts with PHANTOM-...), not the key ID/hash prefix."
                 } else {
                     ""
                 };

@@ -59,8 +59,8 @@ fn write_java_args_file(
 ) -> Result<PathBuf, String> {
     let args_file = game_dir
         .join("config")
-        .join("cobalt")
-        .join("cobalt_launch_args.txt");
+        .join("phantom")
+        .join("phantom_launch_args.txt");
 
     if let Some(parent) = args_file.parent() {
         fs::create_dir_all(parent)
@@ -75,7 +75,7 @@ fn write_java_args_file(
 
     let contents = format!(
         "\
--Dcobalt.session={}
+-Dphantom.session={}
 -Djava.library.path={}
 -Dorg.lwjgl.librarypath={}
 -Dorg.lwjgl.system.SharedLibraryExtractPath={}
@@ -234,7 +234,7 @@ fn build_fabric_client_classpath(libraries_dir: &Path) -> Result<String, String>
 fn prepare_natives_dir(game_dir: &Path, libraries_dir: &Path) -> Result<PathBuf, String> {
     let natives_dir = game_dir
         .join("config")
-        .join("cobalt")
+        .join("phantom")
         .join("natives");
 
     fs::create_dir_all(&natives_dir)
@@ -333,7 +333,7 @@ fn copy_jar(src: &Path, mods_dir: &str) -> Result<(), String> {
     fs::create_dir_all(&mods_dir_path)
         .map_err(|e| format!("Failed to create mods dir {}: {e}", mods_dir_path.display()))?;
 
-    let dest = mods_dir_path.join("cobalt.jar");
+    let dest = mods_dir_path.join("phantom.jar");
 
     let src_canon = resolve_path_no_verbatim(src)?;
 
@@ -346,7 +346,7 @@ fn copy_jar(src: &Path, mods_dir: &str) -> Result<(), String> {
     if let Some(dest_canon) = dest_canon {
         if src_canon == dest_canon {
             println!(
-                "cobalt.jar is already in the mods folder, skipping copy: {}",
+                "phantom.jar is already in the mods folder, skipping copy: {}",
                 dest.display()
             );
             return Ok(());
@@ -354,7 +354,7 @@ fn copy_jar(src: &Path, mods_dir: &str) -> Result<(), String> {
 
         fs::remove_file(&dest).map_err(|e| {
             format!(
-                "Failed to remove old cobalt.jar at {}. Close Minecraft/Prism if it is still open. Error: {e}",
+                "Failed to remove old phantom.jar at {}. Close Minecraft/Prism if it is still open. Error: {e}",
                 dest.display()
             )
         })?;
@@ -362,7 +362,7 @@ fn copy_jar(src: &Path, mods_dir: &str) -> Result<(), String> {
 
     fs::copy(&src_canon, &dest).map_err(|e| {
         format!(
-            "Failed to copy cobalt.jar from {} to {}. Close Minecraft/Prism if it is still open. Error: {e}",
+            "Failed to copy phantom.jar from {} to {}. Close Minecraft/Prism if it is still open. Error: {e}",
             display_path(&src_canon),
             dest.display()
         )

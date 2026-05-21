@@ -134,11 +134,11 @@ pub fn fetch_and_verify(
     if sig_to_verify.is_empty() {
         if allow_unsigned_manifests() {
             eprintln!(
-                "WARNING: unsigned manifest accepted because COBALT_ALLOW_UNSIGNED_MANIFESTS=1 is set."
+                "WARNING: unsigned manifest accepted because PHANTOM_ALLOW_UNSIGNED_MANIFESTS=1 is set."
             );
         } else {
             return Err(
-                "Unsigned manifests are prohibited in production. Set COBALT_ALLOW_UNSIGNED_MANIFESTS=1 only for local development.".to_string(),
+                "Unsigned manifests are prohibited in production. Set PHANTOM_ALLOW_UNSIGNED_MANIFESTS=1 only for local development.".to_string(),
             );
         }
     } else {
@@ -150,7 +150,7 @@ pub fn fetch_and_verify(
 }
 
 fn allow_unsigned_manifests() -> bool {
-    std::env::var("COBALT_ALLOW_UNSIGNED_MANIFESTS")
+    std::env::var("PHANTOM_ALLOW_UNSIGNED_MANIFESTS")
         .map(|val| {
             let normalized = val.trim().to_lowercase();
             normalized == "1" || normalized == "true" || normalized == "yes"
@@ -281,8 +281,8 @@ mod tests {
             "expires_at": "2026-05-02T03:00:00Z",
             "addons": [
                 {
-                    "id": "cobalt",
-                    "url": "/content/module/cobalt-starter.jar",
+                    "id": "phantom",
+                    "url": "/content/module/phantom-starter.jar",
                     "sha256": "abc123",
                     "required": true
                 }
@@ -292,7 +292,7 @@ mod tests {
         let manifest = parse_manifest_body(body).expect("should parse");
         assert_eq!(manifest.id, "stable");
         assert_eq!(manifest.modules.len(), 1);
-        assert_eq!(manifest.modules[0].name, "cobalt");
-        assert_eq!(manifest.modules[0].url, "/content/module/cobalt-starter.jar");
+        assert_eq!(manifest.modules[0].name, "phantom");
+        assert_eq!(manifest.modules[0].url, "/content/module/phantom-starter.jar");
     }
 }

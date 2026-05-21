@@ -20,7 +20,7 @@ struct StoredCreds {
     device_secret_b64: String,
 }
 
-const CREDS_PATH: &str = "config/cobalt/creds.json";
+const CREDS_PATH: &str = "config/phantom/creds.json";
 
 pub fn exists() -> bool {
     PathBuf::from(CREDS_PATH).exists()
@@ -43,7 +43,7 @@ pub fn save(username: &str, device_secret: &[u8]) -> Result<(), String> {
         username: username.to_string(),
         device_secret_b64: STANDARD.encode(&encrypted),
     };
-    fs::create_dir_all("config/cobalt").map_err(|e| e.to_string())?;
+    fs::create_dir_all("config/phantom").map_err(|e| e.to_string())?;
     let json = serde_json::to_string_pretty(&stored).map_err(|e| e.to_string())?;
     fs::write(CREDS_PATH, json).map_err(|e| e.to_string())?;
     Ok(())

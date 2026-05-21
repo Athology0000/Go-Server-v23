@@ -57,7 +57,7 @@ fn detect_game_dir() -> PathBuf {
             return cwd;
         }
 
-        // If launched from a child folder like config/cobalt/cache, walk upward.
+        // If launched from a child folder like config/phantom/cache, walk upward.
         if let Some(found) = find_minecraft_dir_upwards(&cwd) {
             return found;
         }
@@ -103,7 +103,7 @@ fn is_minecraft_game_dir(path: &Path) -> bool {
 
 impl BootstrapConfig {
     pub fn load() -> Self {
-        let path = detect_game_dir().join("config/cobalt/bootstrap.json");
+        let path = detect_game_dir().join("config/phantom/bootstrap.json");
 
         if path.exists() {
             fs::read_to_string(&path)

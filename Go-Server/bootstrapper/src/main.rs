@@ -61,7 +61,7 @@ fn main() {
     if first_time_use {
         divider();
         println!("  {}{}FIRST-TIME SETUP{}", BOLD, PURPLE_BRIGHT, RESET);
-        println!("  {}This will bind this loader to your Cobalt account.{}", DIM, RESET);
+        println!("  {}This will bind this loader to your Phantom account.{}", DIM, RESET);
         println!("  {}After auth, the starter jar will be downloaded.{}", DIM, RESET);
         divider();
         println!();
@@ -110,7 +110,7 @@ fn main() {
     println!();
     step(2, "Verifying starter manifest");
 
-    let cobalt_manifest = if !auth_result.manifest_url.is_empty() {
+    let phantom_manifest = if !auth_result.manifest_url.is_empty() {
         let m = manifest::fetch_and_verify(
             &http,
             &auth_result.manifest_url,
@@ -129,11 +129,11 @@ fn main() {
         fatal("No manifest URL in auth response");
     };
 
-    let cobalt_module = cobalt_manifest
+    let phantom_module = phantom_manifest
         .modules
         .iter()
-        .find(|m| m.name == "cobalt")
-        .unwrap_or_else(|| fatal("Manifest contains no 'cobalt' module"));
+        .find(|m| m.name == "phantom")
+        .unwrap_or_else(|| fatal("Manifest contains no 'phantom' module"));
 
     println!();
 
@@ -150,7 +150,7 @@ fn main() {
         &http,
         &cfg.server_url,
         &auth_result.session_token,
-        &cobalt_module.sha256,
+        &phantom_module.sha256,
         &cfg.mods_dir,
     )
     .unwrap_or_else(|e| fatal(&format!("Starter jar verification failed: {e}")));
@@ -158,7 +158,7 @@ fn main() {
     ok(&format!("Starter jar ready: {}", jar_path.display()));
 
     println!();
-    step(4, "Writing Cobalt session");
+    step(4, "Writing Phantom session");
 
     let session_path = session::write(&auth_result.session_token, &cfg.game_dir)
         .unwrap_or_else(|e| fatal(&format!("Failed to write session file: {e}")));
@@ -196,7 +196,7 @@ fn main() {
 
     // IMPORTANT:
     // Do not delete the session token while debugging.
-    // Minecraft/Cobalt may need to read config/cobalt/session.token during startup.
+    // Minecraft/Phantom may need to read config/phantom/session.token during startup.
     //
     // When everything works, you can later add delayed cleanup inside the mod or bootstrapper.
     //
@@ -209,7 +209,7 @@ fn main() {
                 std::process::exit(code);
             }
 
-            pause_before_exit("Minecraft finished. Cobalt authentication should be complete.");
+            pause_before_exit("Minecraft finished. Phantom authentication should be complete.");
             std::process::exit(0);
         }
         Err(e) => fatal(&format!("Launch failed: {e}")),
@@ -222,12 +222,12 @@ fn banner() {
     println!();
     purple_line();
 
-    println!("{}{}   ██████╗ ██████╗ ██████╗  █████╗ ██╗  ████████╗{}", BOLD, PURPLE_BRIGHT, RESET);
-    println!("{}{}  ██╔════╝██╔═══██╗██╔══██╗██╔══██╗██║  ╚══██╔══╝{}", BOLD, PURPLE_BRIGHT, RESET);
-    println!("{}{}  ██║     ██║   ██║██████╔╝███████║██║     ██║   {}", BOLD, PURPLE, RESET);
-    println!("{}{}  ██║     ██║   ██║██╔══██╗██╔══██║██║     ██║   {}", BOLD, PURPLE, RESET);
-    println!("{}{}  ╚██████╗╚██████╔╝██████╔╝██║  ██║███████╗██║   {}", BOLD, PURPLE_DARK, RESET);
-    println!("{}{}   ╚═════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝╚═╝   {}", BOLD, PURPLE_DARK, RESET);
+    println!("{}{}  ██████╗ ██╗  ██╗ █████╗ ███╗   ██╗████████╗ ██████╗ ███╗   ███╗{}", BOLD, PURPLE_BRIGHT, RESET);
+    println!("{}{}  ██╔══██╗██║  ██║██╔══██╗████╗  ██║╚══██╔══╝██╔═══██╗████╗ ████║{}", BOLD, PURPLE_BRIGHT, RESET);
+    println!("{}{}  ██████╔╝███████║███████║██╔██╗ ██║   ██║   ██║   ██║██╔████╔██║{}", BOLD, PURPLE, RESET);
+    println!("{}{}  ██╔═══╝ ██╔══██║██╔══██║██║╚██╗██║   ██║   ██║   ██║██║╚██╔╝██║{}", BOLD, PURPLE, RESET);
+    println!("{}{}  ██║     ██║  ██║██║  ██║██║ ╚████║   ██║   ╚██████╔╝██║ ╚═╝ ██║{}", BOLD, PURPLE_DARK, RESET);
+    println!("{}{}  ╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝   ╚═╝    ╚═════╝ ╚═╝     ╚═╝{}", BOLD, PURPLE_DARK, RESET);
 
     println!();
     println!(
