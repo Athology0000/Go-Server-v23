@@ -10,7 +10,7 @@ enum class AuthState {
 
 object Auth {
   @Volatile var state: AuthState = AuthState.PENDING
-  @Volatile var statusMessage: String = "Waiting for Cobalt account verification..."
+  @Volatile var statusMessage: String = "Waiting for Phantom account verification..."
   @Volatile var failureReason: String = ""
 
   @Volatile var modulesLoaded: Int = 0
@@ -38,7 +38,7 @@ object Auth {
 
   fun reset() {
     state = AuthState.PENDING
-    statusMessage = "Waiting for Cobalt account verification..."
+    statusMessage = "Waiting for Phantom account verification..."
     failureReason = ""
 
     modulesLoaded = 0

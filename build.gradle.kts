@@ -178,9 +178,7 @@ val phantomProtectedIncludes = listOf(
   "org/phantom/internal/fishing/**",
   "org/phantom/internal/garden/**",
   "org/phantom/internal/grotto/**",
-  "org/phantom/internal/mining/**",
-  "org/cobalt/internal/mining/**",
-  "org/phantom/internal/pig/**",
+  "org/phantom/internal/mining/**",  "org/phantom/internal/pig/**",
   "org/phantom/internal/qol/**",
   "org/phantom/internal/seal/**",
   "org/phantom/internal/spotify/**",
@@ -208,9 +206,7 @@ val phantomMiningIncludes = listOf(
   "org/phantom/internal/combat/*.class",
   "org/phantom/internal/etherwarp/**",
   "org/phantom/internal/grotto/**",
-  "org/phantom/internal/mining/**",
-  "org/cobalt/internal/mining/**",
-)
+  "org/phantom/internal/mining/**",)
 val phantomSlayerIncludes = listOf(
   "org/phantom/internal/remote/PhantomSlayerAddon.class",
   "org/phantom/internal/combat/*.class",
