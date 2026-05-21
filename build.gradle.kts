@@ -594,6 +594,44 @@ tasks.register("encryptPhantomModules") {
   )
 }
 
+// ── Public-layer artifact for the loader (phantom.jar) ──────────────────────
+// Produces phantom-client-public-<version>.jar: the full client mod jar with
+// the protected internal/** packages removed. The separate Loader project
+// consumes this from mavenLocal (modImplementation) and jar-in-jars it into
+// phantom.jar, so the public layer's mixins still load as a real Fabric mod.
+val clientPublicApiJar = tasks.register<Jar>("clientPublicApiJar") {
+  group = "build"
+  description = "Public-layer client jar consumed by the loader (no protected internal/** classes)."
+
+  val remapJarTask = tasks.named("remapJar")
+  // remapJar is finalized by an in-place strip; depend on both so the source
+  // jar is fully written before this task reads it.
+  dependsOn(remapJarTask, "stripProtectedClassesFromRuntimeJar")
+
+  archiveBaseName.set("phantom-client-public")
+  archiveVersion.set(project.version.toString())
+  destinationDirectory.set(layout.buildDirectory.dir("client-public-api"))
+  duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+  from({ remapJarTask.get().outputs.files.map { zipTree(it) } }) {
+    phantomProtectedIncludes.forEach { exclude(it) }
+  }
+}
+
+publishing {
+  publications {
+    create<MavenPublication>("clientPublicApi") {
+      groupId = baseGroup
+      artifactId = "phantom-client-public"
+      version = project.version.toString()
+      artifact(clientPublicApiJar)
+    }
+  }
+  repositories {
+    mavenLocal()
+  }
+}
+
 tasks.register<Copy>("syncPhantomNativeToServer") {
   group = "build"
   description = "Copies Phantom native components into the Go server content/native directory."
