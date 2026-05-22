@@ -1,8 +1,5 @@
 const BASE = 'https://valiant-cooperation-production.up.railway.app'
-<<<<<<< Updated upstream
-=======
 
->>>>>>> Stashed changes
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message)
