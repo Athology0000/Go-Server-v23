@@ -17,9 +17,17 @@ import java.time.Duration
 import java.util.Base64
 
 object BootstrapManifestVerifier {
+    // encodeDefaults MUST be true: the signed payload is re-serialized here and
+    // compared byte-for-byte against the server's Ed25519 signature. Go's
+    // db.ManifestModule / db.ManifestNative have no `omitempty`, so the server
+    // always emits `required` and `init_order`. Omitting them (encodeDefaults =
+    // false) changes the bytes and fails verification for every module.
+    // explicitNulls stays false so a null module_key is omitted, matching the
+    // server's `omitempty` on ModuleKey (the with-key/without-key dual attempt
+    // in verifySignature covers both states).
     private val json = Json {
         ignoreUnknownKeys = true
-        encodeDefaults = false
+        encodeDefaults = true
         explicitNulls = false
     }
 
