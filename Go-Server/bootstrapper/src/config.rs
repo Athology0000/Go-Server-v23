@@ -24,7 +24,7 @@ pub struct BootstrapConfig {
 }
 
 fn default_server_url() -> String {
-    "https://valiant-cooperation-production.up.railway.app/".to_string()
+    "https://valiant-cooperation-production.up.railway.app".to_string()
 }
 
 fn default_mods_dir() -> String {
@@ -105,14 +105,22 @@ impl BootstrapConfig {
     pub fn load() -> Self {
         let path = detect_game_dir().join("config/phantom/bootstrap.json");
 
-        if path.exists() {
+        let mut cfg: Self = if path.exists() {
             fs::read_to_string(&path)
                 .ok()
                 .and_then(|s| serde_json::from_str(&s).ok())
                 .unwrap_or_default()
         } else {
             Self::default()
+        };
+
+        // Trim trailing slashes so endpoint concatenation never produces "//path".
+        let trimmed = cfg.server_url.trim_end_matches('/');
+        if trimmed.len() != cfg.server_url.len() {
+            cfg.server_url = trimmed.to_string();
         }
+
+        cfg
     }
 }
 
