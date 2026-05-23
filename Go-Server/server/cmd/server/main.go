@@ -140,6 +140,11 @@ func main() {
 	enrollment.RegisterRoutes(pub, enrollSvc, rdb)
 	panel.RegisterRoutes(pub, pool, rdb, auditSvc, cfg.MasterKey)
 	content.RegisterRoutes(pub, contentSvc, pool, rdb, cfg.StrictSessionIP)
+	// Also expose the admin API on the public port so the admin panel can
+	// reach it without a second Railway domain. Each /admin/* route still
+	// enforces its own admin-token middleware, so this is a routing change,
+	// not an auth bypass.
+	admin.RegisterRoutes(pub, pool, rdb, cfg.ManifestSigningKey, auditSvc, cfg.AdminAPISecret)
 
 	// =========================
 	// Admin API server
