@@ -40,10 +40,36 @@ pub fn run(cfg: &LaunchConfig) -> Result<i32, String> {
 
     verify_runtime(Path::new(cfg.java_exe))?;
 
-    let status = Command::new(cfg.java_exe)
+    // Critical hardening flags are passed BOTH on the command line and inside the
+    // @args file. The on-cmdline copy is the source of truth: even if an attacker
+    // tampers with the args file between when we write it and when Java reads it,
+    // the JVM still sees these flags. (For booleans like DisableAttachMechanism,
+    // duplicate definitions are simply harmless.)
+    let mut command = Command::new(cfg.java_exe);
+    command
+        .arg("-XX:+DisableAttachMechanism")
+        .arg("-XX:-EnableDynamicAgentLoading")
+        .arg("-Djdk.attach.allowAttachSelf=false")
+        .arg("-Dcom.sun.management.jmxremote=false")
         .arg(format!("@{}", java_path(&args_file)))
         .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
+        .stderr(Stdio::inherit());
+
+    // Refuse to inherit Java's "inject anything into every JVM" env vars. These let
+    // a local attacker (or a careless launcher script) prepend `-javaagent:` /
+    // `-agentlib:` / `-Xdebug` flags to the JVM we spawn, completely bypassing the
+    // locked args file. Strip them before the child inherits the environment.
+    for var in [
+        "JAVA_TOOL_OPTIONS",
+        "_JAVA_OPTIONS",
+        "JDK_JAVA_OPTIONS",
+        "JAVA_OPTIONS",
+        "JAVA_OPTS",
+    ] {
+        command.env_remove(var);
+    }
+
+    let status = command
         .spawn()
         .map_err(|e| format!("Failed to spawn Minecraft: {e}"))?
         .wait()

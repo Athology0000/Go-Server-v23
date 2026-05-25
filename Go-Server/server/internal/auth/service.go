@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -807,7 +808,7 @@ func (s *Service) resolveManifest(ctx context.Context, channel string) (string, 
 		s.cfg.ModuleEncryptionKey,
 	)
 	if stableErr != nil {
-		return "", "", err
+		return "", "", fmt.Errorf("manifest lookup failed: %w; stable manifest build failed: %v", err, stableErr)
 	}
 
 	return s.baseURL + "/content/manifest/stable", stableManifest.Signature, nil

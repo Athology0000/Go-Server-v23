@@ -54,8 +54,6 @@ fn main() {
         .unwrap_or_else(|e| fatal(&format!("Failed to create HTTP client: {e}")));
     let hwid = hwid::collect();
 
-    let _first_time_use = !credentials::exists();
-
     let first_time_use = !credentials::exists();
 
     if first_time_use {
@@ -164,7 +162,18 @@ fn main() {
         .unwrap_or_else(|e| fatal(&format!("Failed to write session file: {e}")));
 
     ok(&format!("Session file written: {}", session_path.display()));
-    warn("Session file will NOT be deleted while debugging.");
+
+    // The session file lives just long enough for phantom.jar to read it on
+    // Minecraft startup. After the JVM exits we wipe it from disk so it can't be
+    // copy-replayed offline. Set PHANTOM_KEEP_SESSION_TOKEN=1 to skip cleanup
+    // (debugging only — the token is the gate to /content/* downloads).
+    let keep_session = env::var("PHANTOM_KEEP_SESSION_TOKEN")
+        .map(|v| !v.is_empty() && v != "0")
+        .unwrap_or(false);
+
+    if keep_session {
+        warn("PHANTOM_KEEP_SESSION_TOKEN set; session.token will NOT be cleaned up after exit.");
+    }
 
     println!();
     step(5, "Starting heartbeat monitor");
@@ -194,13 +203,12 @@ fn main() {
 
     let exit_code = launch::run(&launch_config);
 
-    // IMPORTANT:
-    // Do not delete the session token while debugging.
-    // Minecraft/Phantom may need to read config/phantom/session.token during startup.
-    //
-    // When everything works, you can later add delayed cleanup inside the mod or bootstrapper.
-    //
-    // session::delete(&cfg.game_dir);
+    // Always wipe the session token from disk after Minecraft exits. By this point
+    // phantom.jar has already read it during startup and stage-2 auth is complete;
+    // the on-disk copy is no longer needed and is a replay-attack surface.
+    if !keep_session {
+        session::delete(&cfg.game_dir);
+    }
 
     match exit_code {
         Ok(code) => {
