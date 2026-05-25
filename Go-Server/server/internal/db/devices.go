@@ -72,6 +72,15 @@ func BindHWID(ctx context.Context, pool *pgxpool.Pool, deviceID, hwidHash string
 	return err
 }
 
+// MarkEnrolled moves a device from unbound to hwid_pending without touching hwid_hash.
+// Called by enrollment after the device row exists and device_secret is set.
+func MarkEnrolled(ctx context.Context, pool *pgxpool.Pool, deviceID string) error {
+	_, err := pool.Exec(ctx,
+		`UPDATE devices SET binding_status = 'hwid_pending', updated_at = now()
+		 WHERE id = $1`, deviceID)
+	return err
+}
+
 func FullyBind(ctx context.Context, pool *pgxpool.Pool, deviceID, minecraftUsername, sourceIP string) error {
 	_, err := pool.Exec(ctx,
 		`UPDATE devices SET minecraft_username = $1, binding_status = 'fully_bound',

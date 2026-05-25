@@ -18,7 +18,6 @@ import (
 
 type startRequest struct {
 	Username          string `json:"username"`
-	HWID              string `json:"hwid"`
 	MinecraftUsername string `json:"minecraft_username"`
 	ClientVersion     string `json:"client_version"`
 	BootstrapBuildID  string `json:"bootstrap_build_id"`
@@ -303,16 +302,14 @@ func handleStart(svc *Service) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		var req startRequest
 
-		if err := c.BodyParser(&req); err != nil || req.Username == "" || req.HWID == "" {
+		if err := c.BodyParser(&req); err != nil || req.Username == "" {
 			return c.Status(401).JSON(fiber.Map{"error": "authentication_failed"})
 		}
 
 		ip := middleware.GetRealIP(c)
 
-		result, err := svc.Start(c.Context(), req.Username, req.HWID, req.MinecraftUsername, ip)
-		if errors.Is(err, ErrIPMismatch) ||
-			errors.Is(err, ErrHWIDMismatch) ||
-			errors.Is(err, ErrNotFound) ||
+		result, err := svc.Start(c.Context(), req.Username, req.MinecraftUsername, ip)
+		if errors.Is(err, ErrNotFound) ||
 			errors.Is(err, ErrDeviceBlocked) ||
 			errors.Is(err, ErrUsernameMismatch) {
 			return c.Status(401).JSON(fiber.Map{"error": "authentication_failed"})

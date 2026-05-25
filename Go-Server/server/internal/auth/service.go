@@ -87,7 +87,7 @@ func New(
 	}
 }
 
-func (s *Service) Start(ctx context.Context, username, rawHWID, minecraftUsername, sourceIP string) (*StartResult, error) {
+func (s *Service) Start(ctx context.Context, username, minecraftUsername, sourceIP string) (*StartResult, error) {
 	account, err := db.GetAccountByUsername(ctx, s.pool, normalize(username))
 	if errors.Is(err, pgx.ErrNoRows) {
 		s.auditSvc.Log("auth.start.fail", nil, nil, nil, &sourceIP, map[string]any{
@@ -131,23 +131,6 @@ func (s *Service) Start(ctx context.Context, username, rawHWID, minecraftUsernam
 			"reason": "device_not_enrolled",
 		})
 		return nil, ErrNotFound
-	}
-
-	if device.BindingStatus == "hwid_pending" {
-		if device.EnrollmentIP == nil || *device.EnrollmentIP != sourceIP {
-			s.auditSvc.Log("auth.start.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
-				"reason": "ip_mismatch",
-			})
-			return nil, ErrIPMismatch
-		}
-	}
-
-	hwidHash := crypto.HMACHash(s.pepper, []byte(normalizeHWID(rawHWID)))
-	if device.HWIDHash == nil || *device.HWIDHash != hwidHash {
-		s.auditSvc.Log("auth.start.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
-			"reason": "hwid_mismatch",
-		})
-		return nil, ErrHWIDMismatch
 	}
 
 	if device.BindingStatus == "fully_bound" && minecraftUsername != "" {
@@ -820,10 +803,6 @@ func manifestIDFromURL(value string) string {
 		return value[idx+1:]
 	}
 	return value
-}
-
-func normalizeHWID(s string) string {
-	return strings.ToUpper(strings.TrimSpace(s))
 }
 
 func shortToken(raw string) string {

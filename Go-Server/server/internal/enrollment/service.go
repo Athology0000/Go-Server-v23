@@ -56,83 +56,13 @@ func computeNewExpiry(hasExisting bool, existing *time.Time, durationDays int) *
 	return &t
 }
 
-func (s *Service) Redeem(ctx context.Context, rawKey, accountID, sourceIP string) error {
-	keyHash := crypto.HashLicenseKey(rawKey)
-	key, err := db.GetLicenseKeyByHash(ctx, s.pool, keyHash)
-	if errors.Is(err, pgx.ErrNoRows) {
-		s.auditSvc.Log("enroll.redeem.fail", &accountID, nil, nil, &sourceIP, map[string]any{"reason": "key_not_found"})
-		return ErrKeyNotFound
-	}
-	if err != nil {
-		return err
-	}
-	if key.Status != "available" {
-		s.auditSvc.Log("enroll.redeem.fail", &accountID, nil, nil, &sourceIP, map[string]any{"reason": "key_not_available", "status": key.Status})
-		return ErrKeyNotAvailable
-	}
-
-	// Ensure the account has an enrollment device secret.
-	// If a device already exists, keep it (single-device model).
-	if _, devErr := db.GetDeviceByAccountID(ctx, s.pool, accountID); devErr != nil {
-		if !errors.Is(devErr, pgx.ErrNoRows) {
-			return devErr
-		}
-		secret := make([]byte, 32)
-		if _, err := rand.Read(secret); err != nil {
-			return err
-		}
-		encrypted, err := crypto.EncryptAESGCM(s.masterKey, secret)
-		if err != nil {
-			return err
-		}
-		if _, err := db.CreateDevice(ctx, s.pool, accountID, sourceIP, encrypted); err != nil {
-			return err
-		}
-	}
-
-	// Create or extend the license on the account based on the key.
-	license, licErr := db.GetLicenseByAccountID(ctx, s.pool, accountID)
-	if licErr != nil && !errors.Is(licErr, pgx.ErrNoRows) {
-		return licErr
-	}
-	var existingExpires *time.Time
-	hasExisting := licErr == nil
-	if hasExisting {
-		existingExpires = license.ExpiresAt
-	}
-	newExpires := computeNewExpiry(hasExisting, existingExpires, key.DurationDays)
-
-	if errors.Is(licErr, pgx.ErrNoRows) {
-		if _, err := db.CreateLicense(ctx, s.pool, accountID, key.PlanTier, time.Now(), newExpires); err != nil {
-			return err
-		}
-	} else {
-		// NOTE: mirrors panel redeem behavior; updates plan + expiry and re-activates.
-		_, err := s.pool.Exec(ctx,
-			`UPDATE licenses
-			 SET plan_tier = $1, status = 'active', expires_at = $2, updated_at = now()
-			 WHERE account_id = $3`,
-			key.PlanTier, newExpires, accountID,
-		)
-		if err != nil {
-			return err
-		}
-	}
-
-	if err := db.RedeemLicenseKey(ctx, s.pool, keyHash, accountID, sourceIP); err != nil {
-		return err
-	}
-	s.auditSvc.Log("enroll.redeem.success", &accountID, nil, nil, &sourceIP, map[string]any{"plan_tier": key.PlanTier})
-	return nil
-}
-
-// RedeemWithHWID performs "bootstrapper mode 2":
+// Redeem performs full enrollment in one call:
 // - Redeem the license key for the given account
 // - Ensure a device secret exists
-// - Bind the HWID immediately (binding_status -> hwid_pending)
+// - Move device to hwid_pending (HWID is pinned later by the loader at /auth/verify-session)
 // - Create/extend the account license (so auth works right away)
-// - Return the username + decrypted device_secret (base64)
-func (s *Service) RedeemWithHWID(ctx context.Context, rawKey, accountID, rawHWID, sourceIP string) (string, string, string, *time.Time, error) {
+// - Return the username + decrypted device_secret (base64) + plan_tier + expires_at
+func (s *Service) Redeem(ctx context.Context, rawKey, accountID, sourceIP string) (string, string, string, *time.Time, error) {
 	keyHash := crypto.HashLicenseKey(rawKey)
 
 	tx, err := s.pool.Begin(ctx)
@@ -229,12 +159,11 @@ func (s *Service) RedeemWithHWID(ctx context.Context, rawKey, accountID, rawHWID
 		secretPlain = plain
 	}
 
-	// Bind HWID (device becomes eligible for auth/start).
-	hwidHash := crypto.HMACHash(s.pepper, []byte(normalizeHWID(rawHWID)))
+	// Mark device enrolled (eligible for auth/start). HWID is pinned later by the loader at /auth/verify-session.
 	if _, err := tx.Exec(ctx,
-		`UPDATE devices SET hwid_hash = $1, binding_status = 'hwid_pending', updated_at = now()
-		 WHERE id = $2`,
-		hwidHash, deviceID); err != nil {
+		`UPDATE devices SET binding_status = 'hwid_pending', updated_at = now()
+		 WHERE id = $1`,
+		deviceID); err != nil {
 		return "", "", "", nil, err
 	}
 
@@ -294,7 +223,7 @@ func (s *Service) RedeemWithHWID(ctx context.Context, rawKey, accountID, rawHWID
 	return username, base64.StdEncoding.EncodeToString(secretPlain), planTier, newExpires, nil
 }
 
-func (s *Service) Handshake(ctx context.Context, username, password, rawHWID, sourceIP string) (string, error) {
+func (s *Service) Handshake(ctx context.Context, username, password, sourceIP string) (string, error) {
 	account, err := db.GetAccountByUsername(ctx, s.pool, normalize(username))
 	if err != nil {
 		s.auditSvc.Log("enroll.handshake.fail", nil, nil, nil, &sourceIP, map[string]any{"reason": "account_not_found", "username": username})
@@ -322,8 +251,7 @@ func (s *Service) Handshake(ctx context.Context, username, password, rawHWID, so
 		s.auditSvc.Log("enroll.handshake.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{"reason": "ip_mismatch"})
 		return "", ErrIPMismatch
 	}
-	hwidHash := crypto.HMACHash(s.pepper, []byte(normalizeHWID(rawHWID)))
-	if err := db.BindHWID(ctx, s.pool, device.ID, hwidHash); err != nil {
+	if err := db.MarkEnrolled(ctx, s.pool, device.ID); err != nil {
 		return "", err
 	}
 	plain, err := crypto.DecryptAESGCM(s.masterKey, device.DeviceSecretEncrypted)
@@ -334,5 +262,4 @@ func (s *Service) Handshake(ctx context.Context, username, password, rawHWID, so
 	return base64.StdEncoding.EncodeToString(plain), nil
 }
 
-func normalize(s string) string     { return strings.ToLower(strings.TrimSpace(s)) }
-func normalizeHWID(s string) string { return strings.ToUpper(strings.TrimSpace(s)) }
+func normalize(s string) string { return strings.ToLower(strings.TrimSpace(s)) }
