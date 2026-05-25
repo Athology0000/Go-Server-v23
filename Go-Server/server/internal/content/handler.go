@@ -5,9 +5,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/phantom/server/internal/middleware"
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/phantom/server/internal/middleware"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -17,9 +17,18 @@ func RegisterRoutes(app *fiber.App, svc *Service, pool *pgxpool.Pool, rdb *redis
 	// 30 fetches per minute per IP for content endpoints.
 	contentLimit := middleware.RateLimit(rdb, 30, time.Minute, middleware.IPKey("content"))
 
-	app.Get("/content/manifest/:id", sessAuth, contentLimit, handleManifest(svc))
-	app.Get("/content/module/:name", sessAuth, contentLimit, handleModule(svc))
-	app.Get("/content/native/:name", sessAuth, contentLimit, handleNative(svc))
+	manifest := handleManifest(svc)
+	module := handleModule(svc)
+	native := handleNative(svc)
+
+	app.Get("/content/manifest/:id", sessAuth, contentLimit, manifest)
+	app.Get("/content/module/:name", sessAuth, contentLimit, module)
+	app.Get("/content/native/:name", sessAuth, contentLimit, native)
+
+	// Compatibility for older bootstrappers that sent double-slash API paths.
+	app.Get("//content/manifest/:id", sessAuth, contentLimit, manifest)
+	app.Get("//content/module/:name", sessAuth, contentLimit, module)
+	app.Get("//content/native/:name", sessAuth, contentLimit, native)
 
 	log.Printf("[content.routes] registered routes: /content/manifest/:id, /content/module/:name, /content/native/:name")
 }

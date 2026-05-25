@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/redis/go-redis/v9"
 	"github.com/phantom/server/internal/middleware"
+	"github.com/redis/go-redis/v9"
 )
 
 type redeemRequest struct {
@@ -27,8 +27,16 @@ func RegisterRoutes(app *fiber.App, svc *Service, rdb *redis.Client) {
 	// 5 attempts per minute per IP — enrollment is a one-time operation
 	enrollLimit := middleware.RateLimit(rdb, 5, time.Minute, middleware.IPKey("enroll"))
 
-	app.Post("/enroll/redeem", enrollLimit, handleRedeem(svc))
-	app.Post("/enroll/handshake", enrollLimit, handleHandshake(svc))
+	redeem := handleRedeem(svc)
+	handshake := handleHandshake(svc)
+
+	app.Post("/enroll/redeem", enrollLimit, redeem)
+	app.Post("/enroll/handshake", enrollLimit, handshake)
+
+	// Compatibility for older bootstrappers that joined a trailing-slash base URL
+	// with slash-prefixed API paths and sent requests like //enroll/handshake.
+	app.Post("//enroll/redeem", enrollLimit, redeem)
+	app.Post("//enroll/handshake", enrollLimit, handshake)
 }
 
 func handleRedeem(svc *Service) fiber.Handler {

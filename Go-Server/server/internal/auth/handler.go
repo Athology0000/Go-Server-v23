@@ -6,13 +6,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gofiber/fiber/v2"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/phantom/server/internal/audit"
 	"github.com/phantom/server/internal/config"
 	"github.com/phantom/server/internal/crypto"
 	"github.com/phantom/server/internal/db"
 	"github.com/phantom/server/internal/middleware"
-	"github.com/gofiber/fiber/v2"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -50,11 +50,24 @@ func RegisterRoutes(app *fiber.App, svc *Service, pool *pgxpool.Pool, rdb *redis
 	authLimit := middleware.RateLimit(rdb, 10, time.Minute, middleware.IPAndUsernameKey("auth"))
 	heartbeatLimit := middleware.RateLimit(rdb, 60, time.Minute, middleware.IPAndUsernameKey("heartbeat"))
 
-	app.Post("/auth/start", authLimit, handleStart(svc))
-	app.Post("/auth/finish", authLimit, handleFinish(svc))
-	app.Post("/auth/verify-minecraft", authLimit, handleVerifyMinecraft(svc))
-	app.Post("/auth/verify-session", authLimit, handleVerifySession(svc))
-	app.Post("/auth/heartbeat", heartbeatLimit, handleHeartbeat(svc))
+	start := handleStart(svc)
+	finish := handleFinish(svc)
+	verifyMinecraft := handleVerifyMinecraft(svc)
+	verifySession := handleVerifySession(svc)
+	heartbeat := handleHeartbeat(svc)
+
+	app.Post("/auth/start", authLimit, start)
+	app.Post("/auth/finish", authLimit, finish)
+	app.Post("/auth/verify-minecraft", authLimit, verifyMinecraft)
+	app.Post("/auth/verify-session", authLimit, verifySession)
+	app.Post("/auth/heartbeat", heartbeatLimit, heartbeat)
+
+	// Compatibility for older bootstrappers that sent double-slash API paths.
+	app.Post("//auth/start", authLimit, start)
+	app.Post("//auth/finish", authLimit, finish)
+	app.Post("//auth/verify-minecraft", authLimit, verifyMinecraft)
+	app.Post("//auth/verify-session", authLimit, verifySession)
+	app.Post("//auth/heartbeat", heartbeatLimit, heartbeat)
 
 	panelLimit := middleware.RateLimit(rdb, 20, time.Minute, middleware.IPKey("panel-auth"))
 	app.Post("/auth/login", panelLimit, handlePanelLogin(pool, auditSvc))

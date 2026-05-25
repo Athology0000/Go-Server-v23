@@ -1,3 +1,4 @@
+use crate::client::api_url;
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use reqwest::blocking::Client;
@@ -55,8 +56,12 @@ pub fn run(client: &Client, server_url: &str, hwid: &str) -> Result<EnrollmentRe
             println!("\nBinding device...");
 
             let hs_resp = client
-                .post(format!("{}/enroll/handshake", server_url))
-                .json(&HandshakeRequest { username: &username, password: &password, hwid })
+                .post(api_url(server_url, "/enroll/handshake"))
+                .json(&HandshakeRequest {
+                    username: &username,
+                    password: &password,
+                    hwid,
+                })
                 .send()
                 .map_err(|e| format!("enroll/handshake request failed: {e}"))?;
 
@@ -95,13 +100,18 @@ pub fn run(client: &Client, server_url: &str, hwid: &str) -> Result<EnrollmentRe
                 return Err(format!("Enrollment error: {err}"));
             }
 
-            let secret_b64 = hs.device_secret.ok_or("Missing device_secret in response")?;
+            let secret_b64 = hs
+                .device_secret
+                .ok_or("Missing device_secret in response")?;
             let secret_bytes = STANDARD
                 .decode(&secret_b64)
                 .map_err(|e| format!("Invalid device_secret encoding: {e}"))?;
 
             println!("Enrollment complete. Welcome, {}!\n", username);
-            Ok(EnrollmentResult { username, device_secret: secret_bytes })
+            Ok(EnrollmentResult {
+                username,
+                device_secret: secret_bytes,
+            })
         }
         "2" => {
             let account_id = prompt("Enter your Phantom account ID (from dashboard): ")?;
@@ -110,8 +120,12 @@ pub fn run(client: &Client, server_url: &str, hwid: &str) -> Result<EnrollmentRe
             println!("\nRedeeming license key...");
 
             let redeem_resp = client
-                .post(format!("{}/enroll/redeem", server_url))
-                .json(&RedeemRequest { license_key: &license_key, account_id: &account_id, hwid })
+                .post(api_url(server_url, "/enroll/redeem"))
+                .json(&RedeemRequest {
+                    license_key: &license_key,
+                    account_id: &account_id,
+                    hwid,
+                })
                 .send()
                 .map_err(|e| format!("enroll/redeem request failed: {e}"))?;
 
@@ -149,14 +163,21 @@ pub fn run(client: &Client, server_url: &str, hwid: &str) -> Result<EnrollmentRe
                 return Err(format!("Enrollment error: {err} ({reason})"));
             }
 
-            let username = redeem.username.ok_or("Missing username in redeem response")?;
-            let secret_b64 = redeem.device_secret.ok_or("Missing device_secret in redeem response")?;
+            let username = redeem
+                .username
+                .ok_or("Missing username in redeem response")?;
+            let secret_b64 = redeem
+                .device_secret
+                .ok_or("Missing device_secret in redeem response")?;
             let secret_bytes = STANDARD
                 .decode(&secret_b64)
                 .map_err(|e| format!("Invalid device_secret encoding: {e}"))?;
 
             println!("Enrollment complete. Welcome, {}!\n", username);
-            Ok(EnrollmentResult { username, device_secret: secret_bytes })
+            Ok(EnrollmentResult {
+                username,
+                device_secret: secret_bytes,
+            })
         }
         _ => Err("Invalid selection (enter 1 or 2)".to_string()),
     }

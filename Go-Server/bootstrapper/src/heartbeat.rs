@@ -1,3 +1,4 @@
+use crate::client::api_url;
 use reqwest::blocking::Client;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Seek, SeekFrom};
@@ -50,11 +51,12 @@ fn heartbeat_loop(client: Client, server_url: &str, session_token: &str, game_di
                     new_pos += line.len() as u64 + 1; // +1 for newline
 
                     // Check for module activity indicators
-                    if line.contains("[Phantom]") ||
-                       line.contains("is actively running") ||
-                       line.contains("module loaded") ||
-                       line.contains("injecting") ||
-                       line.contains("hooking") {
+                    if line.contains("[Phantom]")
+                        || line.contains("is actively running")
+                        || line.contains("module loaded")
+                        || line.contains("injecting")
+                        || line.contains("hooking")
+                    {
                         has_activity = true;
                     }
                 }
@@ -68,7 +70,7 @@ fn heartbeat_loop(client: Client, server_url: &str, session_token: &str, game_di
             last_activity = Instant::now();
 
             // Send heartbeat
-            let url = format!("{}/auth/heartbeat", server_url);
+            let url = api_url(server_url, "/auth/heartbeat");
             let body = serde_json::json!({
                 "session_token": session_token
             });
@@ -85,7 +87,8 @@ fn heartbeat_loop(client: Client, server_url: &str, session_token: &str, game_di
                     eprintln!("Heartbeat error: {}", e);
                 }
             }
-        } else if last_activity.elapsed() > Duration::from_secs(300) { // 5 minutes of inactivity
+        } else if last_activity.elapsed() > Duration::from_secs(300) {
+            // 5 minutes of inactivity
             // Stop heartbeats if no activity for 5 minutes
             break;
         }

@@ -1,3 +1,4 @@
+use crate::client::api_url;
 use reqwest::blocking::Client;
 use sha2::{Digest, Sha256};
 use std::fs::{self, File};
@@ -29,18 +30,16 @@ pub fn ensure(
         }
 
         println!("phantom.jar: hash mismatch, redownloading");
-        fs::remove_file(&jar_path)
-            .map_err(|e| format!("Failed to remove old phantom.jar: {e}"))?;
+        fs::remove_file(&jar_path).map_err(|e| format!("Failed to remove old phantom.jar: {e}"))?;
     } else {
         println!("phantom.jar: not found in mods folder — downloading");
     }
 
     if tmp_path.exists() {
-        fs::remove_file(&tmp_path)
-            .map_err(|e| format!("Failed to remove old temp jar: {e}"))?;
+        fs::remove_file(&tmp_path).map_err(|e| format!("Failed to remove old temp jar: {e}"))?;
     }
 
-    let url = format!("{}/content/module/phantom", server_url.trim_end_matches('/'));
+    let url = api_url(server_url, "/content/module/phantom");
 
     println!("phantom.jar: downloading from {}", url);
     println!("phantom.jar: saving to {}", jar_path.display());
@@ -99,8 +98,7 @@ pub fn ensure(
 
         return Err(format!(
             "JAR hash mismatch. Expected {}, got {}",
-            expected_sha256,
-            downloaded_hash
+            expected_sha256, downloaded_hash
         ));
     }
 
@@ -113,8 +111,8 @@ pub fn ensure(
 }
 
 fn file_sha256(path: &Path) -> Result<String, String> {
-    let mut file = File::open(path)
-        .map_err(|e| format!("Failed to open {}: {e}", path.display()))?;
+    let mut file =
+        File::open(path).map_err(|e| format!("Failed to open {}: {e}", path.display()))?;
 
     let mut hasher = Sha256::new();
     let mut buffer = [0u8; 64 * 1024];

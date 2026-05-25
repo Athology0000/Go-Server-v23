@@ -28,10 +28,7 @@ fn default_server_url() -> String {
 }
 
 fn default_mods_dir() -> String {
-    detect_game_dir()
-        .join("mods")
-        .to_string_lossy()
-        .to_string()
+    detect_game_dir().join("mods").to_string_lossy().to_string()
 }
 
 fn default_java_exe() -> String {
@@ -114,9 +111,9 @@ impl BootstrapConfig {
             Self::default()
         };
 
-        // Trim trailing slashes so endpoint concatenation never produces "//path".
-        let trimmed = cfg.server_url.trim_end_matches('/');
-        if trimmed.len() != cfg.server_url.len() {
+        // Trim whitespace and trailing slashes so endpoint concatenation never produces "//path".
+        let trimmed = cfg.server_url.trim().trim_end_matches('/');
+        if trimmed != cfg.server_url {
             cfg.server_url = trimmed.to_string();
         }
 

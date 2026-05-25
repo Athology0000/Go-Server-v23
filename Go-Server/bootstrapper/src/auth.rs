@@ -1,3 +1,4 @@
+use crate::client::api_url;
 use hmac::{Hmac, Mac};
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
@@ -62,7 +63,7 @@ pub fn authenticate(
     build_id: &str,
 ) -> Result<AuthResult, String> {
     let start_resp = client
-        .post(format!("{}/auth/start", server_url))
+        .post(api_url(server_url, "/auth/start"))
         .json(&StartRequest {
             username,
             hwid,
@@ -95,7 +96,7 @@ pub fn authenticate(
     let proof = compute_proof(device_secret, &challenge);
 
     let finish_resp = client
-        .post(format!("{}/auth/finish", server_url))
+        .post(api_url(server_url, "/auth/finish"))
         .json(&FinishRequest {
             username,
             proof,
