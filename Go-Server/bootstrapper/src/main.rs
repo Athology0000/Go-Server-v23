@@ -4,7 +4,6 @@ mod config;
 mod credentials;
 mod enrollment;
 mod heartbeat;
-mod hwid;
 mod jar;
 mod launch;
 mod manifest;
@@ -52,7 +51,6 @@ fn main() {
 
     let http = client::build(&cfg.server_url)
         .unwrap_or_else(|e| fatal(&format!("Failed to create HTTP client: {e}")));
-    let hwid = hwid::collect();
 
     let first_time_use = !credentials::exists();
 
@@ -64,7 +62,7 @@ fn main() {
         divider();
         println!();
 
-        match enrollment::run(&http, &cfg.server_url, &hwid) {
+        match enrollment::run(&http, &cfg.server_url) {
             Ok(result) => {
                 if let Err(e) = credentials::save(&result.username, &result.device_secret) {
                     fatal(&format!("Failed to save credentials: {e}"));
@@ -90,7 +88,6 @@ fn main() {
         &http,
         &cfg.server_url,
         &creds.username,
-        &hwid,
         &creds.device_secret,
         &cfg.client_version,
         &cfg.build_id,

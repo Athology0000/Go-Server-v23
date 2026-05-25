@@ -18,7 +18,6 @@ pub struct AuthResult {
 #[derive(Serialize)]
 struct StartRequest<'a> {
     username: &'a str,
-    hwid: &'a str,
     minecraft_username: &'a str,
     client_version: &'a str,
     bootstrap_build_id: &'a str,
@@ -57,7 +56,6 @@ pub fn authenticate(
     client: &Client,
     server_url: &str,
     username: &str,
-    hwid: &str,
     device_secret: &[u8],
     client_version: &str,
     build_id: &str,
@@ -66,7 +64,6 @@ pub fn authenticate(
         .post(api_url(server_url, "/auth/start"))
         .json(&StartRequest {
             username,
-            hwid,
             minecraft_username: "",
             client_version,
             bootstrap_build_id: build_id,

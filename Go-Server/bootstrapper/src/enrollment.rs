@@ -10,7 +10,6 @@ use std::io::{self, Write};
 struct RedeemRequest<'a> {
     license_key: &'a str,
     account_id: &'a str,
-    hwid: &'a str,
 }
 
 #[derive(Deserialize)]
@@ -26,7 +25,6 @@ struct RedeemResponse {
 struct HandshakeRequest<'a> {
     username: &'a str,
     password: &'a str,
-    hwid: &'a str,
 }
 
 #[derive(Deserialize)]
@@ -40,7 +38,7 @@ pub struct EnrollmentResult {
     pub device_secret: Vec<u8>,
 }
 
-pub fn run(client: &Client, server_url: &str, hwid: &str) -> Result<EnrollmentResult, String> {
+pub fn run(client: &Client, server_url: &str) -> Result<EnrollmentResult, String> {
     println!("\n=== Phantom First-Time Setup ===\n");
 
     println!("Select setup method:");
@@ -60,7 +58,6 @@ pub fn run(client: &Client, server_url: &str, hwid: &str) -> Result<EnrollmentRe
                 .json(&HandshakeRequest {
                     username: &username,
                     password: &password,
-                    hwid,
                 })
                 .send()
                 .map_err(|e| format!("enroll/handshake request failed: {e}"))?;
@@ -124,7 +121,6 @@ pub fn run(client: &Client, server_url: &str, hwid: &str) -> Result<EnrollmentRe
                 .json(&RedeemRequest {
                     license_key: &license_key,
                     account_id: &account_id,
-                    hwid,
                 })
                 .send()
                 .map_err(|e| format!("enroll/redeem request failed: {e}"))?;

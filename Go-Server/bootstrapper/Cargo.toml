@@ -17,11 +17,10 @@ sha2 = "0.10"
 hmac = "0.12"
 hex = "0.4"
 base64 = "0.22"
-winreg = "0.52"
 chrono = { version = "0.4", features = ["clock"] }
 rpassword = "7.5.2"
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = ["dpapi", "wincrypt", "fileapi", "winbase"] }
+winapi = { version = "0.3", features = ["dpapi", "wincrypt", "winbase"] }
 
 [dev-dependencies]
 tempfile = "3"
