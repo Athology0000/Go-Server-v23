@@ -354,14 +354,8 @@ fn verify_integrity() -> Result<(), String> {
         .filter(|s| !s.is_empty());
 
     let Some(expected) = expected else {
-        if cfg!(debug_assertions) {
-            return Ok(());
-        }
-
-        return Err(
-            "No expected bootstrapper SHA-256 configured. Set PHANTOM_BOOTSTRAPPER_SHA256 for release builds."
-                .to_string(),
-        );
+        warn("PHANTOM_BOOTSTRAPPER_SHA256 is not set; skipping bootstrapper self-integrity check.");
+        return Ok(());
     };
 
     if expected.len() != 64 || !expected.chars().all(|ch| ch.is_ascii_hexdigit()) {

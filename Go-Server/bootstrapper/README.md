@@ -18,7 +18,7 @@ The bootstrapper reads `config/phantom/bootstrap.toml` from the working director
 
 ### Bootstrapper self-check
 
-At startup the bootstrapper SHA-256-hashes itself and compares against the digest baked in at compile time via the `PHANTOM_BOOTSTRAPPER_SHA256` environment variable (set during the release CI build with `option_env!`). If the digest is absent in a release build the check **fails closed** — the process exits immediately.
+At startup the bootstrapper SHA-256-hashes itself and compares against the digest supplied at runtime or baked in at compile time via the `PHANTOM_BOOTSTRAPPER_SHA256` environment variable. If the digest is absent, the check emits a warning and continues. If the digest is present but malformed or does not match, the check fails closed.
 
 ---
 
