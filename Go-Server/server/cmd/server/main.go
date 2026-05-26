@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/ed25519"
+	"encoding/base64"
 	"io"
 	"log"
 	"os"
@@ -35,6 +37,9 @@ func main() {
 	}
 
 	log.Println("BOOTING PHANTOM SERVER VERSION: railway-debug-root-health-v2")
+	manifestPublicKey := base64.StdEncoding.EncodeToString(
+		ed25519.PrivateKey(cfg.ManifestSigningKey).Public().(ed25519.PublicKey),
+	)
 
 	ctx := context.Background()
 
@@ -120,10 +125,11 @@ func main() {
 
 	pub.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
-			"ok":        true,
-			"service":   "phantom-public-api",
-			"timestamp": time.Now().UTC().Format(time.RFC3339),
-			"version":   "railway-debug-root-health-v2",
+			"ok":                  true,
+			"service":             "phantom-public-api",
+			"timestamp":           time.Now().UTC().Format(time.RFC3339),
+			"version":             "railway-debug-root-health-v2",
+			"manifest_public_key": manifestPublicKey,
 		})
 	})
 
@@ -182,10 +188,11 @@ func main() {
 
 	adm.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
-			"ok":        true,
-			"service":   "phantom-admin-api",
-			"timestamp": time.Now().UTC().Format(time.RFC3339),
-			"version":   "railway-debug-root-health-v2",
+			"ok":                  true,
+			"service":             "phantom-admin-api",
+			"timestamp":           time.Now().UTC().Format(time.RFC3339),
+			"version":             "railway-debug-root-health-v2",
+			"manifest_public_key": manifestPublicKey,
 		})
 	})
 

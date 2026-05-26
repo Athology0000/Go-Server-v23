@@ -70,8 +70,8 @@ struct SignedPayload<'a> {
     build_id: &'a str,
     channel: &'a str,
     minimum_loader_version: &'a str,
-    #[serde(skip_serializing_if = "str::is_empty")]
-    module_key: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    module_key: Option<&'a str>,
     modules: Vec<SignedModule<'a>>,
     native_components: Vec<SignedNative<'a>>,
 }
@@ -205,7 +205,9 @@ fn parse_manifest_body(body: &str) -> Result<ContentManifest, String> {
 }
 
 fn verify_signature(manifest: &ContentManifest, sig_b64: &str) -> Result<(), String> {
-    if MANIFEST_PUBLIC_KEY_B64 == "REPLACE_ME_WITH_32_BYTE_BASE64_ED25519_PUBLIC_KEY" {
+    let public_key_b64 = manifest_public_key_b64();
+
+    if public_key_b64 == "REPLACE_ME_WITH_32_BYTE_BASE64_ED25519_PUBLIC_KEY" {
         return Err(
             "Manifest public key is still the placeholder. Replace MANIFEST_PUBLIC_KEY_B64 or use unsigned local dev manifests only."
                 .to_string(),
@@ -213,7 +215,7 @@ fn verify_signature(manifest: &ContentManifest, sig_b64: &str) -> Result<(), Str
     }
 
     let public_key_bytes: [u8; 32] = STANDARD
-        .decode(MANIFEST_PUBLIC_KEY_B64)
+        .decode(&public_key_b64)
         .map_err(|_| "Invalid MANIFEST_PUBLIC_KEY_B64")?
         .try_into()
         .map_err(|_| "Public key must be exactly 32 bytes")?;
@@ -228,7 +230,7 @@ fn verify_signature(manifest: &ContentManifest, sig_b64: &str) -> Result<(), Str
         build_id: &manifest.build_id,
         channel: &manifest.channel,
         minimum_loader_version: &manifest.minimum_loader_version,
-        module_key: &manifest.module_key,
+        module_key: Some(manifest.module_key.trim()).filter(|key| !key.is_empty()),
         modules: manifest
             .modules
             .iter()
@@ -253,15 +255,35 @@ fn verify_signature(manifest: &ContentManifest, sig_b64: &str) -> Result<(), Str
     };
 
     let payload_json = serde_json::to_vec(&payload).map_err(|e| e.to_string())?;
+    let payload_without_key = SignedPayload {
+        module_key: None,
+        ..payload
+    };
+    let payload_without_key_json =
+        serde_json::to_vec(&payload_without_key).map_err(|e| e.to_string())?;
 
     let verifying_key = VerifyingKey::from_bytes(&public_key_bytes)
         .map_err(|e| format!("Invalid public key: {e}"))?;
 
     let signature = Signature::from_bytes(&sig_bytes);
 
-    verifying_key
-        .verify(&payload_json, &signature)
-        .map_err(|_| "Manifest signature verification FAILED — manifest may be tampered".to_string())
+    if verifying_key.verify(&payload_json, &signature).is_ok()
+        || verifying_key
+            .verify(&payload_without_key_json, &signature)
+            .is_ok()
+    {
+        return Ok(());
+    }
+
+    Err("Manifest signature verification FAILED - manifest may be tampered or signed by a different MANIFEST_SIGNING_KEY".to_string())
+}
+
+fn manifest_public_key_b64() -> String {
+    std::env::var("PHANTOM_MANIFEST_PUBLIC_KEY_B64")
+        .or_else(|_| std::env::var("PHANTOM_MANIFEST_PUBLIC_KEY"))
+        .unwrap_or_else(|_| MANIFEST_PUBLIC_KEY_B64.to_string())
+        .trim()
+        .to_string()
 }
 
 #[cfg(test)]
