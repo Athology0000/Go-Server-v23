@@ -82,6 +82,7 @@ func (s *Service) ModuleBytes(ctx context.Context, accountID, name string) ([]by
 	moduleName := NormalizeModuleName(name)
 
 	allowed :=
+		moduleName == "phantom" ||
 		moduleName == "phantom-core" ||
 		slices.Contains(ent.EnabledModules, "*") ||
 			slices.Contains(ent.EnabledModules, moduleName) ||

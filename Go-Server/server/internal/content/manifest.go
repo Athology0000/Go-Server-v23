@@ -56,7 +56,7 @@ func BuildStableManifest(_ context.Context, contentDir, baseURL, channel string,
 			Name:      moduleName,
 			URL:       baseURL + "/content/module/" + url.PathEscape(moduleName),
 			SHA256:    hash,
-			Required:  moduleName == "phantom-core",
+			Required:  moduleName == "phantom" || moduleName == "phantom-core",
 			InitOrder: len(modules),
 		})
 	}
