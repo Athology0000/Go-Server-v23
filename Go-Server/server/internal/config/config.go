@@ -16,7 +16,7 @@ type Config struct {
 	MasterKey             []byte // 32 bytes, AES-256
 	ServerPepper          []byte // 32 bytes, HMAC key
 	ManifestSigningKey    []byte // Ed25519 private key (64 bytes)
-	ModuleEncryptionKey   []byte // 32 bytes, AES-256; defaults to MasterKey
+	ModuleEncryptionKey   []byte // 32 bytes, AES-256; defaults to bundled content key
 	DBURL                 string
 	RedisURL              string
 	AdminAPISecret        string
@@ -33,6 +33,8 @@ type Config struct {
 	SessionTTLHours       int
 	MigrationsDir         string
 }
+
+const defaultModuleEncryptionKeyB64 = "+KNMlsGkQLDvy2mcNClGzYIS65A5JQocOuRl2gtUVeQ="
 
 func Load() (*Config, error) {
 	_ = godotenv.Load()
@@ -57,7 +59,7 @@ func Load() (*Config, error) {
 		MasterKey:             masterKey,
 		ServerPepper:          pepper,
 		ManifestSigningKey:    signingKey,
-		ModuleEncryptionKey:   decodeOptionalBase64Env("MODULE_ENCRYPTION_KEY", 32, masterKey),
+		ModuleEncryptionKey:   decodeOptionalBase64Env("MODULE_ENCRYPTION_KEY", 32, mustDecodeBase64(defaultModuleEncryptionKeyB64, 32)),
 		DBURL:                 requireEnv("DB_URL"),
 		RedisURL:              requireEnv("REDIS_URL"),
 		AdminAPISecret:        requireEnv("ADMIN_API_SECRET"),
@@ -159,5 +161,13 @@ func decodeOptionalBase64Env(key string, expectedLen int, fallback []byte) []byt
 		panic(fmt.Sprintf("%s: expected base64-encoded %d-byte value", key, expectedLen))
 	}
 
+	return b
+}
+
+func mustDecodeBase64(raw string, expectedLen int) []byte {
+	b, err := base64.StdEncoding.DecodeString(raw)
+	if err != nil || len(b) != expectedLen {
+		panic(fmt.Sprintf("default module encryption key must be base64-encoded %d-byte value", expectedLen))
+	}
 	return b
 }
