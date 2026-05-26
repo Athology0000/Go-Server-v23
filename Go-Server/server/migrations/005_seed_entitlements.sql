@@ -8,6 +8,6 @@
 INSERT INTO entitlements (plan_tier, enabled_features, enabled_modules, native_components, content_channel)
 VALUES
     ('lifetime', '["*"]', '["*"]', '["*"]', 'stable'),
-    ('pro',      '[]',    '[]',    '[]',     'stable'),
+    ('pro',      '["*"]', '["*"]', '["*"]',  'stable'),
     ('trial',    '[]',    '[]',    '[]',     'stable')
 ON CONFLICT (plan_tier) DO NOTHING;

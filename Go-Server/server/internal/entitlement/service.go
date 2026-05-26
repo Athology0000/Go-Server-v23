@@ -3,6 +3,7 @@ package entitlement
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -50,15 +51,29 @@ func (s *Service) Resolve(ctx context.Context, accountID string) (*Result, error
 		return &Result{Authorized: false, Reason: "entitlement_inactive"}, nil
 	}
 
+	fullAccess := isFullAccessTier(license.PlanTier)
 	ent, err := db.GetEntitlement(ctx, s.pool, license.PlanTier)
 	if err != nil {
+		if fullAccess {
+			return fullAccessResult(license.PlanTier, "stable", license.ExpiresAt), nil
+		}
 		return &Result{Authorized: false, Reason: "no_entitlement"}, nil
+	}
+
+	contentChannel := strings.TrimSpace(ent.ContentChannel)
+	if contentChannel == "" {
+		contentChannel = "stable"
+	}
+	if fullAccess {
+		return fullAccessResult(license.PlanTier, contentChannel, license.ExpiresAt), nil
 	}
 
 	modules := make([]string, len(ent.EnabledModules))
 	copy(modules, ent.EnabledModules)
 	features := make([]string, len(ent.EnabledFeatures))
 	copy(features, ent.EnabledFeatures)
+	nativeComponents := make([]string, len(ent.NativeComponents))
+	copy(nativeComponents, ent.NativeComponents)
 
 	override, err := db.GetPlanOverride(ctx, s.pool, accountID)
 	if err == nil && override != nil {
@@ -71,10 +86,35 @@ func (s *Service) Resolve(ctx context.Context, accountID string) (*Result, error
 		PlanTier:             license.PlanTier,
 		EnabledModules:       modules,
 		EnabledFeatures:      features,
-		NativeComponents:     ent.NativeComponents,
-		ContentChannel:       ent.ContentChannel,
+		NativeComponents:     nativeComponents,
+		ContentChannel:       contentChannel,
 		EntitlementExpiresAt: license.ExpiresAt,
 	}, nil
+}
+
+func isFullAccessTier(planTier string) bool {
+	switch strings.ToLower(strings.TrimSpace(planTier)) {
+	case "lifetime", "pro":
+		return true
+	default:
+		return false
+	}
+}
+
+func fullAccessResult(planTier, contentChannel string, expiresAt *time.Time) *Result {
+	contentChannel = strings.TrimSpace(contentChannel)
+	if contentChannel == "" {
+		contentChannel = "stable"
+	}
+	return &Result{
+		Authorized:           true,
+		PlanTier:             planTier,
+		EnabledModules:       []string{"*"},
+		EnabledFeatures:      []string{"*"},
+		NativeComponents:     []string{"*"},
+		ContentChannel:       contentChannel,
+		EntitlementExpiresAt: expiresAt,
+	}
 }
 
 func applyOverride(base, add, remove []string) []string {
