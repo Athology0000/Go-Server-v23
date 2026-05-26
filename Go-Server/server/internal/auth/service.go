@@ -742,6 +742,19 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 		features = []string{}
 	}
 
+	// Refresh last_seen_ip so subsequent SessionAuth-protected content fetches
+	// from the same bootstrap (manifest, module, native) pass strictIP. Without
+	// this, clients behind carrier-grade NAT or rotating egress IPs (where the
+	// content fetch IP differs from the session-creation IP) get permanently
+	// 401'd on every content endpoint despite holding a valid session.
+	if err := db.UpdateSessionLastSeenIP(ctx, s.pool, sess.ID, sourceIP); err != nil {
+		log.Printf("[auth.verify_session] last_seen_ip_update_failed ip=%s session_id=%s err=%v",
+			sourceIP,
+			sess.ID,
+			err,
+		)
+	}
+
 	s.auditSvc.Log("auth.verify_session.success", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
 		"plan_tier":          ent.PlanTier,
 		"minecraft_username": minecraftUsername,

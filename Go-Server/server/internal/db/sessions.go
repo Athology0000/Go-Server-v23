@@ -149,6 +149,21 @@ func UpdateSessionExpiresAt(
 	return err
 }
 
+func UpdateSessionLastSeenIP(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	sessionID string,
+	ip string,
+) error {
+	_, err := pool.Exec(ctx, `
+		UPDATE sessions
+		SET last_seen_ip = $1
+		WHERE id = $2
+	`, ip, sessionID)
+
+	return err
+}
+
 func RevokeSession(
 	ctx context.Context,
 	pool *pgxpool.Pool,
