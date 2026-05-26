@@ -2,6 +2,7 @@
 package config
 
 import (
+	"crypto/ed25519"
 	"encoding/base64"
 	"fmt"
 	"net/url"
@@ -15,7 +16,7 @@ import (
 type Config struct {
 	MasterKey             []byte // 32 bytes, AES-256
 	ServerPepper          []byte // 32 bytes, HMAC key
-	ManifestSigningKey    []byte // Ed25519 private key (64 bytes)
+	ManifestSigningKey    []byte // Ed25519 private key derived from MANIFEST_SIGNING_KEY seed material
 	ModuleEncryptionKey   []byte // 32 bytes, AES-256; defaults to bundled content key
 	DBURL                 string
 	RedisURL              string
@@ -47,7 +48,7 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	signingKey, err := decodeBase64Env("MANIFEST_SIGNING_KEY", 64)
+	signingKey, err := decodeManifestSigningKeyEnv()
 	if err != nil {
 		return nil, err
 	}
@@ -148,6 +149,22 @@ func decodeBase64Env(key string, expectedLen int) ([]byte, error) {
 		return nil, fmt.Errorf("%s: expected %d bytes, got %d", key, expectedLen, len(b))
 	}
 	return b, nil
+}
+
+func decodeManifestSigningKeyEnv() ([]byte, error) {
+	raw := requireEnv("MANIFEST_SIGNING_KEY")
+	b, err := base64.StdEncoding.DecodeString(raw)
+	if err != nil {
+		return nil, fmt.Errorf("MANIFEST_SIGNING_KEY: invalid base64: %w", err)
+	}
+	if len(b) != ed25519.SeedSize && len(b) != ed25519.PrivateKeySize {
+		return nil, fmt.Errorf("MANIFEST_SIGNING_KEY: expected %d-byte seed or %d-byte private key, got %d", ed25519.SeedSize, ed25519.PrivateKeySize, len(b))
+	}
+
+	// Older generated configs used 64 random bytes, which is not a valid
+	// Ed25519 private key. Treat the first 32 bytes as seed material and
+	// derive a valid seed+public-key private key every time.
+	return ed25519.NewKeyFromSeed(b[:ed25519.SeedSize]), nil
 }
 
 func decodeOptionalBase64Env(key string, expectedLen int, fallback []byte) []byte {
