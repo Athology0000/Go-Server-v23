@@ -5,7 +5,7 @@ use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 
 // 32-byte Ed25519 public key matching the server's MANIFEST_SIGNING_KEY.
-const MANIFEST_PUBLIC_KEY_B64: &str = "LLeG53gx/aRVy/jhuuKFHJqATd9+cN0Jm04RVxq3o34=";
+const MANIFEST_PUBLIC_KEY_B64: &str = "3FyEwjVZAwTakBdN3Bd8yjTPE+VtEc83SydcksfQcZQ=";
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct ManifestModule {
