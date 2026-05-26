@@ -68,7 +68,11 @@ func Load() (*Config, error) {
 		AdminPort:             getEnvOr("ADMIN_PORT", "8081"),
 		ContentDir:            getEnvOr("CONTENT_DIR", "./content"),
 		BaseURL:               getEnvOr("BASE_URL", "http://localhost:8080"),
-		StrictSessionIP:       getEnvOr("STRICT_SESSION_IP", "true") == "true",
+		// Default to false: clients behind carrier-grade NAT or Railway/Cloudflare
+		// edges often present rotating egress IPs across consecutive requests, so
+		// strict IP-binding produces false 401s on otherwise-valid sessions. Set
+		// STRICT_SESSION_IP=true explicitly to re-enable the check.
+		StrictSessionIP:       getEnvOr("STRICT_SESSION_IP", "false") == "true",
 		AppEnv:                strings.ToLower(getEnvOr("APP_ENV", "development")),
 		AllowPublicRegistration: getEnvOr("ALLOW_PUBLIC_REGISTRATION", "") == "true",
 		PublicCORSAllowOrigins: publicOrigins,
