@@ -4,10 +4,8 @@ use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 
-// 32-byte Ed25519 public key.
-// PRODUCTION SECURITY REQUIREMENT: Replace this with the actual production public key!
-// This placeholder key provides NO security and will accept any signature.
-const MANIFEST_PUBLIC_KEY_B64: &str = "REPLACE_ME_WITH_32_BYTE_BASE64_ED25519_PUBLIC_KEY";
+// 32-byte Ed25519 public key matching the server's MANIFEST_SIGNING_KEY.
+const MANIFEST_PUBLIC_KEY_B64: &str = "LLeG53gx/aRVy/jhuuKFHJqATd9+cN0Jm04RVxq3o34=";
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct ManifestModule {
