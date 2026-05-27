@@ -27,7 +27,7 @@ pub fn run(cfg: &LaunchConfig) -> Result<i32, String> {
     println!("Using assets dir: {}", display_path(&assets_dir));
     println!("Using natives dir: {}", display_path(&natives_dir));
 
-    let classpath = build_fabric_client_classpath(&libraries_dir)?;
+    let classpath = build_fabric_client_classpath(&libraries_dir, &game_dir, &prism_root)?;
     let args_file = write_java_args_file(
         &game_dir,
         &assets_dir,
@@ -149,12 +149,57 @@ net.fabricmc.loader.impl.launch.knot.KnotClient
     Ok(args_file)
 }
 
-fn build_fabric_client_classpath(libraries_dir: &Path) -> Result<String, String> {
+/// Returns the Minecraft client jar, trying multiple launcher layouts.
+///
+/// Prism/MultiMC: `<libraries>/com/mojang/minecraft/<ver>/minecraft-<ver>-client.jar`
+/// Vanilla layout (some Pandora Launcher instances): `<game_dir>/versions/<ver>/<ver>.jar`
+/// Vanilla under launcher root:                       `<prism_root>/versions/<ver>/<ver>.jar`
+/// Vanilla, client-suffixed:                          `<game_dir>/versions/<ver>/minecraft-<ver>-client.jar`
+fn locate_minecraft_jar(
+    libraries_dir: &Path,
+    game_dir: &Path,
+    prism_root: &Path,
+    version: &str,
+) -> Result<PathBuf, String> {
+    let candidates = [
+        libraries_dir.join(format!("com/mojang/minecraft/{ver}/minecraft-{ver}-client.jar", ver = version)),
+        game_dir.join(format!("versions/{ver}/{ver}.jar", ver = version)),
+        prism_root.join(format!("versions/{ver}/{ver}.jar", ver = version)),
+        game_dir.join(format!("versions/{ver}/minecraft-{ver}-client.jar", ver = version)),
+        prism_root.join(format!("versions/{ver}/minecraft-{ver}-client.jar", ver = version)),
+    ];
+
+    for candidate in &candidates {
+        if candidate.is_file() {
+            println!("Located Minecraft jar at: {}", display_path(candidate));
+            return Ok(candidate.clone());
+        }
+    }
+
+    let tried = candidates
+        .iter()
+        .map(|p| format!("  - {}", display_path(p)))
+        .collect::<Vec<_>>()
+        .join("\n");
+    Err(format!(
+        "Could not find Minecraft {version} client jar. Tried:\n{tried}\n\
+         The bootstrapper expects one of these launcher layouts. If your launcher \
+         stores the jar elsewhere, copy or symlink it to the first path above."
+    ))
+}
+
+fn build_fabric_client_classpath(
+    libraries_dir: &Path,
+    game_dir: &Path,
+    prism_root: &Path,
+) -> Result<String, String> {
+    let minecraft_jar = locate_minecraft_jar(libraries_dir, game_dir, prism_root, "1.21.11")?;
+
     let required = vec![
         libraries_dir.join("net/fabricmc/fabric-loader/0.18.4/fabric-loader-0.18.4.jar"),
         libraries_dir.join("net/fabricmc/intermediary/1.21.11/intermediary-1.21.11.jar"),
         libraries_dir.join("net/fabricmc/sponge-mixin/0.17.0+mixin.0.8.7/sponge-mixin-0.17.0+mixin.0.8.7.jar"),
-        libraries_dir.join("com/mojang/minecraft/1.21.11/minecraft-1.21.11-client.jar"),
+        minecraft_jar,
 
         libraries_dir.join("org/ow2/asm/asm/9.9/asm-9.9.jar"),
         libraries_dir.join("org/ow2/asm/asm-analysis/9.9/asm-analysis-9.9.jar"),
