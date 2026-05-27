@@ -101,24 +101,33 @@ fn write_java_args_file(
     let assets_dir_str = java_path(assets_dir);
     let natives_dir_str = java_path(natives_dir);
 
+    // Every {} below holds a filesystem path that may contain spaces (e.g.
+    // an instance folder named "1.21.11 - Copy"). Java's argfile parser
+    // splits on whitespace unless the token is wrapped in `"..."`, so an
+    // unquoted spaced path turns into multiple arguments and the JVM
+    // rejects the launch with "Could not create the Java Virtual Machine".
+    //
+    // Wrap each path-bearing value in double quotes. Forward slashes from
+    // java_path() keep the contents free of backslashes that would need
+    // additional escaping.
     let contents = format!(
         "\
--Dphantom.session={}
+-Dphantom.session=\"{}\"
 -XX:+DisableAttachMechanism
 -XX:-EnableDynamicAgentLoading
 -Djdk.attach.allowAttachSelf=false
 -Dcom.sun.management.jmxremote=false
--Djava.library.path={}
--Dorg.lwjgl.librarypath={}
--Dorg.lwjgl.system.SharedLibraryExtractPath={}
--Dorg.lwjgl.system.SharedLibraryExtractDirectory={}
+-Djava.library.path=\"{}\"
+-Dorg.lwjgl.librarypath=\"{}\"
+-Dorg.lwjgl.system.SharedLibraryExtractPath=\"{}\"
+-Dorg.lwjgl.system.SharedLibraryExtractDirectory=\"{}\"
 -cp
-{}
+\"{}\"
 net.fabricmc.loader.impl.launch.knot.KnotClient
 --gameDir
-{}
+\"{}\"
 --assetsDir
-{}
+\"{}\"
 --assetIndex
 29
 --version
