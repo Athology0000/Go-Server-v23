@@ -27,13 +27,15 @@ pub fn run(cfg: &LaunchConfig) -> Result<i32, String> {
     println!("Using assets dir: {}", display_path(&assets_dir));
     println!("Using natives dir: {}", display_path(&natives_dir));
 
-    let classpath = build_fabric_client_classpath(&libraries_dir, &game_dir, &prism_root)?;
+    let (classpath, minecraft_jar) =
+        build_fabric_client_classpath(&libraries_dir, &game_dir, &prism_root)?;
     let args_file = write_java_args_file(
         &game_dir,
         &assets_dir,
         &natives_dir,
         cfg.session_file,
         &classpath,
+        &minecraft_jar,
     )?;
 
     println!("Using Java args file: {}", display_path(&args_file));
@@ -84,6 +86,7 @@ fn write_java_args_file(
     natives_dir: &Path,
     session_file: &Path,
     classpath: &str,
+    minecraft_jar: &Path,
 ) -> Result<PathBuf, String> {
     let args_file = game_dir
         .join("config")
@@ -100,6 +103,7 @@ fn write_java_args_file(
     let game_dir_str = java_path(game_dir);
     let assets_dir_str = java_path(assets_dir);
     let natives_dir_str = java_path(natives_dir);
+    let minecraft_jar_str = java_path(minecraft_jar);
 
     // Every {} below holds a filesystem path that may contain spaces (e.g.
     // an instance folder named "1.21.11 - Copy"). Java's argfile parser
@@ -110,6 +114,12 @@ fn write_java_args_file(
     // Wrap each path-bearing value in double quotes. Forward slashes from
     // java_path() keep the contents free of backslashes that would need
     // additional escaping.
+    //
+    // -Dfabric.gameJarPath.client tells Fabric's MinecraftGameProvider
+    // exactly where the Minecraft client jar is, instead of asking it to
+    // discover the jar by classpath scanning. Required on launchers
+    // (Pandora etc.) that store the client jar at a path the
+    // KnotClassLoader's autodetection doesn't recognize.
     let contents = format!(
         "\
 -Dphantom.session=\"{}\"
@@ -117,6 +127,8 @@ fn write_java_args_file(
 -XX:-EnableDynamicAgentLoading
 -Djdk.attach.allowAttachSelf=false
 -Dcom.sun.management.jmxremote=false
+-Dfabric.gameJarPath.client=\"{}\"
+-Dfabric.gameJarPath=\"{}\"
 -Djava.library.path=\"{}\"
 -Dorg.lwjgl.librarypath=\"{}\"
 -Dorg.lwjgl.system.SharedLibraryExtractPath=\"{}\"
@@ -134,6 +146,8 @@ net.fabricmc.loader.impl.launch.knot.KnotClient
 1.21.11
 ",
         session_path,
+        minecraft_jar_str,
+        minecraft_jar_str,
         natives_dir_str,
         natives_dir_str,
         natives_dir_str,
@@ -192,14 +206,14 @@ fn build_fabric_client_classpath(
     libraries_dir: &Path,
     game_dir: &Path,
     prism_root: &Path,
-) -> Result<String, String> {
+) -> Result<(String, PathBuf), String> {
     let minecraft_jar = locate_minecraft_jar(libraries_dir, game_dir, prism_root, "1.21.11")?;
 
     let required = vec![
         libraries_dir.join("net/fabricmc/fabric-loader/0.18.4/fabric-loader-0.18.4.jar"),
         libraries_dir.join("net/fabricmc/intermediary/1.21.11/intermediary-1.21.11.jar"),
         libraries_dir.join("net/fabricmc/sponge-mixin/0.17.0+mixin.0.8.7/sponge-mixin-0.17.0+mixin.0.8.7.jar"),
-        minecraft_jar,
+        minecraft_jar.clone(),
 
         libraries_dir.join("org/ow2/asm/asm/9.9/asm-9.9.jar"),
         libraries_dir.join("org/ow2/asm/asm-analysis/9.9/asm-analysis-9.9.jar"),
@@ -310,11 +324,13 @@ fn build_fabric_client_classpath(
 
     println!("Filtered classpath jars: {}", jars.len());
 
-    Ok(jars
+    let classpath = jars
         .iter()
         .map(|p| java_path(p))
         .collect::<Vec<_>>()
-        .join(sep))
+        .join(sep);
+
+    Ok((classpath, minecraft_jar))
 }
 
 fn prepare_natives_dir(game_dir: &Path, libraries_dir: &Path) -> Result<PathBuf, String> {
