@@ -1,0 +1,3 @@
+ALTER TABLE license_keys
+  ADD COLUMN IF NOT EXISTS duration_days INT NOT NULL DEFAULT 30;
+

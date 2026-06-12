@@ -1,0 +1,6 @@
+build/
+.gradle/
+out.jar
+out.dll
+dummy.dll
+test-input/*.class

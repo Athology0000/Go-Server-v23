@@ -1,0 +1,4 @@
+.env
+docker/
+admin/node_modules
+panel/node_modules
