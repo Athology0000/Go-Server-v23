@@ -6,6 +6,7 @@ import "strings"
 // stored in entitlements.enabled_modules: strip path + extension (via
 // NormalizeModuleName), then the build's "phantom-" bundle prefix.
 // "phantom-autowalk.enc" -> "autowalk".
+// Core bundles ("phantom", "phantom-core") are recognized by IsCoreModule before this mapping is consulted; EntitlementID("phantom-core") is "core" and is never used as an entitlement row.
 func EntitlementID(name string) string {
 	return strings.TrimPrefix(NormalizeModuleName(name), "phantom-")
 }
@@ -26,8 +27,8 @@ func ModuleAllowed(name string, enabledModules []string) bool {
 	if IsCoreModule(name) {
 		return true
 	}
-	id := EntitlementID(name)
 	full := NormalizeModuleName(name)
+	id := strings.TrimPrefix(full, "phantom-")
 	for _, m := range enabledModules {
 		switch m {
 		case "*", id, full, full + ".jar":

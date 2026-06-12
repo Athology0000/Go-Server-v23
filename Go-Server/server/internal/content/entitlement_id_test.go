@@ -9,6 +9,7 @@ func TestEntitlementID(t *testing.T) {
 		{"phantom-autowalk", "autowalk"},
 		{"autowalk", "autowalk"},
 		{"phantom.enc", "phantom"},
+		{"phantom-core", "core"}, // core is matched via IsCoreModule BEFORE this is consulted
 	}
 	for _, c := range cases {
 		if got := EntitlementID(c.in); got != c.want {
@@ -42,6 +43,7 @@ func TestModuleAllowed(t *testing.T) {
 		{"phantom-autowalk.enc", []string{"autowalk"}, true},             // canonical bare id
 		{"phantom-autowalk.enc", []string{"phantom-autowalk"}, true},     // legacy full name
 		{"phantom-autowalk.enc", []string{"phantom-autowalk.jar"}, true}, // legacy .jar form
+		{"phantom-autowalk", []string{"phantom-autowalk.jar"}, true},     // legacy .jar row, extensionless request
 		{"phantom-autowalk.enc", []string{"mining"}, false},
 		{"phantom-autowalk.enc", nil, false},
 	}
