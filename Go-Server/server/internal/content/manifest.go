@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -45,12 +46,24 @@ func BuildStableManifest(_ context.Context, contentDir, baseURL, channel string,
 		}
 
 		jarPath := filepath.Join(modulesDir, entry.Name())
-		bytecode, err := readModuleArtifact(jarPath, moduleKey)
+		raw, err := os.ReadFile(jarPath)
 		if err != nil {
 			return nil, err
 		}
 
-		hash := sha256Hex(bytecode)
+		// The loader verifies sha256 over the bytes it downloads — the artifact
+		// exactly as served — and only then decrypts it in the native. So the
+		// manifest hash must cover the stored bytes (ciphertext for .enc), not the
+		// decrypted plaintext. We still confirm each .enc decrypts with the
+		// configured module key, so a wrong MODULE_ENCRYPTION_KEY fails loudly here
+		// instead of shipping a bundle every client would reject.
+		if strings.EqualFold(filepath.Ext(jarPath), ".enc") {
+			if _, decErr := ccrypto.DecryptAESGCM(moduleKey, raw); decErr != nil {
+				return nil, fmt.Errorf("module %s does not decrypt with the configured module key: %w", entry.Name(), decErr)
+			}
+		}
+
+		hash := sha256Hex(raw)
 		moduleName := strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
 		modules = append(modules, db.ManifestModule{
 			Name:      moduleName,
@@ -184,19 +197,6 @@ func isPhantomModuleArtifact(name string) bool {
 func isNativeArtifact(name string) bool {
 	ext := strings.ToLower(filepath.Ext(name))
 	return ext == ".dll" || ext == ".so" || ext == ".dylib"
-}
-
-func readModuleArtifact(path string, moduleKey []byte) ([]byte, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-
-	if strings.EqualFold(filepath.Ext(path), ".enc") {
-		return ccrypto.DecryptAESGCM(moduleKey, data)
-	}
-
-	return data, nil
 }
 
 func sha256Hex(data []byte) string {
