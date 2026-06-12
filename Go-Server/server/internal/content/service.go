@@ -70,7 +70,7 @@ func (s *Service) GetStableManifest(ctx context.Context, accountID string) (*db.
 		return nil, ErrNotEntitled
 	}
 
-	return BuildStableManifest(ctx, s.contentDir, s.baseURL, ent.ContentChannel, s.signingKey, s.moduleKey)
+	return BuildStableManifest(ctx, s.contentDir, s.baseURL, ent.ContentChannel, s.signingKey, s.moduleKey, ent.EnabledModules)
 }
 
 func (s *Service) ModuleBytes(ctx context.Context, accountID, name string) ([]byte, string, error) {
@@ -81,13 +81,7 @@ func (s *Service) ModuleBytes(ctx context.Context, accountID, name string) ([]by
 
 	moduleName := NormalizeModuleName(name)
 
-	allowed :=
-		moduleName == "phantom-core" ||
-		slices.Contains(ent.EnabledModules, "*") ||
-			slices.Contains(ent.EnabledModules, moduleName) ||
-			slices.Contains(ent.EnabledModules, moduleName+".jar")
-
-	if !allowed {
+	if !ModuleAllowed(moduleName, ent.EnabledModules) {
 		return nil, "", ErrNotEntitled
 	}
 

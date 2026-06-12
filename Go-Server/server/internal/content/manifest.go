@@ -26,7 +26,7 @@ type signedManifestPayload struct {
 	NativeComponents []db.ManifestNative `json:"native_components"`
 }
 
-func BuildStableManifest(_ context.Context, contentDir, baseURL, channel string, signingKey, moduleKey []byte) (*db.ContentManifest, error) {
+func BuildStableManifest(_ context.Context, contentDir, baseURL, channel string, signingKey, moduleKey []byte, enabledModules []string) (*db.ContentManifest, error) {
 	modulesDir := filepath.Join(contentDir, "modules")
 	entries, err := os.ReadDir(modulesDir)
 	if err != nil {
@@ -44,6 +44,12 @@ func BuildStableManifest(_ context.Context, contentDir, baseURL, channel string,
 			continue
 		}
 
+		// Entitlement filter: a bundle the account cannot download must not
+		// appear in its manifest, or the loader 403s mid-load and locks out.
+		if !ModuleAllowed(entry.Name(), enabledModules) {
+			continue
+		}
+
 		jarPath := filepath.Join(modulesDir, entry.Name())
 		bytecode, err := readModuleArtifact(jarPath, moduleKey)
 		if err != nil {
@@ -56,13 +62,9 @@ func BuildStableManifest(_ context.Context, contentDir, baseURL, channel string,
 			Name:      moduleName,
 			URL:       baseURL + "/content/module/" + url.PathEscape(moduleName),
 			SHA256:    hash,
-			Required:  moduleName == "phantom-core",
+			Required:  IsCoreModule(entry.Name()),
 			InitOrder: len(modules),
 		})
-	}
-
-	if len(modules) == 0 {
-		return nil, ErrNotFound
 	}
 
 	sort.SliceStable(modules, func(i, j int) bool {

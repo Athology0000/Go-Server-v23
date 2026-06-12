@@ -23,14 +23,15 @@ import (
 )
 
 var (
-	ErrNotFound         = errors.New("not found")
-	ErrIPMismatch       = errors.New("ip mismatch")
-	ErrHWIDMismatch     = errors.New("hwid mismatch")
-	ErrUsernameMismatch = errors.New("username mismatch")
-	ErrBadProof         = errors.New("bad proof")
-	ErrDeviceBlocked    = errors.New("device blocked")
-	ErrNoChallenge      = errors.New("no challenge")
-	ErrSessionInvalid   = errors.New("session invalid")
+	ErrNotFound            = errors.New("not found")
+	ErrIPMismatch          = errors.New("ip mismatch")
+	ErrHWIDMismatch        = errors.New("hwid mismatch")
+	ErrUsernameMismatch    = errors.New("username mismatch")
+	ErrBadProof            = errors.New("bad proof")
+	ErrDeviceBlocked       = errors.New("device blocked")
+	ErrNoChallenge         = errors.New("no challenge")
+	ErrSessionInvalid      = errors.New("session invalid")
+	ErrManifestUnavailable = errors.New("manifest unavailable")
 )
 
 type StartResult struct {
@@ -290,10 +291,10 @@ func (s *Service) Finish(ctx context.Context, username, proofHex, sourceIP, mine
 		return nil, err
 	}
 
-	manifestURL, manifestSig, err := s.resolveManifest(ctx, ent.ContentChannel)
+	manifestURL, manifestSig, err := s.resolveManifest(ctx, ent.ContentChannel, ent.EnabledModules)
 	if err != nil {
 		log.Printf("[auth.finish] no manifest found for channel %s: %v", ent.ContentChannel, err)
-		return nil, errors.New("no manifest available for your plan")
+		return nil, fmt.Errorf("%w: %v", ErrManifestUnavailable, err)
 	}
 
 	s.auditSvc.Log("auth.finish.success", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
@@ -456,7 +457,7 @@ func (s *Service) VerifyMinecraft(ctx context.Context, rawToken, minecraftUserna
 		}, nil
 	}
 
-	manifestURL, manifestSig, _ := s.resolveManifest(ctx, ent.ContentChannel)
+	manifestURL, manifestSig, _ := s.resolveManifest(ctx, ent.ContentChannel, ent.EnabledModules)
 
 	s.auditSvc.Log("auth.verify_mc.success", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
 		"plan_tier": ent.PlanTier,
@@ -707,7 +708,7 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 		}, nil
 	}
 
-	manifestURL, manifestSig, manifestErr := s.resolveManifest(ctx, ent.ContentChannel)
+	manifestURL, manifestSig, manifestErr := s.resolveManifest(ctx, ent.ContentChannel, ent.EnabledModules)
 	if manifestErr == nil {
 
 		log.Printf("[auth.verify_session] manifest_found ip=%s account_id=%s channel=%s manifest_id=%s manifest_url=%s signature_present=%t",
@@ -776,7 +777,7 @@ func normalize(s string) string {
 	return strings.ToLower(strings.TrimSpace(s))
 }
 
-func (s *Service) resolveManifest(ctx context.Context, channel string) (string, string, error) {
+func (s *Service) resolveManifest(ctx context.Context, channel string, enabledModules []string) (string, string, error) {
 	manifest, err := db.GetLatestManifest(ctx, s.pool, channel)
 	if err == nil {
 		return s.baseURL + "/content/manifest/" + manifest.ID, manifest.Signature, nil
@@ -789,6 +790,7 @@ func (s *Service) resolveManifest(ctx context.Context, channel string) (string, 
 		channel,
 		s.cfg.ManifestSigningKey,
 		s.cfg.ModuleEncryptionKey,
+		enabledModules,
 	)
 	if stableErr != nil {
 		return "", "", fmt.Errorf("manifest lookup failed: %w; stable manifest build failed: %v", err, stableErr)
