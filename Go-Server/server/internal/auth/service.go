@@ -342,7 +342,10 @@ func (s *Service) Heartbeat(ctx context.Context, sessionToken, sourceIP string) 
 
 	session, err := db.GetSessionByTokenHash(ctx, s.pool, tokenHash)
 	if err != nil {
-		return nil, ErrSessionInvalid
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSessionInvalid
+		}
+		return nil, err
 	}
 
 	if session.Revoked {
@@ -361,7 +364,9 @@ func (s *Service) Heartbeat(ctx context.Context, sessionToken, sourceIP string) 
 	}
 
 	if !ent.Authorized {
-		_ = db.RevokeSession(ctx, s.pool, session.ID)
+		if revokeErr := db.RevokeSession(ctx, s.pool, session.ID); revokeErr != nil {
+			log.Printf("[auth.heartbeat] revoke failed session_id=%s err=%v", session.ID, revokeErr)
+		}
 		s.auditSvc.Log("auth.heartbeat.entitlement_revoked", &session.AccountID, &session.DeviceID, nil, &sourceIP, map[string]any{
 			"session_id": session.ID,
 			"reason":     ent.Reason,
@@ -369,14 +374,14 @@ func (s *Service) Heartbeat(ctx context.Context, sessionToken, sourceIP string) 
 		return nil, ErrSessionInvalid
 	}
 
-	// Extend session expiration
-	newExpiresAt := time.Now().Add(time.Hour)
-	if err := db.UpdateSessionExpiresAt(ctx, s.pool, session.ID, newExpiresAt); err != nil {
-		return nil, err
+	planTier := strings.TrimSpace(ent.PlanTier)
+	if planTier == "" {
+		planTier = "unknown"
 	}
 
-	// Keep the stored session view in step with what the client is told.
-	if err := db.UpdateSessionEntitlements(ctx, s.pool, session.ID, ent.PlanTier, ent.EnabledModules, ent.EnabledFeatures); err != nil {
+	// Extend session and keep the stored view in step with what the client is told.
+	newExpiresAt := time.Now().Add(time.Hour)
+	if err := db.UpdateSessionHeartbeat(ctx, s.pool, session.ID, newExpiresAt, planTier, ent.EnabledModules, ent.EnabledFeatures); err != nil {
 		return nil, err
 	}
 
@@ -385,7 +390,7 @@ func (s *Service) Heartbeat(ctx context.Context, sessionToken, sourceIP string) 
 	})
 
 	return &HeartbeatResult{
-		PlanTier: ent.PlanTier,
+		PlanTier: planTier,
 		Modules:  ent.EnabledModules,
 		Features: ent.EnabledFeatures,
 	}, nil

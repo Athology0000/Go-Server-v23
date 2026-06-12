@@ -52,7 +52,10 @@ func (s *Service) Resolve(ctx context.Context, accountID string) (*Result, error
 
 	ent, err := db.GetEntitlement(ctx, s.pool, license.PlanTier)
 	if err != nil {
-		return &Result{Authorized: false, Reason: "no_entitlement"}, nil
+		if errors.Is(err, pgx.ErrNoRows) {
+			return &Result{Authorized: false, Reason: "no_entitlement"}, nil
+		}
+		return nil, err
 	}
 
 	modules := make([]string, len(ent.EnabledModules))
@@ -61,6 +64,9 @@ func (s *Service) Resolve(ctx context.Context, accountID string) (*Result, error
 	copy(features, ent.EnabledFeatures)
 
 	override, err := db.GetPlanOverride(ctx, s.pool, accountID)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
 	if err == nil && override != nil {
 		modules = applyOverride(modules, override.AdditionalModules, override.RemovedModules)
 		features = applyOverride(features, override.AdditionalFeatures, override.RemovedFeatures)

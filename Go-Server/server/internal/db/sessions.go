@@ -149,19 +149,20 @@ func UpdateSessionExpiresAt(
 	return err
 }
 
-func UpdateSessionEntitlements(
+func UpdateSessionHeartbeat(
 	ctx context.Context,
 	pool *pgxpool.Pool,
 	sessionID string,
+	expiresAt time.Time,
 	planTier string,
 	modules []string,
 	features []string,
 ) error {
 	_, err := pool.Exec(ctx, `
 		UPDATE sessions
-		SET plan_tier = $1, enabled_modules = $2, enabled_features = $3
-		WHERE id = $4
-	`, planTier, modules, features, sessionID)
+		SET expires_at = $1, plan_tier = $2, enabled_modules = $3, enabled_features = $4
+		WHERE id = $5
+	`, expiresAt, planTier, modules, features, sessionID)
 
 	return err
 }
