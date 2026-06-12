@@ -149,6 +149,23 @@ func UpdateSessionExpiresAt(
 	return err
 }
 
+func UpdateSessionEntitlements(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	sessionID string,
+	planTier string,
+	modules []string,
+	features []string,
+) error {
+	_, err := pool.Exec(ctx, `
+		UPDATE sessions
+		SET plan_tier = $1, enabled_modules = $2, enabled_features = $3
+		WHERE id = $4
+	`, planTier, modules, features, sessionID)
+
+	return err
+}
+
 func RevokeSession(
 	ctx context.Context,
 	pool *pgxpool.Pool,

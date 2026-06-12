@@ -328,36 +328,67 @@ func (s *Service) Finish(ctx context.Context, username, proofHex, sourceIP, mine
 	}, nil
 }
 
-func (s *Service) Heartbeat(ctx context.Context, sessionToken, sourceIP string) error {
+type HeartbeatResult struct {
+	PlanTier string
+	Modules  []string
+	Features []string
+}
+
+func (s *Service) Heartbeat(ctx context.Context, sessionToken, sourceIP string) (*HeartbeatResult, error) {
 	tokenHash, err := crypto.HashToken(sessionToken)
 	if err != nil {
-		return ErrSessionInvalid
+		return nil, ErrSessionInvalid
 	}
 
 	session, err := db.GetSessionByTokenHash(ctx, s.pool, tokenHash)
 	if err != nil {
-		return ErrSessionInvalid
+		return nil, ErrSessionInvalid
 	}
 
 	if session.Revoked {
-		return ErrSessionInvalid
+		return nil, ErrSessionInvalid
 	}
 
 	if session.ExpiresAt.Before(time.Now()) {
-		return ErrSessionInvalid
+		return nil, ErrSessionInvalid
+	}
+
+	// Re-resolve entitlements every beat: a revoked/expired license takes
+	// effect mid-session instead of surviving until restart.
+	ent, err := s.entSvc.Resolve(ctx, session.AccountID)
+	if err != nil {
+		return nil, err
+	}
+
+	if !ent.Authorized {
+		_ = db.RevokeSession(ctx, s.pool, session.ID)
+		s.auditSvc.Log("auth.heartbeat.entitlement_revoked", &session.AccountID, &session.DeviceID, nil, &sourceIP, map[string]any{
+			"session_id": session.ID,
+			"reason":     ent.Reason,
+		})
+		return nil, ErrSessionInvalid
 	}
 
 	// Extend session expiration
 	newExpiresAt := time.Now().Add(time.Hour)
 	if err := db.UpdateSessionExpiresAt(ctx, s.pool, session.ID, newExpiresAt); err != nil {
-		return err
+		return nil, err
+	}
+
+	// Keep the stored session view in step with what the client is told.
+	if err := db.UpdateSessionEntitlements(ctx, s.pool, session.ID, ent.PlanTier, ent.EnabledModules, ent.EnabledFeatures); err != nil {
+		return nil, err
 	}
 
 	s.auditSvc.Log("auth.heartbeat", &session.AccountID, &session.DeviceID, nil, &sourceIP, map[string]any{
 		"session_id": session.ID,
 	})
 
-	return nil
+	return &HeartbeatResult{
+		PlanTier: ent.PlanTier,
+		Modules:  ent.EnabledModules,
+		Features: ent.EnabledFeatures,
+	}, nil
 }
 
 type VerifyMinecraftResult struct {

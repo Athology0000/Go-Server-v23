@@ -351,6 +351,14 @@ func handleFinish(svc *Service) fiber.Handler {
 			return c.Status(401).JSON(fiber.Map{"error": "authentication_failed"})
 		}
 
+		if errors.Is(err, ErrManifestUnavailable) {
+			log.Printf("[auth.finish.route] manifest_unavailable ip=%s username=%s err=%v", ip, req.Username, err)
+			return c.Status(503).JSON(fiber.Map{
+				"error":   "manifest_unavailable",
+				"message": "No starter manifest is available. Ensure CONTENT_DIR/modules contains phantom.jar or create an active manifest.",
+			})
+		}
+
 		if err != nil {
 			log.Printf("[auth.finish.route] internal_error ip=%s username=%s err=%v", ip, req.Username, err)
 			return c.Status(500).JSON(fiber.Map{"error": "authentication_failed"})
@@ -555,15 +563,20 @@ func handleHeartbeat(svc *Service) fiber.Handler {
 
 		ip := middleware.GetRealIP(c)
 
-		err := svc.Heartbeat(c.Context(), req.SessionToken, ip)
+		res, err := svc.Heartbeat(c.Context(), req.SessionToken, ip)
 		if errors.Is(err, ErrSessionInvalid) {
-			return c.Status(401).JSON(fiber.Map{"error": "session_invalid"})
+			return c.Status(401).JSON(fiber.Map{"status": "unauthorized", "error": "session_invalid"})
 		}
 
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 
-		return c.JSON(fiber.Map{"status": "ok"})
+		return c.JSON(fiber.Map{
+			"status":           "ok",
+			"plan_tier":        res.PlanTier,
+			"enabled_modules":  res.Modules,
+			"enabled_features": res.Features,
+		})
 	}
 }
