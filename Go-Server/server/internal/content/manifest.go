@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -59,11 +60,10 @@ func BuildStableManifest(_ context.Context, contentDir, baseURL, channel string,
 		hash := sha256Hex(bytecode)
 		moduleName := strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
 		modules = append(modules, db.ManifestModule{
-			Name:      moduleName,
-			URL:       baseURL + "/content/module/" + url.PathEscape(moduleName),
-			SHA256:    hash,
-			Required:  IsCoreModule(entry.Name()),
-			InitOrder: len(modules),
+			Name:     moduleName,
+			URL:      baseURL + "/content/module/" + url.PathEscape(moduleName),
+			SHA256:   hash,
+			Required: IsCoreModule(entry.Name()),
 		})
 	}
 
@@ -73,6 +73,13 @@ func BuildStableManifest(_ context.Context, contentDir, baseURL, channel string,
 
 	for i := range modules {
 		modules[i].InitOrder = i
+	}
+
+	// A manifest with no core bundle means the content dir is misdeployed
+	// (core is always entitled, so filtering can never remove it). Fail like
+	// the old zero-modules guard did instead of signing an unusable manifest.
+	if !slices.ContainsFunc(modules, func(m db.ManifestModule) bool { return m.Required }) {
+		return nil, ErrNotFound
 	}
 
 	natives, err := buildNativeManifest(contentDir, baseURL)

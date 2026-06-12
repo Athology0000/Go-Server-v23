@@ -45,10 +45,44 @@ func buildFor(t *testing.T, dir string, enabled []string) []string {
 
 func TestManifestFiltersToEntitledModules(t *testing.T) {
 	dir := contentDirWith(t, "phantom.jar", "phantom-autowalk.jar", "phantom-mining.jar")
-	got := buildFor(t, dir, []string{"autowalk"})
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := BuildStableManifest(context.Background(), dir, "https://example.test", "stable",
+		priv, make([]byte, 32), []string{"autowalk"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := make([]string, 0, len(m.Modules))
+	for _, mod := range m.Modules {
+		names = append(names, mod.Name)
+	}
 	want := []string{"phantom", "phantom-autowalk"} // sorted; mining excluded
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("modules = %v, want %v", got, want)
+	if !reflect.DeepEqual(names, want) {
+		t.Errorf("modules = %v, want %v", names, want)
+	}
+	for i, mod := range m.Modules {
+		if mod.InitOrder != i {
+			t.Errorf("InitOrder[%d] = %d, want %d", i, mod.InitOrder, i)
+		}
+		wantRequired := mod.Name == "phantom"
+		if mod.Required != wantRequired {
+			t.Errorf("Required[%s] = %v, want %v", mod.Name, mod.Required, wantRequired)
+		}
+	}
+}
+
+func TestManifestWithoutCoreBundleErrors(t *testing.T) {
+	dir := contentDirWith(t, "phantom-autowalk.jar") // no phantom.jar: misdeployed
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = BuildStableManifest(context.Background(), dir, "https://example.test", "stable",
+		priv, make([]byte, 32), []string{"autowalk"})
+	if err == nil {
+		t.Fatal("expected an error for a content dir with no core bundle")
 	}
 }
 
