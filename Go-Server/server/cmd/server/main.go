@@ -28,6 +28,19 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 )
 
+// trustedProxyRanges are the private/CGNAT ranges Railway's edge + internal mesh
+// originate from. Fiber only honors X-Forwarded-For when the TCP peer falls in one
+// of these, so an internet client connecting directly can never spoof its IP — its
+// untrusted peer makes c.IP() fall back to RemoteAddr.
+var trustedProxyRanges = []string{
+	"100.64.0.0/10", // Railway internal CGNAT mesh (the rotating hop)
+	"10.0.0.0/8",
+	"172.16.0.0/12",
+	"192.168.0.0/16",
+	"127.0.0.1/32",
+	"::1/128",
+}
+
 func main() {
 	log.SetOutput(io.MultiWriter(os.Stdout, logbuf.Writer()))
 
@@ -36,7 +49,7 @@ func main() {
 		log.Fatalf("config: %v", err)
 	}
 
-	log.Println("BOOTING PHANTOM SERVER VERSION: entitlement-workflow-v1")
+	log.Println("BOOTING PHANTOM SERVER VERSION: entitlement-workflow-v2-xff")
 	manifestPublicKey := base64.StdEncoding.EncodeToString(
 		ed25519.PrivateKey(cfg.ManifestSigningKey).Public().(ed25519.PublicKey),
 	)
@@ -95,6 +108,14 @@ func main() {
 	pub := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
 		BodyLimit:             cfg.BodyLimit,
+		// Behind Railway's proxy the TCP peer is a rotating CGNAT hop (100.64.x),
+		// so c.IP() must read the real client from X-Forwarded-For — otherwise the
+		// auth/start↔finish challenge IP-pin mismatches every request. Only XFF from
+		// a trusted (private/CGNAT) peer is honored; an untrusted peer falls back to
+		// RemoteAddr, so this can never let an internet client spoof its IP.
+		ProxyHeader:             fiber.HeaderXForwardedFor,
+		EnableTrustedProxyCheck: true,
+		TrustedProxies:          trustedProxyRanges,
 	})
 
 	pub.Use(middleware.RealIP())
@@ -119,7 +140,7 @@ func main() {
 			"ok":      true,
 			"service": "phantom-public-api",
 			"message": "Phantom public API is online",
-			"version": "entitlement-workflow-v1",
+			"version": "entitlement-workflow-v2-xff",
 		})
 	})
 
@@ -128,7 +149,7 @@ func main() {
 			"ok":                  true,
 			"service":             "phantom-public-api",
 			"timestamp":           time.Now().UTC().Format(time.RFC3339),
-			"version":             "entitlement-workflow-v1",
+			"version":             "entitlement-workflow-v2-xff",
 			"manifest_public_key": manifestPublicKey,
 		})
 	})
@@ -158,6 +179,10 @@ func main() {
 	adm := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
 		BodyLimit:             cfg.BodyLimit,
+		// Same trusted-proxy IP resolution as the public app (see pub config above).
+		ProxyHeader:             fiber.HeaderXForwardedFor,
+		EnableTrustedProxyCheck: true,
+		TrustedProxies:          trustedProxyRanges,
 	})
 
 	adm.Use(middleware.RealIP())
@@ -182,7 +207,7 @@ func main() {
 			"ok":      true,
 			"service": "phantom-admin-api",
 			"message": "Phantom admin API is online",
-			"version": "entitlement-workflow-v1",
+			"version": "entitlement-workflow-v2-xff",
 		})
 	})
 
@@ -191,7 +216,7 @@ func main() {
 			"ok":                  true,
 			"service":             "phantom-admin-api",
 			"timestamp":           time.Now().UTC().Format(time.RFC3339),
-			"version":             "entitlement-workflow-v1",
+			"version":             "entitlement-workflow-v2-xff",
 			"manifest_public_key": manifestPublicKey,
 		})
 	})
