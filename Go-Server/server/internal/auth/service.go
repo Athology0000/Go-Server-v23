@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"regexp"
 	"strings"
 	"time"
 
@@ -21,6 +22,17 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
+
+// offlineUsernamePattern matches the placeholder Minecraft usernames Fabric and
+// PrismLauncher generate for offline-mode launches (Player followed by digits).
+// These rotate per launch, so a device bound to one such name will perma-mismatch
+// on every subsequent launch. When either the bound name or the incoming name
+// looks like an offline placeholder we silently rebind instead of returning 403.
+var offlineUsernamePattern = regexp.MustCompile(`^Player\d+$`)
+
+func isOfflinePlaceholderName(name string) bool {
+	return offlineUsernamePattern.MatchString(strings.TrimSpace(name))
+}
 
 var (
 	ErrNotFound            = errors.New("not found")
@@ -623,24 +635,45 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 					minecraftUsernameInput,
 				)
 			} else if !strings.EqualFold(*device.MinecraftUsername, minecraftUsernameInput) {
-				log.Printf(
-					"[auth.verify_session] minecraft_username_mismatch ip=%s device_id=%s expected=%q got=%q",
-					sourceIP,
-					device.ID,
-					*device.MinecraftUsername,
-					minecraftUsernameInput,
-				)
+				if isOfflinePlaceholderName(minecraftUsernameInput) || isOfflinePlaceholderName(*device.MinecraftUsername) {
+					log.Printf(
+						"[auth.verify_session] minecraft_offline_rebind ip=%s device_id=%s old=%q new=%q",
+						sourceIP,
+						device.ID,
+						*device.MinecraftUsername,
+						minecraftUsernameInput,
+					)
 
-				s.auditSvc.Log("auth.verify_session.fail", &sess.AccountID, &device.ID, nil, &sourceIP, map[string]any{
-					"reason":   "minecraft_username_mismatch",
-					"expected": *device.MinecraftUsername,
-					"got":      minecraftUsernameInput,
-				})
+					if err := db.FullyBind(ctx, s.pool, device.ID, minecraftUsernameInput, sourceIP); err != nil {
+						log.Printf("[auth.verify_session] minecraft_offline_rebind_failed ip=%s device_id=%s err=%v",
+							sourceIP,
+							device.ID,
+							err,
+						)
+						return nil, err
+					}
 
-				return &VerifySessionResult{
-					Authorized: false,
-					Reason:     "minecraft_username_mismatch",
-				}, nil
+					device.MinecraftUsername = &minecraftUsernameInput
+				} else {
+					log.Printf(
+						"[auth.verify_session] minecraft_username_mismatch ip=%s device_id=%s expected=%q got=%q",
+						sourceIP,
+						device.ID,
+						*device.MinecraftUsername,
+						minecraftUsernameInput,
+					)
+
+					s.auditSvc.Log("auth.verify_session.fail", &sess.AccountID, &device.ID, nil, &sourceIP, map[string]any{
+						"reason":   "minecraft_username_mismatch",
+						"expected": *device.MinecraftUsername,
+						"got":      minecraftUsernameInput,
+					})
+
+					return &VerifySessionResult{
+						Authorized: false,
+						Reason:     "minecraft_username_mismatch",
+					}, nil
+				}
 			}
 		default:
 			log.Printf("[auth.verify_session] minecraft_bind_skipped ip=%s device_id=%s status=%s",
@@ -777,6 +810,19 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 	features := ent.EnabledFeatures
 	if features == nil {
 		features = []string{}
+	}
+
+	// Refresh last_seen_ip so subsequent SessionAuth-protected content fetches
+	// from the same bootstrap (manifest, module, native) pass strictIP. Without
+	// this, clients behind carrier-grade NAT or rotating egress IPs (where the
+	// content fetch IP differs from the session-creation IP) get permanently
+	// 401'd on every content endpoint despite holding a valid session.
+	if err := db.UpdateSessionLastSeenIP(ctx, s.pool, sess.ID, sourceIP); err != nil {
+		log.Printf("[auth.verify_session] last_seen_ip_update_failed ip=%s session_id=%s err=%v",
+			sourceIP,
+			sess.ID,
+			err,
+		)
 	}
 
 	s.auditSvc.Log("auth.verify_session.success", &account.ID, &device.ID, nil, &sourceIP, map[string]any{

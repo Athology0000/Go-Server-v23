@@ -2,6 +2,7 @@
 package config
 
 import (
+	"crypto/ed25519"
 	"encoding/base64"
 	"fmt"
 	"net/url"
@@ -15,8 +16,8 @@ import (
 type Config struct {
 	MasterKey             []byte // 32 bytes, AES-256
 	ServerPepper          []byte // 32 bytes, HMAC key
-	ManifestSigningKey    []byte // Ed25519 private key (64 bytes)
-	ModuleEncryptionKey   []byte // 32 bytes, AES-256; defaults to MasterKey
+	ManifestSigningKey    []byte // Ed25519 private key derived from MANIFEST_SIGNING_KEY seed material
+	ModuleEncryptionKey   []byte // 32 bytes, AES-256; defaults to bundled content key
 	DBURL                 string
 	RedisURL              string
 	AdminAPISecret        string
@@ -34,6 +35,8 @@ type Config struct {
 	MigrationsDir         string
 }
 
+const defaultModuleEncryptionKeyB64 = "+KNMlsGkQLDvy2mcNClGzYIS65A5JQocOuRl2gtUVeQ="
+
 func Load() (*Config, error) {
 	_ = godotenv.Load()
 
@@ -45,7 +48,7 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	signingKey, err := decodeBase64Env("MANIFEST_SIGNING_KEY", 64)
+	signingKey, err := decodeManifestSigningKeyEnv()
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +60,7 @@ func Load() (*Config, error) {
 		MasterKey:             masterKey,
 		ServerPepper:          pepper,
 		ManifestSigningKey:    signingKey,
-		ModuleEncryptionKey:   decodeOptionalBase64Env("MODULE_ENCRYPTION_KEY", 32, masterKey),
+		ModuleEncryptionKey:   decodeOptionalBase64Env("MODULE_ENCRYPTION_KEY", 32, mustDecodeBase64(defaultModuleEncryptionKeyB64, 32)),
 		DBURL:                 requireEnv("DB_URL"),
 		RedisURL:              requireEnv("REDIS_URL"),
 		AdminAPISecret:        requireEnv("ADMIN_API_SECRET"),
@@ -65,7 +68,11 @@ func Load() (*Config, error) {
 		AdminPort:             getEnvOr("ADMIN_PORT", "8081"),
 		ContentDir:            getEnvOr("CONTENT_DIR", "./content"),
 		BaseURL:               getEnvOr("BASE_URL", "http://localhost:8080"),
-		StrictSessionIP:       getEnvOr("STRICT_SESSION_IP", "true") == "true",
+		// Default to false: clients behind carrier-grade NAT or Railway/Cloudflare
+		// edges often present rotating egress IPs across consecutive requests, so
+		// strict IP-binding produces false 401s on otherwise-valid sessions. Set
+		// STRICT_SESSION_IP=true explicitly to re-enable the check.
+		StrictSessionIP:       getEnvOr("STRICT_SESSION_IP", "false") == "true",
 		AppEnv:                strings.ToLower(getEnvOr("APP_ENV", "development")),
 		AllowPublicRegistration: getEnvOr("ALLOW_PUBLIC_REGISTRATION", "") == "true",
 		PublicCORSAllowOrigins: publicOrigins,
@@ -148,6 +155,22 @@ func decodeBase64Env(key string, expectedLen int) ([]byte, error) {
 	return b, nil
 }
 
+func decodeManifestSigningKeyEnv() ([]byte, error) {
+	raw := requireEnv("MANIFEST_SIGNING_KEY")
+	b, err := base64.StdEncoding.DecodeString(raw)
+	if err != nil {
+		return nil, fmt.Errorf("MANIFEST_SIGNING_KEY: invalid base64: %w", err)
+	}
+	if len(b) != ed25519.SeedSize && len(b) != ed25519.PrivateKeySize {
+		return nil, fmt.Errorf("MANIFEST_SIGNING_KEY: expected %d-byte seed or %d-byte private key, got %d", ed25519.SeedSize, ed25519.PrivateKeySize, len(b))
+	}
+
+	// Older generated configs used 64 random bytes, which is not a valid
+	// Ed25519 private key. Treat the first 32 bytes as seed material and
+	// derive a valid seed+public-key private key every time.
+	return ed25519.NewKeyFromSeed(b[:ed25519.SeedSize]), nil
+}
+
 func decodeOptionalBase64Env(key string, expectedLen int, fallback []byte) []byte {
 	raw := os.Getenv(key)
 	if raw == "" {
@@ -159,5 +182,13 @@ func decodeOptionalBase64Env(key string, expectedLen int, fallback []byte) []byt
 		panic(fmt.Sprintf("%s: expected base64-encoded %d-byte value", key, expectedLen))
 	}
 
+	return b
+}
+
+func mustDecodeBase64(raw string, expectedLen int) []byte {
+	b, err := base64.StdEncoding.DecodeString(raw)
+	if err != nil || len(b) != expectedLen {
+		panic(fmt.Sprintf("default module encryption key must be base64-encoded %d-byte value", expectedLen))
+	}
 	return b
 }

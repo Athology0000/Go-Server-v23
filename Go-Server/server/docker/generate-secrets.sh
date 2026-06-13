@@ -21,7 +21,7 @@ for key in MASTER_KEY SERVER_PEPPER; do
 done
 
 if warn_if_exists "MANIFEST_SIGNING_KEY"; then
-  echo "MANIFEST_SIGNING_KEY=$(openssl rand -base64 64 | tr -d '\n')"
+  echo "MANIFEST_SIGNING_KEY=$(openssl rand -base64 32 | tr -d '\n')"
 fi
 
 if warn_if_exists "ADMIN_API_SECRET"; then
