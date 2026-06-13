@@ -239,9 +239,28 @@ func (s *Service) Handshake(ctx context.Context, username, password, sourceIP st
 		return "", ErrBadCredentials
 	}
 	device, err := db.GetDeviceByAccountID(ctx, s.pool, account.ID)
-	if err != nil {
-		s.auditSvc.Log("enroll.handshake.fail", &account.ID, nil, nil, &sourceIP, map[string]any{"reason": "device_not_found"})
-		return "", ErrBadCredentials
+	if errors.Is(err, pgx.ErrNoRows) {
+		// First enrollment for this account: no device row yet. Auto-provision an unbound
+		// device bound to the current IP, then enroll it below. A valid account self-enrolls
+		// its machine — the same device state the license-key redeem path produces, but keyed
+		// on the verified username/password instead of a key. HWID pinning at
+		// /auth/verify-session and the one-device-per-account model still constrain it.
+		secretPlain := make([]byte, 32)
+		if _, randErr := rand.Read(secretPlain); randErr != nil {
+			return "", randErr
+		}
+		enc, encErr := crypto.EncryptAESGCM(s.masterKey, secretPlain)
+		if encErr != nil {
+			return "", encErr
+		}
+		device, err = db.CreateDevice(ctx, s.pool, account.ID, sourceIP, enc)
+		if err != nil {
+			return "", err
+		}
+		s.auditSvc.Log("enroll.handshake.device_created", &account.ID, &device.ID, nil, &sourceIP, nil)
+	} else if err != nil {
+		s.auditSvc.Log("enroll.handshake.fail", &account.ID, nil, nil, &sourceIP, map[string]any{"reason": "device_lookup_error"})
+		return "", err
 	}
 	if device.BindingStatus != "unbound" {
 		s.auditSvc.Log("enroll.handshake.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{"reason": "device_already_bound", "status": device.BindingStatus})
