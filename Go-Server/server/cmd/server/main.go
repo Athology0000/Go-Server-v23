@@ -36,7 +36,7 @@ func main() {
 		log.Fatalf("config: %v", err)
 	}
 
-	log.Println("BOOTING PHANTOM SERVER VERSION: railway-debug-root-health-v2")
+	log.Println("BOOTING PHANTOM SERVER VERSION: entitlement-workflow-v1")
 	manifestPublicKey := base64.StdEncoding.EncodeToString(
 		ed25519.PrivateKey(cfg.ManifestSigningKey).Public().(ed25519.PublicKey),
 	)
@@ -119,7 +119,7 @@ func main() {
 			"ok":      true,
 			"service": "phantom-public-api",
 			"message": "Phantom public API is online",
-			"version": "railway-debug-root-health-v2",
+			"version": "entitlement-workflow-v1",
 		})
 	})
 
@@ -128,7 +128,7 @@ func main() {
 			"ok":                  true,
 			"service":             "phantom-public-api",
 			"timestamp":           time.Now().UTC().Format(time.RFC3339),
-			"version":             "railway-debug-root-health-v2",
+			"version":             "entitlement-workflow-v1",
 			"manifest_public_key": manifestPublicKey,
 		})
 	})
@@ -182,7 +182,7 @@ func main() {
 			"ok":      true,
 			"service": "phantom-admin-api",
 			"message": "Phantom admin API is online",
-			"version": "railway-debug-root-health-v2",
+			"version": "entitlement-workflow-v1",
 		})
 	})
 
@@ -191,7 +191,7 @@ func main() {
 			"ok":                  true,
 			"service":             "phantom-admin-api",
 			"timestamp":           time.Now().UTC().Format(time.RFC3339),
-			"version":             "railway-debug-root-health-v2",
+			"version":             "entitlement-workflow-v1",
 			"manifest_public_key": manifestPublicKey,
 		})
 	})
