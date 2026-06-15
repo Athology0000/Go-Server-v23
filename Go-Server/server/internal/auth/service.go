@@ -525,7 +525,7 @@ func (s *Service) VerifyMinecraft(ctx context.Context, rawToken, minecraftUserna
 	}, nil
 }
 
-func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecraftUsernameInput string) (*VerifySessionResult, error) {
+func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecraftUsernameInput, hwidHash string) (*VerifySessionResult, error) {
 	started := time.Now()
 	minecraftUsernameInput = strings.TrimSpace(minecraftUsernameInput)
 
@@ -745,6 +745,27 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 			Authorized: false,
 			Reason:     "device_blocked",
 		}, nil
+	}
+
+	// HWID trust-on-first-use (default OFF; gated by HWID_TOFU_ENABLED). Pin the device's HWID the
+	// first time one is seen, then require it to match on subsequent sessions. When disabled, the
+	// hwid_hash the loader sends is ignored, preserving the current no-HWID behaviour.
+	if s.cfg.HwidTofuEnabled && strings.TrimSpace(hwidHash) != "" {
+		if device.HWIDHash == nil || strings.TrimSpace(*device.HWIDHash) == "" {
+			if err := db.PinHWID(ctx, s.pool, device.ID, hwidHash); err != nil {
+				return nil, err
+			}
+			device.HWIDHash = &hwidHash
+			s.auditSvc.Log("auth.verify_session.hwid_pinned", &account.ID, &device.ID, nil, &sourceIP, nil)
+		} else if !strings.EqualFold(strings.TrimSpace(*device.HWIDHash), strings.TrimSpace(hwidHash)) {
+			s.auditSvc.Log("auth.verify_session.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
+				"reason": "hwid_mismatch",
+			})
+			return &VerifySessionResult{
+				Authorized: false,
+				Reason:     "hwid_mismatch",
+			}, nil
+		}
 	}
 
 	ent, err := s.entSvc.Resolve(ctx, account.ID)

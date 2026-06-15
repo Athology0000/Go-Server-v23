@@ -27,6 +27,7 @@ type Config struct {
 	ContentDir              string
 	BaseURL                 string
 	StrictSessionIP         bool
+	HwidTofuEnabled         bool
 	AppEnv                  string
 	AllowPublicRegistration bool
 	PublicCORSAllowOrigins  string
@@ -83,7 +84,10 @@ func Load() (*Config, error) {
 		// edges often present rotating egress IPs across consecutive requests, so
 		// strict IP-binding produces false 401s on otherwise-valid sessions. Set
 		// STRICT_SESSION_IP=true explicitly to re-enable the check.
-		StrictSessionIP:         getEnvOr("STRICT_SESSION_IP", "false") == "true",
+		StrictSessionIP: getEnvOr("STRICT_SESSION_IP", "false") == "true",
+		// HWID trust-on-first-use at /auth/verify-session. OFF by default — HWID enforcement was
+		// deliberately removed; this re-enables it (pin-on-first-sight, compare after) only when set.
+		HwidTofuEnabled:         getEnvOr("HWID_TOFU_ENABLED", "false") == "true",
 		AppEnv:                  strings.ToLower(getEnvOr("APP_ENV", "development")),
 		AllowPublicRegistration: getEnvOr("ALLOW_PUBLIC_REGISTRATION", "") == "true",
 		PublicCORSAllowOrigins:  publicOrigins,

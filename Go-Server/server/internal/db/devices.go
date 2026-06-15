@@ -81,6 +81,14 @@ func MarkEnrolled(ctx context.Context, pool *pgxpool.Pool, deviceID string) erro
 	return err
 }
 
+// PinHWID records a device's HWID hash (trust-on-first-use) without changing binding_status.
+// Used by /auth/verify-session when HWID TOFU is enabled and the device has no HWID yet.
+func PinHWID(ctx context.Context, pool *pgxpool.Pool, deviceID, hwidHash string) error {
+	_, err := pool.Exec(ctx,
+		`UPDATE devices SET hwid_hash = $1, updated_at = now() WHERE id = $2`, hwidHash, deviceID)
+	return err
+}
+
 func FullyBind(ctx context.Context, pool *pgxpool.Pool, deviceID, minecraftUsername, sourceIP string) error {
 	_, err := pool.Exec(ctx,
 		`UPDATE devices SET minecraft_username = $1, binding_status = 'fully_bound',
