@@ -1,5 +1,29 @@
 const ENV_BASE = (import.meta.env.VITE_API_URL as string | undefined)?.trim()
-const BASE = ENV_BASE && ENV_BASE.length > 0 ? ENV_BASE.replace(/\/+$/, '') : 'http://localhost:8080'
+
+// Dev convenience fallback. In production a missing VITE_API_URL is almost
+// always a misconfigured deploy, so we surface it loudly rather than failing
+// silently — but we keep serving the known default so a live build still works.
+const DEV_FALLBACK = 'http://localhost:8080'
+
+function resolveBase(): string {
+  if (ENV_BASE && ENV_BASE.length > 0) return ENV_BASE.replace(/\/+$/, '')
+  if (import.meta.env.PROD) {
+    console.error(
+      '[api] VITE_API_URL is not set for this production build — falling back to ' +
+        `${DEV_FALLBACK}. Set VITE_API_URL in the deploy environment.`,
+    )
+  }
+  return DEV_FALLBACK
+}
+
+const BASE = resolveBase()
+
+// Send cookies when the backend opts into httpOnly-cookie auth (VITE_AUTH_MODE=cookie).
+// Defaults to 'same-origin' (current bearer-token behaviour, no CORS change).
+const CREDENTIALS: RequestCredentials =
+  import.meta.env.VITE_AUTH_MODE === 'cookie' ? 'include' : 'same-origin'
+
+const DEFAULT_TIMEOUT_MS = 15_000
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -22,12 +46,28 @@ export async function apiFetch<T>(
   }
   if (token) headers['Authorization'] = `Bearer ${token}`
 
+  // Abort the request if it hangs, unless the caller supplied their own signal.
+  const controller = options.signal ? null : new AbortController()
+  const timeout = controller
+    ? setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS)
+    : null
+
   let res: Response
   try {
-    res = await fetch(`${BASE}${path}`, { ...options, headers })
+    res = await fetch(`${BASE}${path}`, {
+      credentials: CREDENTIALS,
+      ...options,
+      headers,
+      signal: options.signal ?? controller?.signal,
+    })
   } catch (err: unknown) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new Error('Request timed out')
+    }
     const msg = err instanceof Error ? err.message : 'Network error'
     throw new Error(msg)
+  } finally {
+    if (timeout) clearTimeout(timeout)
   }
 
   if (!res.ok) {

@@ -9,30 +9,32 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/joho/godotenv"
 )
 
 type Config struct {
-	MasterKey             []byte // 32 bytes, AES-256
-	ServerPepper          []byte // 32 bytes, HMAC key
-	ManifestSigningKey    []byte // Ed25519 private key derived from MANIFEST_SIGNING_KEY seed material
-	ModuleEncryptionKey   []byte // 32 bytes, AES-256; defaults to bundled content key
-	DBURL                 string
-	RedisURL              string
-	AdminAPISecret        string
-	PublicPort            string
-	AdminPort             string
-	ContentDir            string
-	BaseURL               string
-	StrictSessionIP       bool
-	AppEnv                string
+	MasterKey               []byte // 32 bytes, AES-256
+	ServerPepper            []byte // 32 bytes, HMAC key
+	ManifestSigningKey      []byte // Ed25519 private key derived from MANIFEST_SIGNING_KEY seed material
+	ModuleEncryptionKey     []byte // 32 bytes, AES-256; defaults to bundled content key
+	DBURL                   string
+	RedisURL                string
+	AdminAPISecret          string
+	PublicPort              string
+	AdminPort               string
+	ContentDir              string
+	BaseURL                 string
+	StrictSessionIP         bool
+	AppEnv                  string
 	AllowPublicRegistration bool
-	PublicCORSAllowOrigins string
-	AdminCORSAllowOrigins  string
-	BodyLimit             int
-	SessionTTLHours       int
-	MigrationsDir         string
+	PublicCORSAllowOrigins  string
+	AdminCORSAllowOrigins   string
+	BodyLimit               int
+	SessionTTLHours         int
+	HeartbeatLivenessWindow time.Duration
+	MigrationsDir           string
 
 	// Per-user watermarking of .jar downloads. Optional and gated: when WATERMARK_ENABLED is
 	// true AND the obfuscator jar + config + secret are set, each .jar module download is
@@ -66,29 +68,33 @@ func Load() (*Config, error) {
 	adminOrigins := sanitizeOrigins(getEnvOr("ADMIN_CORS_ALLOW_ORIGINS", publicOrigins))
 
 	cfg := &Config{
-		MasterKey:             masterKey,
-		ServerPepper:          pepper,
-		ManifestSigningKey:    signingKey,
-		ModuleEncryptionKey:   decodeOptionalBase64Env("MODULE_ENCRYPTION_KEY", 32, mustDecodeBase64(defaultModuleEncryptionKeyB64, 32)),
-		DBURL:                 requireEnv("DB_URL"),
-		RedisURL:              requireEnv("REDIS_URL"),
-		AdminAPISecret:        requireEnv("ADMIN_API_SECRET"),
-		PublicPort:            getEnvOr("PUBLIC_PORT", "8080"),
-		AdminPort:             getEnvOr("ADMIN_PORT", "8081"),
-		ContentDir:            getEnvOr("CONTENT_DIR", "./content"),
-		BaseURL:               getEnvOr("BASE_URL", "http://localhost:8080"),
+		MasterKey:           masterKey,
+		ServerPepper:        pepper,
+		ManifestSigningKey:  signingKey,
+		ModuleEncryptionKey: decodeOptionalBase64Env("MODULE_ENCRYPTION_KEY", 32, mustDecodeBase64(defaultModuleEncryptionKeyB64, 32)),
+		DBURL:               requireEnv("DB_URL"),
+		RedisURL:            requireEnv("REDIS_URL"),
+		AdminAPISecret:      requireEnv("ADMIN_API_SECRET"),
+		PublicPort:          getEnvOr("PUBLIC_PORT", "8080"),
+		AdminPort:           getEnvOr("ADMIN_PORT", "8081"),
+		ContentDir:          getEnvOr("CONTENT_DIR", "./content"),
+		BaseURL:             getEnvOr("BASE_URL", "http://localhost:8080"),
 		// Default to false: clients behind carrier-grade NAT or Railway/Cloudflare
 		// edges often present rotating egress IPs across consecutive requests, so
 		// strict IP-binding produces false 401s on otherwise-valid sessions. Set
 		// STRICT_SESSION_IP=true explicitly to re-enable the check.
-		StrictSessionIP:       getEnvOr("STRICT_SESSION_IP", "false") == "true",
-		AppEnv:                strings.ToLower(getEnvOr("APP_ENV", "development")),
+		StrictSessionIP:         getEnvOr("STRICT_SESSION_IP", "false") == "true",
+		AppEnv:                  strings.ToLower(getEnvOr("APP_ENV", "development")),
 		AllowPublicRegistration: getEnvOr("ALLOW_PUBLIC_REGISTRATION", "") == "true",
-		PublicCORSAllowOrigins: publicOrigins,
-		AdminCORSAllowOrigins:  adminOrigins,
-		SessionTTLHours:       getEnvIntOr("SESSION_TTL_HOURS", 1),
-		BodyLimit:             getEnvIntOr("BODY_LIMIT_BYTES", 10*1024*1024),
-		MigrationsDir:         getEnvOr("MIGRATIONS_DIR", "./migrations"),
+		PublicCORSAllowOrigins:  publicOrigins,
+		AdminCORSAllowOrigins:   adminOrigins,
+		// Absolute session cap (NOT rolling). Heartbeats no longer extend this;
+		// liveness is governed by HeartbeatLivenessWindow. Default 12h so a normal
+		// play session is never kicked mid-game.
+		SessionTTLHours:         getEnvIntOr("SESSION_TTL_HOURS", 12),
+		HeartbeatLivenessWindow: time.Duration(getEnvIntOr("HEARTBEAT_LIVENESS_WINDOW_SECONDS", 900)) * time.Second,
+		BodyLimit:               getEnvIntOr("BODY_LIMIT_BYTES", 10*1024*1024),
+		MigrationsDir:           getEnvOr("MIGRATIONS_DIR", "./migrations"),
 
 		WatermarkEnabled:    getEnvOr("WATERMARK_ENABLED", "false") == "true",
 		WatermarkJavaPath:   getEnvOr("WATERMARK_JAVA", "java"),

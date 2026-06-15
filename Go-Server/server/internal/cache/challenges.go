@@ -13,7 +13,6 @@ type Challenge struct {
 	DeviceID  string `json:"device_id"`
 	Challenge string `json:"challenge"`
 	SourceIP  string `json:"source_ip"`
-	Used      bool   `json:"used"`
 }
 
 const challengeTTL = 30 * time.Second
@@ -41,4 +40,16 @@ func GetChallenge(ctx context.Context, rdb *redis.Client, deviceID string) (*Cha
 
 func DeleteChallenge(ctx context.Context, rdb *redis.Client, deviceID string) error {
 	return rdb.Del(ctx, challengeKey(deviceID)).Err()
+}
+
+// ConsumeChallenge atomically fetches and deletes the challenge for deviceID via
+// Redis GETDEL. Concurrent /auth/finish calls cannot double-consume: exactly one
+// caller receives the value, the rest get redis.Nil. Returns redis.Nil if absent.
+func ConsumeChallenge(ctx context.Context, rdb *redis.Client, deviceID string) (*Challenge, error) {
+	data, err := rdb.GetDel(ctx, challengeKey(deviceID)).Bytes()
+	if err != nil {
+		return nil, err
+	}
+	c := &Challenge{}
+	return c, json.Unmarshal(data, c)
 }

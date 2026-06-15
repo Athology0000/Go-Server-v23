@@ -10,6 +10,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/phantom/server/internal/audit"
+	"github.com/phantom/server/internal/content"
 	"github.com/phantom/server/internal/crypto"
 	"github.com/phantom/server/internal/db"
 	"github.com/phantom/server/internal/logbuf"
@@ -237,10 +238,10 @@ func handleUpdateLicenseStatus(pool *pgxpool.Pool, auditSvc *audit.Service) fibe
 func handleGenerateLicenseKeys(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		var body struct {
-			PlanTier string  `json:"plan_tier"`
-			Count    int     `json:"count"`
-			DurationDays int `json:"duration_days"`
-			Notes    *string `json:"notes"`
+			PlanTier     string  `json:"plan_tier"`
+			Count        int     `json:"count"`
+			DurationDays int     `json:"duration_days"`
+			Notes        *string `json:"notes"`
 		}
 		if err := c.BodyParser(&body); err != nil || body.PlanTier == "" || body.Count <= 0 {
 			return c.Status(400).JSON(fiber.Map{"error": "invalid_request"})
@@ -411,19 +412,7 @@ func handleCreateManifest(pool *pgxpool.Pool, signingKey []byte, auditSvc *audit
 			body.ExpiresIn = 72
 		}
 
-		payload := struct {
-			BuildID          string              `json:"build_id"`
-			Channel          string              `json:"channel"`
-			MinLoaderVersion string              `json:"minimum_loader_version"`
-			ModuleKey        string              `json:"module_key,omitempty"`
-			Modules          []db.ManifestModule `json:"modules"`
-			NativeComponents []db.ManifestNative `json:"native_components"`
-		}{body.BuildID, body.Channel, body.MinLoaderVersion, body.ModuleKey, body.Modules, body.NativeComponents}
-
-		sig, err := crypto.SignManifest(signingKey, payload)
-		if err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
-		}
+		expiresAt := time.Now().Add(time.Duration(body.ExpiresIn) * time.Hour)
 
 		m := &db.ContentManifest{
 			BuildID:          body.BuildID,
@@ -432,9 +421,18 @@ func handleCreateManifest(pool *pgxpool.Pool, signingKey []byte, auditSvc *audit
 			ModuleKey:        body.ModuleKey,
 			Modules:          body.Modules,
 			NativeComponents: body.NativeComponents,
-			Signature:        sig,
-			ExpiresAt:        time.Now().Add(time.Duration(body.ExpiresIn) * time.Hour),
+			ExpiresAt:        expiresAt,
+			ExpiresAtMillis:  expiresAt.UnixMilli(),
+			// Server-assigned monotonic epoch (creation time): a new admin manifest for a channel
+			// outranks the previous one, advancing the client's rollback high-water-mark.
+			Epoch: time.Now().UnixMilli(),
 		}
+		// One canonicalizer signs both stable and admin paths so they cannot drift apart.
+		sig, err := content.SignManifest(signingKey, m)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
+		}
+		m.Signature = sig
 		created, err := db.CreateManifest(c.Context(), pool, m)
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
@@ -620,7 +618,9 @@ func handleBanUser(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.Handler {
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 		tok := middleware.GetAdminToken(c)
-		var body struct{ Reason string `json:"reason"` }
+		var body struct {
+			Reason string `json:"reason"`
+		}
 		_ = c.BodyParser(&body)
 		auditSvc.Log("admin.user.ban", &id, nil, &tok.AdminUsername, nil,
 			map[string]any{"reason": body.Reason})
@@ -686,18 +686,18 @@ func handleUpgradePlan(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.Handle
 // ── Keys (frontend-facing) ─────────────────────────────────────────────────────
 
 type keyRow struct {
-	ID          string     `json:"id"`
+	ID string `json:"id"`
 	// key is the only field older frontends understand.
 	// For list endpoints: it's the key hash prefix (safe to display).
 	// For generate endpoint: it's the raw key (only shown once).
-	Key         string     `json:"key"`
-	KeyHash     string     `json:"keyHash,omitempty"`
-	KeyHashPrefix string   `json:"keyHashPrefix,omitempty"`
-	Plan        string     `json:"plan"`
-	DurationDays int       `json:"durationDays"`
-	CreatedAt   time.Time  `json:"createdAt"`
-	UsedBy      *string    `json:"usedBy"`
-	UsedAt      *time.Time `json:"usedAt"`
+	Key           string     `json:"key"`
+	KeyHash       string     `json:"keyHash,omitempty"`
+	KeyHashPrefix string     `json:"keyHashPrefix,omitempty"`
+	Plan          string     `json:"plan"`
+	DurationDays  int        `json:"durationDays"`
+	CreatedAt     time.Time  `json:"createdAt"`
+	UsedBy        *string    `json:"usedBy"`
+	UsedAt        *time.Time `json:"usedAt"`
 }
 
 func handleListKeys(pool *pgxpool.Pool) fiber.Handler {
@@ -716,15 +716,15 @@ func handleListKeys(pool *pgxpool.Pool) fiber.Handler {
 				prefix = prefix[:16]
 			}
 			rows = append(rows, keyRow{
-				ID:           k.ID,
-				Key:          prefix,
-				KeyHash:      display,
+				ID:            k.ID,
+				Key:           prefix,
+				KeyHash:       display,
 				KeyHashPrefix: prefix,
-				Plan:         k.PlanTier,
-				DurationDays: k.DurationDays,
-				CreatedAt:    k.CreatedAt,
-				UsedBy:       k.RedeemedBy,
-				UsedAt:       k.RedeemedAt,
+				Plan:          k.PlanTier,
+				DurationDays:  k.DurationDays,
+				CreatedAt:     k.CreatedAt,
+				UsedBy:        k.RedeemedBy,
+				UsedAt:        k.RedeemedAt,
 			})
 		}
 		return c.JSON(rows)
@@ -763,15 +763,15 @@ func handleGenerateKey(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.Handle
 		auditSvc.Log("admin.key.generate", nil, nil, &tok.AdminUsername, nil,
 			map[string]any{"plan": body.Plan})
 		return c.Status(201).JSON(keyRow{
-			ID:           k.ID,
-			Key:          raw,
-			KeyHash:      hash,
+			ID:            k.ID,
+			Key:           raw,
+			KeyHash:       hash,
 			KeyHashPrefix: hashPrefix,
-			Plan:         k.PlanTier,
-			DurationDays: body.DurationDays,
-			CreatedAt:    k.CreatedAt,
-			UsedBy:       nil,
-			UsedAt:       nil,
+			Plan:          k.PlanTier,
+			DurationDays:  body.DurationDays,
+			CreatedAt:     k.CreatedAt,
+			UsedBy:        nil,
+			UsedAt:        nil,
 		})
 	}
 }

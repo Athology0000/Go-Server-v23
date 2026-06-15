@@ -322,3 +322,15 @@ body {
   filter: blur(0);
   user-select: text;
 }
+
+/* Respect users who ask for less motion: kill the perpetual orb float and
+   other infinite/entrance animations, and collapse long transitions. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .orb-1, .orb-2, .orb-3 { animation: none !important; }
+}

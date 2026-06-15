@@ -2,8 +2,8 @@ package db
 
 import (
 	"context"
-	"time"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"time"
 )
 
 type Device struct {

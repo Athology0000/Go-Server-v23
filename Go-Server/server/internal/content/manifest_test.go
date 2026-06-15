@@ -141,15 +141,7 @@ func TestBuildStableManifest_SignatureVerifies(t *testing.T) {
 		t.Fatalf("BuildStableManifest: %v", err)
 	}
 
-	payload := signedManifestPayload{
-		BuildID:          m.BuildID,
-		Channel:          m.Channel,
-		MinLoaderVersion: m.MinLoaderVersion,
-		ModuleKey:        m.ModuleKey,
-		Modules:          m.Modules,
-		NativeComponents: m.NativeComponents,
-	}
-	signed, err := json.Marshal(payload)
+	signed, err := json.Marshal(signedPayloadOf(m))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,12 +169,14 @@ func TestSignedManifestPayload_GoldenBytes(t *testing.T) {
 			InitOrder: 0,
 		}},
 		NativeComponents: []db.ManifestNative{},
+		ExpiresAtMillis:  1750000000000,
+		Epoch:            1750000000000,
 	}
 	got, err := json.Marshal(payload)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"build_id":"stable-filesystem","channel":"stable","minimum_loader_version":"1","module_key":"bW9kdWxlS2V5","modules":[{"name":"phantom-autowalk","url":"https://example.test/content/module/phantom-autowalk","sha256":"abc123","required":false,"init_order":0}],"native_components":[]}`
+	want := `{"build_id":"stable-filesystem","channel":"stable","minimum_loader_version":"1","module_key":"bW9kdWxlS2V5","modules":[{"name":"phantom-autowalk","url":"https://example.test/content/module/phantom-autowalk","sha256":"abc123","required":false,"init_order":0}],"native_components":[],"expires_at_millis":1750000000000,"epoch":1750000000000}`
 	if string(got) != want {
 		t.Errorf("signed bytes drift:\n got=%s\nwant=%s", string(got), want)
 	}
@@ -193,7 +187,7 @@ func TestSignedManifestPayload_GoldenBytes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(got2) != `{"build_id":"stable-filesystem","channel":"stable","minimum_loader_version":"1","modules":[{"name":"phantom-autowalk","url":"https://example.test/content/module/phantom-autowalk","sha256":"abc123","required":false,"init_order":0}],"native_components":[]}` {
+	if string(got2) != `{"build_id":"stable-filesystem","channel":"stable","minimum_loader_version":"1","modules":[{"name":"phantom-autowalk","url":"https://example.test/content/module/phantom-autowalk","sha256":"abc123","required":false,"init_order":0}],"native_components":[],"expires_at_millis":1750000000000,"epoch":1750000000000}` {
 		t.Errorf("omitempty module_key not dropped: %s", string(got2))
 	}
 }

@@ -1,10 +1,12 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getUsers, banUser, unbanUser, type UserRecord } from '../api/admin'
 import { useAuth } from '../store/auth'
+import { useAsync } from '../hooks/useAsync'
 import GlassCard from '../components/GlassCard'
 import Badge from '../components/Badge'
 import Spinner from '../components/Spinner'
+import Modal from '../components/Modal'
 
 function getUserStatus(u: UserRecord): 'active' | 'banned' | 'expired' {
   if (u.banned) return 'banned'
@@ -21,39 +23,37 @@ export default function Users() {
   const token = useAuth(s => s.token)!
   const navigate = useNavigate()
 
-  const [users, setUsers] = useState<UserRecord[]>([])
   const [search, setSearch] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [debounced, setDebounced] = useState('')
 
   const [banModal, setBanModal] = useState<{ user: UserRecord } | null>(null)
   const [banReason, setBanReason] = useState('')
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [actionError, setActionError] = useState('')
 
-  const load = useCallback(() => {
-    setLoading(true)
-    setError('')
-    getUsers(search, token)
-      .then(setUsers)
-      .catch(e => setError(e instanceof Error ? e.message : 'Failed to load'))
-      .finally(() => setLoading(false))
-  }, [search, token])
-
+  // Debounce the search box so we don't refetch on every keystroke.
   useEffect(() => {
-    const t = setTimeout(load, 300)
+    const t = setTimeout(() => setDebounced(search), 300)
     return () => clearTimeout(t)
-  }, [load])
+  }, [search])
+
+  const { data, loading, error, reload } = useAsync(
+    () => getUsers(debounced, token),
+    [debounced, token],
+  )
+  const users = data ?? []
 
   const handleBan = async () => {
     if (!banModal) return
     setActionLoading(banModal.user.id)
+    setActionError('')
     try {
       await banUser(banModal.user.id, banReason, token)
       setBanModal(null)
       setBanReason('')
-      load()
+      reload()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Action failed')
+      setActionError(e instanceof Error ? e.message : 'Action failed')
     } finally {
       setActionLoading(null)
     }
@@ -61,15 +61,18 @@ export default function Users() {
 
   const handleUnban = async (user: UserRecord) => {
     setActionLoading(user.id)
+    setActionError('')
     try {
       await unbanUser(user.id, token)
-      load()
+      reload()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Action failed')
+      setActionError(e instanceof Error ? e.message : 'Action failed')
     } finally {
       setActionLoading(null)
     }
   }
+
+  const shownError = error || actionError
 
   return (
     <div>
@@ -85,6 +88,7 @@ export default function Users() {
           <svg
             width="16"
             height="16"
+            aria-hidden="true"
             className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[color:var(--text-muted)]"
             fill="none"
             viewBox="0 0 24 24"
@@ -99,12 +103,13 @@ export default function Users() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search username or email..."
+            aria-label="Search users by username or email"
             className="input-field pl-10 pr-4 py-2.5 rounded-xl w-72"
           />
         </div>
       </div>
 
-      {error && <div className="mb-4 text-sm alert-error rounded-xl px-4 py-3">{error}</div>}
+      {shownError && <div className="mb-4 text-sm alert-error rounded-xl px-4 py-3" role="alert">{shownError}</div>}
 
       <GlassCard padding="p-0">
         {loading ? (
@@ -140,10 +145,15 @@ export default function Users() {
                       className="border-b border-[color:var(--border)] last:border-0 hover:bg-[var(--surface-2)] transition-colors"
                     >
                       <td className="py-3.5 px-5">
-                        <button onClick={() => navigate(`/users/${u.id}`)} className="flex items-center gap-2.5 group">
+                        <button
+                          onClick={() => navigate(`/users/${u.id}`)}
+                          className="flex items-center gap-2.5 group"
+                          aria-label={`View details for ${u.username}`}
+                        >
                           <div
                             className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
                             style={{ background: u.banned ? '#999' : 'var(--red)' }}
+                            aria-hidden="true"
                           >
                             {u.username[0].toUpperCase()}
                           </div>
@@ -180,6 +190,7 @@ export default function Users() {
                             onClick={() => handleUnban(u)}
                             className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all hover:bg-[rgba(0,255,163,0.08)]"
                             style={{ color: 'var(--good)' }}
+                            aria-label={`Unban ${u.username}`}
                           >
                             Unban
                           </button>
@@ -191,6 +202,7 @@ export default function Users() {
                             }}
                             className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all"
                             style={{ color: 'var(--red)' }}
+                            aria-label={`Ban ${u.username}`}
                             onMouseEnter={e => (e.currentTarget.style.background = 'var(--red-light)')}
                             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                           >
@@ -207,23 +219,21 @@ export default function Users() {
         )}
       </GlassCard>
 
-      {banModal && (
-        <div
-          className="fixed inset-0 flex items-center justify-center z-50 p-4"
-          style={{ background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }}
-        >
-          <div className="glass rounded-2xl p-7 w-full max-w-md shadow-2xl">
-            <h3 className="font-display text-xl tracking-wider text-[color:var(--text)] mb-1">BAN USER</h3>
+      <Modal open={!!banModal} onClose={() => setBanModal(null)} title="BAN USER">
+        {banModal && (
+          <>
             <p className="text-sm text-[color:var(--text-muted)] mb-5">
               Banning <span className="font-semibold text-[color:var(--text)]">{banModal.user.username}</span> will immediately revoke their access.
             </p>
 
             <div className="mb-5">
-              <label className="label">Reason</label>
+              <label className="label" htmlFor="ban-reason">Reason</label>
               <input
+                id="ban-reason"
                 type="text"
                 value={banReason}
                 onChange={e => setBanReason(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && banReason.trim() && !actionLoading) handleBan() }}
                 className="input-field px-4 py-3 rounded-xl"
                 placeholder="e.g. Terms of service violation"
                 autoFocus
@@ -242,10 +252,9 @@ export default function Users() {
                 {actionLoading ? <Spinner size={16} color="white" /> : 'Confirm Ban'}
               </button>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
     </div>
   )
 }
-

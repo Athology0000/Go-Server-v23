@@ -95,7 +95,7 @@ func TestWatermarkModuleDownloadHTTP(t *testing.T) {
 	svc.SetWatermarker(wm)
 
 	app := fiber.New()
-	app.Get("/content/module/:name", middleware.SessionAuth(pool, false), handleModule(svc))
+	app.Get("/content/module/:name", middleware.SessionAuth(pool, false, time.Hour), handleModule(svc))
 
 	req := httptest.NewRequest("GET", "/content/module/"+moduleName, nil)
 	req.Header.Set("Authorization", "Bearer "+rawToken)

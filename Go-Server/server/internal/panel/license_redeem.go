@@ -6,12 +6,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/phantom/server/internal/audit"
-	"github.com/phantom/server/internal/crypto"
-	"github.com/phantom/server/internal/middleware"
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/phantom/server/internal/audit"
+	"github.com/phantom/server/internal/crypto"
+	"github.com/phantom/server/internal/middleware"
 	"github.com/redis/go-redis/v9"
 )
 

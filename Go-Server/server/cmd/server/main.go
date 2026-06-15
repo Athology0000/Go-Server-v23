@@ -184,7 +184,7 @@ func main() {
 	auth.RegisterRoutes(pub, authSvc, pool, rdb, auditSvc, cfg)
 	enrollment.RegisterRoutes(pub, enrollSvc, rdb)
 	panel.RegisterRoutes(pub, pool, rdb, auditSvc, cfg.MasterKey)
-	content.RegisterRoutes(pub, contentSvc, pool, rdb, cfg.StrictSessionIP)
+	content.RegisterRoutes(pub, contentSvc, pool, rdb, cfg.StrictSessionIP, cfg.HeartbeatLivenessWindow)
 	// Also expose the admin API on the public port so the admin panel can
 	// reach it without a second Railway domain. Each /admin/* route still
 	// enforces its own admin-token middleware, so this is a routing change,

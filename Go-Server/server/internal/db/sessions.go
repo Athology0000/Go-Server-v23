@@ -17,8 +17,9 @@ type Session struct {
 	EnabledFeatures      []string   `json:"enabled_features"`
 	EntitlementExpiresAt *time.Time `json:"entitlement_expires_at"`
 	ExpiresAt            time.Time  `json:"expires_at"`
+	LastHeartbeatAt      time.Time  `json:"last_heartbeat_at"`
 	Revoked              bool       `json:"revoked"`
-	LastSeenIP            *string    `json:"last_seen_ip"`
+	LastSeenIP           *string    `json:"last_seen_ip"`
 	CreatedAt            time.Time  `json:"created_at"`
 }
 
@@ -58,6 +59,7 @@ func CreateSession(
 			enabled_features,
 			entitlement_expires_at,
 			expires_at,
+			last_heartbeat_at,
 			revoked,
 			last_seen_ip,
 			created_at
@@ -84,6 +86,7 @@ func CreateSession(
 		&s.EnabledFeatures,
 		&s.EntitlementExpiresAt,
 		&s.ExpiresAt,
+		&s.LastHeartbeatAt,
 		&s.Revoked,
 		&s.LastSeenIP,
 		&s.CreatedAt,
@@ -108,6 +111,7 @@ func GetSessionByTokenHash(
 			enabled_features,
 			entitlement_expires_at,
 			expires_at,
+			last_heartbeat_at,
 			revoked,
 			last_seen_ip,
 			created_at
@@ -126,6 +130,7 @@ func GetSessionByTokenHash(
 		&s.EnabledFeatures,
 		&s.EntitlementExpiresAt,
 		&s.ExpiresAt,
+		&s.LastHeartbeatAt,
 		&s.Revoked,
 		&s.LastSeenIP,
 		&s.CreatedAt,
@@ -153,16 +158,15 @@ func UpdateSessionHeartbeat(
 	ctx context.Context,
 	pool *pgxpool.Pool,
 	sessionID string,
-	expiresAt time.Time,
 	planTier string,
 	modules []string,
 	features []string,
 ) error {
 	_, err := pool.Exec(ctx, `
 		UPDATE sessions
-		SET expires_at = $1, plan_tier = $2, enabled_modules = $3, enabled_features = $4
-		WHERE id = $5
-	`, expiresAt, planTier, modules, features, sessionID)
+		SET last_heartbeat_at = now(), plan_tier = $1, enabled_modules = $2, enabled_features = $3
+		WHERE id = $4
+	`, planTier, modules, features, sessionID)
 
 	return err
 }
@@ -213,6 +217,7 @@ func ListActiveSessions(
 			enabled_features,
 			entitlement_expires_at,
 			expires_at,
+			last_heartbeat_at,
 			revoked,
 			last_seen_ip,
 			created_at
@@ -243,6 +248,7 @@ func ListActiveSessions(
 			&s.EnabledFeatures,
 			&s.EntitlementExpiresAt,
 			&s.ExpiresAt,
+			&s.LastHeartbeatAt,
 			&s.Revoked,
 			&s.LastSeenIP,
 			&s.CreatedAt,

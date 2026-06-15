@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"encoding/json"
 	"errors"
 	"log"
 	"strings"
@@ -41,8 +42,8 @@ type verifySessionRequest struct {
 }
 
 type heartbeatRequest struct {
-	SessionToken string   `json:"session_token"`
-	Activity     []string `json:"activity"`
+	SessionToken string          `json:"session_token"`
+	Activity     json.RawMessage `json:"activity"`
 }
 
 func RegisterRoutes(app *fiber.App, svc *Service, pool *pgxpool.Pool, rdb *redis.Client, auditSvc *audit.Service, cfg *config.Config) {
@@ -563,7 +564,7 @@ func handleHeartbeat(svc *Service) fiber.Handler {
 
 		ip := middleware.GetRealIP(c)
 
-		res, err := svc.Heartbeat(c.Context(), req.SessionToken, ip)
+		res, err := svc.Heartbeat(c.Context(), req.SessionToken, ip, req.Activity)
 		if errors.Is(err, ErrSessionInvalid) {
 			return c.Status(401).JSON(fiber.Map{"status": "unauthorized", "error": "session_invalid"})
 		}

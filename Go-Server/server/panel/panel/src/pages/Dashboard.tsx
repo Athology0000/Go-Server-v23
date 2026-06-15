@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getMe, type UserProfile } from '../api/user'
 import { useAuth } from '../store/auth'
+import { useAsync } from '../hooks/useAsync'
 import GlassCard from '../components/GlassCard'
 import Spinner from '../components/Spinner'
 
@@ -16,17 +17,18 @@ function CopyButton({ value, label }: { value: string; label: string }) {
   return (
     <button
       onClick={copy}
+      aria-label={copied ? 'Copied to clipboard' : `Copy ${label}`}
       className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all"
       style={{ borderColor: 'rgba(155,89,255,0.3)', color: copied ? 'var(--good)' : 'var(--text-muted)', background: 'transparent' }}
     >
       {copied ? (
         <>
-          <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path d="M5 13l4 4L19 7"/></svg>
+          <svg width="11" height="11" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path d="M5 13l4 4L19 7"/></svg>
           Copied
         </>
       ) : (
         <>
-          <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          <svg width="11" height="11" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
           {label}
         </>
       )}
@@ -120,8 +122,9 @@ function BootstrapSetupCard({ profile }: { profile: UserProfile }) {
                 onClick={() => { setDraft(row.value!); setEditing(true) }}
                 className="flex-shrink-0 text-xs text-[color:var(--text-dim)] hover:text-[color:var(--text)] transition-colors"
                 title="Edit"
+                aria-label="Edit license key"
               >
-                <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                <svg width="12" height="12" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
               </button>
             )}
           </div>
@@ -143,21 +146,10 @@ function formatDate(dateStr: string) {
 export default function Dashboard() {
   const token = useAuth(s => s.token)
   const authUser = useAuth(s => s.user)
-  const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    if (!token) {
-      setLoading(false)
-      setProfile(null)
-      return
-    }
-    getMe(token)
-      .then(setProfile)
-      .catch(e => setError(e instanceof Error ? e.message : 'Failed to load'))
-      .finally(() => setLoading(false))
-  }, [token])
+  const { data: profile, loading, error } = useAsync<UserProfile | null>(
+    () => (token ? getMe(token) : Promise.resolve(null)),
+    [token],
+  )
 
   const hasPlan = Boolean(profile?.plan)
   const planActive = hasPlan && (profile?.planExpiry ? new Date(profile.planExpiry) > new Date() : true)

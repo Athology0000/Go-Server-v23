@@ -26,6 +26,35 @@ type signedManifestPayload struct {
 	ModuleKey        string              `json:"module_key,omitempty"`
 	Modules          []db.ManifestModule `json:"modules"`
 	NativeComponents []db.ManifestNative `json:"native_components"`
+	// expires_at_millis + epoch are INSIDE the signature so a MITM can neither extend a manifest's
+	// expiry nor roll a client back to an older bundle (a lower epoch) without breaking the Ed25519
+	// signature. No omitempty: a zero must still be emitted so the signed bytes reproduce identically
+	// in the Java + C++ verifiers. revoked is deliberately NOT signed — its signed value is always
+	// false (the server never re-signs on revoke), so revocation is enforced server-side and by the
+	// heartbeat lease instead.
+	ExpiresAtMillis int64 `json:"expires_at_millis"`
+	Epoch           int64 `json:"epoch"`
+}
+
+// signedPayloadOf projects a ContentManifest onto the exact subset that is Ed25519-signed.
+func signedPayloadOf(m *db.ContentManifest) signedManifestPayload {
+	return signedManifestPayload{
+		BuildID:          m.BuildID,
+		Channel:          m.Channel,
+		MinLoaderVersion: m.MinLoaderVersion,
+		ModuleKey:        m.ModuleKey,
+		Modules:          m.Modules,
+		NativeComponents: m.NativeComponents,
+		ExpiresAtMillis:  m.ExpiresAtMillis,
+		Epoch:            m.Epoch,
+	}
+}
+
+// SignManifest signs the canonical signed-payload subset of m. It is the single source of truth
+// for the signed byte contract so the stable-filesystem and admin manifest paths can never drift
+// to different signed bytes (which would make one of them fail verification on the client).
+func SignManifest(signingKey []byte, m *db.ContentManifest) (string, error) {
+	return ccrypto.SignManifest(signingKey, signedPayloadOf(m))
 }
 
 func BuildStableManifest(_ context.Context, contentDir, baseURL, channel string, signingKey, moduleKey []byte, enabledModules []string) (*db.ContentManifest, error) {
@@ -41,6 +70,7 @@ func BuildStableManifest(_ context.Context, contentDir, baseURL, channel string,
 	}
 
 	modules := make([]db.ManifestModule, 0)
+	var maxModuleMtimeMillis int64
 	for _, entry := range entries {
 		if entry.IsDir() || !isPhantomModuleArtifact(entry.Name()) {
 			continue
@@ -50,6 +80,13 @@ func BuildStableManifest(_ context.Context, contentDir, baseURL, channel string,
 		// appear in its manifest, or the loader 403s mid-load and locks out.
 		if !ModuleAllowed(entry.Name(), enabledModules) {
 			continue
+		}
+
+		// Newest served-artifact mtime becomes the manifest epoch (rollback ordering key).
+		if info, infoErr := entry.Info(); infoErr == nil {
+			if mm := info.ModTime().UnixMilli(); mm > maxModuleMtimeMillis {
+				maxModuleMtimeMillis = mm
+			}
 		}
 
 		jarPath := filepath.Join(modulesDir, entry.Name())
@@ -100,33 +137,33 @@ func BuildStableManifest(_ context.Context, contentDir, baseURL, channel string,
 		return nil, err
 	}
 
-	payload := signedManifestPayload{
+	// One expiry instant, signed as epoch-millis AND served as the time.Time, so the client verifies
+	// the exact integer it reconstructs rather than re-deriving it from an RFC3339 string.
+	expiresAt := time.Now().Add(15 * time.Minute)
+	manifest := &db.ContentManifest{
+		ID:               "stable",
 		BuildID:          "stable-filesystem",
 		Channel:          channel,
 		MinLoaderVersion: "1",
 		ModuleKey:        base64.StdEncoding.EncodeToString(moduleKey),
 		Modules:          modules,
 		NativeComponents: natives,
+		ExpiresAt:        expiresAt,
+		ExpiresAtMillis:  expiresAt.UnixMilli(),
+		// Monotonic per-channel ordering key: the newest content mtime. Stable for unchanged
+		// content (re-serve → same epoch ≥ client high-water-mark → accepted), and it rises as
+		// content is redeployed. Serving an older bundle yields a lower epoch the native rejects.
+		Epoch:     maxModuleMtimeMillis,
+		Revoked:   false,
+		CreatedAt: time.Now(),
 	}
 
-	signature, err := ccrypto.SignManifest(signingKey, payload)
+	signature, err := SignManifest(signingKey, manifest)
 	if err != nil {
 		return nil, err
 	}
-
-	return &db.ContentManifest{
-		ID:               "stable",
-		BuildID:          payload.BuildID,
-		Channel:          payload.Channel,
-		MinLoaderVersion: payload.MinLoaderVersion,
-		ModuleKey:        payload.ModuleKey,
-		Modules:          payload.Modules,
-		NativeComponents: payload.NativeComponents,
-		Signature:        signature,
-		ExpiresAt:        time.Now().Add(15 * time.Minute),
-		Revoked:          false,
-		CreatedAt:        time.Now(),
-	}, nil
+	manifest.Signature = signature
+	return manifest, nil
 }
 
 func buildNativeManifest(contentDir, baseURL string) ([]db.ManifestNative, error) {

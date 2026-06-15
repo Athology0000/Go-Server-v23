@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import GlassCard from '../components/GlassCard'
 import Spinner from '../components/Spinner'
-import { getActivityLog, getAuditLog, getServerLogs, type AuditRecord } from '../api/admin'
+import { getActivityLog, getAuditLog, getServerLogs } from '../api/admin'
 import { useAuth } from '../store/auth'
+import { useAsync } from '../hooks/useAsync'
 
 function fmtTs(value: string) {
   return new Date(value).toLocaleString()
@@ -38,17 +39,9 @@ function eventLabel(type: string): string {
 
 function ActivityLog() {
   const token = useAuth(s => s.token)!
-  const [rows, setRows] = useState<AuditRecord[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const bodyRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    getActivityLog(token)
-      .then(setRows)
-      .catch(e => setError(e instanceof Error ? e.message : 'Failed to load'))
-      .finally(() => setLoading(false))
-  }, [token])
+  const { data, loading, error } = useAsync(() => getActivityLog(token), [token])
+  const rows = data ?? []
 
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight
@@ -93,17 +86,9 @@ function ActivityLog() {
 
 function FullAuditLog() {
   const token = useAuth(s => s.token)!
-  const [rows, setRows] = useState<AuditRecord[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const bodyRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    getAuditLog(token)
-      .then(setRows)
-      .catch(e => setError(e instanceof Error ? e.message : 'Failed to load'))
-      .finally(() => setLoading(false))
-  }, [token])
+  const { data, loading, error } = useAsync(() => getAuditLog(token), [token])
+  const rows = data ?? []
 
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight

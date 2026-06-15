@@ -5,6 +5,7 @@ import { useAuth } from '../store/auth'
 import GlassCard from '../components/GlassCard'
 import Badge from '../components/Badge'
 import Spinner from '../components/Spinner'
+import Modal from '../components/Modal'
 
 const PLANS = ['starter', 'pro', 'lifetime'] as const
 const DURATIONS = [
@@ -67,6 +68,7 @@ export default function UserDetail() {
       .finally(() => setLoading(false))
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load() }, [id])
 
   const handleBan = async () => {
@@ -112,7 +114,7 @@ export default function UserDetail() {
   }
 
   if (loading) return <div className="flex items-center justify-center h-64"><Spinner size={32} /></div>
-  if (!user) return <div className="alert-error rounded-xl px-4 py-3">{error || 'User not found'}</div>
+  if (!user) return <div className="alert-error rounded-xl px-4 py-3" role="alert">{error || 'User not found'}</div>
 
   return (
     <div>
@@ -120,7 +122,7 @@ export default function UserDetail() {
         onClick={() => navigate('/users')}
         className="flex items-center gap-2 text-sm text-[color:var(--text-muted)] hover:text-[color:var(--text)] mb-6 transition-colors"
       >
-        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+        <svg width="16" height="16" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
           <path d="M19 12H5M12 5l-7 7 7 7" />
         </svg>
         Back to Users
@@ -131,6 +133,7 @@ export default function UserDetail() {
           <div
             className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-bold text-white shadow-lg flex-shrink-0"
             style={{ background: user.banned ? '#999' : 'var(--red)' }}
+            aria-hidden="true"
           >
             {user.username[0].toUpperCase()}
           </div>
@@ -149,7 +152,7 @@ export default function UserDetail() {
             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(77,200,255,0.07)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           >
-            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+            <svg width="14" height="14" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
               <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
             </svg>
             Add Time
@@ -162,7 +165,7 @@ export default function UserDetail() {
             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(192,132,252,0.07)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           >
-            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+            <svg width="14" height="14" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
               <path d="M5 15l7-7 7 7"/>
             </svg>
             Upgrade Plan
@@ -191,7 +194,7 @@ export default function UserDetail() {
         </div>
       </div>
 
-      {error && <div className="mb-4 text-sm alert-error rounded-xl px-4 py-3">{error}</div>}
+      {error && <div className="mb-4 text-sm alert-error rounded-xl px-4 py-3" role="alert">{error}</div>}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <GlassCard padding="p-5">
@@ -227,146 +230,133 @@ export default function UserDetail() {
       </div>
 
       {/* Add Time Modal */}
-      {addTimeModal && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }}>
-          <div className="glass rounded-2xl p-7 w-full max-w-md shadow-2xl">
-            <h3 className="font-display text-xl tracking-wider text-[color:var(--text)] mb-1">ADD TIME</h3>
-            <p className="text-sm text-[color:var(--text-muted)] mb-5">
-              Extend subscription for <strong className="text-[color:var(--text)]">{user.username}</strong>
-            </p>
+      <Modal open={addTimeModal} onClose={() => setAddTimeModal(false)} title="ADD TIME">
+        <p className="text-sm text-[color:var(--text-muted)] mb-5">
+          Extend subscription for <strong className="text-[color:var(--text)]">{user.username}</strong>
+        </p>
 
-            <div className="mb-4">
-              <label className="label">Duration</label>
-              <div className="flex flex-wrap gap-2">
-                {DURATIONS.map(d => (
-                  <button
-                    key={d.value}
-                    type="button"
-                    onClick={() => setSelectedDays(d.value)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border"
-                    style={selectedDays === d.value
-                      ? { background: 'var(--capture)', color: '#000', borderColor: 'transparent' }
-                      : { background: 'var(--surface)', color: 'var(--text-muted)', borderColor: 'var(--border)' }}
-                  >
-                    {d.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="mb-5">
-              <label className="label">Plan (if no active plan)</label>
-              <div className="flex gap-2">
-                {PLANS.map(p => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => setAddTimePlan(p)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all capitalize border"
-                    style={addTimePlan === p
-                      ? { background: 'var(--red)', color: '#fff', borderColor: 'transparent' }
-                      : { background: 'var(--surface)', color: 'var(--text-muted)', borderColor: 'var(--border)' }}
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <button onClick={() => setAddTimeModal(false)} className="btn-ghost flex-1 py-2.5 rounded-xl text-sm">
-                Cancel
-              </button>
+        <div className="mb-4">
+          <label className="label">Duration</label>
+          <div className="flex flex-wrap gap-2">
+            {DURATIONS.map(d => (
               <button
-                onClick={handleAddTime}
-                disabled={actionLoading}
-                className="flex-1 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all"
-                style={{ background: 'var(--capture)', color: '#000' }}
+                key={d.value}
+                type="button"
+                onClick={() => setSelectedDays(d.value)}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border"
+                style={selectedDays === d.value
+                  ? { background: 'var(--capture)', color: '#000', borderColor: 'transparent' }
+                  : { background: 'var(--surface)', color: 'var(--text-muted)', borderColor: 'var(--border)' }}
               >
-                {actionLoading ? <Spinner size={16} color="#000" /> : `Add ${selectedDays} Days`}
+                {d.label}
               </button>
-            </div>
+            ))}
           </div>
         </div>
-      )}
+
+        <div className="mb-5">
+          <label className="label">Plan (if no active plan)</label>
+          <div className="flex gap-2">
+            {PLANS.map(p => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setAddTimePlan(p)}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all capitalize border"
+                style={addTimePlan === p
+                  ? { background: 'var(--red)', color: '#fff', borderColor: 'transparent' }
+                  : { background: 'var(--surface)', color: 'var(--text-muted)', borderColor: 'var(--border)' }}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <button onClick={() => setAddTimeModal(false)} className="btn-ghost flex-1 py-2.5 rounded-xl text-sm">
+            Cancel
+          </button>
+          <button
+            onClick={handleAddTime}
+            disabled={actionLoading}
+            className="flex-1 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all"
+            style={{ background: 'var(--capture)', color: '#000' }}
+          >
+            {actionLoading ? <Spinner size={16} color="#000" /> : `Add ${selectedDays} Days`}
+          </button>
+        </div>
+      </Modal>
 
       {/* Upgrade Plan Modal */}
-      {upgradeModal && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }}>
-          <div className="glass rounded-2xl p-7 w-full max-w-md shadow-2xl">
-            <h3 className="font-display text-xl tracking-wider text-[color:var(--text)] mb-1">UPGRADE PLAN</h3>
-            <p className="text-sm text-[color:var(--text-muted)] mb-5">
-              Change plan for <strong className="text-[color:var(--text)]">{user.username}</strong>
-            </p>
+      <Modal open={upgradeModal} onClose={() => setUpgradeModal(false)} title="UPGRADE PLAN">
+        <p className="text-sm text-[color:var(--text-muted)] mb-5">
+          Change plan for <strong className="text-[color:var(--text)]">{user.username}</strong>
+        </p>
 
-            <div className="mb-5">
-              <label className="label">Select Plan</label>
-              <div className="flex gap-2">
-                {PLANS.map(p => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => setUpgradeTo(p)}
-                    className="flex-1 py-3 rounded-xl text-sm font-semibold transition-all capitalize border"
-                    style={upgradeTo === p
-                      ? { background: 'var(--accent2)', color: '#fff', borderColor: 'transparent' }
-                      : { background: 'var(--surface)', color: 'var(--text-muted)', borderColor: 'var(--border)' }}
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <button onClick={() => setUpgradeModal(false)} className="btn-ghost flex-1 py-2.5 rounded-xl text-sm">
-                Cancel
-              </button>
+        <div className="mb-5">
+          <label className="label">Select Plan</label>
+          <div className="flex gap-2">
+            {PLANS.map(p => (
               <button
-                onClick={handleUpgrade}
-                disabled={actionLoading}
-                className="flex-1 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all"
-                style={{ background: 'var(--accent2)', color: '#fff' }}
+                key={p}
+                type="button"
+                onClick={() => setUpgradeTo(p)}
+                className="flex-1 py-3 rounded-xl text-sm font-semibold transition-all capitalize border"
+                style={upgradeTo === p
+                  ? { background: 'var(--accent2)', color: '#fff', borderColor: 'transparent' }
+                  : { background: 'var(--surface)', color: 'var(--text-muted)', borderColor: 'var(--border)' }}
               >
-                {actionLoading ? <Spinner size={16} color="white" /> : `Set to ${upgradeTo}`}
+                {p}
               </button>
-            </div>
+            ))}
           </div>
         </div>
-      )}
+
+        <div className="flex gap-3">
+          <button onClick={() => setUpgradeModal(false)} className="btn-ghost flex-1 py-2.5 rounded-xl text-sm">
+            Cancel
+          </button>
+          <button
+            onClick={handleUpgrade}
+            disabled={actionLoading}
+            className="flex-1 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all"
+            style={{ background: 'var(--accent2)', color: '#fff' }}
+          >
+            {actionLoading ? <Spinner size={16} color="white" /> : `Set to ${upgradeTo}`}
+          </button>
+        </div>
+      </Modal>
 
       {/* Ban Modal */}
-      {banModal && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }}>
-          <div className="glass rounded-2xl p-7 w-full max-w-md shadow-2xl">
-            <h3 className="font-display text-xl tracking-wider text-[color:var(--text)] mb-1">BAN USER</h3>
-            <p className="text-sm text-[color:var(--text-muted)] mb-5">
-              Banning <strong className="text-[color:var(--text)]">{user.username}</strong> will revoke all access immediately.
-            </p>
-            <div className="mb-5">
-              <label className="label">Reason</label>
-              <input
-                type="text"
-                value={banReason}
-                onChange={e => setBanReason(e.target.value)}
-                className="input-field px-4 py-3 rounded-xl"
-                placeholder="Reason for ban"
-                autoFocus
-              />
-            </div>
-            <div className="flex gap-3">
-              <button onClick={() => setBanModal(false)} className="btn-ghost flex-1 py-2.5 rounded-xl text-sm">Cancel</button>
-              <button
-                onClick={handleBan}
-                disabled={!banReason.trim() || actionLoading}
-                className="btn-red flex-1 py-2.5 rounded-xl text-sm flex items-center justify-center gap-2"
-              >
-                {actionLoading ? <Spinner size={16} color="white" /> : 'Confirm Ban'}
-              </button>
-            </div>
-          </div>
+      <Modal open={banModal} onClose={() => setBanModal(false)} title="BAN USER">
+        <p className="text-sm text-[color:var(--text-muted)] mb-5">
+          Banning <strong className="text-[color:var(--text)]">{user.username}</strong> will revoke all access immediately.
+        </p>
+        <div className="mb-5">
+          <label className="label" htmlFor="detail-ban-reason">Reason</label>
+          <input
+            id="detail-ban-reason"
+            type="text"
+            value={banReason}
+            onChange={e => setBanReason(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && banReason.trim() && !actionLoading) handleBan() }}
+            className="input-field px-4 py-3 rounded-xl"
+            placeholder="Reason for ban"
+            autoFocus
+          />
         </div>
-      )}
+        <div className="flex gap-3">
+          <button onClick={() => setBanModal(false)} className="btn-ghost flex-1 py-2.5 rounded-xl text-sm">Cancel</button>
+          <button
+            onClick={handleBan}
+            disabled={!banReason.trim() || actionLoading}
+            className="btn-red flex-1 py-2.5 rounded-xl text-sm flex items-center justify-center gap-2"
+          >
+            {actionLoading ? <Spinner size={16} color="white" /> : 'Confirm Ban'}
+          </button>
+        </div>
+      </Modal>
     </div>
   )
 }

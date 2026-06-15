@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -11,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/phantom/server/internal/audit"
 	"github.com/phantom/server/internal/cache"
 	"github.com/phantom/server/internal/config"
@@ -18,8 +21,6 @@ import (
 	"github.com/phantom/server/internal/crypto"
 	"github.com/phantom/server/internal/db"
 	"github.com/phantom/server/internal/entitlement"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -55,9 +56,9 @@ type FinishResult struct {
 	Authenticated        bool
 	Authorized           bool
 	Reason               string
-	AccountID             string
+	AccountID            string
 	Username             string
-	SessionToken          string
+	SessionToken         string
 	ExpiresIn            int
 	PlanTier             string
 	Modules              []string
@@ -199,8 +200,8 @@ func (s *Service) Finish(ctx context.Context, username, proofHex, sourceIP, mine
 		return nil, ErrNotFound
 	}
 
-	ch, err := cache.GetChallenge(ctx, s.rdb, device.ID)
-	if err != nil || ch.Used {
+	ch, err := cache.ConsumeChallenge(ctx, s.rdb, device.ID)
+	if err != nil {
 		s.auditSvc.Log("auth.finish.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
 			"reason": "no_challenge_or_expired",
 		})
@@ -212,11 +213,8 @@ func (s *Service) Finish(ctx context.Context, username, proofHex, sourceIP, mine
 			"reason":   "ip_mismatch",
 			"expected": ch.SourceIP,
 		})
-		cache.DeleteChallenge(ctx, s.rdb, device.ID)
 		return nil, ErrIPMismatch
 	}
-
-	cache.DeleteChallenge(ctx, s.rdb, device.ID)
 
 	plain, err := crypto.DecryptAESGCM(s.masterKey, device.DeviceSecretEncrypted)
 	if err != nil {
@@ -259,9 +257,9 @@ func (s *Service) Finish(ctx context.Context, username, proofHex, sourceIP, mine
 		return &FinishResult{
 			Authenticated: true,
 			Authorized:    false,
-			AccountID:      account.ID,
-			Username:       account.Username,
-			Reason:         ent.Reason,
+			AccountID:     account.ID,
+			Username:      account.Username,
+			Reason:        ent.Reason,
 		}, nil
 	}
 
@@ -327,9 +325,9 @@ func (s *Service) Finish(ctx context.Context, username, proofHex, sourceIP, mine
 	return &FinishResult{
 		Authenticated:        true,
 		Authorized:           true,
-		AccountID:             account.ID,
-		Username:              account.Username,
-		SessionToken:          rawToken,
+		AccountID:            account.ID,
+		Username:             account.Username,
+		SessionToken:         rawToken,
 		ExpiresIn:            3600,
 		PlanTier:             planTier,
 		Modules:              modules,
@@ -346,7 +344,7 @@ type HeartbeatResult struct {
 	Features []string
 }
 
-func (s *Service) Heartbeat(ctx context.Context, sessionToken, sourceIP string) (*HeartbeatResult, error) {
+func (s *Service) Heartbeat(ctx context.Context, sessionToken, sourceIP string, activity json.RawMessage) (*HeartbeatResult, error) {
 	tokenHash, err := crypto.HashToken(sessionToken)
 	if err != nil {
 		return nil, ErrSessionInvalid
@@ -360,11 +358,7 @@ func (s *Service) Heartbeat(ctx context.Context, sessionToken, sourceIP string) 
 		return nil, err
 	}
 
-	if session.Revoked {
-		return nil, ErrSessionInvalid
-	}
-
-	if session.ExpiresAt.Before(time.Now()) {
+	if !db.SessionLive(session, time.Now(), s.cfg.HeartbeatLivenessWindow) {
 		return nil, ErrSessionInvalid
 	}
 
@@ -391,10 +385,19 @@ func (s *Service) Heartbeat(ctx context.Context, sessionToken, sourceIP string) 
 		planTier = "unknown"
 	}
 
-	// Extend session and keep the stored view in step with what the client is told.
-	newExpiresAt := time.Now().Add(time.Hour)
-	if err := db.UpdateSessionHeartbeat(ctx, s.pool, session.ID, newExpiresAt, planTier, ent.EnabledModules, ent.EnabledFeatures); err != nil {
+	// Refresh liveness (last_heartbeat_at) and the stored entitlement view, but do
+	// NOT extend expires_at — the session stays open only while heartbeats arrive.
+	if err := db.UpdateSessionHeartbeat(ctx, s.pool, session.ID, planTier, ent.EnabledModules, ent.EnabledFeatures); err != nil {
 		return nil, err
+	}
+
+	// Persist what the loader reported for the stats page. Default to an empty
+	// JSON array when the client sent nothing parseable.
+	if len(activity) == 0 {
+		activity = json.RawMessage("[]")
+	}
+	if err := db.InsertSessionActivity(ctx, s.pool, session.ID, session.AccountID, session.DeviceID, activity); err != nil {
+		log.Printf("[auth.heartbeat] activity insert failed session_id=%s err=%v", session.ID, err)
 	}
 
 	s.auditSvc.Log("auth.heartbeat", &session.AccountID, &session.DeviceID, nil, &sourceIP, map[string]any{
@@ -422,7 +425,7 @@ type VerifyMinecraftResult struct {
 type VerifySessionResult struct {
 	Authorized           bool
 	Reason               string
-	AccountID             string
+	AccountID            string
 	Username             string
 	MinecraftUsername    string
 	PlanTier             string
@@ -440,7 +443,7 @@ func (s *Service) VerifyMinecraft(ctx context.Context, rawToken, minecraftUserna
 	}
 
 	sess, err := db.GetSessionByTokenHash(ctx, s.pool, tokenHash)
-	if err != nil || sess.Revoked || time.Now().After(sess.ExpiresAt) {
+	if err != nil || !db.SessionLive(sess, time.Now(), s.cfg.HeartbeatLivenessWindow) {
 		return nil, ErrSessionInvalid
 	}
 
@@ -575,6 +578,12 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 			sess.ID,
 			sess.ExpiresAt.Format(time.RFC3339),
 		)
+		return nil, ErrSessionInvalid
+	}
+
+	if !db.SessionLive(sess, time.Now(), s.cfg.HeartbeatLivenessWindow) {
+		log.Printf("[auth.verify_session] session_stale ip=%s session_id=%s last_heartbeat=%s",
+			sourceIP, sess.ID, sess.LastHeartbeatAt.Format(time.RFC3339))
 		return nil, ErrSessionInvalid
 	}
 
@@ -843,14 +852,14 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 
 	return &VerifySessionResult{
 		Authorized:           true,
-		AccountID:             account.ID,
-		Username:              account.Username,
-		MinecraftUsername:     minecraftUsername,
-		PlanTier:              ent.PlanTier,
-		Modules:               modules,
-		Features:              features,
-		ManifestURL:           manifestURL,
-		ManifestSignature:     manifestSig,
+		AccountID:            account.ID,
+		Username:             account.Username,
+		MinecraftUsername:    minecraftUsername,
+		PlanTier:             ent.PlanTier,
+		Modules:              modules,
+		Features:             features,
+		ManifestURL:          manifestURL,
+		ManifestSignature:    manifestSig,
 		EntitlementExpiresAt: ent.EntitlementExpiresAt,
 	}, nil
 }

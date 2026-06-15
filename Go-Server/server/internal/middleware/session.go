@@ -17,7 +17,7 @@ import (
 // NAT or rotating egress IPs (Railway/Cloudflare edges) get false 401s under
 // the previous behavior; the strictIP gate now logs a warning instead of
 // rejecting when the IP changes, leaving the token itself as the credential.
-func SessionAuth(pool *pgxpool.Pool, strictIP bool) fiber.Handler {
+func SessionAuth(pool *pgxpool.Pool, strictIP bool, livenessWindow time.Duration) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		raw, err := ParseBearerToken(c.Get("Authorization"))
 		if err != nil {
@@ -28,7 +28,7 @@ func SessionAuth(pool *pgxpool.Pool, strictIP bool) fiber.Handler {
 			return c.Status(401).JSON(fiber.Map{"error": "authentication_failed", "message": "Authentication failed"})
 		}
 		session, err := db.GetSessionByTokenHash(c.Context(), pool, hash)
-		if err != nil || session.Revoked || time.Now().After(session.ExpiresAt) {
+		if err != nil || !db.SessionLive(session, time.Now(), livenessWindow) {
 			return c.Status(401).JSON(fiber.Map{"error": "authentication_failed", "message": "Authentication failed"})
 		}
 

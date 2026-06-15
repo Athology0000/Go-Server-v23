@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/phantom/server/internal/db"
 	"github.com/phantom/server/internal/entitlement"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var (
@@ -136,7 +136,7 @@ func (s *Service) NativePath(ctx context.Context, accountID, name string) (strin
 
 	allowed :=
 		len(ent.NativeComponents) == 0 ||
-		slices.Contains(ent.NativeComponents, "*") ||
+			slices.Contains(ent.NativeComponents, "*") ||
 			slices.Contains(ent.NativeComponents, safeName) ||
 			slices.Contains(ent.NativeComponents, nativeID)
 
@@ -152,4 +152,3 @@ func (s *Service) NativePath(ctx context.Context, accountID, name string) (strin
 
 	return path, nil
 }
-

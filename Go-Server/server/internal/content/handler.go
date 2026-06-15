@@ -11,8 +11,8 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-func RegisterRoutes(app *fiber.App, svc *Service, pool *pgxpool.Pool, rdb *redis.Client, strictIP bool) {
-	sessAuth := middleware.SessionAuth(pool, strictIP)
+func RegisterRoutes(app *fiber.App, svc *Service, pool *pgxpool.Pool, rdb *redis.Client, strictIP bool, livenessWindow time.Duration) {
+	sessAuth := middleware.SessionAuth(pool, strictIP, livenessWindow)
 
 	// 30 fetches per minute per IP for content endpoints.
 	contentLimit := middleware.RateLimit(rdb, 30, time.Minute, middleware.IPKey("content"))

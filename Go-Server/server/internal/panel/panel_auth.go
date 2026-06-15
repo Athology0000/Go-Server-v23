@@ -3,11 +3,11 @@ package panel
 import (
 	"time"
 
+	"github.com/gofiber/fiber/v2"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/phantom/server/internal/crypto"
 	"github.com/phantom/server/internal/db"
 	"github.com/phantom/server/internal/middleware"
-	"github.com/gofiber/fiber/v2"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // PanelAuth validates the panel bearer token (panel_sessions) and stores the
@@ -35,4 +35,3 @@ func GetPanelSession(c *fiber.Ctx) *db.PanelSession {
 	s, _ := c.Locals("panel_session").(*db.PanelSession)
 	return s
 }
-
