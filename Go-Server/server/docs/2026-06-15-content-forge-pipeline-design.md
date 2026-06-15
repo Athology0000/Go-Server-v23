@@ -3,7 +3,7 @@
 - **Date:** 2026-06-15
 - **Status:** Draft for review (no code yet)
 - **Owner:** Phantom
-- **Repos touched:** `Go-Server` (server: Go), `obfuscator` (one prod config file)
+- **Repos touched:** `Go-Server` only (the obfuscator is consumed as a built jar artifact; the forge-prod config ships with the server)
 
 ## 1. Goal
 
@@ -68,22 +68,23 @@ At most one `live` row per module; approving a new build moves the previous `liv
 
 ## 4. Components
 
-### 4.1 Obfuscator — one new prod config (`obfuscator/forge-prod.json`)
-Aggressive Fabric-compatible passes **plus** the watermark stage enabled (id/secret
-supplied per-build via CLI flags). No class encryption (Fabric-incompatible), no native
-(done locally). Based on the existing `phantom-fabric-aggressive.json`:
+### 4.1 Obfuscator — one new prod config (`Go-Server/server/configs/forge-prod.json`)
+**Decided:** start at the **proven MC-loadable set** (`name+string+record+number`) plus the
+watermark stage (id/secret supplied per-build via CLI flags). No class encryption
+(Fabric-incompatible), no native (done locally), and `flatten`/`runtimeMangle`/`integrity`
+held back until each is in-game-verified and added one at a time. The config ships with the
+server so `FORGE_CONFIG` is a deploy artifact, not an external obfuscator-repo path.
 
 ```json
 {
   "passes": [
-    { "name": "name" }, { "name": "string" }, { "name": "record" },
-    { "name": "number" }, { "name": "flatten" }, { "name": "runtimeMangle" }
+    { "name": "name" }, { "name": "string" }, { "name": "record" }, { "name": "number" }
   ],
   "stages": [
     { "name": "watermark", "enabled": true },
     { "name": "classEncryption", "enabled": false },
     { "name": "pack", "enabled": false },
-    { "name": "integrity", "enabled": true }
+    { "name": "integrity", "enabled": false }
   ],
   "crypto": { "keySplitParts": 3 },
   "watermark": { "enabled": true, "id": "forge-unset", "secret": "set-via---watermark-secret" },
@@ -253,13 +254,10 @@ delivery from execution. Out of scope for v1.)
 4. **(exists)** per-user watermark on download — already shipped.
 
 ## 10. Open questions / risks
-- **MC-loadability of the forge-prod pass set (highest risk):** only `name+string+record+
-  number` is confirmed loadable in-game so far. `forge-prod.json` here also enables
-  `flatten`, `runtimeMangle`, and the `integrity` stage — these are **not yet MC-verified**.
-  Before declaring forge-prod "production," the operator (in-game verifier) must confirm a
-  forged build still loads in Minecraft; if any pass breaks loading, trim it from the config.
-  Recommended: start `forge-prod.json` at the proven set and add passes one at a time with
-  an in-game check each.
+- **MC-loadability of the forge-prod pass set — RESOLVED:** forge-prod ships at the proven
+  `name+string+record+number` set (operator verifies in MC). `flatten`/`runtimeMangle`/
+  `integrity` are deferred and added one at a time, each gated by an in-game load check.
+  No longer a blocking risk for v1.
 - **Manifest builder reuse:** promotion must call the existing stable-manifest builder so
   the dll hash lands in `native_components` correctly — confirm the builder accepts a
   native component + hash, or extend it. (Resolve when implementing increment 2.)
