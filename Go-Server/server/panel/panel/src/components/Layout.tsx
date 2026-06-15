@@ -74,11 +74,11 @@ export default function Layout() {
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150 ${
                   isActive
-                    ? 'text-white shadow-sm'
+                    ? 'text-[color:var(--text)]'
                     : 'text-[color:var(--text-muted)] hover:text-[color:var(--text)] hover:bg-[var(--surface-2)]'
                 }`
               }
-              style={({ isActive }) => isActive ? { background: 'var(--red)' } : {}}
+              style={({ isActive }) => isActive ? { background: 'var(--red-light)' } : {}}
             >
               {icon}
               {label}
