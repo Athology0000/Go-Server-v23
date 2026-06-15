@@ -66,18 +66,15 @@ func main() {
 		log.Fatalf("migrate: %v", err)
 	}
 
-	rdb, err := cache.NewClient(cfg.RedisURL)
-	if err != nil {
-		log.Fatalf("redis: %v", err)
-	}
-	defer rdb.Close()
+	// Ephemeral state (rate-limit counters + auth challenges) lives in Postgres now — no Redis
+	// dependency. This background sweep reaps expired rows.
+	cache.StartSweeper(ctx, pool, 5*time.Minute)
 
 	entSvc := entitlement.New(pool)
 	auditSvc := audit.New(pool)
 
 	authSvc := auth.New(
 		pool,
-		rdb,
 		entSvc,
 		auditSvc,
 		cfg.MasterKey,
@@ -145,7 +142,7 @@ func main() {
 	}))
 
 	pub.Use(middleware.RateLimit(
-		rdb,
+		pool,
 		120,
 		time.Minute,
 		middleware.IPKey("global"),
@@ -181,15 +178,15 @@ func main() {
 		})
 	})
 
-	auth.RegisterRoutes(pub, authSvc, pool, rdb, auditSvc, cfg)
-	enrollment.RegisterRoutes(pub, enrollSvc, rdb)
-	panel.RegisterRoutes(pub, pool, rdb, auditSvc, cfg.MasterKey)
-	content.RegisterRoutes(pub, contentSvc, pool, rdb, cfg.StrictSessionIP, cfg.HeartbeatLivenessWindow)
+	auth.RegisterRoutes(pub, authSvc, pool, auditSvc, cfg)
+	enrollment.RegisterRoutes(pub, enrollSvc, pool)
+	panel.RegisterRoutes(pub, pool, auditSvc, cfg.MasterKey)
+	content.RegisterRoutes(pub, contentSvc, pool, cfg.StrictSessionIP, cfg.HeartbeatLivenessWindow)
 	// Also expose the admin API on the public port so the admin panel can
 	// reach it without a second Railway domain. Each /admin/* route still
 	// enforces its own admin-token middleware, so this is a routing change,
 	// not an auth bypass.
-	admin.RegisterRoutes(pub, pool, rdb, cfg.ManifestSigningKey, auditSvc, cfg.AdminAPISecret, cfg.ContentDir)
+	admin.RegisterRoutes(pub, pool, cfg.ManifestSigningKey, auditSvc, cfg.AdminAPISecret, cfg.ContentDir)
 
 	// =========================
 	// Admin API server
@@ -212,7 +209,7 @@ func main() {
 	}))
 
 	adm.Use(middleware.RateLimit(
-		rdb,
+		pool,
 		60,
 		time.Minute,
 		middleware.IPKey("admin-global"),
@@ -242,7 +239,6 @@ func main() {
 	admin.RegisterRoutes(
 		adm,
 		pool,
-		rdb,
 		cfg.ManifestSigningKey,
 		auditSvc,
 		cfg.AdminAPISecret,

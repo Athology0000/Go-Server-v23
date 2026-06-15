@@ -15,13 +15,6 @@ services:
       timeout: 5s
       retries: 10
 
-  redis:
-    image: redis:7-alpine
-    volumes:
-      - phantom_redisdata:/data
-    ports:
-      - "6379:6379"
-
   migrate:
     image: postgres:16-alpine
     depends_on:
@@ -46,7 +39,6 @@ services:
     env_file: .env
     environment:
       DB_URL: postgres://phantom:phantom@postgres:5432/phantom?sslmode=disable
-      REDIS_URL: redis://redis:6379
       PUBLIC_PORT: "8080"
       ADMIN_PORT: "8081"
       STRICT_SESSION_IP: "false"
@@ -75,4 +67,3 @@ services:
 
 volumes:
   phantom_pgdata:
-  phantom_redisdata:

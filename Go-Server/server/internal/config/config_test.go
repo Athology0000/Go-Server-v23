@@ -13,7 +13,6 @@ func TestHwidTofuDefaultByEnv(t *testing.T) {
 		t.Setenv("SERVER_PEPPER", k32)
 		t.Setenv("MANIFEST_SIGNING_KEY", k32)
 		t.Setenv("DB_URL", "postgres://x")
-		t.Setenv("REDIS_URL", "redis://x")
 		t.Setenv("ADMIN_API_SECRET", "secret")
 	}
 

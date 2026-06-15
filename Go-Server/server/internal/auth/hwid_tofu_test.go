@@ -9,25 +9,24 @@ import (
 	"github.com/phantom/server/internal/config"
 	"github.com/phantom/server/internal/db"
 	"github.com/phantom/server/internal/entitlement"
-	"github.com/redis/go-redis/v9"
 )
 
 // HWID trust-on-first-use at /auth/verify-session, gated by HWID_TOFU_ENABLED. Exercised against a
-// live Postgres + Redis. Skips without TEST_DB_URL/TEST_REDIS_URL.
+// live Postgres. Skips without TEST_DB_URL.
 
-func newTestServiceHwid(pool *pgxpool.Pool, rdb *redis.Client, hwidTofu bool) *Service {
+func newTestServiceHwid(pool *pgxpool.Pool, hwidTofu bool) *Service {
 	cfg := &config.Config{
 		SessionTTLHours:         12,
 		HeartbeatLivenessWindow: 15 * time.Minute,
 		HwidTofuEnabled:         hwidTofu,
 	}
-	return New(pool, rdb, entitlement.New(pool), audit.New(pool),
+	return New(pool, entitlement.New(pool), audit.New(pool),
 		make([]byte, 32), make([]byte, 32), "http://localhost:8080", cfg)
 }
 
 // With TOFU enabled: the first HWID is pinned, a matching HWID passes, a different one is denied.
 func TestVerifySessionHwidTofu(t *testing.T) {
-	ctx, pool, rdb := testEnv(t)
+	ctx, pool := testEnv(t)
 	rawToken, _, _ := seedSession(t, ctx, pool)
 	sess, err := db.GetSessionByTokenHash(ctx, pool, mustHash(t, rawToken))
 	if err != nil {
@@ -35,7 +34,7 @@ func TestVerifySessionHwidTofu(t *testing.T) {
 	}
 	deviceID := sess.DeviceID
 
-	svc := newTestServiceHwid(pool, rdb, true)
+	svc := newTestServiceHwid(pool, true)
 
 	// First sight pins the HWID.
 	res, err := svc.VerifySession(ctx, rawToken, "127.0.0.1", "", "hwid-aaa")
@@ -76,7 +75,7 @@ func TestVerifySessionHwidTofu(t *testing.T) {
 // With TOFU disabled (the default), the HWID the loader sends is ignored — nothing is pinned and a
 // changed HWID does not block. Preserves the deliberate no-HWID-enforcement behaviour.
 func TestVerifySessionHwidIgnoredWhenDisabled(t *testing.T) {
-	ctx, pool, rdb := testEnv(t)
+	ctx, pool := testEnv(t)
 	rawToken, _, _ := seedSession(t, ctx, pool)
 	sess, err := db.GetSessionByTokenHash(ctx, pool, mustHash(t, rawToken))
 	if err != nil {
@@ -84,7 +83,7 @@ func TestVerifySessionHwidIgnoredWhenDisabled(t *testing.T) {
 	}
 	deviceID := sess.DeviceID
 
-	svc := newTestServiceHwid(pool, rdb, false)
+	svc := newTestServiceHwid(pool, false)
 
 	res, err := svc.VerifySession(ctx, rawToken, "127.0.0.1", "", "hwid-aaa")
 	if err != nil {
@@ -105,14 +104,14 @@ func TestVerifySessionHwidIgnoredWhenDisabled(t *testing.T) {
 // Hardware-change recovery: after an admin device reset clears the pinned HWID, the next
 // verify-session re-pins the new hardware (TOFU first-sight again) instead of locking out.
 func TestVerifySessionHwidRecoveryAfterReset(t *testing.T) {
-	ctx, pool, rdb := testEnv(t)
+	ctx, pool := testEnv(t)
 	rawToken, _, _ := seedSession(t, ctx, pool)
 	sess, err := db.GetSessionByTokenHash(ctx, pool, mustHash(t, rawToken))
 	if err != nil {
 		t.Fatalf("load session: %v", err)
 	}
 	deviceID := sess.DeviceID
-	svc := newTestServiceHwid(pool, rdb, true)
+	svc := newTestServiceHwid(pool, true)
 
 	// Pin the original HWID; a different one is then rejected (the hardware-change lockout).
 	if _, err := svc.VerifySession(ctx, rawToken, "127.0.0.1", "", "hwid-old"); err != nil {

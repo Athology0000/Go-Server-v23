@@ -16,26 +16,23 @@ import (
 	"github.com/phantom/server/internal/crypto"
 	"github.com/phantom/server/internal/db"
 	"github.com/phantom/server/internal/entitlement"
-	"github.com/redis/go-redis/v9"
 )
 
 // These integration tests exercise the real auth.Service heartbeat path against a live
-// Postgres + Redis (the docker-compose stack). They prove the liveness-heartbeat behaviour
+// Postgres (the docker-compose stack). They prove the liveness-heartbeat behaviour
 // introduced for the session-liveness work end-to-end: a heartbeat refreshes liveness without
 // extending the absolute session cap, writes an activity row, and a session that stops
 // heartbeating (or loses its entitlement) is rejected.
 //
-// Point TEST_DB_URL + TEST_REDIS_URL at the stack, e.g.
+// Point TEST_DB_URL at the stack, e.g.
 //   TEST_DB_URL=postgres://phantom:phantom@localhost:5432/phantom?sslmode=disable
-//   TEST_REDIS_URL=redis://localhost:6379
-// Skips cleanly when either is unset.
+// Skips cleanly when unset.
 
-func testEnv(t *testing.T) (context.Context, *pgxpool.Pool, *redis.Client) {
+func testEnv(t *testing.T) (context.Context, *pgxpool.Pool) {
 	t.Helper()
 	dbURL := os.Getenv("TEST_DB_URL")
-	redisURL := os.Getenv("TEST_REDIS_URL")
-	if dbURL == "" || redisURL == "" {
-		t.Skip("TEST_DB_URL/TEST_REDIS_URL unset; skipping auth integration test")
+	if dbURL == "" {
+		t.Skip("TEST_DB_URL unset; skipping auth integration test")
 	}
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, dbURL)
@@ -47,23 +44,16 @@ func testEnv(t *testing.T) (context.Context, *pgxpool.Pool, *redis.Client) {
 		t.Skipf("postgres not reachable (%v); skipping", err)
 	}
 	t.Cleanup(pool.Close)
-
-	opt, err := redis.ParseURL(redisURL)
-	if err != nil {
-		t.Fatalf("parse TEST_REDIS_URL: %v", err)
-	}
-	rdb := redis.NewClient(opt)
-	t.Cleanup(func() { _ = rdb.Close() })
-	return ctx, pool, rdb
+	return ctx, pool
 }
 
 // newTestService builds a real auth.Service with a fixed liveness window.
-func newTestService(pool *pgxpool.Pool, rdb *redis.Client, livenessWindow time.Duration) *Service {
+func newTestService(pool *pgxpool.Pool, livenessWindow time.Duration) *Service {
 	cfg := &config.Config{
 		SessionTTLHours:         12,
 		HeartbeatLivenessWindow: livenessWindow,
 	}
-	return New(pool, rdb, entitlement.New(pool), audit.New(pool),
+	return New(pool, entitlement.New(pool), audit.New(pool),
 		make([]byte, 32), make([]byte, 32), "http://localhost:8080", cfg)
 }
 
@@ -124,8 +114,8 @@ func cleanupAccount(pool *pgxpool.Pool, accountID string) {
 // absolute expires_at cap forward — and a session that has gone stale (no recent heartbeat) is
 // rejected even though its cap has not yet elapsed.
 func TestHeartbeatLivenessAndActivity(t *testing.T) {
-	ctx, pool, rdb := testEnv(t)
-	svc := newTestService(pool, rdb, 15*time.Minute)
+	ctx, pool := testEnv(t)
+	svc := newTestService(pool, 15*time.Minute)
 	rawToken, sessionID, _ := seedSession(t, ctx, pool)
 
 	before, err := db.GetSessionByTokenHash(ctx, pool, mustHash(t, rawToken))
@@ -178,8 +168,8 @@ func TestHeartbeatLivenessAndActivity(t *testing.T) {
 
 // When the account's license is revoked, the next heartbeat must deny and revoke the session.
 func TestHeartbeatRevokesOnEntitlementLoss(t *testing.T) {
-	ctx, pool, rdb := testEnv(t)
-	svc := newTestService(pool, rdb, 15*time.Minute)
+	ctx, pool := testEnv(t)
+	svc := newTestService(pool, 15*time.Minute)
 	rawToken, sessionID, _ := seedSession(t, ctx, pool)
 
 	// First beat authorizes.

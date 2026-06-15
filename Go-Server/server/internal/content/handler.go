@@ -8,14 +8,13 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/phantom/server/internal/middleware"
-	"github.com/redis/go-redis/v9"
 )
 
-func RegisterRoutes(app *fiber.App, svc *Service, pool *pgxpool.Pool, rdb *redis.Client, strictIP bool, livenessWindow time.Duration) {
+func RegisterRoutes(app *fiber.App, svc *Service, pool *pgxpool.Pool, strictIP bool, livenessWindow time.Duration) {
 	sessAuth := middleware.SessionAuth(pool, strictIP, livenessWindow)
 
 	// 30 fetches per minute per IP for content endpoints.
-	contentLimit := middleware.RateLimit(rdb, 30, time.Minute, middleware.IPKey("content"))
+	contentLimit := middleware.RateLimit(pool, 30, time.Minute, middleware.IPKey("content"))
 
 	manifest := handleManifest(svc)
 	module := handleModule(svc)

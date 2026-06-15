@@ -63,7 +63,6 @@ Environment variables required by the server:
 - `SERVER_PEPPER` — base64, 32 bytes.
 - `MANIFEST_SIGNING_KEY` — base64, 64 bytes.
 - `DB_URL`
-- `REDIS_URL`
 - `ADMIN_API_SECRET`
 - Optional: `PUBLIC_PORT`, `ADMIN_PORT`, `CONTENT_DIR`, `BASE_URL`, `STRICT_SESSION_IP`, `APP_ENV`.
 

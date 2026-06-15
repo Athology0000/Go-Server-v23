@@ -15,9 +15,9 @@ import (
 )
 
 // These exercise the real challenge-response handshake (Start -> Finish) against a live
-// Postgres + Redis. The device secret is seeded encrypted under the same master key the
+// Postgres. The device secret is seeded encrypted under the same master key the
 // Service holds, so a genuine HMAC proof can be forged the way the loader's native does.
-// Skips without TEST_DB_URL/TEST_REDIS_URL.
+// Skips without TEST_DB_URL.
 
 // seedEnrolledDevice provisions account -> device(hwid_pending, known secret) -> pro license.
 func seedEnrolledDevice(t *testing.T, ctx context.Context, pool *pgxpool.Pool, masterKey []byte) (username, accountID string, secret []byte) {
@@ -80,9 +80,9 @@ func seedManifestForChannel(t *testing.T, ctx context.Context, pool *pgxpool.Poo
 
 // A valid HMAC proof over the issued challenge yields an authorized session.
 func TestChallengeResponseAuthFlow(t *testing.T) {
-	ctx, pool, rdb := testEnv(t)
+	ctx, pool := testEnv(t)
 	masterKey := make([]byte, 32)
-	svc := newTestService(pool, rdb, 15*time.Minute)
+	svc := newTestService(pool, 15*time.Minute)
 	username, accountID, secret := seedEnrolledDevice(t, ctx, pool, masterKey)
 
 	// Finish resolves a manifest for the entitlement's channel — seed exactly that channel.
@@ -119,9 +119,9 @@ func TestChallengeResponseAuthFlow(t *testing.T) {
 
 // A bad proof is rejected, and five consecutive failures suspend the device.
 func TestFinishRejectsBadProofAndSuspends(t *testing.T) {
-	ctx, pool, rdb := testEnv(t)
+	ctx, pool := testEnv(t)
 	masterKey := make([]byte, 32)
-	svc := newTestService(pool, rdb, 15*time.Minute)
+	svc := newTestService(pool, 15*time.Minute)
 	username, accountID, _ := seedEnrolledDevice(t, ctx, pool, masterKey)
 
 	device, err := db.GetDeviceByAccountID(ctx, pool, accountID)

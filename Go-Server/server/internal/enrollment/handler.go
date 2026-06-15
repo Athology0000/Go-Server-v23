@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/phantom/server/internal/middleware"
-	"github.com/redis/go-redis/v9"
 )
 
 type redeemRequest struct {
@@ -19,9 +19,9 @@ type handshakeRequest struct {
 	Password string `json:"password"`
 }
 
-func RegisterRoutes(app *fiber.App, svc *Service, rdb *redis.Client) {
+func RegisterRoutes(app *fiber.App, svc *Service, pool *pgxpool.Pool) {
 	// 5 attempts per minute per IP — enrollment is a one-time operation
-	enrollLimit := middleware.RateLimit(rdb, 5, time.Minute, middleware.IPKey("enroll"))
+	enrollLimit := middleware.RateLimit(pool, 5, time.Minute, middleware.IPKey("enroll"))
 
 	redeem := handleRedeem(svc)
 	handshake := handleHandshake(svc)

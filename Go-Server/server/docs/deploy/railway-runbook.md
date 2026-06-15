@@ -27,12 +27,14 @@ exposed.
 
 ---
 
-## 1. Provision the datastores
+## 1. Provision the datastore
 
-In the Railway project, add two plugins:
+In the Railway project, add one plugin:
 
 1. **PostgreSQL** → exposes `DATABASE_URL`.
-2. **Redis** → exposes `REDIS_URL`.
+
+(No Redis: rate-limit counters and short-lived auth challenges live in Postgres
+as of migration 011 — the server needs only one datastore.)
 
 ---
 
@@ -90,7 +92,6 @@ In the Railway service **Variables**, set:
 | `MANIFEST_SIGNING_KEY` | **the release key** (see §2) |
 | `ADMIN_API_SECRET` | from `.env.railway` |
 | `DB_URL` | `${{Postgres.DATABASE_URL}}` |
-| `REDIS_URL` | `${{Redis.REDIS_URL}}` |
 | `APP_ENV` | `production` |
 | `BASE_URL` | `$BASE` (your Railway https domain — must be `https://` in production) |
 | `PUBLIC_PORT` | `8080` |

@@ -14,7 +14,6 @@ import (
 	"github.com/phantom/server/internal/crypto"
 	"github.com/phantom/server/internal/db"
 	"github.com/phantom/server/internal/middleware"
-	"github.com/redis/go-redis/v9"
 )
 
 type startRequest struct {
@@ -47,9 +46,9 @@ type heartbeatRequest struct {
 	Activity     json.RawMessage `json:"activity"`
 }
 
-func RegisterRoutes(app *fiber.App, svc *Service, pool *pgxpool.Pool, rdb *redis.Client, auditSvc *audit.Service, cfg *config.Config) {
-	authLimit := middleware.RateLimit(rdb, 10, time.Minute, middleware.IPAndUsernameKey("auth"))
-	heartbeatLimit := middleware.RateLimit(rdb, 60, time.Minute, middleware.IPAndUsernameKey("heartbeat"))
+func RegisterRoutes(app *fiber.App, svc *Service, pool *pgxpool.Pool, auditSvc *audit.Service, cfg *config.Config) {
+	authLimit := middleware.RateLimit(pool, 10, time.Minute, middleware.IPAndUsernameKey("auth"))
+	heartbeatLimit := middleware.RateLimit(pool, 60, time.Minute, middleware.IPAndUsernameKey("heartbeat"))
 
 	start := handleStart(svc)
 	finish := handleFinish(svc)
@@ -70,7 +69,7 @@ func RegisterRoutes(app *fiber.App, svc *Service, pool *pgxpool.Pool, rdb *redis
 	app.Post("//auth/verify-session", authLimit, verifySession)
 	app.Post("//auth/heartbeat", heartbeatLimit, heartbeat)
 
-	panelLimit := middleware.RateLimit(rdb, 20, time.Minute, middleware.IPKey("panel-auth"))
+	panelLimit := middleware.RateLimit(pool, 20, time.Minute, middleware.IPKey("panel-auth"))
 	app.Post("/auth/login", panelLimit, handlePanelLogin(pool, auditSvc))
 	app.Post("/auth/register", panelLimit, handlePanelRegister(pool, cfg.AllowPublicRegistration))
 	app.Get("/user/me", handleGetMe(pool))
