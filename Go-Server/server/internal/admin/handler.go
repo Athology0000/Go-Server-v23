@@ -25,6 +25,7 @@ func RegisterRoutes(app *fiber.App, pool *pgxpool.Pool, rdb *redis.Client, signi
 	super := middleware.AdminAuth(pool, "super_admin")
 	setupLimit := middleware.RateLimit(rdb, 3, time.Hour, middleware.IPKey("admin-setup"))
 	loginLimit := middleware.RateLimit(rdb, 5, time.Minute, middleware.IPAndUsernameKey("admin-login"))
+	keyGenLimit := middleware.RateLimit(rdb, 60, time.Hour, middleware.IPKey("admin-keygen"))
 
 	// Bootstrap — seed the first super_admin (protected by ADMIN_API_SECRET)
 	app.Post("/admin/setup", setupLimit, handleAdminSetup(pool, adminAPISecret))
@@ -42,8 +43,10 @@ func RegisterRoutes(app *fiber.App, pool *pgxpool.Pool, rdb *redis.Client, signi
 
 	// Keys (frontend-facing)
 	app.Get("/admin/keys", viewer, handleListKeys(pool))
-	// Key generation is intentionally available to all authenticated staff users (viewer+).
-	app.Post("/admin/keys/generate", viewer, handleGenerateKey(pool, auditSvc))
+	// Key generation mints revenue-bearing keys, so it requires support+ (not
+	// read-only viewers, matching the super-only bulk endpoint's intent) and is
+	// rate-limited per IP to blunt scripted mass-minting.
+	app.Post("/admin/keys/generate", keyGenLimit, support, handleGenerateKey(pool, auditSvc))
 
 	// Accounts
 	app.Post("/admin/accounts", super, handleCreateAccount(pool, auditSvc))
