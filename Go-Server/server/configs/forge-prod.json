@@ -1,0 +1,18 @@
+{
+  "passes": [
+    { "name": "name" },
+    { "name": "string" },
+    { "name": "record" },
+    { "name": "number" }
+  ],
+  "stages": [
+    { "name": "watermark", "enabled": true },
+    { "name": "classEncryption", "enabled": false },
+    { "name": "pack", "enabled": false },
+    { "name": "integrity", "enabled": false }
+  ],
+  "crypto": { "keySplitParts": 3 },
+  "watermark": { "enabled": true, "id": "forge-unset", "secret": "set-via---watermark-secret" },
+  "bootstrapAllowlist": [],
+  "nativeMode": "disabled"
+}
