@@ -1,50 +1,55 @@
+import { z } from 'zod'
 import { apiFetch } from './client'
 
-export interface UserProfile {
-  id: string
-  username: string
-  email: string
-  plan: string | null
-  planExpiry: string | null
-  hwid: string | null
-  hwidBound: boolean
-  minecraftUsername: string | null
-  createdAt: string
-  licenseKeyPrefix: string | null
-}
+export const userProfileSchema = z.object({
+  id: z.string(),
+  username: z.string(),
+  email: z.string(),
+  plan: z.string().nullable(),
+  planExpiry: z.string().nullable(),
+  hwid: z.string().nullable(),
+  hwidBound: z.boolean(),
+  minecraftUsername: z.string().nullable(),
+  createdAt: z.string(),
+  licenseKeyPrefix: z.string().nullable(),
+})
+export type UserProfile = z.infer<typeof userProfileSchema>
 
-export interface RedeemResponse {
-  success: boolean
-  plan: string
-  expiry: string | null
-}
+export const redeemResponseSchema = z.object({
+  success: z.boolean(),
+  plan: z.string(),
+  expiry: z.string().nullable(),
+})
+export type RedeemResponse = z.infer<typeof redeemResponseSchema>
 
-export interface UserStats {
-  totalSessions: number
-  totalRuntimeSeconds: number
-  totalCoins: number
-  totalFish: number
-  totalDrops: number
-  lastSeen: string | null
-}
+export const userStatsSchema = z.object({
+  totalSessions: z.number(),
+  totalRuntimeSeconds: z.number(),
+  totalCoins: z.number(),
+  totalFish: z.number(),
+  totalDrops: z.number(),
+  lastSeen: z.string().nullable(),
+})
+export type UserStats = z.infer<typeof userStatsSchema>
 
-export interface LeaderboardEntry {
-  rank: number
-  username: string
-  value: number
-}
+export const leaderboardEntrySchema = z.object({
+  rank: z.number(),
+  username: z.string(),
+  value: z.number(),
+})
+export type LeaderboardEntry = z.infer<typeof leaderboardEntrySchema>
 
 export const getMe = (token: string) =>
-  apiFetch<UserProfile>('/user/me', {}, token)
+  apiFetch('/user/me', {}, token, userProfileSchema)
 
 export const redeemKey = (key: string, token: string) =>
-  apiFetch<RedeemResponse>('/license/redeem', {
+  apiFetch('/license/redeem', {
     method: 'POST',
     body: JSON.stringify({ key }),
-  }, token)
+  }, token, redeemResponseSchema)
 
 export const getStats = (token: string) =>
-  apiFetch<UserStats>('/user/stats', {}, token)
+  apiFetch('/user/stats', {}, token, userStatsSchema)
 
 export const getLeaderboard = (stat: string, token: string) =>
-  apiFetch<LeaderboardEntry[]>(`/leaderboard?stat=${encodeURIComponent(stat)}`, {}, token)
+  apiFetch(`/leaderboard?stat=${encodeURIComponent(stat)}`, {}, token, z.array(leaderboardEntrySchema))

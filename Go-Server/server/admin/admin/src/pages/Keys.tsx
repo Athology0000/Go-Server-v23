@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, type FormEvent } from 'react'
 import { generateKey, getKeys, type GeneratedKey } from '../api/admin'
 import { useAuth } from '../store/auth'
+import { useToast } from '../store/toast'
 import GlassCard from '../components/GlassCard'
 import Badge from '../components/Badge'
 import Spinner from '../components/Spinner'
@@ -26,44 +27,6 @@ const DURATIONS = [
 
 function fmtDate(d: string) {
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-interface KeyToast {
-  rawKey: string
-  keyId: string
-}
-
-function KeyCopiedToast({ toast, onDismiss }: { toast: KeyToast; onDismiss: () => void }) {
-  useEffect(() => {
-    const t = setTimeout(onDismiss, 5000)
-    return () => clearTimeout(t)
-  }, [onDismiss])
-
-  return (
-    <div
-      style={{
-        position: 'fixed', top: 20, left: '50%', transform: 'translateX(-50%)',
-        zIndex: 9999, minWidth: 340, maxWidth: 560,
-        background: '#fff', color: '#111', borderRadius: 14,
-        boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-        padding: '14px 18px',
-        animation: 'toastIn 0.22s ease',
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-        <span style={{ fontWeight: 700, fontSize: 13, letterSpacing: 0.3 }}>Key copied to clipboard</span>
-        <button onClick={onDismiss} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: '#888', lineHeight: 1 }}>×</button>
-      </div>
-      <div style={{ fontSize: 11, color: '#555', marginBottom: 4 }}>Redemption key (give to customer)</div>
-      <code style={{ display: 'block', fontSize: 12, fontFamily: 'monospace', background: '#f3f3f3', borderRadius: 7, padding: '7px 10px', wordBreak: 'break-all', marginBottom: 8 }}>
-        {toast.rawKey}
-      </code>
-      <div style={{ fontSize: 11, color: '#555', marginBottom: 3 }}>Key ID (for your records)</div>
-      <code style={{ display: 'block', fontSize: 11, fontFamily: 'monospace', color: '#7c5cbf' }}>
-        {toast.keyId}
-      </code>
-    </div>
-  )
 }
 
 function CopyChip({
@@ -120,7 +83,7 @@ export default function Keys() {
   const [keys, setKeys] = useState<GeneratedKey[]>([])
   const [keysLoading, setKeysLoading] = useState(true)
   const rawKeyCache = useRef<Record<string, string>>(loadKeyCache())
-  const [toast, setToast] = useState<KeyToast | null>(null)
+  const showToast = useToast(s => s.show)
 
   const loadKeys = () => {
     setKeysLoading(true)
@@ -147,6 +110,7 @@ export default function Keys() {
       const updated = { ...rawKeyCache.current, [key.id]: key.key }
       rawKeyCache.current = updated
       saveKeyCache(updated)
+      showToast('success', `${key.plan.toUpperCase()} key generated`)
       loadKeys()
     } catch (err: unknown) {
       setGenError(err instanceof Error ? err.message : 'Generation failed')
@@ -159,7 +123,6 @@ export default function Keys() {
 
   return (
     <div>
-      {toast && <KeyCopiedToast toast={toast} onDismiss={() => setToast(null)} />}
       <div className="mb-8">
         <div className="page-title mb-1">KEY GENERATOR</div>
         <p className="text-[color:var(--text-muted)] text-sm">Generate and manage license keys</p>
@@ -251,7 +214,7 @@ export default function Keys() {
                 <code className="flex-1 text-xs font-mono text-[color:var(--text)] break-all leading-relaxed">
                   {newKey.key}
                 </code>
-                <CopyChip value={newKey.key} label="Copy Key" tone="accent" onCopy={() => setToast({ rawKey: newKey.key, keyId: hashPrefix })} />
+                <CopyChip value={newKey.key} label="Copy Key" tone="accent" onCopy={() => showToast('success', 'Key copied to clipboard')} />
               </div>
 
               <p className="text-xs text-[color:var(--text-muted)] mt-2">
@@ -280,6 +243,7 @@ export default function Keys() {
                     {['Key ID', 'Plan', 'Duration', 'Created', 'Status'].map(h => (
                       <th
                         key={h}
+                        scope="col"
                         className="text-left py-3 px-5 text-[10px] font-semibold text-[color:var(--text-dim)] uppercase tracking-widest"
                       >
                         {h}
@@ -300,7 +264,7 @@ export default function Keys() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <code className="text-xs font-mono text-[color:var(--text)]">{displayId}</code>
                           {rawKey ? (
-                            <CopyChip value={rawKey} label="Copy Key" tone="accent" onCopy={() => setToast({ rawKey, keyId: displayId })} />
+                            <CopyChip value={rawKey} label="Copy Key" tone="accent" onCopy={() => showToast('success', 'Key copied to clipboard')} />
                           ) : (
                             <CopyChip value={displayId} label="Copy ID" tone="alt" />
                           )}

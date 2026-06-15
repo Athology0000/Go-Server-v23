@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-route
 import { useAuth } from './store/auth'
 import { setUnauthorizedHandler } from './api/client'
 import BackgroundOrbs from './components/BackgroundOrbs'
+import ToastHost from './components/ToastHost'
 import ErrorBoundary from './components/ErrorBoundary'
 import Spinner from './components/Spinner'
 import Layout from './components/Layout'
@@ -43,6 +44,7 @@ export default function App() {
     <BrowserRouter>
       <AuthWatcher />
       <BackgroundOrbs />
+      <ToastHost />
       <div className="relative z-10">
         <ErrorBoundary>
           <Suspense fallback={<PageFallback />}>

@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
-import { getLeaderboard, type LeaderboardEntry } from '../api/user'
+import { useState } from 'react'
+import { getLeaderboard } from '../api/user'
 import { useAuth } from '../store/auth'
+import { useAsync } from '../hooks/useAsync'
 import GlassCard from '../components/GlassCard'
 import Spinner from '../components/Spinner'
 
@@ -31,18 +32,8 @@ export default function Leaderboard() {
   const token = useAuth(s => s.token)!
   const authUser = useAuth(s => s.user)
   const [tab, setTab] = useState('coins')
-  const [data, setData] = useState<LeaderboardEntry[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    setLoading(true)
-    setError('')
-    getLeaderboard(tab, token)
-      .then(setData)
-      .catch(e => setError(e instanceof Error ? e.message : 'Failed to load'))
-      .finally(() => setLoading(false))
-  }, [tab, token])
+  const { data: rows, loading, error } = useAsync(() => getLeaderboard(tab, token), [tab, token])
+  const data = rows ?? []
 
   return (
     <div>
@@ -80,9 +71,9 @@ export default function Leaderboard() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-[color:var(--border)]">
-                <th className="text-left py-3.5 px-5 text-[10px] font-semibold text-[color:var(--text-muted)] uppercase tracking-widest w-12">#</th>
-                <th className="text-left py-3.5 px-4 text-[10px] font-semibold text-[color:var(--text-muted)] uppercase tracking-widest">Player</th>
-                <th className="text-right py-3.5 px-5 text-[10px] font-semibold text-[color:var(--text-muted)] uppercase tracking-widest">{TABS.find(t => t.key === tab)?.label}</th>
+                <th scope="col" className="text-left py-3.5 px-5 text-[10px] font-semibold text-[color:var(--text-muted)] uppercase tracking-widest w-12">#</th>
+                <th scope="col" className="text-left py-3.5 px-4 text-[10px] font-semibold text-[color:var(--text-muted)] uppercase tracking-widest">Player</th>
+                <th scope="col" className="text-right py-3.5 px-5 text-[10px] font-semibold text-[color:var(--text-muted)] uppercase tracking-widest">{TABS.find(t => t.key === tab)?.label}</th>
               </tr>
             </thead>
             <tbody>

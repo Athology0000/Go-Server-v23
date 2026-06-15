@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
-import { getMe, type UserProfile } from '../api/user'
+import { useState } from 'react'
+import { getMe } from '../api/user'
 import { useAuth } from '../store/auth'
+import { useAsync } from '../hooks/useAsync'
 import GlassCard from '../components/GlassCard'
 import Spinner from '../components/Spinner'
 
@@ -45,16 +46,7 @@ function CopySecret({ label, value, hint }: { label: string; value: string; hint
 
 export default function Device() {
   const token = useAuth(s => s.token)!
-  const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    getMe(token)
-      .then(setProfile)
-      .catch(e => setError(e instanceof Error ? e.message : 'Failed to load'))
-      .finally(() => setLoading(false))
-  }, [token])
+  const { data: profile, loading, error } = useAsync(() => getMe(token), [token])
 
   if (loading) return (
     <div className="flex items-center justify-center h-64"><Spinner size={32} /></div>

@@ -1,0 +1,52 @@
+name: Frontend CI
+
+on:
+  pull_request:
+    paths:
+      - 'Go-Server/server/panel/panel/**'
+      - 'Go-Server/server/admin/admin/**'
+      - '.github/workflows/frontend-ci.yml'
+  push:
+    branches: [go-server]
+    paths:
+      - 'Go-Server/server/panel/panel/**'
+      - 'Go-Server/server/admin/admin/**'
+      - '.github/workflows/frontend-ci.yml'
+
+jobs:
+  build-test:
+    name: build & test (${{ matrix.app }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app:
+          - Go-Server/server/panel/panel
+          - Go-Server/server/admin/admin
+    defaults:
+      run:
+        working-directory: ${{ matrix.app }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      # Lint/format are advisory for now (don't block the build on style).
+      - name: Lint
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Format check
+        run: npm run format:check
+        continue-on-error: true
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build

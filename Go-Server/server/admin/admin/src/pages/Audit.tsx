@@ -40,7 +40,8 @@ function eventLabel(type: string): string {
 function ActivityLog() {
   const token = useAuth(s => s.token)!
   const bodyRef = useRef<HTMLDivElement>(null)
-  const { data, loading, error } = useAsync(() => getActivityLog(token), [token])
+  const [limit, setLimit] = useState(120)
+  const { data, loading, error } = useAsync(() => getActivityLog(token, limit), [token, limit])
   const rows = data ?? []
 
   useEffect(() => {
@@ -78,6 +79,13 @@ function ActivityLog() {
           </div>
         </div>
       </GlassCard>
+      {!loading && rows.length >= limit && (
+        <div className="mt-3 flex justify-center">
+          <button onClick={() => setLimit(l => l + 120)} className="btn-ghost px-4 py-2 rounded-xl text-xs">
+            Load more
+          </button>
+        </div>
+      )}
     </>
   )
 }
@@ -87,7 +95,8 @@ function ActivityLog() {
 function FullAuditLog() {
   const token = useAuth(s => s.token)!
   const bodyRef = useRef<HTMLDivElement>(null)
-  const { data, loading, error } = useAsync(() => getAuditLog(token), [token])
+  const [limit, setLimit] = useState(120)
+  const { data, loading, error } = useAsync(() => getAuditLog(token, limit), [token, limit])
   const rows = data ?? []
 
   useEffect(() => {
@@ -125,6 +134,13 @@ function FullAuditLog() {
           </div>
         </div>
       </GlassCard>
+      {!loading && rows.length >= limit && (
+        <div className="mt-3 flex justify-center">
+          <button onClick={() => setLimit(l => l + 120)} className="btn-ghost px-4 py-2 rounded-xl text-xs">
+            Load more
+          </button>
+        </div>
+      )}
     </>
   )
 }

@@ -10,8 +10,8 @@
   --border:       rgba(155,89,255,0.14);
   --border-2:     rgba(155,89,255,0.28);
   --text:         #e0d8f8;
-  --text-muted:   rgba(224,216,248,0.45);
-  --text-dim:     rgba(224,216,248,0.18);
+  --text-muted:   rgba(224,216,248,0.6);
+  --text-dim:     rgba(224,216,248,0.38);
   --accent:       #9b59ff;
   --accent-soft:  #7a30e0;
   --accent-glow:  rgba(155,89,255,0.45);
@@ -333,4 +333,30 @@ body {
     scroll-behavior: auto !important;
   }
   .orb-1, .orb-2, .orb-3 { animation: none !important; }
+}
+
+/* Visible keyboard focus ring across all interactive elements */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Skip-to-content link (visually hidden until keyboard-focused) */
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 100;
+  transform: translateY(-150%);
+  transition: transform 0.15s ease;
+  background: var(--accent);
+  color: #fff;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.skip-link:focus {
+  transform: translateY(0);
 }

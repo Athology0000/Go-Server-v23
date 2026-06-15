@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
-import { getStats, type UserStats } from '../api/user'
+import { getStats } from '../api/user'
 import { useAuth } from '../store/auth'
+import { useAsync } from '../hooks/useAsync'
 import GlassCard from '../components/GlassCard'
 import Spinner from '../components/Spinner'
 
@@ -47,16 +47,7 @@ function StatCard({ label, value, sub, icon, accent }: StatCardProps) {
 
 export default function Stats() {
   const token = useAuth(s => s.token)!
-  const [stats, setStats] = useState<UserStats | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    getStats(token)
-      .then(setStats)
-      .catch(e => setError(e instanceof Error ? e.message : 'Failed to load stats'))
-      .finally(() => setLoading(false))
-  }, [token])
+  const { data: stats, loading, error } = useAsync(() => getStats(token), [token])
 
   if (loading) return (
     <div className="flex items-center justify-center h-64"><Spinner size={32} /></div>

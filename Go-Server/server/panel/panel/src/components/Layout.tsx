@@ -29,6 +29,7 @@ export default function Layout() {
 
   return (
     <div className="flex h-full min-h-screen">
+      <a href="#main-content" className="skip-link">Skip to content</a>
       {/* Sidebar */}
       <aside className="fixed top-0 left-0 h-full glass rounded-none flex flex-col" style={{ width: 'var(--sidebar-w)', zIndex: 10 }}>
         {/* Brand */}
@@ -100,7 +101,7 @@ export default function Layout() {
       </aside>
 
       {/* Page content */}
-      <main className="flex-1 overflow-auto" style={{ marginLeft: 'var(--sidebar-w)' }}>
+      <main id="main-content" tabIndex={-1} className="flex-1 overflow-auto outline-none" style={{ marginLeft: 'var(--sidebar-w)' }}>
         <div className="p-8 max-w-5xl mx-auto">
           <Outlet />
         </div>

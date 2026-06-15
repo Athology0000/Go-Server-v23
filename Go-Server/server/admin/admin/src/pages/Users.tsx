@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getUsers, banUser, unbanUser, type UserRecord } from '../api/admin'
 import { useAuth } from '../store/auth'
+import { useToast } from '../store/toast'
 import { useAsync } from '../hooks/useAsync'
 import GlassCard from '../components/GlassCard'
 import Badge from '../components/Badge'
@@ -19,17 +20,21 @@ function fmtDate(d: string | null) {
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+const PAGE_SIZE = 25
+
 export default function Users() {
   const token = useAuth(s => s.token)!
   const navigate = useNavigate()
 
   const [search, setSearch] = useState('')
   const [debounced, setDebounced] = useState('')
+  const [page, setPage] = useState(0)
 
   const [banModal, setBanModal] = useState<{ user: UserRecord } | null>(null)
   const [banReason, setBanReason] = useState('')
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
+  const showToast = useToast(s => s.show)
 
   // Debounce the search box so we don't refetch on every keystroke.
   useEffect(() => {
@@ -37,11 +42,17 @@ export default function Users() {
     return () => clearTimeout(t)
   }, [search])
 
+  // Reset to the first page whenever the search query changes.
+  useEffect(() => { setPage(0) }, [debounced])
+
   const { data, loading, error, reload } = useAsync(
     () => getUsers(debounced, token),
     [debounced, token],
   )
   const users = data ?? []
+  const totalPages = Math.max(1, Math.ceil(users.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages - 1)
+  const pageUsers = users.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE)
 
   const handleBan = async () => {
     if (!banModal) return
@@ -49,6 +60,7 @@ export default function Users() {
     setActionError('')
     try {
       await banUser(banModal.user.id, banReason, token)
+      showToast('success', `${banModal.user.username} banned`)
       setBanModal(null)
       setBanReason('')
       reload()
@@ -64,6 +76,7 @@ export default function Users() {
     setActionError('')
     try {
       await unbanUser(user.id, token)
+      showToast('success', `${user.username} unbanned`)
       reload()
     } catch (e) {
       setActionError(e instanceof Error ? e.message : 'Action failed')
@@ -124,6 +137,7 @@ export default function Users() {
                   {['User', 'Email', 'Plan', 'Expiry', 'Last Seen', 'Status', 'Actions'].map(h => (
                     <th
                       key={h}
+                      scope="col"
                       className="text-left py-3.5 px-5 text-[10px] font-semibold text-[color:var(--text-dim)] uppercase tracking-widest first:rounded-tl-2xl"
                     >
                       {h}
@@ -139,7 +153,7 @@ export default function Users() {
                     </td>
                   </tr>
                 ) : (
-                  users.map(u => (
+                  pageUsers.map(u => (
                     <tr
                       key={u.id}
                       className="border-b border-[color:var(--border)] last:border-0 hover:bg-[var(--surface-2)] transition-colors"
@@ -218,6 +232,30 @@ export default function Users() {
           </div>
         )}
       </GlassCard>
+
+      {!loading && users.length > PAGE_SIZE && (
+        <div className="flex items-center justify-between mt-4 text-sm text-[color:var(--text-muted)]">
+          <span>
+            Showing {safePage * PAGE_SIZE + 1}–{Math.min(users.length, safePage * PAGE_SIZE + PAGE_SIZE)} of {users.length}
+          </span>
+          <div className="flex gap-2">
+            <button
+              disabled={safePage === 0}
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              className="btn-ghost px-3 py-1.5 rounded-lg text-xs disabled:opacity-40"
+            >
+              Prev
+            </button>
+            <button
+              disabled={safePage >= totalPages - 1}
+              onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+              className="btn-ghost px-3 py-1.5 rounded-lg text-xs disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
 
       <Modal open={!!banModal} onClose={() => setBanModal(null)} title="BAN USER">
         {banModal && (

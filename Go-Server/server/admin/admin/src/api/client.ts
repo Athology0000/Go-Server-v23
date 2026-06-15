@@ -1,3 +1,5 @@
+import type { ZodType } from 'zod'
+
 const ENV_BASE = (import.meta.env.VITE_API_URL as string | undefined)?.trim()
 
 // Dev convenience fallback. In production a missing VITE_API_URL is almost
@@ -38,7 +40,8 @@ export function setUnauthorizedHandler(fn: () => void) { _onUnauthorized = fn }
 export async function apiFetch<T>(
   path: string,
   options: RequestInit = {},
-  token?: string | null
+  token?: string | null,
+  schema?: ZodType<T>
 ): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -98,5 +101,16 @@ export async function apiFetch<T>(
   }
 
   if (res.status === 204) return undefined as T
-  return res.json() as Promise<T>
+
+  const json = await res.json()
+  if (!schema) return json as T
+
+  // Validate the server response shape so contract drift surfaces as a clear
+  // error instead of an `undefined` deep inside a component.
+  const parsed = schema.safeParse(json)
+  if (!parsed.success) {
+    console.error('[api] response validation failed for', path, parsed.error.issues)
+    throw new ApiError(res.status, 'Received an unexpected response from the server')
+  }
+  return parsed.data
 }

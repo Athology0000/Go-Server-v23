@@ -1,60 +1,80 @@
+import { z } from 'zod'
 import { apiFetch } from './client'
-import type { AdminUser as AuthUser } from '../store/auth'
 
-export interface AuthResponse {
-  token: string
-  user: AuthUser
-}
+const adminUserSchema = z.object({
+  id: z.string(),
+  username: z.string(),
+  email: z.string().nullable(),
+  role: z.enum(['admin', 'superadmin']),
+})
 
-export interface UserRecord {
-  id: string
-  username: string
-  email: string | null
-  plan: string | null
-  planExpiry: string | null
-  hwid: string | null
-  hwidBound: boolean
-  banned: boolean
-  bannedReason: string | null
-  createdAt: string
-  lastSeen: string | null
-  minecraftUsername: string | null
-}
+export const authResponseSchema = z.object({
+  token: z.string(),
+  user: adminUserSchema,
+})
+export type AuthResponse = z.infer<typeof authResponseSchema>
 
-export interface GeneratedKey {
-  id: string
-  key: string
-  keyHash?: string
-  keyHashPrefix?: string
-  plan: string
-  durationDays: number
-  createdAt: string
-  usedBy: string | null
-  usedAt: string | null
-}
+export const userRecordSchema = z.object({
+  id: z.string(),
+  username: z.string(),
+  email: z.string().nullable(),
+  plan: z.string().nullable(),
+  planExpiry: z.string().nullable(),
+  hwid: z.string().nullable(),
+  hwidBound: z.boolean(),
+  banned: z.boolean(),
+  bannedReason: z.string().nullable(),
+  createdAt: z.string(),
+  lastSeen: z.string().nullable(),
+  minecraftUsername: z.string().nullable(),
+})
+export type UserRecord = z.infer<typeof userRecordSchema>
 
-export interface AuditRecord {
-  id: string
-  event_type: string
-  account_id: string | null
-  device_id: string | null
-  admin_name: string | null
-  ip: string | null
-  details: Record<string, unknown> | null
-  created_at: string
-}
+export const generatedKeySchema = z.object({
+  id: z.string(),
+  key: z.string(),
+  keyHash: z.string().optional(),
+  keyHashPrefix: z.string().optional(),
+  plan: z.string(),
+  durationDays: z.number(),
+  createdAt: z.string(),
+  usedBy: z.string().nullable(),
+  usedAt: z.string().nullable(),
+})
+export type GeneratedKey = z.infer<typeof generatedKeySchema>
+
+export const auditRecordSchema = z.object({
+  id: z.string(),
+  event_type: z.string(),
+  account_id: z.string().nullable(),
+  device_id: z.string().nullable(),
+  admin_name: z.string().nullable(),
+  ip: z.string().nullable(),
+  details: z.record(z.unknown()).nullable(),
+  created_at: z.string(),
+})
+export type AuditRecord = z.infer<typeof auditRecordSchema>
+
+const addTimeResponseSchema = z.object({ status: z.string(), new_expiry: z.string() })
+const upgradeResponseSchema = z.object({ status: z.string(), plan: z.string() })
+
+export const serverLogResponseSchema = z.object({
+  lines: z.array(z.string()),
+  seq: z.number(),
+})
+export type ServerLogResponse = z.infer<typeof serverLogResponseSchema>
 
 export const adminLogin = (username: string, password: string) =>
-  apiFetch<AuthResponse>('/admin/auth/login', {
+  apiFetch('/admin/auth/login', {
     method: 'POST',
     body: JSON.stringify({ username, password }),
-  })
+  }, undefined, authResponseSchema)
 
 export const getUsers = (search: string, token: string) =>
-  apiFetch<UserRecord[]>(`/admin/users${search ? `?q=${encodeURIComponent(search)}` : ''}`, {}, token)
+  apiFetch(`/admin/users${search ? `?q=${encodeURIComponent(search)}` : ''}`, {}, token, z.array(userRecordSchema))
 
 export const getUser = (id: string, token: string) =>
-  apiFetch<UserRecord>(`/admin/users/${id}`, {}, token)
+  apiFetch(`/admin/users/${id}`, {}, token, userRecordSchema)
 
 export const banUser = (id: string, reason: string, token: string) =>
   apiFetch<void>(`/admin/users/${id}/ban`, {
@@ -66,36 +86,31 @@ export const unbanUser = (id: string, token: string) =>
   apiFetch<void>(`/admin/users/${id}/unban`, { method: 'POST' }, token)
 
 export const addTime = (id: string, days: number, plan: string, token: string) =>
-  apiFetch<{ status: string; new_expiry: string }>(`/admin/users/${id}/add-time`, {
+  apiFetch(`/admin/users/${id}/add-time`, {
     method: 'POST',
     body: JSON.stringify({ days, plan }),
-  }, token)
+  }, token, addTimeResponseSchema)
 
 export const upgradePlan = (id: string, plan: string, token: string) =>
-  apiFetch<{ status: string; plan: string }>(`/admin/users/${id}/upgrade`, {
+  apiFetch(`/admin/users/${id}/upgrade`, {
     method: 'POST',
     body: JSON.stringify({ plan }),
-  }, token)
+  }, token, upgradeResponseSchema)
 
 export const generateKey = (plan: string, durationDays: number, token: string) =>
-  apiFetch<GeneratedKey>('/admin/keys/generate', {
+  apiFetch('/admin/keys/generate', {
     method: 'POST',
     body: JSON.stringify({ plan, durationDays }),
-  }, token)
+  }, token, generatedKeySchema)
 
 export const getKeys = (token: string) =>
-  apiFetch<GeneratedKey[]>('/admin/keys', {}, token)
+  apiFetch('/admin/keys', {}, token, z.array(generatedKeySchema))
 
 export const getAuditLog = (token: string, limit = 120, offset = 0) =>
-  apiFetch<AuditRecord[]>(`/admin/audit?limit=${limit}&offset=${offset}`, {}, token)
+  apiFetch(`/admin/audit?limit=${limit}&offset=${offset}`, {}, token, z.array(auditRecordSchema))
 
 export const getActivityLog = (token: string, limit = 120, offset = 0) =>
-  apiFetch<AuditRecord[]>(`/admin/activity?limit=${limit}&offset=${offset}`, {}, token)
-
-export interface ServerLogResponse {
-  lines: string[]
-  seq: number
-}
+  apiFetch(`/admin/activity?limit=${limit}&offset=${offset}`, {}, token, z.array(auditRecordSchema))
 
 export const getServerLogs = (token: string, after = 0) =>
-  apiFetch<ServerLogResponse>(`/admin/server-logs?after=${after}`, {}, token)
+  apiFetch(`/admin/server-logs?after=${after}`, {}, token, serverLogResponseSchema)
