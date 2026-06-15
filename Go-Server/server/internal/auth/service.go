@@ -756,10 +756,18 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 				return nil, err
 			}
 			device.HWIDHash = &hwidHash
-			s.auditSvc.Log("auth.verify_session.hwid_pinned", &account.ID, &device.ID, nil, &sourceIP, nil)
+			s.auditSvc.Log("auth.verify_session.hwid_pinned", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
+				"hwid_prefix": shortHash(hwidHash),
+			})
 		} else if !strings.EqualFold(strings.TrimSpace(*device.HWIDHash), strings.TrimSpace(hwidHash)) {
+			// Sanitized prefixes (not the full hashes) so operators can distinguish a genuine
+			// hardware change from a spoofing attempt. Recovery = admin device reset + re-enroll.
+			log.Printf("[auth.verify_session] hwid_mismatch ip=%s device_id=%s stored=%s got=%s",
+				sourceIP, device.ID, shortHash(strings.TrimSpace(*device.HWIDHash)), shortHash(strings.TrimSpace(hwidHash)))
 			s.auditSvc.Log("auth.verify_session.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
-				"reason": "hwid_mismatch",
+				"reason":        "hwid_mismatch",
+				"stored_prefix": shortHash(strings.TrimSpace(*device.HWIDHash)),
+				"got_prefix":    shortHash(strings.TrimSpace(hwidHash)),
 			})
 			return &VerifySessionResult{
 				Authorized: false,

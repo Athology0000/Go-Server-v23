@@ -97,6 +97,7 @@ In the Railway service **Variables**, set:
 | `STRICT_SESSION_IP` | `false` (Railway edges rotate egress IPs) |
 | `SESSION_TTL_HOURS` | `12` (absolute session cap; optional, this is the default) |
 | `HEARTBEAT_LIVENESS_WINDOW_SECONDS` | `900` (optional, default; session dies this long after the last heartbeat) |
+| `HWID_TOFU_ENABLED` | defaults **on** when `APP_ENV=production` (device hardware pinning). Set `false` to disable, or `true` in a non-prod env to enable. Recovery on hardware change = admin reset + re-enroll (§8). |
 
 > Railway targets port **8080**; the server reads `PUBLIC_PORT`. If the healthcheck
 > fails, confirm the service's exposed/target port is 8080.
@@ -123,7 +124,7 @@ the signing key before anything else.
 ```bash
 # Create the first super_admin (one-time; guarded by ADMIN_API_SECRET).
 curl -s -X POST $BASE/admin/setup \
-  -H "Authorization: $ADMIN_API_SECRET" \
+  -H "Authorization: Bearer $ADMIN_API_SECRET" \
   -H 'Content-Type: application/json' \
   -d '{"username":"admin","password":"<a-strong-12+char-password>"}' | jq
 
@@ -180,3 +181,34 @@ native is verified in-game.
 - Rotating a leaked `ADMIN_API_SECRET` / `MASTER_KEY`: set the new value and
   redeploy. Rotating `MASTER_KEY` invalidates stored device secrets (users
   re-enroll). Rotating `MANIFEST_SIGNING_KEY` requires a client pin update + rebuild.
+
+---
+
+## 8. HWID hardware-change recovery (when `HWID_TOFU_ENABLED`)
+
+With HWID pinning on, a device's hardware ID is pinned on the first verify-session
+and must match afterward. A **legitimate hardware change** — renaming the computer,
+replacing the C: drive, or reinstalling Windows — changes the HWID, so the next
+verify-session returns `authorized:false, reason:"hwid_mismatch"` and the loader
+locks down. This is by design; recovery is a one-step admin action + re-enroll:
+
+1. **Diagnose** via the audit log. Mismatch events carry sanitized prefixes (never the
+   full hash): `event_type='auth.verify_session.fail'` with `reason='hwid_mismatch'`
+   (and `stored_prefix`/`got_prefix`); the original pin is
+   `event_type='auth.verify_session.hwid_pinned'`.
+2. **Reset the device** (clears the pinned HWID; support+ admin token):
+   ```bash
+   curl -s -X POST $BASE/admin/devices/<device_id>/reset \
+     -H "Authorization: Bearer $ADMIN_TOKEN"
+   ```
+   This sets `binding_status='unbound'`, `hwid_hash=NULL`.
+3. **User re-enrolls** on the new hardware (redeem a key, or username/password
+   handshake). Re-enroll returns the device secret again — it is stored server-side
+   under `MASTER_KEY`, not bound to the old machine — so the user can re-auth.
+4. **Re-auth** → the next verify-session **re-pins the new HWID** (TOFU first-sight).
+   The account and license are untouched; no data loss.
+
+> The reset does not regenerate the device secret, so the old machine could still hold
+> it — but the old machine's (now different) HWID fails the pin, so it cannot use the
+> session. To fully invalidate the old machine, delete the device row and re-enroll
+> from scratch.

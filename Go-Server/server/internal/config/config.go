@@ -111,6 +111,14 @@ func Load() (*Config, error) {
 		cfg.AllowPublicRegistration = true
 	}
 
+	// HWID trust-on-first-use defaults ON in production (device hardware pinning) and OFF
+	// elsewhere so dev/test/staging enroll freely. An explicit HWID_TOFU_ENABLED= overrides in
+	// any environment. Recovery from a hardware change is an admin device reset + re-enroll
+	// (see docs/deploy/railway-runbook.md).
+	if cfg.AppEnv == "production" && os.Getenv("HWID_TOFU_ENABLED") == "" {
+		cfg.HwidTofuEnabled = true
+	}
+
 	if cfg.AppEnv == "production" && !strings.HasPrefix(cfg.BaseURL, "https://") {
 		return nil, fmt.Errorf("BASE_URL must use https:// in production")
 	}
