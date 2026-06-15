@@ -3,6 +3,7 @@ package content
 import (
 	"context"
 	"errors"
+	"log"
 	"os"
 	"path/filepath"
 	"slices"
@@ -21,13 +22,18 @@ var (
 )
 
 type Service struct {
-	pool       *pgxpool.Pool
-	entSvc     *entitlement.Service
-	contentDir string
-	signingKey []byte
-	moduleKey  []byte
-	baseURL    string
+	pool        *pgxpool.Pool
+	entSvc      *entitlement.Service
+	contentDir  string
+	signingKey  []byte
+	moduleKey   []byte
+	baseURL     string
+	watermarker *Watermarker // optional; when set+enabled, .jar downloads are stamped per-account
 }
+
+// SetWatermarker enables per-user watermarking of .jar downloads. nil/unconfigured leaves
+// downloads byte-exact (the prior behavior).
+func (s *Service) SetWatermarker(w *Watermarker) { s.watermarker = w }
 
 func New(pool *pgxpool.Pool, entSvc *entitlement.Service, contentDir string, signingKey, moduleKey []byte, baseURL string) *Service {
 	return &Service{
@@ -96,6 +102,20 @@ func (s *Service) ModuleBytes(ctx context.Context, accountID, name string) ([]by
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, "", err
+	}
+
+	// Per-user watermark: only plain .jar artifacts. Encrypted .enc bundles must stay byte-exact
+	// (the signed manifest covers their hash and the loader decrypts them verbatim), so they are
+	// never re-stamped here. Fail-open: a watermark hiccup serves the un-watermarked jar rather
+	// than breaking the download.
+	if s.watermarker.Enabled() && strings.HasSuffix(strings.ToLower(path), ".jar") {
+		stamped, werr := s.watermarker.Apply(ctx, raw, accountID)
+		if werr != nil {
+			log.Printf("[content.module] watermark failed account_id=%s module=%s err=%v (serving un-watermarked)",
+				accountID, moduleName, werr)
+		} else {
+			raw = stamped
+		}
 	}
 
 	return raw, filepath.Base(path), nil

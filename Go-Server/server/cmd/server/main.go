@@ -102,6 +102,24 @@ func main() {
 		cfg.BaseURL,
 	)
 
+	// Per-user watermarking of .jar downloads. Gated behind WATERMARK_ENABLED and a fully
+	// configured obfuscator jar/config/secret; otherwise downloads stay byte-exact.
+	if cfg.WatermarkEnabled {
+		wm := &content.Watermarker{
+			JavaPath:   cfg.WatermarkJavaPath,
+			ObfJar:     cfg.WatermarkObfJar,
+			ConfigPath: cfg.WatermarkConfigPath,
+			Secret:     cfg.WatermarkSecret,
+		}
+		if wm.Enabled() {
+			contentSvc.SetWatermarker(wm)
+			log.Printf("[content] per-user jar watermarking enabled (obfuscator=%s)", cfg.WatermarkObfJar)
+		} else {
+			log.Printf("[content] WATERMARK_ENABLED=true but watermarker is not fully configured " +
+				"(need WATERMARK_OBFUSCATOR_JAR, WATERMARK_CONFIG, WATERMARK_SECRET) — serving un-watermarked jars")
+		}
+	}
+
 	// =========================
 	// Public API server
 	// =========================

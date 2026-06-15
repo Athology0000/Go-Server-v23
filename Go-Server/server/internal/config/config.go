@@ -33,6 +33,15 @@ type Config struct {
 	BodyLimit             int
 	SessionTTLHours       int
 	MigrationsDir         string
+
+	// Per-user watermarking of .jar downloads. Optional and gated: when WATERMARK_ENABLED is
+	// true AND the obfuscator jar + config + secret are set, each .jar module download is
+	// stamped with the requesting account id (HMAC-signed) so a leaked jar traces to a user.
+	WatermarkEnabled    bool
+	WatermarkJavaPath   string // java executable (default "java")
+	WatermarkObfJar     string // path to the watermark-capable obfuscator jar
+	WatermarkConfigPath string // path to the watermark-only obfuscator config json
+	WatermarkSecret     string // HMAC secret used to sign/verify the embedded watermark
 }
 
 const defaultModuleEncryptionKeyB64 = "+KNMlsGkQLDvy2mcNClGzYIS65A5JQocOuRl2gtUVeQ="
@@ -80,6 +89,12 @@ func Load() (*Config, error) {
 		SessionTTLHours:       getEnvIntOr("SESSION_TTL_HOURS", 1),
 		BodyLimit:             getEnvIntOr("BODY_LIMIT_BYTES", 10*1024*1024),
 		MigrationsDir:         getEnvOr("MIGRATIONS_DIR", "./migrations"),
+
+		WatermarkEnabled:    getEnvOr("WATERMARK_ENABLED", "false") == "true",
+		WatermarkJavaPath:   getEnvOr("WATERMARK_JAVA", "java"),
+		WatermarkObfJar:     getEnvOr("WATERMARK_OBFUSCATOR_JAR", ""),
+		WatermarkConfigPath: getEnvOr("WATERMARK_CONFIG", ""),
+		WatermarkSecret:     getEnvOr("WATERMARK_SECRET", ""),
 	}
 
 	if cfg.AppEnv != "production" && os.Getenv("ALLOW_PUBLIC_REGISTRATION") == "" {
