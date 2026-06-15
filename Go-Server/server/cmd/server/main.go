@@ -66,18 +66,16 @@ func main() {
 		log.Fatalf("migrate: %v", err)
 	}
 
-	rdb, err := cache.NewClient(cfg.RedisURL)
-	if err != nil {
-		log.Fatalf("redis: %v", err)
-	}
-	defer rdb.Close()
+	// In-process challenge store + rate limiter (replaces the former Redis cache).
+	store := cache.NewStore()
+	defer store.Close()
 
 	entSvc := entitlement.New(pool)
 	auditSvc := audit.New(pool)
 
 	authSvc := auth.New(
 		pool,
-		rdb,
+		store,
 		entSvc,
 		auditSvc,
 		cfg.MasterKey,
@@ -127,7 +125,7 @@ func main() {
 	}))
 
 	pub.Use(middleware.RateLimit(
-		rdb,
+		store,
 		120,
 		time.Minute,
 		middleware.IPKey("global"),
@@ -163,15 +161,15 @@ func main() {
 		})
 	})
 
-	auth.RegisterRoutes(pub, authSvc, pool, rdb, auditSvc, cfg)
-	enrollment.RegisterRoutes(pub, enrollSvc, rdb)
-	panel.RegisterRoutes(pub, pool, rdb, auditSvc, cfg.MasterKey)
-	content.RegisterRoutes(pub, contentSvc, pool, rdb, cfg.StrictSessionIP)
+	auth.RegisterRoutes(pub, authSvc, pool, store, auditSvc, cfg)
+	enrollment.RegisterRoutes(pub, enrollSvc, store)
+	panel.RegisterRoutes(pub, pool, store, auditSvc, cfg.MasterKey)
+	content.RegisterRoutes(pub, contentSvc, pool, store, cfg.StrictSessionIP)
 	// Also expose the admin API on the public port so the admin panel can
 	// reach it without a second Railway domain. Each /admin/* route still
 	// enforces its own admin-token middleware, so this is a routing change,
 	// not an auth bypass.
-	admin.RegisterRoutes(pub, pool, rdb, cfg.ManifestSigningKey, auditSvc, cfg.AdminAPISecret)
+	admin.RegisterRoutes(pub, pool, store, cfg.ManifestSigningKey, auditSvc, cfg.AdminAPISecret)
 
 	// =========================
 	// Admin API server
@@ -194,7 +192,7 @@ func main() {
 	}))
 
 	adm.Use(middleware.RateLimit(
-		rdb,
+		store,
 		60,
 		time.Minute,
 		middleware.IPKey("admin-global"),
@@ -224,7 +222,7 @@ func main() {
 	admin.RegisterRoutes(
 		adm,
 		pool,
-		rdb,
+		store,
 		cfg.ManifestSigningKey,
 		auditSvc,
 		cfg.AdminAPISecret,

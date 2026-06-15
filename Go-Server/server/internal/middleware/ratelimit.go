@@ -6,14 +6,13 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/redis/go-redis/v9"
 	"github.com/phantom/server/internal/cache"
 )
 
-func RateLimit(rdb *redis.Client, limit int, window time.Duration, keyFn func(*fiber.Ctx) string) fiber.Handler {
+func RateLimit(store *cache.Store, limit int, window time.Duration, keyFn func(*fiber.Ctx) string) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		key := keyFn(c)
-		allowed, remaining, reset, err := cache.CheckRateLimit(c.Context(), rdb, key, limit, window)
+		allowed, remaining, reset, err := cache.CheckRateLimit(store, key, limit, window)
 		c.Set("X-RateLimit-Limit", strconv.Itoa(limit))
 		c.Set("X-RateLimit-Remaining", strconv.Itoa(remaining))
 		c.Set("X-RateLimit-Reset", strconv.FormatInt(reset.Unix(), 10))

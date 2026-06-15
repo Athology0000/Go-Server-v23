@@ -10,19 +10,19 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/phantom/server/internal/audit"
+	"github.com/phantom/server/internal/cache"
 	"github.com/phantom/server/internal/crypto"
 	"github.com/phantom/server/internal/db"
 	"github.com/phantom/server/internal/logbuf"
 	"github.com/phantom/server/internal/middleware"
-	"github.com/redis/go-redis/v9"
 )
 
-func RegisterRoutes(app *fiber.App, pool *pgxpool.Pool, rdb *redis.Client, signingKey []byte, auditSvc *audit.Service, adminAPISecret string) {
+func RegisterRoutes(app *fiber.App, pool *pgxpool.Pool, store *cache.Store, signingKey []byte, auditSvc *audit.Service, adminAPISecret string) {
 	viewer := middleware.AdminAuth(pool, "viewer")
 	support := middleware.AdminAuth(pool, "support")
 	super := middleware.AdminAuth(pool, "super_admin")
-	setupLimit := middleware.RateLimit(rdb, 3, time.Hour, middleware.IPKey("admin-setup"))
-	loginLimit := middleware.RateLimit(rdb, 5, time.Minute, middleware.IPAndUsernameKey("admin-login"))
+	setupLimit := middleware.RateLimit(store, 3, time.Hour, middleware.IPKey("admin-setup"))
+	loginLimit := middleware.RateLimit(store, 5, time.Minute, middleware.IPAndUsernameKey("admin-login"))
 
 	// Bootstrap — seed the first super_admin (protected by ADMIN_API_SECRET)
 	app.Post("/admin/setup", setupLimit, handleAdminSetup(pool, adminAPISecret))

@@ -1,18 +1,4 @@
+// Package cache provides the server's in-process challenge store and rate
+// limiter, backed by an in-memory TTL map (see store.go). It previously wrapped
+// a Redis client; that external dependency has been removed.
 package cache
-
-import (
-	"context"
-	"github.com/redis/go-redis/v9"
-)
-
-func NewClient(redisURL string) (*redis.Client, error) {
-	opts, err := redis.ParseURL(redisURL)
-	if err != nil {
-		return nil, err
-	}
-	client := redis.NewClient(opts)
-	if err := client.Ping(context.Background()).Err(); err != nil {
-		return nil, err
-	}
-	return client, nil
-}

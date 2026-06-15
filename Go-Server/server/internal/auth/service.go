@@ -20,7 +20,6 @@ import (
 	"github.com/phantom/server/internal/entitlement"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/redis/go-redis/v9"
 )
 
 // offlineUsernamePattern matches the placeholder Minecraft usernames Fabric and
@@ -69,7 +68,7 @@ type FinishResult struct {
 
 type Service struct {
 	pool      *pgxpool.Pool
-	rdb       *redis.Client
+	store     *cache.Store
 	entSvc    *entitlement.Service
 	auditSvc  *audit.Service
 	masterKey []byte
@@ -80,7 +79,7 @@ type Service struct {
 
 func New(
 	pool *pgxpool.Pool,
-	rdb *redis.Client,
+	store *cache.Store,
 	entSvc *entitlement.Service,
 	auditSvc *audit.Service,
 	masterKey []byte,
@@ -90,7 +89,7 @@ func New(
 ) *Service {
 	return &Service{
 		pool:      pool,
-		rdb:       rdb,
+		store:     store,
 		entSvc:    entSvc,
 		auditSvc:  auditSvc,
 		masterKey: masterKey,
@@ -162,7 +161,7 @@ func (s *Service) Start(ctx context.Context, username, minecraftUsername, source
 
 	challengeB64 := base64.StdEncoding.EncodeToString(challenge)
 
-	if err := cache.StoreChallenge(ctx, s.rdb, &cache.Challenge{
+	if err := cache.StoreChallenge(s.store, &cache.Challenge{
 		DeviceID:  device.ID,
 		Challenge: challengeB64,
 		SourceIP:  sourceIP,
@@ -199,7 +198,7 @@ func (s *Service) Finish(ctx context.Context, username, proofHex, sourceIP, mine
 		return nil, ErrNotFound
 	}
 
-	ch, err := cache.GetChallenge(ctx, s.rdb, device.ID)
+	ch, err := cache.GetChallenge(s.store, device.ID)
 	if err != nil || ch.Used {
 		s.auditSvc.Log("auth.finish.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
 			"reason": "no_challenge_or_expired",
@@ -212,11 +211,11 @@ func (s *Service) Finish(ctx context.Context, username, proofHex, sourceIP, mine
 			"reason":   "ip_mismatch",
 			"expected": ch.SourceIP,
 		})
-		cache.DeleteChallenge(ctx, s.rdb, device.ID)
+		cache.DeleteChallenge(s.store, device.ID)
 		return nil, ErrIPMismatch
 	}
 
-	cache.DeleteChallenge(ctx, s.rdb, device.ID)
+	cache.DeleteChallenge(s.store, device.ID)
 
 	plain, err := crypto.DecryptAESGCM(s.masterKey, device.DeviceSecretEncrypted)
 	if err != nil {

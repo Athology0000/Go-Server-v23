@@ -1,22 +1,16 @@
 package cache
 
 import (
-	"context"
 	"fmt"
 	"time"
-
-	"github.com/redis/go-redis/v9"
 )
 
-func CheckRateLimit(ctx context.Context, rdb *redis.Client, key string, limit int, window time.Duration) (bool, int, time.Time, error) {
-	redisKey := fmt.Sprintf("rl:%s", key)
-	pipe := rdb.Pipeline()
-	incr := pipe.Incr(ctx, redisKey)
-	pipe.Expire(ctx, redisKey, window)
-	if _, err := pipe.Exec(ctx); err != nil {
-		return false, 0, time.Time{}, err
-	}
-	count := int(incr.Val())
+// CheckRateLimit increments the counter for key within the rolling window and
+// reports whether the request is still under limit, the remaining allowance, and
+// when the window resets. The error return is retained for call-site
+// compatibility and is always nil with the in-memory store.
+func CheckRateLimit(store *Store, key string, limit int, window time.Duration) (bool, int, time.Time, error) {
+	count := store.Incr(fmt.Sprintf("rl:%s", key), window)
 	remaining := limit - count
 	if remaining < 0 {
 		remaining = 0

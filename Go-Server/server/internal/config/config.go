@@ -19,7 +19,6 @@ type Config struct {
 	ManifestSigningKey    []byte // Ed25519 private key derived from MANIFEST_SIGNING_KEY seed material
 	ModuleEncryptionKey   []byte // 32 bytes, AES-256; defaults to bundled content key
 	DBURL                 string
-	RedisURL              string
 	AdminAPISecret        string
 	PublicPort            string
 	AdminPort             string
@@ -62,7 +61,6 @@ func Load() (*Config, error) {
 		ManifestSigningKey:    signingKey,
 		ModuleEncryptionKey:   decodeOptionalBase64Env("MODULE_ENCRYPTION_KEY", 32, mustDecodeBase64(defaultModuleEncryptionKeyB64, 32)),
 		DBURL:                 requireEnv("DB_URL"),
-		RedisURL:              requireEnv("REDIS_URL"),
 		AdminAPISecret:        requireEnv("ADMIN_API_SECRET"),
 		PublicPort:            getEnvOr("PUBLIC_PORT", "8080"),
 		AdminPort:             getEnvOr("ADMIN_PORT", "8081"),

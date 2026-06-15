@@ -1,12 +1,10 @@
 package cache
 
 import (
-	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
-
-	"github.com/redis/go-redis/v9"
 )
 
 type Challenge struct {
@@ -18,27 +16,32 @@ type Challenge struct {
 
 const challengeTTL = 30 * time.Second
 
+// ErrChallengeNotFound is returned by GetChallenge when no live challenge exists
+// for the device (never stored, already consumed, or expired).
+var ErrChallengeNotFound = errors.New("challenge not found")
+
 func challengeKey(deviceID string) string {
 	return fmt.Sprintf("auth:challenge:%s", deviceID)
 }
 
-func StoreChallenge(ctx context.Context, rdb *redis.Client, c *Challenge) error {
+func StoreChallenge(store *Store, c *Challenge) error {
 	data, err := json.Marshal(c)
 	if err != nil {
 		return err
 	}
-	return rdb.Set(ctx, challengeKey(c.DeviceID), data, challengeTTL).Err()
+	store.Set(challengeKey(c.DeviceID), data, challengeTTL)
+	return nil
 }
 
-func GetChallenge(ctx context.Context, rdb *redis.Client, deviceID string) (*Challenge, error) {
-	data, err := rdb.Get(ctx, challengeKey(deviceID)).Bytes()
-	if err != nil {
-		return nil, err
+func GetChallenge(store *Store, deviceID string) (*Challenge, error) {
+	data, ok := store.Get(challengeKey(deviceID))
+	if !ok {
+		return nil, ErrChallengeNotFound
 	}
 	c := &Challenge{}
 	return c, json.Unmarshal(data, c)
 }
 
-func DeleteChallenge(ctx context.Context, rdb *redis.Client, deviceID string) error {
-	return rdb.Del(ctx, challengeKey(deviceID)).Err()
+func DeleteChallenge(store *Store, deviceID string) {
+	store.Del(challengeKey(deviceID))
 }

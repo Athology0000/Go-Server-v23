@@ -7,17 +7,17 @@ import (
 	"time"
 
 	"github.com/phantom/server/internal/audit"
+	"github.com/phantom/server/internal/cache"
 	"github.com/phantom/server/internal/crypto"
 	"github.com/phantom/server/internal/middleware"
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/redis/go-redis/v9"
 )
 
-func RegisterRoutes(app *fiber.App, pool *pgxpool.Pool, rdb *redis.Client, auditSvc *audit.Service, masterKey []byte) {
+func RegisterRoutes(app *fiber.App, pool *pgxpool.Pool, store *cache.Store, auditSvc *audit.Service, masterKey []byte) {
 	// Keep this fairly low; users should rarely be redeeming more than a couple keys.
-	redeemLimit := middleware.RateLimit(rdb, 5, time.Minute, middleware.IPKey("panel-redeem"))
+	redeemLimit := middleware.RateLimit(store, 5, time.Minute, middleware.IPKey("panel-redeem"))
 	app.Post("/license/redeem", redeemLimit, PanelAuth(pool), handleRedeemLicense(pool, auditSvc, masterKey))
 }
 
