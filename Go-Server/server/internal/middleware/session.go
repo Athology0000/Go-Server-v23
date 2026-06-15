@@ -32,6 +32,17 @@ func SessionAuth(pool *pgxpool.Pool, strictIP bool, livenessWindow time.Duration
 			return c.Status(401).JSON(fiber.Map{"error": "authentication_failed", "message": "Authentication failed"})
 		}
 
+		// A banned/suspended account must lose access immediately, even with a
+		// live session token and an unexpired license. Entitlement resolution
+		// only checks the license, so this is the gate that enforces account bans
+		// for the game client.
+		if session.AccountStatus == "banned" || session.AccountStatus == "suspended" {
+			return c.Status(403).JSON(fiber.Map{
+				"error":   "account_" + session.AccountStatus,
+				"message": "Account " + session.AccountStatus,
+			})
+		}
+
 		realIP := GetRealIP(c)
 		if strictIP && session.LastSeenIP != nil && *session.LastSeenIP != realIP {
 			log.Printf("[session_auth] ip_changed session_id=%s old=%q new=%q (allowing through; token is the credential)",

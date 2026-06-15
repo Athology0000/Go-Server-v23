@@ -21,6 +21,10 @@ type Session struct {
 	Revoked              bool       `json:"revoked"`
 	LastSeenIP           *string    `json:"last_seen_ip"`
 	CreatedAt            time.Time  `json:"created_at"`
+	// AccountStatus is populated by GetSessionByTokenHash (JOIN accounts) so the
+	// auth middleware can reject banned/suspended accounts. Empty for sessions
+	// loaded by other queries.
+	AccountStatus string `json:"-"`
 }
 
 func CreateSession(
@@ -102,21 +106,23 @@ func GetSessionByTokenHash(
 ) (*Session, error) {
 	row := pool.QueryRow(ctx, `
 		SELECT
-			id,
-			session_token_hash,
-			device_id,
-			account_id,
-			plan_tier,
-			enabled_modules,
-			enabled_features,
-			entitlement_expires_at,
-			expires_at,
-			last_heartbeat_at,
-			revoked,
-			last_seen_ip,
-			created_at
-		FROM sessions
-		WHERE session_token_hash = $1
+			s.id,
+			s.session_token_hash,
+			s.device_id,
+			s.account_id,
+			s.plan_tier,
+			s.enabled_modules,
+			s.enabled_features,
+			s.entitlement_expires_at,
+			s.expires_at,
+			s.last_heartbeat_at,
+			s.revoked,
+			s.last_seen_ip,
+			s.created_at,
+			a.status
+		FROM sessions s
+		JOIN accounts a ON a.id = s.account_id
+		WHERE s.session_token_hash = $1
 	`, tokenHash)
 
 	s := &Session{}
@@ -134,9 +140,19 @@ func GetSessionByTokenHash(
 		&s.Revoked,
 		&s.LastSeenIP,
 		&s.CreatedAt,
+		&s.AccountStatus,
 	)
 
 	return s, err
+}
+
+// RevokeAccountSessions revokes every live session for an account. Used when an
+// account is banned so already-running game clients are cut off immediately
+// instead of lingering until their license expires.
+func RevokeAccountSessions(ctx context.Context, pool *pgxpool.Pool, accountID string) error {
+	_, err := pool.Exec(ctx,
+		`UPDATE sessions SET revoked = true WHERE account_id = $1 AND revoked = false`, accountID)
+	return err
 }
 
 func UpdateSessionExpiresAt(
