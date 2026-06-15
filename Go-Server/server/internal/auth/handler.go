@@ -39,6 +39,7 @@ type verifySessionRequest struct {
 	SessionToken      string `json:"session_token"`
 	Token             string `json:"token"`
 	MinecraftUsername string `json:"minecraft_username"`
+	HwidHash          string `json:"hwid_hash"`
 }
 
 type heartbeatRequest struct {
@@ -490,7 +491,7 @@ func handleVerifySession(svc *Service) fiber.Handler {
 			})
 		}
 
-		result, err := svc.VerifySession(c.Context(), rawToken, ip, minecraftUsername)
+		result, err := svc.VerifySession(c.Context(), rawToken, ip, minecraftUsername, req.HwidHash)
 
 		if errors.Is(err, ErrSessionInvalid) {
 			log.Printf("[auth.verify_session.route] response ip=%s status=401 reason=session_invalid", ip)
