@@ -628,6 +628,12 @@ func handleBanUser(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.Handler {
 		if err := db.UpdateAccountStatus(c.Context(), pool, id, "banned"); err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
+		// Cut off any live game-client sessions immediately. SessionAuth also
+		// rejects banned accounts on the next request, but revoking now is instant
+		// and closes the cached-entitlement window.
+		if err := db.RevokeAccountSessions(c.Context(), pool, id); err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
+		}
 		tok := middleware.GetAdminToken(c)
 		var body struct {
 			Reason string `json:"reason"`
