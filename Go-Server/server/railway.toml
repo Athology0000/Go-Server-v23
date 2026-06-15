@@ -1,0 +1,22 @@
+# Railway service config for the Phantom Go auth/content server.
+#
+# Build: the multi-stage Dockerfile in this directory (server/). Provision a
+# PostgreSQL plugin and a Redis plugin in the SAME Railway project; their
+# connection strings are wired to DB_URL / REDIS_URL (see docs/deploy/railway-runbook.md).
+#
+# The admin API is also mounted on the public port (see cmd/server/main.go), so
+# only one port needs exposing. Set PUBLIC_PORT to the port Railway targets (8080).
+#
+# Migrations run automatically on boot (db.RunMigrations); a fresh Railway Postgres
+# is built from migrations 001..009 on first start.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "./phantom-server"
+healthcheckPath = "/health"
+healthcheckTimeout = 120
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10

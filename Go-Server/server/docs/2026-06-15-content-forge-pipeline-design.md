@@ -3,7 +3,7 @@
 - **Date:** 2026-06-15
 - **Status:** Draft for review (no code yet)
 - **Owner:** Phantom
-- **Repos touched:** `Go-Server` (server: Go), `obfuscator` (one prod config file)
+- **Repos touched:** `Go-Server` only (the obfuscator is consumed as a built jar artifact; the forge-prod config ships with the server)
 
 ## 1. Goal
 
@@ -68,22 +68,23 @@ At most one `live` row per module; approving a new build moves the previous `liv
 
 ## 4. Components
 
-### 4.1 Obfuscator — one new prod config (`obfuscator/forge-prod.json`)
-Aggressive Fabric-compatible passes **plus** the watermark stage enabled (id/secret
-supplied per-build via CLI flags). No class encryption (Fabric-incompatible), no native
-(done locally). Based on the existing `phantom-fabric-aggressive.json`:
+### 4.1 Obfuscator — one new prod config (`Go-Server/server/configs/forge-prod.json`)
+**Decided:** start at the **proven MC-loadable set** (`name+string+record+number`) plus the
+watermark stage (id/secret supplied per-build via CLI flags). No class encryption
+(Fabric-incompatible), no native (done locally), and `flatten`/`runtimeMangle`/`integrity`
+held back until each is in-game-verified and added one at a time. The config ships with the
+server so `FORGE_CONFIG` is a deploy artifact, not an external obfuscator-repo path.
 
 ```json
 {
   "passes": [
-    { "name": "name" }, { "name": "string" }, { "name": "record" },
-    { "name": "number" }, { "name": "flatten" }, { "name": "runtimeMangle" }
+    { "name": "name" }, { "name": "string" }, { "name": "record" }, { "name": "number" }
   ],
   "stages": [
     { "name": "watermark", "enabled": true },
     { "name": "classEncryption", "enabled": false },
     { "name": "pack", "enabled": false },
-    { "name": "integrity", "enabled": true }
+    { "name": "integrity", "enabled": false }
   ],
   "crypto": { "keySplitParts": 3 },
   "watermark": { "enabled": true, "id": "forge-unset", "secret": "set-via---watermark-secret" },
@@ -184,17 +185,22 @@ POST   /admin/builds/:id/deny                   (super)  -> mark denied, purge s
 "Notification on the superadmin panel" = the panel polls `?status=pending_approval` and
 shows a badge/list with Approve/Deny buttons. (UI is increment 3; API is increment 2.)
 
-### 4.7 Promotion (on approve)
-Atomic, supersede-aware:
+### 4.7 Promotion (on approve) — IMPLEMENTED
+Atomic, supersede-aware. **Key simplification found during implementation:** the signed
+content manifest is built **on-demand from the filesystem** (`BuildStableManifest` scans
+`content/modules` + `content/native`, hashes each artifact, and Ed25519-signs per request;
+`buildNativeManifest` already covers the `.dll` hash, and the epoch rises with the newest
+mtime). So **installing the files into the content dir IS the go-live** — there is no manifest
+to persist or re-sign, and the `content_manifests` table is untouched. Steps:
 1. Verify staged artifacts still match `jar_sha256`/`dll_sha256` (tamper check).
-2. Install: copy staged `module.jar` → `content/modules/<module>.jar`, `module.dll` →
-   `content/native/<module>.dll` (write-temp + rename for atomicity).
-3. Rebuild + Ed25519-sign the content manifest including the dll hash in
-   `native_components`; persist to `content_manifests`.
-4. `UPDATE content_builds SET status='superseded' WHERE module=$m AND status='live'`,
-   then this row → `live`, set `decided_by/at`.
-5. Audit-log the promotion.
-Rollback is "approve the previous build" (its staged artifacts are retained until purged).
+2. Install: staged `module.jar` → `content/modules/<module>.jar`, `module.dll` →
+   `content/native/<module>.dll` (write-temp + `os.Rename`, which atomically replaces the
+   prior live artifact — Go's rename replaces on Windows too).
+3. `content_builds`: supersede the prior live row for the module, set this row `live`,
+   record `decided_by/at`. (Bookkeeping; serving is already live from step 2.)
+4. Audit-log the promotion (`admin.build.approve`).
+The next manifest request rebuilds + signs from the filesystem, automatically including the
+new jar + dll hashes and a risen epoch. Rollback = approve the previous build.
 
 ### 4.8 Serve (unchanged)
 `GET /content/module/:name` already serves `content/modules/<name>.jar` and applies the
@@ -253,16 +259,15 @@ delivery from execution. Out of scope for v1.)
 4. **(exists)** per-user watermark on download — already shipped.
 
 ## 10. Open questions / risks
-- **MC-loadability of the forge-prod pass set (highest risk):** only `name+string+record+
-  number` is confirmed loadable in-game so far. `forge-prod.json` here also enables
-  `flatten`, `runtimeMangle`, and the `integrity` stage — these are **not yet MC-verified**.
-  Before declaring forge-prod "production," the operator (in-game verifier) must confirm a
-  forged build still loads in Minecraft; if any pass breaks loading, trim it from the config.
-  Recommended: start `forge-prod.json` at the proven set and add passes one at a time with
-  an in-game check each.
-- **Manifest builder reuse:** promotion must call the existing stable-manifest builder so
-  the dll hash lands in `native_components` correctly — confirm the builder accepts a
-  native component + hash, or extend it. (Resolve when implementing increment 2.)
+- **MC-loadability of the forge-prod pass set — RESOLVED:** forge-prod ships at the proven
+  `name+string+record+number` set (operator verifies in MC). `flatten`/`runtimeMangle`/
+  `integrity` are deferred and added one at a time, each gated by an in-game load check.
+  No longer a blocking risk for v1.
+- **Manifest builder reuse — RESOLVED:** no reuse needed. The stable manifest is built
+  on-demand from the filesystem and `buildNativeManifest` already hashes every `.dll` in
+  `content/native`, so a promoted dll appears in `native_components` automatically on the next
+  manifest request. Promotion does not touch the manifest subsystem (and so never conflicts
+  with the in-flight manifest WIP).
 - **Module naming:** forge `--name` must map to the served module id used by entitlements
   (`NormalizeModuleName`/`ModuleAllowed`). Use the same normalization the content service
   uses so a forged module is immediately entitle-able.
