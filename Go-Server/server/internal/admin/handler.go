@@ -13,12 +13,13 @@ import (
 	"github.com/phantom/server/internal/content"
 	"github.com/phantom/server/internal/crypto"
 	"github.com/phantom/server/internal/db"
+	"github.com/phantom/server/internal/forge"
 	"github.com/phantom/server/internal/logbuf"
 	"github.com/phantom/server/internal/middleware"
 	"github.com/redis/go-redis/v9"
 )
 
-func RegisterRoutes(app *fiber.App, pool *pgxpool.Pool, rdb *redis.Client, signingKey []byte, auditSvc *audit.Service, adminAPISecret string) {
+func RegisterRoutes(app *fiber.App, pool *pgxpool.Pool, rdb *redis.Client, signingKey []byte, auditSvc *audit.Service, adminAPISecret string, contentDir string) {
 	viewer := middleware.AdminAuth(pool, "viewer")
 	support := middleware.AdminAuth(pool, "support")
 	super := middleware.AdminAuth(pool, "super_admin")
@@ -73,6 +74,13 @@ func RegisterRoutes(app *fiber.App, pool *pgxpool.Pool, rdb *redis.Client, signi
 	// Manifests
 	app.Post("/admin/manifests", super, handleCreateManifest(pool, signingKey, auditSvc))
 	app.Get("/admin/manifests", viewer, handleGetLatestManifest(pool))
+
+	// Forge builds (super_admin): list pending forged builds, approve (promote live) or deny.
+	forgePromoter := &forge.Promoter{ContentDir: contentDir}
+	app.Get("/admin/builds", super, handleListBuilds(pool))
+	app.Get("/admin/builds/:id", super, handleGetBuild(pool))
+	app.Post("/admin/builds/:id/approve", super, handleApproveBuild(pool, auditSvc, forgePromoter))
+	app.Post("/admin/builds/:id/deny", super, handleDenyBuild(pool, auditSvc, forgePromoter))
 
 	// Sessions
 	app.Get("/admin/sessions", viewer, handleListSessions(pool))

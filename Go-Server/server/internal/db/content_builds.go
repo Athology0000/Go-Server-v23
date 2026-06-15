@@ -71,6 +71,42 @@ func GetBuildByBuildID(ctx context.Context, pool *pgxpool.Pool, buildID string) 
 	return scanContentBuild(row)
 }
 
+// ApproveBuild marks a build live and records who approved it.
+func ApproveBuild(ctx context.Context, pool *pgxpool.Pool, buildID, decidedBy string) (*ContentBuild, error) {
+	row := pool.QueryRow(ctx,
+		`UPDATE content_builds SET status = 'live', decided_by = $2, decided_at = now()
+		 WHERE build_id = $1 RETURNING `+contentBuildCols,
+		buildID, decidedBy)
+	return scanContentBuild(row)
+}
+
+// DenyBuild marks a build denied and records who denied it.
+func DenyBuild(ctx context.Context, pool *pgxpool.Pool, buildID, decidedBy string) (*ContentBuild, error) {
+	row := pool.QueryRow(ctx,
+		`UPDATE content_builds SET status = 'denied', decided_by = $2, decided_at = now()
+		 WHERE build_id = $1 RETURNING `+contentBuildCols,
+		buildID, decidedBy)
+	return scanContentBuild(row)
+}
+
+// SupersedePriorLive moves any current live build(s) for a module (other than exceptBuildID)
+// to 'superseded' — called when a newer build is promoted so a module has at most one live row.
+func SupersedePriorLive(ctx context.Context, pool *pgxpool.Pool, module, exceptBuildID string) error {
+	_, err := pool.Exec(ctx,
+		`UPDATE content_builds SET status = 'superseded'
+		 WHERE module = $1 AND status = 'live' AND build_id <> $2`,
+		module, exceptBuildID)
+	return err
+}
+
+// GetLiveBuild returns the current live build for a module, or pgx.ErrNoRows if none.
+func GetLiveBuild(ctx context.Context, pool *pgxpool.Pool, module string) (*ContentBuild, error) {
+	row := pool.QueryRow(ctx,
+		`SELECT `+contentBuildCols+` FROM content_builds WHERE module = $1 AND status = 'live' LIMIT 1`,
+		module)
+	return scanContentBuild(row)
+}
+
 // ListBuildsByStatus returns builds in a given status, newest first (drives the panel
 // pending-approval list).
 func ListBuildsByStatus(ctx context.Context, pool *pgxpool.Pool, status string, limit int) ([]*ContentBuild, error) {

@@ -185,17 +185,22 @@ POST   /admin/builds/:id/deny                   (super)  -> mark denied, purge s
 "Notification on the superadmin panel" = the panel polls `?status=pending_approval` and
 shows a badge/list with Approve/Deny buttons. (UI is increment 3; API is increment 2.)
 
-### 4.7 Promotion (on approve)
-Atomic, supersede-aware:
+### 4.7 Promotion (on approve) — IMPLEMENTED
+Atomic, supersede-aware. **Key simplification found during implementation:** the signed
+content manifest is built **on-demand from the filesystem** (`BuildStableManifest` scans
+`content/modules` + `content/native`, hashes each artifact, and Ed25519-signs per request;
+`buildNativeManifest` already covers the `.dll` hash, and the epoch rises with the newest
+mtime). So **installing the files into the content dir IS the go-live** — there is no manifest
+to persist or re-sign, and the `content_manifests` table is untouched. Steps:
 1. Verify staged artifacts still match `jar_sha256`/`dll_sha256` (tamper check).
-2. Install: copy staged `module.jar` → `content/modules/<module>.jar`, `module.dll` →
-   `content/native/<module>.dll` (write-temp + rename for atomicity).
-3. Rebuild + Ed25519-sign the content manifest including the dll hash in
-   `native_components`; persist to `content_manifests`.
-4. `UPDATE content_builds SET status='superseded' WHERE module=$m AND status='live'`,
-   then this row → `live`, set `decided_by/at`.
-5. Audit-log the promotion.
-Rollback is "approve the previous build" (its staged artifacts are retained until purged).
+2. Install: staged `module.jar` → `content/modules/<module>.jar`, `module.dll` →
+   `content/native/<module>.dll` (write-temp + `os.Rename`, which atomically replaces the
+   prior live artifact — Go's rename replaces on Windows too).
+3. `content_builds`: supersede the prior live row for the module, set this row `live`,
+   record `decided_by/at`. (Bookkeeping; serving is already live from step 2.)
+4. Audit-log the promotion (`admin.build.approve`).
+The next manifest request rebuilds + signs from the filesystem, automatically including the
+new jar + dll hashes and a risen epoch. Rollback = approve the previous build.
 
 ### 4.8 Serve (unchanged)
 `GET /content/module/:name` already serves `content/modules/<name>.jar` and applies the
@@ -258,9 +263,11 @@ delivery from execution. Out of scope for v1.)
   `name+string+record+number` set (operator verifies in MC). `flatten`/`runtimeMangle`/
   `integrity` are deferred and added one at a time, each gated by an in-game load check.
   No longer a blocking risk for v1.
-- **Manifest builder reuse:** promotion must call the existing stable-manifest builder so
-  the dll hash lands in `native_components` correctly — confirm the builder accepts a
-  native component + hash, or extend it. (Resolve when implementing increment 2.)
+- **Manifest builder reuse — RESOLVED:** no reuse needed. The stable manifest is built
+  on-demand from the filesystem and `buildNativeManifest` already hashes every `.dll` in
+  `content/native`, so a promoted dll appears in `native_components` automatically on the next
+  manifest request. Promotion does not touch the manifest subsystem (and so never conflicts
+  with the in-flight manifest WIP).
 - **Module naming:** forge `--name` must map to the served module id used by entitlements
   (`NormalizeModuleName`/`ModuleAllowed`). Use the same normalization the content service
   uses so a forged module is immediately entitle-able.
