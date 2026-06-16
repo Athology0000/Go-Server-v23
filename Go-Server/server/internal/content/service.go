@@ -76,7 +76,7 @@ func (s *Service) GetStableManifest(ctx context.Context, accountID string) (*db.
 		return nil, ErrNotEntitled
 	}
 
-	return BuildStableManifest(ctx, s.contentDir, s.baseURL, ent.ContentChannel, s.signingKey, s.moduleKey, ent.EnabledModules)
+	return BuildStableManifest(ctx, s.contentDir, ent.LicenseID, s.baseURL, ent.ContentChannel, s.signingKey, s.moduleKey, ent.EnabledModules)
 }
 
 func (s *Service) ModuleBytes(ctx context.Context, accountID, name string) ([]byte, string, error) {
@@ -91,7 +91,9 @@ func (s *Service) ModuleBytes(ctx context.Context, accountID, name string) ([]by
 		return nil, "", ErrNotEntitled
 	}
 
-	path, err := moduleFilePath(s.contentDir, moduleName)
+	// Per-license routing: serve from the requesting account's CONTENT_DIR/modules/<licenseId>
+	// subtree when present (its uniquely-watermarked bundles), else the shared dir.
+	path, err := moduleFilePath(effectiveModulesDir(s.contentDir, ent.LicenseID), moduleName)
 	if err != nil {
 		return nil, "", err
 	}

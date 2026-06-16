@@ -57,8 +57,24 @@ func SignManifest(signingKey []byte, m *db.ContentManifest) (string, error) {
 	return ccrypto.SignManifest(signingKey, signedPayloadOf(m))
 }
 
-func BuildStableManifest(_ context.Context, contentDir, baseURL, channel string, signingKey, moduleKey []byte, enabledModules []string) (*db.ContentManifest, error) {
-	modulesDir := filepath.Join(contentDir, "modules")
+// effectiveModulesDir returns the per-license content subtree (CONTENT_DIR/modules/<licenseId>) when
+// it exists, otherwise the shared CONTENT_DIR/modules. Per-license bundles are watermarked uniquely,
+// so a client served from its own subtree gets bundles (and manifest hashes) distinct from everyone
+// else's; a license with no subtree falls back to the shared build.
+func effectiveModulesDir(contentDir, licenseID string) string {
+	shared := filepath.Join(contentDir, "modules")
+	if licenseID == "" {
+		return shared
+	}
+	perLicense := filepath.Join(shared, licenseID)
+	if info, err := os.Stat(perLicense); err == nil && info.IsDir() {
+		return perLicense
+	}
+	return shared
+}
+
+func BuildStableManifest(_ context.Context, contentDir, licenseID, baseURL, channel string, signingKey, moduleKey []byte, enabledModules []string) (*db.ContentManifest, error) {
+	modulesDir := effectiveModulesDir(contentDir, licenseID)
 	entries, err := os.ReadDir(modulesDir)
 	if err != nil {
 		return nil, err
@@ -208,20 +224,20 @@ func NormalizeModuleName(name string) string {
 	return strings.TrimSuffix(safeName, filepath.Ext(safeName))
 }
 
-func moduleFilePath(contentDir, name string) (string, error) {
+func moduleFilePath(modulesDir, name string) (string, error) {
 	moduleName := NormalizeModuleName(name)
 	if moduleName == "" || moduleName == "." {
 		return "", ErrNotFound
 	}
 
-	path := filepath.Join(contentDir, "modules", moduleName+".jar")
+	path := filepath.Join(modulesDir, moduleName+".jar")
 	if _, err := os.Stat(path); err == nil {
 		return path, nil
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return "", err
 	}
 
-	encPath := filepath.Join(contentDir, "modules", moduleName+".enc")
+	encPath := filepath.Join(modulesDir, moduleName+".enc")
 	if _, encErr := os.Stat(encPath); encErr == nil {
 		return encPath, nil
 	} else if !errors.Is(encErr, os.ErrNotExist) {

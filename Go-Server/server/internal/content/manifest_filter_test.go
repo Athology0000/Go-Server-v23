@@ -31,7 +31,7 @@ func buildFor(t *testing.T, dir string, enabled []string) []string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m, err := BuildStableManifest(context.Background(), dir, "https://example.test", "stable",
+	m, err := BuildStableManifest(context.Background(), dir, "", "https://example.test", "stable",
 		priv, make([]byte, 32), enabled)
 	if err != nil {
 		t.Fatal(err)
@@ -49,7 +49,7 @@ func TestManifestFiltersToEntitledModules(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m, err := BuildStableManifest(context.Background(), dir, "https://example.test", "stable",
+	m, err := BuildStableManifest(context.Background(), dir, "", "https://example.test", "stable",
 		priv, make([]byte, 32), []string{"autowalk"})
 	if err != nil {
 		t.Fatal(err)
@@ -79,7 +79,7 @@ func TestManifestWithoutCoreBundleErrors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = BuildStableManifest(context.Background(), dir, "https://example.test", "stable",
+	_, err = BuildStableManifest(context.Background(), dir, "", "https://example.test", "stable",
 		priv, make([]byte, 32), []string{"autowalk"})
 	if err == nil {
 		t.Fatal("expected an error for a content dir with no core bundle")

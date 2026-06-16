@@ -58,6 +58,9 @@ func RegisterRoutes(app *fiber.App, pool *pgxpool.Pool, signingKey []byte, audit
 	app.Get("/admin/licenses/:account_id", viewer, handleGetLicense(pool))
 	app.Patch("/admin/licenses/:id/status", support, handleUpdateLicenseStatus(pool, auditSvc))
 
+	// Leak tracing: map a recovered bundle watermark id back to the license it was built for.
+	app.Get("/admin/trace/watermark/:wmid", support, handleTraceWatermark(contentDir))
+
 	// License keys
 	app.Post("/admin/license-keys", super, handleGenerateLicenseKeys(pool, auditSvc))
 	app.Delete("/admin/license-keys/:id", super, handleRevokeLicenseKey(pool, auditSvc))
@@ -171,6 +174,17 @@ func handleUpdateAccountStatus(pool *pgxpool.Pool, auditSvc *audit.Service) fibe
 		auditSvc.Log("admin.account.status", &id, nil, &tok.AdminUsername, nil,
 			map[string]any{"status": body.Status})
 		return c.JSON(fiber.Map{"status": "updated"})
+	}
+}
+
+func handleTraceWatermark(contentDir string) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		wmid := c.Params("wmid")
+		licenseID, err := content.LookupWatermark(contentDir, wmid)
+		if err != nil {
+			return c.Status(404).JSON(fiber.Map{"error": "not_found", "wmid": wmid})
+		}
+		return c.JSON(fiber.Map{"wmid": wmid, "license_id": licenseID})
 	}
 }
 
