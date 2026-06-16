@@ -73,16 +73,30 @@ func TestManifestFiltersToEntitledModules(t *testing.T) {
 	}
 }
 
-func TestManifestWithoutCoreBundleErrors(t *testing.T) {
-	dir := contentDirWith(t, "phantom-autowalk.jar") // no phantom.jar: misdeployed
+func TestManifestWithoutCoreBundleSucceeds(t *testing.T) {
+	// The framework core ships INSIDE the client jar in this deployment model, so a content dir
+	// with only non-core module bundles is a valid deployment and must build a manifest (modules
+	// resolve their framework superclasses from the jar's parent classloader), not error.
+	dir := contentDirWith(t, "phantom-autowalk.jar", "phantom-combat.jar") // no phantom.jar core
+	got := buildFor(t, dir, []string{"autowalk", "combat"})
+	want := []string{"phantom-autowalk", "phantom-combat"} // sorted
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("modules = %v, want %v", got, want)
+	}
+}
+
+func TestManifestEmptyContentDirErrors(t *testing.T) {
+	// A content dir with zero module artifacts is a genuine misdeploy and must still error rather
+	// than signing a manifest that delivers nothing.
+	dir := contentDirWith(t) // modules/ exists but is empty
 	_, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
 	_, err = BuildStableManifest(context.Background(), dir, "", "https://example.test", "stable",
-		priv, make([]byte, 32), []string{"autowalk"})
+		priv, make([]byte, 32), []string{"*"})
 	if err == nil {
-		t.Fatal("expected an error for a content dir with no core bundle")
+		t.Fatal("expected an error for an empty content dir")
 	}
 }
 

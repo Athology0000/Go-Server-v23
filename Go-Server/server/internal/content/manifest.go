@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -141,10 +140,13 @@ func BuildStableManifest(_ context.Context, contentDir, licenseID, baseURL, chan
 		modules[i].InitOrder = i
 	}
 
-	// A manifest with no core bundle means the content dir is misdeployed
-	// (core is always entitled, so filtering can never remove it). Fail like
-	// the old zero-modules guard did instead of signing an unusable manifest.
-	if !slices.ContainsFunc(modules, func(m db.ManifestModule) bool { return m.Required }) {
+	// In this deployment model the framework core ships INSIDE the client jar, so there is no
+	// server-delivered core bundle — modules resolve their framework superclasses from the jar
+	// (parent classloader). We therefore no longer require a Required/core module; we only fail an
+	// empty content dir (zero modules), so a genuine misdeploy still surfaces instead of signing a
+	// manifest that delivers nothing. (Entitlement filtering can narrow per account, but the
+	// unfiltered filesystem always has ≥1 module when correctly deployed.)
+	if len(modules) == 0 {
 		return nil, ErrNotFound
 	}
 

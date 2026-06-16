@@ -894,18 +894,38 @@ func normalize(s string) string {
 }
 
 func (s *Service) resolveManifest(ctx context.Context, licenseID, channel string, enabledModules []string) (string, string, error) {
-	manifest, err := db.GetLatestManifest(ctx, s.pool, channel)
-	if err == nil {
-		return s.baseURL + "/content/manifest/" + manifest.ID, manifest.Signature, nil
+	dbManifest, dbErr := db.GetLatestManifest(ctx, s.pool, channel)
+
+	// An operator-pinned DB manifest wins ONLY when it actually delivers modules. An empty manifest
+	// (historically inserted just to clear a 503) must not shadow the per-account filesystem build,
+	// or unlock succeeds but no modules ever stream. It is still honored as a last-resort safety net
+	// below, so a content-build failure can never re-introduce a fleet lockout.
+	if dbErr == nil && len(dbManifest.Modules) > 0 {
+		return s.baseURL + "/content/manifest/" + dbManifest.ID, dbManifest.Signature, nil
 	}
 
-	// Server-side per-license generation: materialize this license's bundles (no-op once cached)
-	// before building the stable manifest, so a fresh license resolves without a build/redeploy.
+	stableURL, stableSig, stableErr := s.resolveStableManifest(ctx, licenseID, channel, enabledModules)
+	if stableErr == nil {
+		return stableURL, stableSig, nil
+	}
+
+	// Fail-open, not fail-closed: if the filesystem build fails (e.g. content not yet deployed) but
+	// any DB manifest exists (even an empty one), serve it so authentication still completes and
+	// unlock stays alive, rather than 503-locking the whole fleet.
+	if dbErr == nil {
+		return s.baseURL + "/content/manifest/" + dbManifest.ID, dbManifest.Signature, nil
+	}
+	return "", "", fmt.Errorf("manifest lookup failed: %w; stable manifest build failed: %v", dbErr, stableErr)
+}
+
+// resolveStableManifest materializes this license's bundles (no-op once cached) and builds the
+// per-account filesystem manifest. Split out so resolveManifest can treat any failure here uniformly
+// and fall back to a DB manifest.
+func (s *Service) resolveStableManifest(ctx context.Context, licenseID, channel string, enabledModules []string) (string, string, error) {
 	if genErr := content.EnsureLicenseBundles(s.cfg.ContentDir, licenseID, s.cfg.ModuleEncryptionKey, s.cfg.ModuleWmSecret, s.cfg.ModuleWmPepper); genErr != nil {
 		return "", "", fmt.Errorf("generate license bundles: %w", genErr)
 	}
-
-	stableManifest, stableErr := content.BuildStableManifest(
+	stableManifest, err := content.BuildStableManifest(
 		ctx,
 		s.cfg.ContentDir,
 		licenseID,
@@ -915,10 +935,9 @@ func (s *Service) resolveManifest(ctx context.Context, licenseID, channel string
 		s.cfg.ModuleEncryptionKey,
 		enabledModules,
 	)
-	if stableErr != nil {
-		return "", "", fmt.Errorf("manifest lookup failed: %w; stable manifest build failed: %v", err, stableErr)
+	if err != nil {
+		return "", "", err
 	}
-
 	return s.baseURL + "/content/manifest/stable", stableManifest.Signature, nil
 }
 
