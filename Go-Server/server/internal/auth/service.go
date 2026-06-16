@@ -899,6 +899,12 @@ func (s *Service) resolveManifest(ctx context.Context, licenseID, channel string
 		return s.baseURL + "/content/manifest/" + manifest.ID, manifest.Signature, nil
 	}
 
+	// Server-side per-license generation: materialize this license's bundles (no-op once cached)
+	// before building the stable manifest, so a fresh license resolves without a build/redeploy.
+	if genErr := content.EnsureLicenseBundles(s.cfg.ContentDir, licenseID, s.cfg.ModuleEncryptionKey, s.cfg.ModuleWmSecret, s.cfg.ModuleWmPepper); genErr != nil {
+		return "", "", fmt.Errorf("generate license bundles: %w", genErr)
+	}
+
 	stableManifest, stableErr := content.BuildStableManifest(
 		ctx,
 		s.cfg.ContentDir,

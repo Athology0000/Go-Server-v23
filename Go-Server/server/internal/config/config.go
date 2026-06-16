@@ -44,6 +44,13 @@ type Config struct {
 	WatermarkObfJar     string // path to the watermark-capable obfuscator jar
 	WatermarkConfigPath string // path to the watermark-only obfuscator config json
 	WatermarkSecret     string // HMAC secret used to sign/verify the embedded watermark
+
+	// Server-side per-license generation (pure Go, no JVM): when both are set, the content service
+	// watermarks each license's bundles from CONTENT_DIR/_jars and AES-encrypts them on first
+	// request. These mirror the build-side MODULE_WM_SECRET/MODULE_WM_PEPPER, held server-side so the
+	// server can stamp + trace per license without a build/redeploy per customer.
+	ModuleWmSecret string
+	ModuleWmPepper string
 }
 
 const defaultModuleEncryptionKeyB64 = "+KNMlsGkQLDvy2mcNClGzYIS65A5JQocOuRl2gtUVeQ="
@@ -103,6 +110,8 @@ func Load() (*Config, error) {
 		WatermarkObfJar:     getEnvOr("WATERMARK_OBFUSCATOR_JAR", ""),
 		WatermarkConfigPath: getEnvOr("WATERMARK_CONFIG", ""),
 		WatermarkSecret:     getEnvOr("WATERMARK_SECRET", ""),
+		ModuleWmSecret:      getEnvOr("MODULE_WM_SECRET", ""),
+		ModuleWmPepper:      getEnvOr("MODULE_WM_PEPPER", ""),
 	}
 
 	if cfg.AppEnv != "production" && os.Getenv("ALLOW_PUBLIC_REGISTRATION") == "" {

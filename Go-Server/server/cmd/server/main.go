@@ -99,6 +99,14 @@ func main() {
 		cfg.BaseURL,
 	)
 
+	// Server-side per-license generation: when MODULE_WM_SECRET/MODULE_WM_PEPPER are set, the content
+	// service watermarks + encrypts each license's bundles in pure Go from CONTENT_DIR/_jars on first
+	// request (no JVM, no per-customer build/redeploy).
+	if cfg.ModuleWmSecret != "" && cfg.ModuleWmPepper != "" {
+		contentSvc.SetGeneration(cfg.ModuleWmSecret, cfg.ModuleWmPepper)
+		log.Printf("[content] server-side per-license generation enabled (jars=%s/_jars)", cfg.ContentDir)
+	}
+
 	// Per-user watermarking of .jar downloads. Gated behind WATERMARK_ENABLED and a fully
 	// configured obfuscator jar/config/secret; otherwise downloads stay byte-exact.
 	if cfg.WatermarkEnabled {

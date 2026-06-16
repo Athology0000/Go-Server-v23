@@ -28,7 +28,15 @@ type Service struct {
 	signingKey  []byte
 	moduleKey   []byte
 	baseURL     string
+	wmSecret    string // server-side per-license generation; empty = generation off (serve on-disk only)
+	wmPepper    string
 	watermarker *Watermarker // optional; when set+enabled, .jar downloads are stamped per-account
+}
+
+// SetGeneration enables server-side per-license bundle generation (pure Go) from CONTENT_DIR/_jars.
+func (s *Service) SetGeneration(wmSecret, wmPepper string) {
+	s.wmSecret = wmSecret
+	s.wmPepper = wmPepper
 }
 
 // SetWatermarker enables per-user watermarking of .jar downloads. nil/unconfigured leaves
@@ -76,6 +84,12 @@ func (s *Service) GetStableManifest(ctx context.Context, accountID string) (*db.
 		return nil, ErrNotEntitled
 	}
 
+	// Generate this license's watermarked bundles on first sight (no-op once cached), so the manifest
+	// below hashes the freshly-generated per-license .enc.
+	if err := EnsureLicenseBundles(s.contentDir, ent.LicenseID, s.moduleKey, s.wmSecret, s.wmPepper); err != nil {
+		return nil, err
+	}
+
 	return BuildStableManifest(ctx, s.contentDir, ent.LicenseID, s.baseURL, ent.ContentChannel, s.signingKey, s.moduleKey, ent.EnabledModules)
 }
 
@@ -89,6 +103,11 @@ func (s *Service) ModuleBytes(ctx context.Context, accountID, name string) ([]by
 
 	if !ModuleAllowed(moduleName, ent.EnabledModules) {
 		return nil, "", ErrNotEntitled
+	}
+
+	// Generate this license's bundles on first sight (no-op once cached) so the download below resolves.
+	if err := EnsureLicenseBundles(s.contentDir, ent.LicenseID, s.moduleKey, s.wmSecret, s.wmPepper); err != nil {
+		return nil, "", err
 	}
 
 	// Per-license routing: serve from the requesting account's CONTENT_DIR/modules/<licenseId>
