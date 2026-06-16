@@ -3,10 +3,14 @@ package db
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// ErrManifestNotFound is returned when a manifest id does not exist.
+var ErrManifestNotFound = errors.New("manifest not found")
 
 type ManifestModule struct {
 	Name      string `json:"name"`
@@ -74,6 +78,19 @@ func scanManifest(row scannable) (*ContentManifest, error) {
 	// integer that was signed (the millis floor round-trips through timestamptz).
 	m.ExpiresAtMillis = m.ExpiresAt.UnixMilli()
 	return m, nil
+}
+
+// RevokeManifest marks a content manifest revoked so GetLatestManifest stops returning it (the
+// resolver then falls through to the per-license stable manifest). Idempotent on already-revoked rows.
+func RevokeManifest(ctx context.Context, pool *pgxpool.Pool, id string) error {
+	tag, err := pool.Exec(ctx, `UPDATE content_manifests SET revoked = true WHERE id = $1`, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrManifestNotFound
+	}
+	return nil
 }
 
 func CreateManifest(ctx context.Context, pool *pgxpool.Pool, m *ContentManifest) (*ContentManifest, error) {

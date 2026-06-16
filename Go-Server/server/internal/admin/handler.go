@@ -79,6 +79,7 @@ func RegisterRoutes(app *fiber.App, pool *pgxpool.Pool, signingKey []byte, audit
 	// Manifests
 	app.Post("/admin/manifests", super, handleCreateManifest(pool, signingKey, auditSvc))
 	app.Get("/admin/manifests", viewer, handleGetLatestManifest(pool))
+	app.Patch("/admin/manifests/:id/revoke", super, handleRevokeManifest(pool, auditSvc))
 
 	// Forge builds (super_admin): list pending forged builds, approve (promote live) or deny.
 	forgePromoter := &forge.Promoter{ContentDir: contentDir}
@@ -174,6 +175,19 @@ func handleUpdateAccountStatus(pool *pgxpool.Pool, auditSvc *audit.Service) fibe
 		auditSvc.Log("admin.account.status", &id, nil, &tok.AdminUsername, nil,
 			map[string]any{"status": body.Status})
 		return c.JSON(fiber.Map{"status": "updated"})
+	}
+}
+
+func handleRevokeManifest(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		id := c.Params("id")
+		if err := db.RevokeManifest(c.Context(), pool, id); err != nil {
+			return c.Status(404).JSON(fiber.Map{"error": "not_found", "id": id})
+		}
+		tok := middleware.GetAdminToken(c)
+		auditSvc.Log("admin.manifest.revoke", nil, nil, &tok.AdminUsername, nil,
+			map[string]any{"manifest_id": id})
+		return c.JSON(fiber.Map{"status": "revoked", "id": id})
 	}
 }
 
