@@ -56,7 +56,7 @@ func TestBuildStableManifest_HashesServedCiphertext(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	m, err := BuildStableManifest(context.Background(), dir, "https://example.test", "stable", fixedSigningKey(), moduleKey, []string{"*"})
+	m, err := BuildStableManifest(context.Background(), dir, "", "https://example.test", "stable", fixedSigningKey(), moduleKey, []string{"*"})
 	if err != nil {
 		t.Fatalf("BuildStableManifest: %v", err)
 	}
@@ -111,7 +111,7 @@ func TestBuildStableManifest_WrongModuleKeyFails(t *testing.T) {
 	for i := range wrongKey {
 		wrongKey[i] = byte(255 - i)
 	}
-	if _, err := BuildStableManifest(context.Background(), dir, "https://example.test", "stable", fixedSigningKey(), wrongKey, []string{"*"}); err == nil {
+	if _, err := BuildStableManifest(context.Background(), dir, "", "https://example.test", "stable", fixedSigningKey(), wrongKey, []string{"*"}); err == nil {
 		t.Fatal("expected BuildStableManifest to fail with a wrong module key, got nil error")
 	}
 }
@@ -136,7 +136,7 @@ func TestBuildStableManifest_SignatureVerifies(t *testing.T) {
 	}
 
 	priv := fixedSigningKey()
-	m, err := BuildStableManifest(context.Background(), dir, "https://example.test", "stable", priv, fixedModuleKey(), []string{"*"})
+	m, err := BuildStableManifest(context.Background(), dir, "", "https://example.test", "stable", priv, fixedModuleKey(), []string{"*"})
 	if err != nil {
 		t.Fatalf("BuildStableManifest: %v", err)
 	}

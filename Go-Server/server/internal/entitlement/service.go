@@ -14,6 +14,7 @@ import (
 type Result struct {
 	Authorized           bool
 	Reason               string
+	LicenseID            string
 	PlanTier             string
 	EnabledModules       []string
 	EnabledFeatures      []string
@@ -58,7 +59,9 @@ func (s *Service) Resolve(ctx context.Context, accountID string) (*Result, error
 			// A full-access tier is a runtime rule, not a DB row: a missing row
 			// still grants it. Anything else without a row has no entitlement.
 			if fullAccess {
-				return fullAccessResult(license.PlanTier, "stable", license.ExpiresAt), nil
+				res := fullAccessResult(license.PlanTier, "stable", license.ExpiresAt)
+				res.LicenseID = license.ID
+				return res, nil
 			}
 			return &Result{Authorized: false, Reason: "no_entitlement"}, nil
 		}
@@ -72,7 +75,9 @@ func (s *Service) Resolve(ctx context.Context, accountID string) (*Result, error
 		contentChannel = "stable"
 	}
 	if fullAccess {
-		return fullAccessResult(license.PlanTier, contentChannel, license.ExpiresAt), nil
+		res := fullAccessResult(license.PlanTier, contentChannel, license.ExpiresAt)
+		res.LicenseID = license.ID
+		return res, nil
 	}
 
 	modules := make([]string, len(ent.EnabledModules))
@@ -93,6 +98,7 @@ func (s *Service) Resolve(ctx context.Context, accountID string) (*Result, error
 
 	return &Result{
 		Authorized:           true,
+		LicenseID:            license.ID,
 		PlanTier:             license.PlanTier,
 		EnabledModules:       modules,
 		EnabledFeatures:      features,
