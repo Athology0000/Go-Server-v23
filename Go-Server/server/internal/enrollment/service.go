@@ -28,10 +28,19 @@ type Service struct {
 	auditSvc  *audit.Service
 	masterKey []byte
 	pepper    []byte
+	// deviceSecret is the DeviceSecret module: it owns the master key for sealing/opening a
+	// device secret, so Handshake asks to seal/open instead of calling AES-GCM with the key.
+	deviceSecret *crypto.DeviceSecret
 }
 
 func New(pool *pgxpool.Pool, auditSvc *audit.Service, masterKey, pepper []byte) *Service {
-	return &Service{pool: pool, auditSvc: auditSvc, masterKey: masterKey, pepper: pepper}
+	return &Service{
+		pool:         pool,
+		auditSvc:     auditSvc,
+		masterKey:    masterKey,
+		pepper:       pepper,
+		deviceSecret: crypto.NewDeviceSecret(masterKey),
+	}
 }
 
 // Redeem now lives in the Redemption module (redemption.go): the multi-step redemption
@@ -65,7 +74,7 @@ func (s *Service) Handshake(ctx context.Context, username, password, sourceIP st
 		if _, randErr := rand.Read(secretPlain); randErr != nil {
 			return "", randErr
 		}
-		enc, encErr := crypto.EncryptAESGCM(s.masterKey, secretPlain)
+		enc, encErr := s.deviceSecret.Seal(secretPlain)
 		if encErr != nil {
 			return "", encErr
 		}
@@ -89,7 +98,7 @@ func (s *Service) Handshake(ctx context.Context, username, password, sourceIP st
 	if err := db.MarkEnrolled(ctx, s.pool, device.ID); err != nil {
 		return "", err
 	}
-	plain, err := crypto.DecryptAESGCM(s.masterKey, device.DeviceSecretEncrypted)
+	plain, err := s.deviceSecret.Open(device.DeviceSecretEncrypted)
 	if err != nil {
 		return "", err
 	}

@@ -10,6 +10,10 @@ import (
 	"github.com/phantom/server/internal/db"
 )
 
+// tokenIssuer hashes presented bearer tokens through the TokenIssuer module so the
+// middleware asks for a token's stored-hash form instead of calling HashToken raw.
+var tokenIssuer = crypto.NewTokenIssuer()
+
 // SessionAuth validates the bearer token. When strictIP is true the request's
 // source IP must match the session's last_seen_ip — but we always refresh
 // last_seen_ip on a successful pass so subsequent requests in the same launch
@@ -23,7 +27,7 @@ func SessionAuth(pool *pgxpool.Pool, strictIP bool, livenessWindow time.Duration
 		if err != nil {
 			return c.Status(401).JSON(fiber.Map{"error": "authentication_failed", "message": "Authentication failed"})
 		}
-		hash, err := crypto.HashToken(raw)
+		hash, err := tokenIssuer.HashPresented(raw)
 		if err != nil {
 			return c.Status(401).JSON(fiber.Map{"error": "authentication_failed", "message": "Authentication failed"})
 		}

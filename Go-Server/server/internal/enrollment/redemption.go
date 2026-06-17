@@ -60,11 +60,19 @@ type Redemption struct {
 	pool      *pgxpool.Pool
 	auditSvc  *audit.Service
 	masterKey []byte
+	// deviceSecret is the DeviceSecret module: it owns the master key for sealing/opening a
+	// device secret, so the transaction asks to seal/open instead of calling AES-GCM raw.
+	deviceSecret *crypto.DeviceSecret
 }
 
 // NewRedemption wires the module to the live pool and crypto material.
 func NewRedemption(pool *pgxpool.Pool, auditSvc *audit.Service, masterKey []byte) *Redemption {
-	return &Redemption{pool: pool, auditSvc: auditSvc, masterKey: masterKey}
+	return &Redemption{
+		pool:         pool,
+		auditSvc:     auditSvc,
+		masterKey:    masterKey,
+		deviceSecret: crypto.NewDeviceSecret(masterKey),
+	}
 }
 
 // computeNewExpiry is the redemption's lifetime rule, kept pure so it can be asserted
@@ -168,7 +176,7 @@ func (r *Redemption) Redeem(ctx context.Context, req RedeemRequest) (RedeemResul
 		if _, err := rand.Read(secretPlain); err != nil {
 			return RedeemResult{}, err
 		}
-		enc, err := crypto.EncryptAESGCM(r.masterKey, secretPlain)
+		enc, err := r.deviceSecret.Seal(secretPlain)
 		if err != nil {
 			return RedeemResult{}, err
 		}
@@ -189,7 +197,7 @@ func (r *Redemption) Redeem(ctx context.Context, req RedeemRequest) (RedeemResul
 		if _, err := tx.Exec(ctx, `UPDATE devices SET enrollment_ip = $1, updated_at = now() WHERE id = $2`, sourceIP, deviceID); err != nil {
 			return RedeemResult{}, err
 		}
-		plain, err := crypto.DecryptAESGCM(r.masterKey, secretEncrypted)
+		plain, err := r.deviceSecret.Open(secretEncrypted)
 		if err != nil {
 			return RedeemResult{}, err
 		}

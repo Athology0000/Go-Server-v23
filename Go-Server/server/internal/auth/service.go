@@ -78,6 +78,13 @@ type Service struct {
 	// binding is the DeviceBinding module: the one owner of the binding lifecycle's legal
 	// transitions. The four endpoints below ask it instead of hand-checking BindingStatus.
 	binding *DeviceBinding
+	// proof / tokens / deviceSecret are the intent-named crypto modules. The auth flow asks
+	// them WHAT it wants (is this proof valid? issue a token, hash a presented one, open a
+	// device secret) instead of calling HMACVerify/GenerateToken/HashToken/DecryptAESGCM with
+	// the master key and raw args. They own the algorithm + key locality.
+	proof        *crypto.ProofValidator
+	tokens       *crypto.TokenIssuer
+	deviceSecret *crypto.DeviceSecret
 }
 
 func New(
@@ -90,14 +97,17 @@ func New(
 	cfg *config.Config,
 ) *Service {
 	return &Service{
-		pool:      pool,
-		entSvc:    entSvc,
-		auditSvc:  auditSvc,
-		masterKey: masterKey,
-		pepper:    pepper,
-		baseURL:   strings.TrimRight(baseURL, "/"),
-		cfg:       cfg,
-		binding:   NewDeviceBinding(pool),
+		pool:         pool,
+		entSvc:       entSvc,
+		auditSvc:     auditSvc,
+		masterKey:    masterKey,
+		pepper:       pepper,
+		baseURL:      strings.TrimRight(baseURL, "/"),
+		cfg:          cfg,
+		binding:      NewDeviceBinding(pool),
+		proof:        crypto.NewProofValidator(),
+		tokens:       crypto.NewTokenIssuer(),
+		deviceSecret: crypto.NewDeviceSecret(masterKey),
 	}
 }
 
@@ -218,12 +228,12 @@ func (s *Service) Finish(ctx context.Context, username, proofHex, sourceIP, mine
 		return nil, ErrIPMismatch
 	}
 
-	plain, err := crypto.DecryptAESGCM(s.masterKey, device.DeviceSecretEncrypted)
+	plain, err := s.deviceSecret.Open(device.DeviceSecretEncrypted)
 	if err != nil {
 		return nil, err
 	}
 
-	if !crypto.HMACVerify(plain, []byte(ch.Challenge), proofHex) {
+	if !s.proof.Valid(plain, []byte(ch.Challenge), proofHex) {
 		count, _ := db.IncrementFailedAttempts(ctx, s.pool, device.ID)
 		if count >= 5 {
 			db.SuspendDevice(ctx, s.pool, device.ID)
@@ -269,7 +279,7 @@ func (s *Service) Finish(ctx context.Context, username, proofHex, sourceIP, mine
 
 	expiresAt := time.Now().Add(time.Duration(s.cfg.SessionTTLHours) * time.Hour)
 
-	rawToken, tokenHash, err := crypto.GenerateToken()
+	rawToken, tokenHash, err := s.tokens.Issue()
 	if err != nil {
 		return nil, err
 	}
@@ -349,7 +359,7 @@ type HeartbeatResult struct {
 }
 
 func (s *Service) Heartbeat(ctx context.Context, sessionToken, sourceIP string, activity json.RawMessage) (*HeartbeatResult, error) {
-	tokenHash, err := crypto.HashToken(sessionToken)
+	tokenHash, err := s.tokens.HashPresented(sessionToken)
 	if err != nil {
 		return nil, ErrSessionInvalid
 	}
@@ -441,7 +451,7 @@ type VerifySessionResult struct {
 }
 
 func (s *Service) VerifyMinecraft(ctx context.Context, rawToken, minecraftUsername, sourceIP string) (*VerifyMinecraftResult, error) {
-	tokenHash, err := crypto.HashToken(rawToken)
+	tokenHash, err := s.tokens.HashPresented(rawToken)
 	if err != nil {
 		return nil, ErrSessionInvalid
 	}
@@ -544,7 +554,7 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 		minecraftUsernameInput,
 	)
 
-	tokenHash, err := crypto.HashToken(rawToken)
+	tokenHash, err := s.tokens.HashPresented(rawToken)
 	if err != nil {
 		log.Printf("[auth.verify_session] token_hash_failed ip=%s err=%v", sourceIP, err)
 		return nil, ErrSessionInvalid

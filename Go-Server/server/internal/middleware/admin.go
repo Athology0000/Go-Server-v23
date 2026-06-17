@@ -5,7 +5,6 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/phantom/server/internal/crypto"
 	"github.com/phantom/server/internal/db"
 )
 
@@ -17,7 +16,7 @@ func AdminAuth(pool *pgxpool.Pool, minRole string) fiber.Handler {
 		if err != nil {
 			return c.Status(401).JSON(fiber.Map{"error": "authentication_failed", "message": "Authentication failed"})
 		}
-		hash, err := crypto.HashToken(raw)
+		hash, err := tokenIssuer.HashPresented(raw)
 		if err != nil {
 			return c.Status(401).JSON(fiber.Map{"error": "authentication_failed", "message": "Authentication failed"})
 		}

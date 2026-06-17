@@ -16,6 +16,11 @@ import (
 	"github.com/phantom/server/internal/middleware"
 )
 
+// panelTokens issues and hashes panel-session tokens through the TokenIssuer module.
+// The panel login/register/me handlers are plain pool-backed functions (no auth.Service),
+// so they share one package-level issuer instead of calling GenerateToken/HashToken raw.
+var panelTokens = crypto.NewTokenIssuer()
+
 type startRequest struct {
 	Username          string `json:"username"`
 	MinecraftUsername string `json:"minecraft_username"`
@@ -81,7 +86,7 @@ func getPanelSession(c *fiber.Ctx, pool *pgxpool.Pool) (*db.PanelSession, error)
 		return nil, err
 	}
 
-	hash, err := crypto.HashToken(raw)
+	hash, err := panelTokens.HashPresented(raw)
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +162,7 @@ func handlePanelLogin(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.Handler
 			})
 		}
 
-		raw, hash, err := crypto.GenerateToken()
+		raw, hash, err := panelTokens.Issue()
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
@@ -229,7 +234,7 @@ func handlePanelRegister(pool *pgxpool.Pool, allowPublicRegistration bool) fiber
 			})
 		}
 
-		raw, tokenHash, err := crypto.GenerateToken()
+		raw, tokenHash, err := panelTokens.Issue()
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
