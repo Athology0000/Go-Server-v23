@@ -75,6 +75,9 @@ type Service struct {
 	pepper    []byte
 	baseURL   string
 	cfg       *config.Config
+	// binding is the DeviceBinding module: the one owner of the binding lifecycle's legal
+	// transitions. The four endpoints below ask it instead of hand-checking BindingStatus.
+	binding *DeviceBinding
 }
 
 func New(
@@ -94,6 +97,7 @@ func New(
 		pepper:    pepper,
 		baseURL:   strings.TrimRight(baseURL, "/"),
 		cfg:       cfg,
+		binding:   NewDeviceBinding(pool),
 	}
 }
 
@@ -128,7 +132,9 @@ func (s *Service) Start(ctx context.Context, username, minecraftUsername, source
 		return nil, err
 	}
 
-	if device.BindingStatus == "suspended" || device.BindingStatus == "banned" {
+	// Lifecycle gates routed through the DeviceBinding module: blocked dead end, then
+	// must be enrolled, then (if already fully bound) the supplied minecraft name must match.
+	if s.binding.IsBlocked(device) {
 		s.auditSvc.Log("auth.start.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
 			"reason": "device_blocked",
 			"status": device.BindingStatus,
@@ -136,14 +142,14 @@ func (s *Service) Start(ctx context.Context, username, minecraftUsername, source
 		return nil, ErrDeviceBlocked
 	}
 
-	if device.BindingStatus != "hwid_pending" && device.BindingStatus != "fully_bound" {
+	if !s.binding.PermitsAuthStart(device) {
 		s.auditSvc.Log("auth.start.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
 			"reason": "device_not_enrolled",
 		})
 		return nil, ErrNotFound
 	}
 
-	if device.BindingStatus == "fully_bound" && minecraftUsername != "" {
+	if s.binding.State(device) == StateFullyBound && minecraftUsername != "" {
 		if device.MinecraftUsername == nil || !strings.EqualFold(*device.MinecraftUsername, minecraftUsername) {
 			s.auditSvc.Log("auth.start.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
 				"reason": "username_mismatch",
@@ -234,8 +240,10 @@ func (s *Service) Finish(ctx context.Context, username, proofHex, sourceIP, mine
 		return nil, ErrBadProof
 	}
 
-	if device.BindingStatus == "hwid_pending" {
-		if err := db.FullyBind(ctx, s.pool, device.ID, minecraftUsername, sourceIP); err != nil {
+	// First successful proof on an enrolled device drives the hwid_pending -> fully_bound
+	// transition. Routed through the module so the lifecycle write lives in one place.
+	if s.binding.State(device) == StateHWIDPending {
+		if err := s.binding.FullyBind(ctx, device.ID, minecraftUsername, sourceIP); err != nil {
 			return nil, err
 		}
 	}
@@ -463,12 +471,16 @@ func (s *Service) VerifyMinecraft(ctx context.Context, rawToken, minecraftUserna
 		}, nil
 	}
 
-	switch device.BindingStatus {
-	case "hwid_pending":
-		if err := db.FullyBind(ctx, s.pool, device.ID, minecraftUsername, sourceIP); err != nil {
+	// Lifecycle gate + username transition via the DeviceBinding module. A hwid_pending
+	// device is upgraded to fully_bound here; a fully_bound device must match its name;
+	// anything else is not eligible. This case-less form preserves the prior switch's
+	// behaviour (note: hwid_pending fully-binds even with an empty incoming name).
+	switch s.binding.State(device) {
+	case StateHWIDPending:
+		if err := s.binding.FullyBind(ctx, device.ID, minecraftUsername, sourceIP); err != nil {
 			return nil, err
 		}
-	case "fully_bound":
+	case StateFullyBound:
 		if device.MinecraftUsername == nil || !strings.EqualFold(*device.MinecraftUsername, minecraftUsername) {
 			s.auditSvc.Log("auth.verify_mc.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
 				"reason": "minecraft_username_mismatch",
@@ -601,9 +613,14 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 	)
 
 	if minecraftUsernameInput != "" {
-		switch device.BindingStatus {
-		case "hwid_pending":
-			if err := db.FullyBind(ctx, s.pool, device.ID, minecraftUsernameInput, sourceIP); err != nil {
+		// The DeviceBinding module decides the legal move for this (state, incoming-name)
+		// pair: first bind, repair an empty/missing name, accept a match, silently rebind an
+		// offline placeholder, or hard-reject a real mismatch. The endpoint only logs and
+		// commits the chosen move, instead of re-deriving the rules from BindingStatus.
+		stateBefore := s.binding.State(device)
+		switch s.binding.PlanUsernameBinding(device, minecraftUsernameInput, isOfflinePlaceholderName) {
+		case UsernameBind:
+			if err := s.binding.FullyBind(ctx, device.ID, minecraftUsernameInput, sourceIP); err != nil {
 				log.Printf("[auth.verify_session] minecraft_bind_failed ip=%s device_id=%s err=%v",
 					sourceIP,
 					device.ID,
@@ -612,75 +629,40 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 				return nil, err
 			}
 
-			device.MinecraftUsername = &minecraftUsernameInput
-			device.BindingStatus = "fully_bound"
-
-			log.Printf("[auth.verify_session] minecraft_bound ip=%s device_id=%s minecraft_username=%q",
+			log.Printf("[auth.verify_session] minecraft_bound ip=%s device_id=%s state_before=%d minecraft_username=%q",
 				sourceIP,
 				device.ID,
+				stateBefore,
 				minecraftUsernameInput,
 			)
 
-		case "fully_bound":
-			if device.MinecraftUsername == nil || strings.TrimSpace(*device.MinecraftUsername) == "" {
-				if err := db.FullyBind(ctx, s.pool, device.ID, minecraftUsernameInput, sourceIP); err != nil {
-					log.Printf("[auth.verify_session] minecraft_rebind_empty_failed ip=%s device_id=%s err=%v",
-						sourceIP,
-						device.ID,
-						err,
-					)
-					return nil, err
-				}
+			device.MinecraftUsername = &minecraftUsernameInput
+			device.BindingStatus = bindingStatusFullyBound
 
-				device.MinecraftUsername = &minecraftUsernameInput
+		case UsernameMismatch:
+			log.Printf(
+				"[auth.verify_session] minecraft_username_mismatch ip=%s device_id=%s expected=%q got=%q",
+				sourceIP,
+				device.ID,
+				ptrStringValue(device.MinecraftUsername),
+				minecraftUsernameInput,
+			)
 
-				log.Printf("[auth.verify_session] minecraft_bound_empty ip=%s device_id=%s minecraft_username=%q",
-					sourceIP,
-					device.ID,
-					minecraftUsernameInput,
-				)
-			} else if !strings.EqualFold(*device.MinecraftUsername, minecraftUsernameInput) {
-				if isOfflinePlaceholderName(minecraftUsernameInput) || isOfflinePlaceholderName(*device.MinecraftUsername) {
-					log.Printf(
-						"[auth.verify_session] minecraft_offline_rebind ip=%s device_id=%s old=%q new=%q",
-						sourceIP,
-						device.ID,
-						*device.MinecraftUsername,
-						minecraftUsernameInput,
-					)
+			s.auditSvc.Log("auth.verify_session.fail", &sess.AccountID, &device.ID, nil, &sourceIP, map[string]any{
+				"reason":   "minecraft_username_mismatch",
+				"expected": ptrStringValue(device.MinecraftUsername),
+				"got":      minecraftUsernameInput,
+			})
 
-					if err := db.FullyBind(ctx, s.pool, device.ID, minecraftUsernameInput, sourceIP); err != nil {
-						log.Printf("[auth.verify_session] minecraft_offline_rebind_failed ip=%s device_id=%s err=%v",
-							sourceIP,
-							device.ID,
-							err,
-						)
-						return nil, err
-					}
+			return &VerifySessionResult{
+				Authorized: false,
+				Reason:     "minecraft_username_mismatch",
+			}, nil
 
-					device.MinecraftUsername = &minecraftUsernameInput
-				} else {
-					log.Printf(
-						"[auth.verify_session] minecraft_username_mismatch ip=%s device_id=%s expected=%q got=%q",
-						sourceIP,
-						device.ID,
-						*device.MinecraftUsername,
-						minecraftUsernameInput,
-					)
+		case UsernameMatches:
+			// Already bound to this name — nothing to persist.
 
-					s.auditSvc.Log("auth.verify_session.fail", &sess.AccountID, &device.ID, nil, &sourceIP, map[string]any{
-						"reason":   "minecraft_username_mismatch",
-						"expected": *device.MinecraftUsername,
-						"got":      minecraftUsernameInput,
-					})
-
-					return &VerifySessionResult{
-						Authorized: false,
-						Reason:     "minecraft_username_mismatch",
-					}, nil
-				}
-			}
-		default:
+		default: // UsernameNoop: unbound/blocked/unknown state at this seam.
 			log.Printf("[auth.verify_session] minecraft_bind_skipped ip=%s device_id=%s status=%s",
 				sourceIP,
 				device.ID,
@@ -724,7 +706,7 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 		}, nil
 	}
 
-	if device.BindingStatus == "suspended" || device.BindingStatus == "banned" {
+	if s.binding.IsBlocked(device) {
 		log.Printf("[auth.verify_session] device_blocked ip=%s account_id=%s device_id=%s status=%s",
 			sourceIP,
 			account.ID,
