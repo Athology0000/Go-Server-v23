@@ -90,6 +90,12 @@ func main() {
 		cfg.ServerPepper,
 	)
 
+	redemption := enrollment.NewRedemption(
+		pool,
+		auditSvc,
+		cfg.MasterKey,
+	)
+
 	contentSvc := content.New(
 		pool,
 		entSvc,
@@ -187,7 +193,7 @@ func main() {
 	})
 
 	auth.RegisterRoutes(pub, authSvc, pool, auditSvc, cfg)
-	enrollment.RegisterRoutes(pub, enrollSvc, pool)
+	enrollment.RegisterRoutes(pub, enrollSvc, redemption, pool)
 	panel.RegisterRoutes(pub, pool, auditSvc, cfg.MasterKey)
 	content.RegisterRoutes(pub, contentSvc, pool, cfg.StrictSessionIP, cfg.HeartbeatLivenessWindow)
 	// Also expose the admin API on the public port so the admin panel can

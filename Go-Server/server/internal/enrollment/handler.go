@@ -19,11 +19,11 @@ type handshakeRequest struct {
 	Password string `json:"password"`
 }
 
-func RegisterRoutes(app *fiber.App, svc *Service, pool *pgxpool.Pool) {
+func RegisterRoutes(app *fiber.App, svc *Service, redemption Redeemer, pool *pgxpool.Pool) {
 	// 5 attempts per minute per IP — enrollment is a one-time operation
 	enrollLimit := middleware.RateLimit(pool, 5, time.Minute, middleware.IPKey("enroll"))
 
-	redeem := handleRedeem(svc)
+	redeem := handleRedeem(redemption)
 	handshake := handleHandshake(svc)
 
 	app.Post("/enroll/redeem", enrollLimit, redeem)
@@ -35,7 +35,7 @@ func RegisterRoutes(app *fiber.App, svc *Service, pool *pgxpool.Pool) {
 	app.Post("//enroll/handshake", enrollLimit, handshake)
 }
 
-func handleRedeem(svc *Service) fiber.Handler {
+func handleRedeem(redemption Redeemer) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		var req redeemRequest
 		if err := c.BodyParser(&req); err != nil || req.LicenseKey == "" || req.AccountID == "" {
@@ -43,7 +43,11 @@ func handleRedeem(svc *Service) fiber.Handler {
 		}
 		ip := middleware.GetRealIP(c)
 
-		username, secret, planTier, expiresAt, err := svc.Redeem(c.Context(), req.LicenseKey, req.AccountID, ip)
+		res, err := redemption.Redeem(c.Context(), RedeemRequest{
+			RawKey:    req.LicenseKey,
+			AccountID: req.AccountID,
+			SourceIP:  ip,
+		})
 		if errors.Is(err, ErrKeyNotFound) || errors.Is(err, ErrKeyNotAvailable) || errors.Is(err, ErrAlreadyEnrolled) {
 			reason := "key_invalid"
 			if errors.Is(err, ErrKeyNotFound) {
@@ -63,10 +67,10 @@ func handleRedeem(svc *Service) fiber.Handler {
 		}
 		return c.Status(200).JSON(fiber.Map{
 			"status":        "redeemed",
-			"username":      username,
-			"device_secret": secret,
-			"plan_tier":     planTier,
-			"expires_at":    expiresAt,
+			"username":      res.Username,
+			"device_secret": res.DeviceSecret,
+			"plan_tier":     res.PlanTier,
+			"expires_at":    res.ExpiresAt,
 		})
 	}
 }
