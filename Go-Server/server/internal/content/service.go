@@ -3,6 +3,7 @@ package content
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -127,19 +128,31 @@ func (s *Service) ModuleBytes(ctx context.Context, accountID, name string) ([]by
 
 	// Per-user watermark: only plain .jar artifacts. Encrypted .enc bundles must stay byte-exact
 	// (the signed manifest covers their hash and the loader decrypts them verbatim), so they are
-	// never re-stamped here. Fail-open: a watermark hiccup serves the un-watermarked jar rather
-	// than breaking the download.
-	if s.watermarker.Enabled() && strings.HasSuffix(strings.ToLower(path), ".jar") {
-		stamped, werr := s.watermarker.Apply(ctx, raw, accountID)
-		if werr != nil {
-			log.Printf("[content.module] watermark failed account_id=%s module=%s err=%v (serving un-watermarked)",
-				accountID, moduleName, werr)
-		} else {
-			raw = stamped
-		}
+	// never re-stamped here.
+	raw, err = s.stampJar(ctx, raw, path, accountID)
+	if err != nil {
+		return nil, "", err
 	}
 
 	return raw, filepath.Base(path), nil
+}
+
+// stampJar embeds the per-account watermark into a plain .jar artifact. When watermarking is
+// enabled and the artifact is a .jar, a stamping failure is FATAL (fail-closed): we return the
+// error rather than serving an un-watermarked, untraceable jar. Serving an unmarked jar would
+// silently defeat leak tracing, so an availability hiccup must not erode traceability. Non-.jar
+// artifacts and the disabled-watermarker case pass through byte-exact.
+func (s *Service) stampJar(ctx context.Context, raw []byte, path, accountID string) ([]byte, error) {
+	if !s.watermarker.Enabled() || !strings.HasSuffix(strings.ToLower(path), ".jar") {
+		return raw, nil
+	}
+	stamped, err := s.watermarker.Apply(ctx, raw, accountID)
+	if err != nil {
+		log.Printf("[content.module] watermark failed account_id=%s module=%s err=%v (refusing to serve un-watermarked)",
+			accountID, filepath.Base(path), err)
+		return nil, fmt.Errorf("watermark module %s for account %s: %w", filepath.Base(path), accountID, err)
+	}
+	return stamped, nil
 }
 
 func (s *Service) NativePath(ctx context.Context, accountID, name string) (string, error) {

@@ -1,6 +1,7 @@
 package content
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"os/exec"
@@ -8,6 +9,62 @@ import (
 	"testing"
 	"time"
 )
+
+// TestStampJarFailClosed proves the security fix: when the watermarker is enabled but stamping a
+// .jar fails (here, a bogus java path makes Apply error), ModuleBytes' helper returns an error
+// instead of the raw bytes. The handler maps any untyped error to 500, so the download fails
+// rather than handing out an un-watermarked, untraceable jar. Needs no DB or JVM.
+func TestStampJarFailClosed(t *testing.T) {
+	svc := &Service{}
+	svc.SetWatermarker(&Watermarker{
+		JavaPath:   filepath.Join(t.TempDir(), "no-such-java-executable"),
+		ObfJar:     "obfuscator.jar",
+		ConfigPath: "watermark-only.json",
+		Secret:     "secret",
+	})
+
+	got, err := svc.stampJar(context.Background(), []byte("PK\x03\x04 fake jar"), "/content/modules/mod.jar", "acct-1")
+	if err == nil {
+		t.Fatal("watermark failure on a .jar must be fatal (fail-closed), but stampJar returned nil error")
+	}
+	if got != nil {
+		t.Fatalf("fail-closed must return no bytes, got %d bytes", len(got))
+	}
+}
+
+// TestStampJarPassThrough confirms the cases that must remain byte-exact: a disabled watermarker
+// (nil) leaves any artifact untouched, and even with an enabled watermarker a non-.jar artifact
+// (e.g. an encrypted .enc bundle) is never re-stamped.
+func TestStampJarPassThrough(t *testing.T) {
+	raw := []byte("byte-exact-payload")
+
+	// Disabled watermarker: a .jar passes through unchanged.
+	disabled := &Service{}
+	got, err := disabled.stampJar(context.Background(), raw, "/content/modules/mod.jar", "acct")
+	if err != nil {
+		t.Fatalf("disabled watermarker should not error: %v", err)
+	}
+	if !bytes.Equal(got, raw) {
+		t.Fatal("disabled watermarker altered the jar bytes")
+	}
+
+	// Enabled watermarker, but a non-.jar artifact must not be touched (so a stamping path that
+	// would fail is never even invoked).
+	enabled := &Service{}
+	enabled.SetWatermarker(&Watermarker{
+		JavaPath:   filepath.Join(t.TempDir(), "no-such-java-executable"),
+		ObfJar:     "obfuscator.jar",
+		ConfigPath: "watermark-only.json",
+		Secret:     "secret",
+	})
+	got, err = enabled.stampJar(context.Background(), raw, "/content/modules/mod.enc", "acct")
+	if err != nil {
+		t.Fatalf(".enc artifact should pass through without watermarking: %v", err)
+	}
+	if !bytes.Equal(got, raw) {
+		t.Fatal(".enc artifact was modified — encrypted bundles must stay byte-exact")
+	}
+}
 
 // obfDir resolves the local Phantom obfuscator checkout that provides the watermark-capable
 // jar, the watermark-only config, and a sample input jar. Override with PHANTOM_OBF_DIR.
