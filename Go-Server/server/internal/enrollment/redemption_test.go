@@ -56,14 +56,20 @@ func postRedeem(t *testing.T, app *fiber.App, body string) (int, map[string]any)
 }
 
 // A malformed or incomplete body is rejected at the handler before the seam is ever touched.
+// Redemption is now bound to a credential proof: license_key + username + password are all
+// required. A request that omits any of them (including the old account_id-only shape) is
+// rejected before the seam.
 func TestRedeemHandlerRejectsBadInput(t *testing.T) {
 	fake := &fakeRedeemer{}
 	app := redeemApp(fake)
 
 	for _, body := range []string{
 		`not json`,
-		`{"license_key":"","account_id":"acc-1"}`,
-		`{"license_key":"KEY","account_id":""}`,
+		`{"license_key":"","username":"neo","password":"pw"}`,
+		`{"license_key":"KEY","username":"","password":"pw"}`,
+		`{"license_key":"KEY","username":"neo","password":""}`,
+		// Account-takeover shape: a raw account_id with no credential proof.
+		`{"license_key":"KEY","account_id":"victim-uuid"}`,
 	} {
 		status, parsed := postRedeem(t, app, body)
 		if status != 400 {
@@ -75,6 +81,30 @@ func TestRedeemHandlerRejectsBadInput(t *testing.T) {
 	}
 	if (fake.gotReq != RedeemRequest{}) {
 		t.Errorf("seam was called for bad input: %+v", fake.gotReq)
+	}
+}
+
+// Regression for the /enroll/redeem account-takeover (issue #1): the handler must derive the
+// redeemed identity from a proven credential, never from a caller-supplied account_id. It must
+// forward username + password to the seam and never forward an attacker-controlled account_id.
+func TestRedeemHandlerBindsToCredentialNotAccountID(t *testing.T) {
+	fake := &fakeRedeemer{result: RedeemResult{Username: "neo", DeviceSecret: "c2VjcmV0", PlanTier: "pro"}}
+	app := redeemApp(fake)
+
+	// Body smuggles a victim account_id alongside the attacker's own credentials. The seam
+	// must redeem onto the credential-proven identity and never the smuggled id — RedeemRequest
+	// has no AccountID field at all, so a body account_id is structurally unreachable; here we
+	// assert the proven credentials are what reaches the seam.
+	status, _ := postRedeem(t, app,
+		`{"license_key":"KEY-123","account_id":"victim-uuid","username":"neo","password":"pw"}`)
+	if status != 200 {
+		t.Fatalf("status = %d, want 200", status)
+	}
+	if fake.gotReq.Username != "neo" || fake.gotReq.Password != "pw" {
+		t.Errorf("seam got Username=%q Password=%q, want neo/pw", fake.gotReq.Username, fake.gotReq.Password)
+	}
+	if fake.gotReq.RawKey != "KEY-123" {
+		t.Errorf("seam got RawKey=%q, want KEY-123", fake.gotReq.RawKey)
 	}
 }
 
@@ -97,7 +127,7 @@ func TestRedeemHandlerErrorMapping(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			app := redeemApp(&fakeRedeemer{err: c.err})
-			status, parsed := postRedeem(t, app, `{"license_key":"KEY","account_id":"acc-1"}`)
+			status, parsed := postRedeem(t, app, `{"license_key":"KEY","username":"neo","password":"pw"}`)
 			if status != c.wantStatus {
 				t.Errorf("status = %d, want %d", status, c.wantStatus)
 			}
@@ -125,12 +155,12 @@ func TestRedeemHandlerSuccessShape(t *testing.T) {
 	}}
 	app := redeemApp(fake)
 
-	status, parsed := postRedeem(t, app, `{"license_key":"KEY-123","account_id":"acc-9"}`)
+	status, parsed := postRedeem(t, app, `{"license_key":"KEY-123","username":"neo","password":"pw"}`)
 	if status != 200 {
 		t.Fatalf("status = %d, want 200", status)
 	}
-	if fake.gotReq.RawKey != "KEY-123" || fake.gotReq.AccountID != "acc-9" {
-		t.Errorf("seam got %+v, want RawKey=KEY-123 AccountID=acc-9", fake.gotReq)
+	if fake.gotReq.RawKey != "KEY-123" || fake.gotReq.Username != "neo" || fake.gotReq.Password != "pw" {
+		t.Errorf("seam got %+v, want RawKey=KEY-123 Username=neo Password=pw", fake.gotReq)
 	}
 	if parsed["status"] != "redeemed" {
 		t.Errorf("status field = %v, want redeemed", parsed["status"])

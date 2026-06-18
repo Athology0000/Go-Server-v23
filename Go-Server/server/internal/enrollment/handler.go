@@ -9,9 +9,15 @@ import (
 	"github.com/phantom/server/internal/middleware"
 )
 
+// redeemRequest binds redemption to a credential proof. The account redeemed onto is derived
+// server-side from the verified username/password — a body-supplied account_id is no longer
+// accepted (issue #1: it let a caller redeem onto, and read the device_secret of, an account
+// they did not own). The bootstrapper already collects username/password for this step (the
+// sibling /enroll/handshake path uses the same credentials).
 type redeemRequest struct {
 	LicenseKey string `json:"license_key"`
-	AccountID  string `json:"account_id"`
+	Username   string `json:"username"`
+	Password   string `json:"password"`
 }
 
 type handshakeRequest struct {
@@ -38,15 +44,16 @@ func RegisterRoutes(app *fiber.App, svc *Service, redemption Redeemer, pool *pgx
 func handleRedeem(redemption Redeemer) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		var req redeemRequest
-		if err := c.BodyParser(&req); err != nil || req.LicenseKey == "" || req.AccountID == "" {
+		if err := c.BodyParser(&req); err != nil || req.LicenseKey == "" || req.Username == "" || req.Password == "" {
 			return c.Status(400).JSON(fiber.Map{"error": "enrollment_failed"})
 		}
 		ip := middleware.GetRealIP(c)
 
 		res, err := redemption.Redeem(c.Context(), RedeemRequest{
-			RawKey:    req.LicenseKey,
-			AccountID: req.AccountID,
-			SourceIP:  ip,
+			RawKey:   req.LicenseKey,
+			Username: req.Username,
+			Password: req.Password,
+			SourceIP: ip,
 		})
 		if errors.Is(err, ErrKeyNotFound) || errors.Is(err, ErrKeyNotAvailable) || errors.Is(err, ErrAlreadyEnrolled) {
 			reason := "key_invalid"
