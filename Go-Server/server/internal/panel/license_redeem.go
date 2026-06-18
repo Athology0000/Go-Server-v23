@@ -67,13 +67,23 @@ func handleRedeemLicense(pool *pgxpool.Pool, auditSvc *audit.Service, masterKey 
 		}
 
 		// Ensure the account has an enrollment device secret.
-		// If a device already exists, we keep it (panel expects a single-device model right now).
-		var hasDevice bool
-		if err := tx.QueryRow(c.Context(), `SELECT EXISTS(SELECT 1 FROM devices WHERE account_id = $1)`, sess.AccountID).
-			Scan(&hasDevice); err != nil {
+		// If a device already exists, we keep it (panel expects a single-device model right now)
+		// — but only if it is still unbound. This mirrors the canonical enrollment redemption
+		// (enrollment.Redemption.Redeem), which rejects a device whose binding_status != "unbound"
+		// (ErrAlreadyEnrolled). Without this guard a suspended/fully_bound device would silently
+		// reuse its secret and stack licenses/upgrades through the panel path.
+		var bindingStatus string
+		deviceErr := tx.QueryRow(c.Context(),
+			`SELECT binding_status FROM devices WHERE account_id = $1 LIMIT 1`,
+			sess.AccountID,
+		).Scan(&bindingStatus)
+		if deviceErr != nil && !errors.Is(deviceErr, pgx.ErrNoRows) {
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error", "message": "Failed to check device status"})
 		}
-		if !hasDevice {
+		if deviceErr == nil && bindingStatus != "unbound" {
+			return c.Status(409).JSON(fiber.Map{"error": "device_not_redeemable", "message": "Device is already enrolled"})
+		}
+		if errors.Is(deviceErr, pgx.ErrNoRows) {
 			secret := make([]byte, 32)
 			if _, err := rand.Read(secret); err != nil {
 				return c.Status(500).JSON(fiber.Map{"error": "internal_error", "message": "Failed to generate device secret"})
