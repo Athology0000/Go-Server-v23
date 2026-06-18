@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -30,10 +31,14 @@ type AuditRecord struct {
 
 func WriteAudit(ctx context.Context, pool *pgxpool.Pool, e AuditEvent) {
 	details, _ := json.Marshal(e.Details)
-	pool.Exec(ctx,
+	// Audit writes are best-effort, but a silent failure leaves forensic gaps with no signal.
+	// Log the error so dropped events are at least visible (and alertable) rather than invisible.
+	if _, err := pool.Exec(ctx,
 		`INSERT INTO audit_log (event_type, account_id, device_id, admin_name, ip, details)
 		 VALUES ($1, $2, $3, $4, $5, $6)`,
-		e.EventType, e.AccountID, e.DeviceID, e.AdminName, e.IP, details)
+		e.EventType, e.AccountID, e.DeviceID, e.AdminName, e.IP, details); err != nil {
+		log.Printf("[audit] failed to write event %q: %v", e.EventType, err)
+	}
 }
 
 func ListActivityLog(ctx context.Context, pool *pgxpool.Pool, limit, offset int) ([]*AuditRecord, error) {
