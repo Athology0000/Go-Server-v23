@@ -66,7 +66,10 @@ func RegisterRoutes(app *fiber.App, pool *pgxpool.Pool, signingKey []byte, audit
 	app.Delete("/admin/license-keys/:id", super, handleRevokeLicenseKey(pool, auditSvc))
 
 	// Devices
-	app.Get("/admin/devices/:id", viewer, handleGetDevice(pool))
+	// Reading a device row exposes the encrypted device secret + HWID hash, so it requires
+	// support+ (not read-only viewers) — matching the support level of the device mutation and
+	// watermark-trace endpoints.
+	app.Get("/admin/devices/:id", support, handleGetDevice(pool))
 	app.Post("/admin/devices/:id/reset", support, handleResetDevice(pool, auditSvc))
 	app.Patch("/admin/devices/:id/status", support, handleUpdateDeviceStatus(pool, auditSvc))
 
@@ -834,6 +837,9 @@ func handleAdminLogin(pool *pgxpool.Pool) fiber.Handler {
 
 		account, err := db.GetAccountByUsername(c.Context(), pool, strings.ToLower(strings.TrimSpace(body.Username)))
 		if err != nil {
+			// Spend the same argon2 work as a real verify so timing doesn't reveal whether the
+			// admin username exists (user-enumeration oracle).
+			crypto.DummyVerifyPassword()
 			return c.Status(401).JSON(fiber.Map{"error": "authentication_failed", "message": "Invalid username or password"})
 		}
 
