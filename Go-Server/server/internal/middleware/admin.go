@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -27,7 +28,9 @@ func AdminAuth(pool *pgxpool.Pool, minRole string) fiber.Handler {
 		if roleRank[token.Role] < roleRank[minRole] {
 			return c.Status(403).JSON(fiber.Map{"error": "not_authorized", "message": "Not authorized"})
 		}
-		go db.TouchAdminToken(c.Context(), pool, token.ID)
+		// Detach from the request context: c.Context() is cancelled/recycled when the handler
+		// returns, which would race this fire-and-forget last-used update and silently drop it.
+		go db.TouchAdminToken(context.Background(), pool, token.ID)
 		c.Locals("admin_token", token)
 		return c.Next()
 	}
