@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -56,12 +57,15 @@ func TestBuildStableManifestPerLicense(t *testing.T) {
 	writeEnc(t, filepath.Join(modules, "phantom.enc"), key, []byte("shared-core"))
 	writeEnc(t, filepath.Join(modules, "phantom-autowalk.enc"), key, []byte("shared-autowalk"))
 
+	// The per-license subtree's bundles are sealed under license A's DERIVED key —
+	// that is what BuildStableManifest now advertises and decrypt-checks for lic-A.
 	licDir := filepath.Join(modules, "lic-A")
 	if err := os.MkdirAll(licDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeEnc(t, filepath.Join(licDir, "phantom.enc"), key, []byte("A-core"))
-	writeEnc(t, filepath.Join(licDir, "phantom-autowalk.enc"), key, []byte("A-autowalk-distinct"))
+	keyA := DeriveLicenseKey(key, "lic-A")
+	writeEnc(t, filepath.Join(licDir, "phantom.enc"), keyA, []byte("A-core"))
+	writeEnc(t, filepath.Join(licDir, "phantom-autowalk.enc"), keyA, []byte("A-autowalk-distinct"))
 
 	ctx := context.Background()
 	mShared, err := BuildStableManifest(ctx, dir, "", "https://x", "stable", priv, key, []string{"*"})
@@ -75,6 +79,19 @@ func TestBuildStableManifestPerLicense(t *testing.T) {
 
 	if moduleSHA(t, mShared, "phantom-autowalk") == moduleSHA(t, mA, "phantom-autowalk") {
 		t.Fatal("per-license autowalk hash must differ from the shared one")
+	}
+	// The per-license manifest must advertise license A's DERIVED key, not the raw
+	// server key the shared manifest carries — that key isolation is the fix.
+	wantSharedKey := base64.StdEncoding.EncodeToString(key)
+	wantAKey := base64.StdEncoding.EncodeToString(DeriveLicenseKey(key, "lic-A"))
+	if mShared.ModuleKey != wantSharedKey {
+		t.Fatalf("shared manifest module_key = %q; want raw server key %q", mShared.ModuleKey, wantSharedKey)
+	}
+	if mA.ModuleKey != wantAKey {
+		t.Fatalf("lic-A manifest module_key = %q; want derived key %q", mA.ModuleKey, wantAKey)
+	}
+	if mA.ModuleKey == mShared.ModuleKey {
+		t.Fatal("per-license manifest must not advertise the global key")
 	}
 	for _, mod := range mA.Modules {
 		if strings.Contains(mod.URL, "lic-A") {

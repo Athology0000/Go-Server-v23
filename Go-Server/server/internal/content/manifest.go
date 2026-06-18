@@ -79,6 +79,19 @@ func BuildStableManifest(_ context.Context, contentDir, licenseID, baseURL, chan
 		return nil, err
 	}
 
+	// The key that this license's .enc bundles were sealed under, and that is
+	// advertised (base64) in its signed manifest. When the license is served from
+	// its own per-license subtree, that is the DERIVED per-license key, so a manifest
+	// (and the bundles it covers) for one license is useless to another. When the
+	// license falls back to the SHARED CONTENT_DIR/modules (no subtree, or empty
+	// licenseID), those bundles are sealed under the raw server key, so we advertise
+	// the raw server key there. effectiveModulesDir already encodes that choice:
+	// a per-license subtree path ends in the licenseID.
+	contentKey := moduleKey
+	if licenseID != "" && modulesDir != filepath.Join(contentDir, "modules") {
+		contentKey = DeriveLicenseKey(moduleKey, licenseID)
+	}
+
 	baseURL = strings.TrimRight(baseURL, "/")
 	if channel == "" {
 		channel = "stable"
@@ -117,7 +130,7 @@ func BuildStableManifest(_ context.Context, contentDir, licenseID, baseURL, chan
 		// configured module key, so a wrong MODULE_ENCRYPTION_KEY fails loudly here
 		// instead of shipping a bundle every client would reject.
 		if strings.EqualFold(filepath.Ext(jarPath), ".enc") {
-			if _, decErr := ccrypto.DecryptAESGCM(moduleKey, raw); decErr != nil {
+			if _, decErr := ccrypto.DecryptAESGCM(contentKey, raw); decErr != nil {
 				return nil, fmt.Errorf("module %s does not decrypt with the configured module key: %w", entry.Name(), decErr)
 			}
 		}
@@ -163,7 +176,7 @@ func BuildStableManifest(_ context.Context, contentDir, licenseID, baseURL, chan
 		BuildID:          "stable-filesystem",
 		Channel:          channel,
 		MinLoaderVersion: "1",
-		ModuleKey:        base64.StdEncoding.EncodeToString(moduleKey),
+		ModuleKey:        base64.StdEncoding.EncodeToString(contentKey),
 		Modules:          modules,
 		NativeComponents: natives,
 		ExpiresAt:        expiresAt,
