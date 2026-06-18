@@ -3,8 +3,10 @@ package config
 
 import (
 	"crypto/ed25519"
+	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"log"
 	"net/url"
 	"os"
 	"strconv"
@@ -18,7 +20,7 @@ type Config struct {
 	MasterKey               []byte // 32 bytes, AES-256
 	ServerPepper            []byte // 32 bytes, HMAC key
 	ManifestSigningKey      []byte // Ed25519 private key derived from MANIFEST_SIGNING_KEY seed material
-	ModuleEncryptionKey     []byte // 32 bytes, AES-256; defaults to bundled content key
+	ModuleEncryptionKey     []byte // 32 bytes, AES-256; required in production, generated dev-only fallback otherwise
 	DBURL                   string
 	AdminAPISecret          string
 	PublicPort              string
@@ -53,10 +55,10 @@ type Config struct {
 	ModuleWmPepper string
 }
 
-const defaultModuleEncryptionKeyB64 = "+KNMlsGkQLDvy2mcNClGzYIS65A5JQocOuRl2gtUVeQ="
-
 func Load() (*Config, error) {
 	_ = godotenv.Load()
+
+	appEnv := strings.ToLower(getEnvOr("APP_ENV", "development"))
 
 	masterKey, err := decodeBase64Env("MASTER_KEY", 32)
 	if err != nil {
@@ -70,6 +72,10 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	moduleKey, err := loadModuleEncryptionKey(appEnv)
+	if err != nil {
+		return nil, err
+	}
 
 	publicOrigins := sanitizeOrigins(getEnvOr("CORS_ALLOW_ORIGINS", "http://localhost:3001,http://localhost:3002,http://127.0.0.1:3001,http://127.0.0.1:3002,http://localhost:5173,http://localhost:5174"))
 	adminOrigins := sanitizeOrigins(getEnvOr("ADMIN_CORS_ALLOW_ORIGINS", publicOrigins))
@@ -78,7 +84,7 @@ func Load() (*Config, error) {
 		MasterKey:           masterKey,
 		ServerPepper:        pepper,
 		ManifestSigningKey:  signingKey,
-		ModuleEncryptionKey: decodeOptionalBase64Env("MODULE_ENCRYPTION_KEY", 32, mustDecodeBase64(defaultModuleEncryptionKeyB64, 32)),
+		ModuleEncryptionKey: moduleKey,
 		DBURL:               requireEnv("DB_URL"),
 		AdminAPISecret:      requireEnv("ADMIN_API_SECRET"),
 		PublicPort:          getEnvOr("PUBLIC_PORT", "8080"),
@@ -93,7 +99,7 @@ func Load() (*Config, error) {
 		// HWID trust-on-first-use at /auth/verify-session. OFF by default — HWID enforcement was
 		// deliberately removed; this re-enables it (pin-on-first-sight, compare after) only when set.
 		HwidTofuEnabled:         getEnvOr("HWID_TOFU_ENABLED", "false") == "true",
-		AppEnv:                  strings.ToLower(getEnvOr("APP_ENV", "development")),
+		AppEnv:                  appEnv,
 		AllowPublicRegistration: getEnvOr("ALLOW_PUBLIC_REGISTRATION", "") == "true",
 		PublicCORSAllowOrigins:  publicOrigins,
 		AdminCORSAllowOrigins:   adminOrigins,
@@ -211,24 +217,33 @@ func decodeManifestSigningKeyEnv() ([]byte, error) {
 	return ed25519.NewKeyFromSeed(b[:ed25519.SeedSize]), nil
 }
 
-func decodeOptionalBase64Env(key string, expectedLen int, fallback []byte) []byte {
-	raw := os.Getenv(key)
+// loadModuleEncryptionKey resolves the AES-256 key used to encrypt module
+// bundles (*.enc) and embed module_key into signed manifests. It is REQUIRED in
+// production: a missing or invalid MODULE_ENCRYPTION_KEY is a hard boot failure
+// there, exactly like MASTER_KEY/SERVER_PEPPER. Outside production (dev/test/
+// staging) a missing key falls back to a freshly generated random key so local
+// workflows are not blocked — never a committed constant — and the fallback is
+// announced loudly so it is never mistaken for a configured key.
+func loadModuleEncryptionKey(appEnv string) ([]byte, error) {
+	raw := os.Getenv("MODULE_ENCRYPTION_KEY")
 	if raw == "" {
-		return fallback
+		if appEnv == "production" {
+			return nil, fmt.Errorf("MODULE_ENCRYPTION_KEY is required in production: set a base64-encoded 32-byte key (e.g. `openssl rand -base64 32`)")
+		}
+		key := make([]byte, 32)
+		if _, err := rand.Read(key); err != nil {
+			return nil, fmt.Errorf("MODULE_ENCRYPTION_KEY: failed to generate dev fallback key: %w", err)
+		}
+		log.Printf("WARNING: MODULE_ENCRYPTION_KEY is not set; generated an ephemeral random module-encryption key for non-production (APP_ENV=%q). Module bundles encrypted now will NOT be decryptable after restart. Set MODULE_ENCRYPTION_KEY for stable behaviour.", appEnv)
+		return key, nil
 	}
 
 	b, err := base64.StdEncoding.DecodeString(raw)
-	if err != nil || len(b) != expectedLen {
-		panic(fmt.Sprintf("%s: expected base64-encoded %d-byte value", key, expectedLen))
+	if err != nil {
+		return nil, fmt.Errorf("MODULE_ENCRYPTION_KEY: invalid base64: %w", err)
 	}
-
-	return b
-}
-
-func mustDecodeBase64(raw string, expectedLen int) []byte {
-	b, err := base64.StdEncoding.DecodeString(raw)
-	if err != nil || len(b) != expectedLen {
-		panic(fmt.Sprintf("default module encryption key must be base64-encoded %d-byte value", expectedLen))
+	if len(b) != 32 {
+		return nil, fmt.Errorf("MODULE_ENCRYPTION_KEY: expected 32 bytes, got %d", len(b))
 	}
-	return b
+	return b, nil
 }
