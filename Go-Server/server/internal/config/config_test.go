@@ -127,6 +127,56 @@ func TestModuleEncryptionKeyRequiredInProduction(t *testing.T) {
 	})
 }
 
+// Public registration must be default-deny in every environment (fail closed): it only turns on
+// with an explicit ALLOW_PUBLIC_REGISTRATION=true. Previously it auto-enabled outside production,
+// so a prod deploy that forgot/misspelled APP_ENV silently opened registration.
+func TestPublicRegistrationDefaultDeny(t *testing.T) {
+	k32 := base64.StdEncoding.EncodeToString(make([]byte, 32))
+	base := func() {
+		t.Setenv("MASTER_KEY", k32)
+		t.Setenv("SERVER_PEPPER", k32)
+		t.Setenv("MANIFEST_SIGNING_KEY", k32)
+		t.Setenv("MODULE_ENCRYPTION_KEY", k32)
+		t.Setenv("DB_URL", "postgres://x")
+		t.Setenv("ADMIN_API_SECRET", "secret")
+		t.Setenv("ALLOW_PUBLIC_REGISTRATION", "")
+	}
+
+	cases := []struct{ name, appEnv, baseURL string }{
+		{"development unset -> off", "development", "http://localhost:8080"},
+		{"unrecognized env unset -> off", "prdo", "http://localhost:8080"},
+		{"empty env unset -> off", "", "http://localhost:8080"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			base()
+			t.Setenv("APP_ENV", tc.appEnv)
+			t.Setenv("BASE_URL", tc.baseURL)
+			cfg, err := Load()
+			if err != nil {
+				t.Fatalf("load: %v", err)
+			}
+			if cfg.AllowPublicRegistration {
+				t.Error("public registration must be default-deny when ALLOW_PUBLIC_REGISTRATION is unset")
+			}
+		})
+	}
+
+	t.Run("explicit true -> on", func(t *testing.T) {
+		base()
+		t.Setenv("APP_ENV", "development")
+		t.Setenv("BASE_URL", "http://localhost:8080")
+		t.Setenv("ALLOW_PUBLIC_REGISTRATION", "true")
+		cfg, err := Load()
+		if err != nil {
+			t.Fatalf("load: %v", err)
+		}
+		if !cfg.AllowPublicRegistration {
+			t.Error("explicit ALLOW_PUBLIC_REGISTRATION=true must enable registration")
+		}
+	})
+}
+
 func allZero(b []byte) bool {
 	for _, x := range b {
 		if x != 0 {

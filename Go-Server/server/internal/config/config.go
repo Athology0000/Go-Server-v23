@@ -120,8 +120,16 @@ func Load() (*Config, error) {
 		ModuleWmPepper:      getEnvOr("MODULE_WM_PEPPER", ""),
 	}
 
-	if cfg.AppEnv != "production" && os.Getenv("ALLOW_PUBLIC_REGISTRATION") == "" {
-		cfg.AllowPublicRegistration = true
+	// Public registration is default-deny in every environment: it must be turned on with an
+	// explicit ALLOW_PUBLIC_REGISTRATION=true. Previously it auto-enabled whenever AppEnv wasn't
+	// "production", so a prod deploy that forgot to set APP_ENV (or misspelled it) silently opened
+	// registration. Fail closed instead.
+	switch cfg.AppEnv {
+	case "production", "staging", "development", "test":
+	default:
+		log.Printf("[config] WARNING: APP_ENV=%q is not a recognized environment "+
+			"(production|staging|development|test); treating it as non-production for feature "+
+			"defaults. Set APP_ENV explicitly.", cfg.AppEnv)
 	}
 
 	// HWID trust-on-first-use defaults ON in production (device hardware pinning) and OFF
@@ -177,6 +185,9 @@ func sanitizeOrigins(raw string) string {
 			continue
 		}
 		if origin == "*" {
+			log.Printf("[config] WARNING: CORS origin \"*\" allows requests from any site. " +
+				"This is safe only because the API authenticates with bearer tokens and never " +
+				"enables AllowCredentials; do NOT add cookie/credentialed auth without removing \"*\".")
 			out = append(out, origin)
 			continue
 		}
