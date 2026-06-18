@@ -16,6 +16,7 @@ import (
 
 	ccrypto "github.com/phantom/server/internal/crypto"
 	"github.com/phantom/server/internal/db"
+	"github.com/phantom/server/internal/entitlement"
 )
 
 type signedManifestPayload struct {
@@ -54,6 +55,55 @@ func signedPayloadOf(m *db.ContentManifest) signedManifestPayload {
 // to different signed bytes (which would make one of them fail verification on the client).
 func SignManifest(signingKey []byte, m *db.ContentManifest) (string, error) {
 	return ccrypto.SignManifest(signingKey, signedPayloadOf(m))
+}
+
+// scopeManifestForEntitlement restricts a persisted (admin-created) manifest to what the caller is
+// actually entitled to, so a license holder who learns another channel/tier's manifest UUID cannot
+// read its module names, URLs, hashes or key. It is the by-ID counterpart to BuildStableManifest's
+// inline filtering and shares ModuleAllowed so the two cannot diverge:
+//
+//  1. Channel scoping: a manifest for a channel the caller is not on is rejected outright
+//     (ErrNotEntitled) rather than filtered, because cross-channel content is not "their" build at all.
+//  2. Per-module filtering: modules and native components the caller is not entitled to are dropped.
+//  3. Re-signing: filtering changes the Ed25519-signed payload, so the manifest is re-signed over the
+//     filtered bytes via SignManifest (the single signed-byte source of truth) — the original DB
+//     signature no longer matches the filtered modules and would fail client verification.
+//
+// The returned manifest is a copy; the input row is not mutated.
+func scopeManifestForEntitlement(m *db.ContentManifest, ent *entitlement.Result, signingKey []byte) (*db.ContentManifest, error) {
+	if m.Channel != ent.ContentChannel {
+		return nil, ErrNotEntitled
+	}
+
+	scoped := *m // copy; we replace the slices and signature below
+
+	modules := make([]db.ManifestModule, 0, len(m.Modules))
+	for _, mod := range m.Modules {
+		if ModuleAllowed(mod.Name, ent.EnabledModules) {
+			modules = append(modules, mod)
+		}
+	}
+	// Re-densify InitOrder so the loader's ordered load has no gaps after drops.
+	for i := range modules {
+		modules[i].InitOrder = i
+	}
+	scoped.Modules = modules
+
+	natives := make([]db.ManifestNative, 0, len(m.NativeComponents))
+	for _, n := range m.NativeComponents {
+		if ModuleAllowed(n.Name, ent.EnabledModules) {
+			natives = append(natives, n)
+		}
+	}
+	scoped.NativeComponents = natives
+
+	// The signed payload now differs from the stored row, so re-sign over the filtered bytes.
+	sig, err := SignManifest(signingKey, &scoped)
+	if err != nil {
+		return nil, err
+	}
+	scoped.Signature = sig
+	return &scoped, nil
 }
 
 // effectiveModulesDir returns the per-license content subtree (CONTENT_DIR/modules/<licenseId>) when

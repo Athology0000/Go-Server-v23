@@ -76,7 +76,12 @@ func (s *Service) GetManifest(ctx context.Context, accountID, manifestID string)
 		return nil, ErrExpired
 	}
 
-	return m, nil
+	// Authz the by-ID manifest to THIS caller. A valid license is not enough: without this a holder
+	// of any license who learns another channel/tier's manifest UUID would read its module names,
+	// URLs, sha256s and module_key. scopeManifestForEntitlement rejects a cross-channel manifest and
+	// drops unentitled modules, re-signing over the filtered payload so the client signature still
+	// verifies. UUID unguessability is not the access control.
+	return scopeManifestForEntitlement(m, ent, s.signingKey)
 }
 
 func (s *Service) GetStableManifest(ctx context.Context, accountID string) (*db.ContentManifest, error) {
