@@ -128,6 +128,9 @@ func handlePanelLogin(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.Handler
 
 		account, err := db.GetAccountByEmail(c.Context(), pool, body.Email)
 		if err != nil {
+			// Spend the same argon2 work as a real verify so timing doesn't reveal whether the
+			// email exists (user-enumeration oracle).
+			crypto.DummyVerifyPassword()
 			auditSvc.Log("panel.login.fail", nil, nil, nil, &ip, map[string]any{
 				"reason": "account_not_found",
 				"email":  body.Email,

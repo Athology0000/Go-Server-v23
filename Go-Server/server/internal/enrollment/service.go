@@ -51,10 +51,14 @@ func New(pool *pgxpool.Pool, auditSvc *audit.Service, masterKey, pepper []byte) 
 func (s *Service) Handshake(ctx context.Context, username, password, sourceIP string) (string, error) {
 	account, err := db.GetAccountByUsername(ctx, s.pool, normalize(username))
 	if err != nil {
+		// Match the argon2 cost of a real verify so a missing account isn't distinguishable by
+		// response time (user-enumeration oracle); same for the blocked branch below.
+		crypto.DummyVerifyPassword()
 		s.auditSvc.Log("enroll.handshake.fail", nil, nil, nil, &sourceIP, map[string]any{"reason": "account_not_found", "username": username})
 		return "", ErrBadCredentials
 	}
 	if account.Status != "active" {
+		crypto.DummyVerifyPassword()
 		s.auditSvc.Log("enroll.handshake.fail", &account.ID, nil, nil, &sourceIP, map[string]any{"reason": "account_blocked"})
 		return "", ErrBadCredentials
 	}

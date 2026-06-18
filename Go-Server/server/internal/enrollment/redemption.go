@@ -136,12 +136,16 @@ func (r *Redemption) Redeem(ctx context.Context, req RedeemRequest) (RedeemResul
 		normalize(req.Username),
 	).Scan(&accountID, &username, &passwordHash, &accountStatus); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			// Spend the same argon2 work as a real verify so a missing account isn't
+			// distinguishable by response time (user-enumeration oracle); same for blocked below.
+			crypto.DummyVerifyPassword()
 			r.auditSvc.Log("enroll.redeem.fail", nil, nil, nil, &sourceIP, map[string]any{"reason": "account_not_found", "username": req.Username})
 			return RedeemResult{}, ErrBadCredentials
 		}
 		return RedeemResult{}, err
 	}
 	if accountStatus != "active" {
+		crypto.DummyVerifyPassword()
 		r.auditSvc.Log("enroll.redeem.fail", &accountID, nil, nil, &sourceIP, map[string]any{"reason": "account_blocked"})
 		return RedeemResult{}, ErrBadCredentials
 	}
