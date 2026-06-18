@@ -55,16 +55,13 @@ func handleRedeem(redemption Redeemer) fiber.Handler {
 			Password: req.Password,
 			SourceIP: ip,
 		})
+		// All key-related failures collapse to one opaque response with no reason. Returning a
+		// per-state reason (key_not_found / key_not_available / already_enrolled / key_invalid)
+		// was a key-existence enumeration oracle (issue #6): it told an attacker which guessed
+		// keys exist and their state. The fine-grained distinction is kept server-side in
+		// audit.Log inside the redemption transaction; the client gets nothing to distinguish on.
 		if errors.Is(err, ErrKeyNotFound) || errors.Is(err, ErrKeyNotAvailable) || errors.Is(err, ErrAlreadyEnrolled) {
-			reason := "key_invalid"
-			if errors.Is(err, ErrKeyNotFound) {
-				reason = "key_not_found"
-			} else if errors.Is(err, ErrKeyNotAvailable) {
-				reason = "key_not_available"
-			} else if errors.Is(err, ErrAlreadyEnrolled) {
-				reason = "already_enrolled"
-			}
-			return c.Status(400).JSON(fiber.Map{"error": "enrollment_failed", "reason": reason})
+			return c.Status(400).JSON(fiber.Map{"error": "enrollment_failed"})
 		}
 		if errors.Is(err, ErrBadCredentials) || errors.Is(err, ErrIPMismatch) {
 			return c.Status(401).JSON(fiber.Map{"error": "enrollment_failed"})

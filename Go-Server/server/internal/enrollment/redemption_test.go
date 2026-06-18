@@ -108,21 +108,23 @@ func TestRedeemHandlerBindsToCredentialNotAccountID(t *testing.T) {
 	}
 }
 
-// Each redemption error maps to a fixed status and (for the key class) reason. This is the
-// reject contract the loader depends on.
+// Each redemption error maps to a fixed status, and every key-related failure collapses to one
+// opaque response with NO reason field. Returning a per-state reason (key_not_found vs
+// key_not_available vs already_enrolled vs key_invalid) was a key-existence enumeration oracle
+// (issue #6): it confirmed to an attacker which guessed keys exist and their state. The
+// server-side audit.Log keeps the fine-grained distinction; the client does not.
 func TestRedeemHandlerErrorMapping(t *testing.T) {
 	cases := []struct {
 		name       string
 		err        error
 		wantStatus int
-		wantReason any // nil = reason field absent
 	}{
-		{"key not found", ErrKeyNotFound, 400, "key_not_found"},
-		{"key not available", ErrKeyNotAvailable, 400, "key_not_available"},
-		{"already enrolled", ErrAlreadyEnrolled, 400, "already_enrolled"},
-		{"bad credentials", ErrBadCredentials, 401, nil},
-		{"ip mismatch", ErrIPMismatch, 401, nil},
-		{"unexpected", context.DeadlineExceeded, 500, nil},
+		{"key not found", ErrKeyNotFound, 400},
+		{"key not available", ErrKeyNotAvailable, 400},
+		{"already enrolled", ErrAlreadyEnrolled, 400},
+		{"bad credentials", ErrBadCredentials, 401},
+		{"ip mismatch", ErrIPMismatch, 401},
+		{"unexpected", context.DeadlineExceeded, 500},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -134,12 +136,49 @@ func TestRedeemHandlerErrorMapping(t *testing.T) {
 			if parsed["error"] != "enrollment_failed" {
 				t.Errorf("error = %v, want enrollment_failed", parsed["error"])
 			}
-			if got, ok := parsed["reason"]; c.wantReason == nil && ok {
-				t.Errorf("reason = %v, want absent", got)
-			} else if c.wantReason != nil && got != c.wantReason {
-				t.Errorf("reason = %v, want %v", got, c.wantReason)
+			// No failure mode may leak a distinguishing reason to the client.
+			if got, ok := parsed["reason"]; ok {
+				t.Errorf("reason = %v leaked, want absent", got)
 			}
 		})
+	}
+}
+
+// The key-existence oracle (issue #6): ErrKeyNotFound, ErrKeyNotAvailable, and ErrAlreadyEnrolled
+// must produce a byte-identical client response, so a key's existence/state cannot be inferred
+// from the reply.
+func TestRedeemHandlerKeyFailuresAreByteIdentical(t *testing.T) {
+	keyErrs := []struct {
+		name string
+		err  error
+	}{
+		{"key not found", ErrKeyNotFound},
+		{"key not available", ErrKeyNotAvailable},
+		{"already enrolled", ErrAlreadyEnrolled},
+	}
+
+	rawResponse := func(t *testing.T, err error) (int, string) {
+		t.Helper()
+		app := redeemApp(&fakeRedeemer{err: err})
+		req := httptest.NewRequest("POST", "/enroll/redeem", strings.NewReader(`{"license_key":"KEY","username":"neo","password":"pw"}`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, rerr := app.Test(req, 10000)
+		if rerr != nil {
+			t.Fatalf("app.Test: %v", rerr)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		return resp.StatusCode, string(body)
+	}
+
+	wantStatus, wantBody := rawResponse(t, keyErrs[0].err)
+	for _, c := range keyErrs[1:] {
+		status, body := rawResponse(t, c.err)
+		if status != wantStatus {
+			t.Errorf("%s: status = %d, want %d (identical to %s)", c.name, status, wantStatus, keyErrs[0].name)
+		}
+		if body != wantBody {
+			t.Errorf("%s: body = %q, want %q (byte-identical to %s)", c.name, body, wantBody, keyErrs[0].name)
+		}
 	}
 }
 
