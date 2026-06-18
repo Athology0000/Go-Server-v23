@@ -547,10 +547,12 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 	started := time.Now()
 	minecraftUsernameInput = strings.TrimSpace(minecraftUsernameInput)
 
-	log.Printf("[auth.verify_session] start ip=%s token_present=%t token=%s minecraft_input=%q",
+	// Never log raw token material (even truncated): these logs are aggregated off-box and
+	// surfaced via /admin/server-logs. token_present + the SHA-256 token_hash prefix below are
+	// enough to correlate a session without leaking the bearer credential.
+	log.Printf("[auth.verify_session] start ip=%s token_present=%t minecraft_input=%q",
 		sourceIP,
 		strings.TrimSpace(rawToken) != "",
-		shortToken(rawToken),
 		minecraftUsernameInput,
 	)
 
@@ -939,14 +941,6 @@ func manifestIDFromURL(value string) string {
 		return value[idx+1:]
 	}
 	return value
-}
-
-func shortToken(raw string) string {
-	raw = strings.TrimSpace(raw)
-	if len(raw) <= 12 {
-		return raw
-	}
-	return raw[:6] + "..." + raw[len(raw)-6:]
 }
 
 func shortHash(raw string) string {
