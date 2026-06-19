@@ -3,6 +3,7 @@ package middleware
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -44,6 +45,10 @@ func IPAndUsernameKey(prefix string) func(*fiber.Ctx) string {
 			Username string `json:"username"`
 		}{}
 		c.BodyParser(&body)
-		return fmt.Sprintf("%s:%s:%s", prefix, GetRealIP(c), body.Username)
+		// Normalize identically to the account lookup (strings.ToLower(strings.TrimSpace(...)))
+		// so cased/whitespace variants of one username can't each get their own rate-limit
+		// bucket while all resolving to the same account.
+		username := strings.ToLower(strings.TrimSpace(body.Username))
+		return fmt.Sprintf("%s:%s:%s", prefix, GetRealIP(c), username)
 	}
 }

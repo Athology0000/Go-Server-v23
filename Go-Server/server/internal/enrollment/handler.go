@@ -9,9 +9,15 @@ import (
 	"github.com/phantom/server/internal/middleware"
 )
 
+// redeemRequest binds redemption to a credential proof. The account redeemed onto is derived
+// server-side from the verified username/password — a body-supplied account_id is no longer
+// accepted (issue #1: it let a caller redeem onto, and read the device_secret of, an account
+// they did not own). The bootstrapper already collects username/password for this step (the
+// sibling /enroll/handshake path uses the same credentials).
 type redeemRequest struct {
 	LicenseKey string `json:"license_key"`
-	AccountID  string `json:"account_id"`
+	Username   string `json:"username"`
+	Password   string `json:"password"`
 }
 
 type handshakeRequest struct {
@@ -38,26 +44,24 @@ func RegisterRoutes(app *fiber.App, svc *Service, redemption Redeemer, pool *pgx
 func handleRedeem(redemption Redeemer) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		var req redeemRequest
-		if err := c.BodyParser(&req); err != nil || req.LicenseKey == "" || req.AccountID == "" {
+		if err := c.BodyParser(&req); err != nil || req.LicenseKey == "" || req.Username == "" || req.Password == "" {
 			return c.Status(400).JSON(fiber.Map{"error": "enrollment_failed"})
 		}
 		ip := middleware.GetRealIP(c)
 
 		res, err := redemption.Redeem(c.Context(), RedeemRequest{
-			RawKey:    req.LicenseKey,
-			AccountID: req.AccountID,
-			SourceIP:  ip,
+			RawKey:   req.LicenseKey,
+			Username: req.Username,
+			Password: req.Password,
+			SourceIP: ip,
 		})
+		// All key-related failures collapse to one opaque response with no reason. Returning a
+		// per-state reason (key_not_found / key_not_available / already_enrolled / key_invalid)
+		// was a key-existence enumeration oracle (issue #6): it told an attacker which guessed
+		// keys exist and their state. The fine-grained distinction is kept server-side in
+		// audit.Log inside the redemption transaction; the client gets nothing to distinguish on.
 		if errors.Is(err, ErrKeyNotFound) || errors.Is(err, ErrKeyNotAvailable) || errors.Is(err, ErrAlreadyEnrolled) {
-			reason := "key_invalid"
-			if errors.Is(err, ErrKeyNotFound) {
-				reason = "key_not_found"
-			} else if errors.Is(err, ErrKeyNotAvailable) {
-				reason = "key_not_available"
-			} else if errors.Is(err, ErrAlreadyEnrolled) {
-				reason = "already_enrolled"
-			}
-			return c.Status(400).JSON(fiber.Map{"error": "enrollment_failed", "reason": reason})
+			return c.Status(400).JSON(fiber.Map{"error": "enrollment_failed"})
 		}
 		if errors.Is(err, ErrBadCredentials) || errors.Is(err, ErrIPMismatch) {
 			return c.Status(401).JSON(fiber.Map{"error": "enrollment_failed"})

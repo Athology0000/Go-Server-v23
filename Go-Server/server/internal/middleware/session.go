@@ -14,13 +14,26 @@ import (
 // middleware asks for a token's stored-hash form instead of calling HashToken raw.
 var tokenIssuer = crypto.NewTokenIssuer()
 
+// rejectForIPMismatch decides whether the strict-IP gate must reject a request.
+// It fires only when strict IP-binding is enabled, the session already has a
+// pinned last_seen_ip (so there is something to compare against — the first
+// request of a session pins, it never rejects), and the request's source IP
+// differs from that pin. When strictIP is false this always returns false, so
+// non-strict sessions keep their refresh-and-continue behaviour. Kept as a pure
+// function so the enforcement contract is unit-testable without a database.
+func rejectForIPMismatch(strictIP bool, lastSeenIP *string, realIP string) bool {
+	return strictIP && lastSeenIP != nil && *lastSeenIP != realIP
+}
+
 // SessionAuth validates the bearer token. When strictIP is true the request's
-// source IP must match the session's last_seen_ip — but we always refresh
-// last_seen_ip on a successful pass so subsequent requests in the same launch
-// from the same IP succeed even after a rotation. Clients behind carrier-grade
-// NAT or rotating egress IPs (Railway/Cloudflare edges) get false 401s under
-// the previous behavior; the strictIP gate now logs a warning instead of
-// rejecting when the IP changes, leaving the token itself as the credential.
+// source IP must match the session's last_seen_ip: once a session has pinned a
+// last_seen_ip, a request from a different IP is rejected with 401 (the
+// last_seen_ip is NOT refreshed and the request does not continue). When
+// strictIP is false the IP is not enforced — last_seen_ip is refreshed on every
+// pass so the token alone is the credential, which avoids false 401s for clients
+// behind carrier-grade NAT or rotating egress IPs (Railway/Cloudflare edges).
+// strictIP is OFF by default (see config.StrictSessionIP); set
+// STRICT_SESSION_IP=true to enable enforcement.
 func SessionAuth(pool *pgxpool.Pool, strictIP bool, livenessWindow time.Duration) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		raw, err := ParseBearerToken(c.Get("Authorization"))
@@ -48,12 +61,13 @@ func SessionAuth(pool *pgxpool.Pool, strictIP bool, livenessWindow time.Duration
 		}
 
 		realIP := GetRealIP(c)
-		if strictIP && session.LastSeenIP != nil && *session.LastSeenIP != realIP {
-			log.Printf("[session_auth] ip_changed session_id=%s old=%q new=%q (allowing through; token is the credential)",
+		if rejectForIPMismatch(strictIP, session.LastSeenIP, realIP) {
+			log.Printf("[session_auth] ip_changed session_id=%s old=%q new=%q (rejected; STRICT_SESSION_IP enforced)",
 				session.ID,
 				*session.LastSeenIP,
 				realIP,
 			)
+			return c.Status(401).JSON(fiber.Map{"error": "authentication_failed", "message": "Authentication failed"})
 		}
 		if session.LastSeenIP == nil || *session.LastSeenIP != realIP {
 			if updateErr := db.UpdateSessionLastSeenIP(c.Context(), pool, session.ID, realIP); updateErr != nil {

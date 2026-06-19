@@ -54,3 +54,23 @@ func VerifyPassword(password, encoded string) (bool, error) {
 	computed := argon2.IDKey([]byte(password), salt, iter, mem, par, uint32(len(expectedHash)))
 	return subtle.ConstantTimeCompare(computed, expectedHash) == 1, nil
 }
+
+// dummyVerifyHash is a valid argon2id hash computed once at package init.
+var dummyVerifyHash string
+
+func init() {
+	if h, err := HashPassword("phantom/dummy-verify/target"); err == nil {
+		dummyVerifyHash = h
+	}
+}
+
+// DummyVerifyPassword runs a full argon2id verification against a fixed internal hash, spending the
+// same work as a real VerifyPassword call. Authentication paths call it on the account-not-found
+// (and account-blocked) branch so the response time does not reveal whether a username/email
+// exists — closing the user-enumeration timing oracle that an early return would otherwise create.
+func DummyVerifyPassword() {
+	if dummyVerifyHash == "" {
+		return
+	}
+	_, _ = VerifyPassword("phantom/dummy-verify/input", dummyVerifyHash)
+}

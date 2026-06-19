@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -30,24 +31,27 @@ type AuditRecord struct {
 
 func WriteAudit(ctx context.Context, pool *pgxpool.Pool, e AuditEvent) {
 	details, _ := json.Marshal(e.Details)
-	pool.Exec(ctx,
+	// Audit writes are best-effort, but a silent failure leaves forensic gaps with no signal.
+	// Log the error so dropped events are at least visible (and alertable) rather than invisible.
+	if _, err := pool.Exec(ctx,
 		`INSERT INTO audit_log (event_type, account_id, device_id, admin_name, ip, details)
 		 VALUES ($1, $2, $3, $4, $5, $6)`,
-		e.EventType, e.AccountID, e.DeviceID, e.AdminName, e.IP, details)
+		e.EventType, e.AccountID, e.DeviceID, e.AdminName, e.IP, details); err != nil {
+		log.Printf("[audit] failed to write event %q: %v", e.EventType, err)
+	}
 }
 
-func ListActivityLog(ctx context.Context, pool *pgxpool.Pool, limit, offset int) ([]*AuditRecord, error) {
+// ListActivityLog returns the activity-feed subset of the audit log. The set of
+// event types is no longer hardcoded here; it is supplied by the caller from the
+// audit-package taxonomy (audit.ActivityEventTypes), so the feed filter cannot
+// drift from the emit sites. Behavior is unchanged: passing today's taxonomy
+// yields the exact same rows as the former hardcoded IN(...) list.
+func ListActivityLog(ctx context.Context, pool *pgxpool.Pool, eventTypes []string, limit, offset int) ([]*AuditRecord, error) {
 	rows, err := pool.Query(ctx,
 		`SELECT id, event_type, account_id, device_id, admin_name, ip, details, created_at
 		 FROM audit_log
-		 WHERE event_type IN (
-		   'panel.login.success','panel.login.fail',
-		   'auth.start.success','auth.start.fail',
-		   'auth.finish.success','auth.finish.fail',
-		   'auth.device.suspended',
-		   'panel.key.redeem.success'
-		 )
-		 ORDER BY created_at DESC LIMIT $1 OFFSET $2`, limit, offset)
+		 WHERE event_type = ANY($1)
+		 ORDER BY created_at DESC LIMIT $2 OFFSET $3`, eventTypes, limit, offset)
 	if err != nil {
 		return nil, err
 	}

@@ -114,7 +114,7 @@ func New(
 func (s *Service) Start(ctx context.Context, username, minecraftUsername, sourceIP string) (*StartResult, error) {
 	account, err := db.GetAccountByUsername(ctx, s.pool, normalize(username))
 	if errors.Is(err, pgx.ErrNoRows) {
-		s.auditSvc.Log("auth.start.fail", nil, nil, nil, &sourceIP, map[string]any{
+		s.auditSvc.Log(audit.EventAuthStartFail, nil, nil, nil, &sourceIP, map[string]any{
 			"reason":   "account_not_found",
 			"username": username,
 		})
@@ -125,7 +125,7 @@ func (s *Service) Start(ctx context.Context, username, minecraftUsername, source
 	}
 
 	if account.Status != "active" {
-		s.auditSvc.Log("auth.start.fail", &account.ID, nil, nil, &sourceIP, map[string]any{
+		s.auditSvc.Log(audit.EventAuthStartFail, &account.ID, nil, nil, &sourceIP, map[string]any{
 			"reason": "account_blocked",
 		})
 		return nil, ErrDeviceBlocked
@@ -133,7 +133,7 @@ func (s *Service) Start(ctx context.Context, username, minecraftUsername, source
 
 	device, err := db.GetDeviceByAccountID(ctx, s.pool, account.ID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		s.auditSvc.Log("auth.start.fail", &account.ID, nil, nil, &sourceIP, map[string]any{
+		s.auditSvc.Log(audit.EventAuthStartFail, &account.ID, nil, nil, &sourceIP, map[string]any{
 			"reason": "device_not_found",
 		})
 		return nil, ErrNotFound
@@ -145,7 +145,7 @@ func (s *Service) Start(ctx context.Context, username, minecraftUsername, source
 	// Lifecycle gates routed through the DeviceBinding module: blocked dead end, then
 	// must be enrolled, then (if already fully bound) the supplied minecraft name must match.
 	if s.binding.IsBlocked(device) {
-		s.auditSvc.Log("auth.start.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
+		s.auditSvc.Log(audit.EventAuthStartFail, &account.ID, &device.ID, nil, &sourceIP, map[string]any{
 			"reason": "device_blocked",
 			"status": device.BindingStatus,
 		})
@@ -153,7 +153,7 @@ func (s *Service) Start(ctx context.Context, username, minecraftUsername, source
 	}
 
 	if !s.binding.PermitsAuthStart(device) {
-		s.auditSvc.Log("auth.start.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
+		s.auditSvc.Log(audit.EventAuthStartFail, &account.ID, &device.ID, nil, &sourceIP, map[string]any{
 			"reason": "device_not_enrolled",
 		})
 		return nil, ErrNotFound
@@ -161,7 +161,7 @@ func (s *Service) Start(ctx context.Context, username, minecraftUsername, source
 
 	if s.binding.State(device) == StateFullyBound && minecraftUsername != "" {
 		if device.MinecraftUsername == nil || !strings.EqualFold(*device.MinecraftUsername, minecraftUsername) {
-			s.auditSvc.Log("auth.start.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
+			s.auditSvc.Log(audit.EventAuthStartFail, &account.ID, &device.ID, nil, &sourceIP, map[string]any{
 				"reason": "username_mismatch",
 			})
 			return nil, ErrUsernameMismatch
@@ -183,7 +183,7 @@ func (s *Service) Start(ctx context.Context, username, minecraftUsername, source
 		return nil, err
 	}
 
-	s.auditSvc.Log("auth.start.success", &account.ID, &device.ID, nil, &sourceIP, nil)
+	s.auditSvc.Log(audit.EventAuthStartSuccess, &account.ID, &device.ID, nil, &sourceIP, nil)
 
 	return &StartResult{
 		Challenge: challengeB64,
@@ -194,7 +194,7 @@ func (s *Service) Start(ctx context.Context, username, minecraftUsername, source
 func (s *Service) Finish(ctx context.Context, username, proofHex, sourceIP, minecraftUsername string) (*FinishResult, error) {
 	account, err := db.GetAccountByUsername(ctx, s.pool, normalize(username))
 	if errors.Is(err, pgx.ErrNoRows) {
-		s.auditSvc.Log("auth.finish.fail", nil, nil, nil, &sourceIP, map[string]any{
+		s.auditSvc.Log(audit.EventAuthFinishFail, nil, nil, nil, &sourceIP, map[string]any{
 			"reason":   "account_not_found",
 			"username": username,
 		})
@@ -206,7 +206,7 @@ func (s *Service) Finish(ctx context.Context, username, proofHex, sourceIP, mine
 
 	device, err := db.GetDeviceByAccountID(ctx, s.pool, account.ID)
 	if err != nil {
-		s.auditSvc.Log("auth.finish.fail", &account.ID, nil, nil, &sourceIP, map[string]any{
+		s.auditSvc.Log(audit.EventAuthFinishFail, &account.ID, nil, nil, &sourceIP, map[string]any{
 			"reason": "device_not_found",
 		})
 		return nil, ErrNotFound
@@ -214,14 +214,14 @@ func (s *Service) Finish(ctx context.Context, username, proofHex, sourceIP, mine
 
 	ch, err := cache.ConsumeChallenge(ctx, s.pool, device.ID)
 	if err != nil {
-		s.auditSvc.Log("auth.finish.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
+		s.auditSvc.Log(audit.EventAuthFinishFail, &account.ID, &device.ID, nil, &sourceIP, map[string]any{
 			"reason": "no_challenge_or_expired",
 		})
 		return nil, ErrNoChallenge
 	}
 
 	if ch.SourceIP != sourceIP {
-		s.auditSvc.Log("auth.finish.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
+		s.auditSvc.Log(audit.EventAuthFinishFail, &account.ID, &device.ID, nil, &sourceIP, map[string]any{
 			"reason":   "ip_mismatch",
 			"expected": ch.SourceIP,
 		})
@@ -237,12 +237,12 @@ func (s *Service) Finish(ctx context.Context, username, proofHex, sourceIP, mine
 		count, _ := db.IncrementFailedAttempts(ctx, s.pool, device.ID)
 		if count >= 5 {
 			db.SuspendDevice(ctx, s.pool, device.ID)
-			s.auditSvc.Log("auth.device.suspended", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
+			s.auditSvc.Log(audit.EventAuthDeviceSuspended, &account.ID, &device.ID, nil, &sourceIP, map[string]any{
 				"reason": "too_many_failed_attempts",
 			})
 		}
 
-		s.auditSvc.Log("auth.finish.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
+		s.auditSvc.Log(audit.EventAuthFinishFail, &account.ID, &device.ID, nil, &sourceIP, map[string]any{
 			"reason":          "bad_proof",
 			"failed_attempts": count,
 		})
@@ -264,7 +264,7 @@ func (s *Service) Finish(ctx context.Context, username, proofHex, sourceIP, mine
 	}
 
 	if !ent.Authorized {
-		s.auditSvc.Log("auth.finish.entitlement_denied", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
+		s.auditSvc.Log(audit.EventAuthFinishEntitlementDenied, &account.ID, &device.ID, nil, &sourceIP, map[string]any{
 			"reason": ent.Reason,
 		})
 
@@ -321,7 +321,7 @@ func (s *Service) Finish(ctx context.Context, username, proofHex, sourceIP, mine
 		return nil, fmt.Errorf("%w: %v", ErrManifestUnavailable, err)
 	}
 
-	s.auditSvc.Log("auth.finish.success", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
+	s.auditSvc.Log(audit.EventAuthFinishSuccess, &account.ID, &device.ID, nil, &sourceIP, map[string]any{
 		"plan_tier": planTier,
 	})
 
@@ -387,7 +387,7 @@ func (s *Service) Heartbeat(ctx context.Context, sessionToken, sourceIP string, 
 		if revokeErr := db.RevokeSession(ctx, s.pool, session.ID); revokeErr != nil {
 			log.Printf("[auth.heartbeat] revoke failed session_id=%s err=%v", session.ID, revokeErr)
 		}
-		s.auditSvc.Log("auth.heartbeat.entitlement_revoked", &session.AccountID, &session.DeviceID, nil, &sourceIP, map[string]any{
+		s.auditSvc.Log(audit.EventAuthHeartbeatEntitlementRevoked, &session.AccountID, &session.DeviceID, nil, &sourceIP, map[string]any{
 			"session_id": session.ID,
 			"reason":     ent.Reason,
 		})
@@ -414,7 +414,7 @@ func (s *Service) Heartbeat(ctx context.Context, sessionToken, sourceIP string, 
 		log.Printf("[auth.heartbeat] activity insert failed session_id=%s err=%v", session.ID, err)
 	}
 
-	s.auditSvc.Log("auth.heartbeat", &session.AccountID, &session.DeviceID, nil, &sourceIP, map[string]any{
+	s.auditSvc.Log(audit.EventAuthHeartbeat, &session.AccountID, &session.DeviceID, nil, &sourceIP, map[string]any{
 		"session_id": session.ID,
 	})
 
@@ -472,7 +472,7 @@ func (s *Service) VerifyMinecraft(ctx context.Context, rawToken, minecraftUserna
 	}
 
 	if account.Status != "active" {
-		s.auditSvc.Log("auth.verify_mc.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
+		s.auditSvc.Log(audit.EventAuthVerifyMCFail, &account.ID, &device.ID, nil, &sourceIP, map[string]any{
 			"reason": "account_blocked",
 		})
 		return &VerifyMinecraftResult{
@@ -492,7 +492,7 @@ func (s *Service) VerifyMinecraft(ctx context.Context, rawToken, minecraftUserna
 		}
 	case StateFullyBound:
 		if device.MinecraftUsername == nil || !strings.EqualFold(*device.MinecraftUsername, minecraftUsername) {
-			s.auditSvc.Log("auth.verify_mc.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
+			s.auditSvc.Log(audit.EventAuthVerifyMCFail, &account.ID, &device.ID, nil, &sourceIP, map[string]any{
 				"reason": "minecraft_username_mismatch",
 			})
 			return &VerifyMinecraftResult{
@@ -501,7 +501,7 @@ func (s *Service) VerifyMinecraft(ctx context.Context, rawToken, minecraftUserna
 			}, nil
 		}
 	default:
-		s.auditSvc.Log("auth.verify_mc.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
+		s.auditSvc.Log(audit.EventAuthVerifyMCFail, &account.ID, &device.ID, nil, &sourceIP, map[string]any{
 			"reason": "device_not_eligible",
 			"status": device.BindingStatus,
 		})
@@ -517,7 +517,7 @@ func (s *Service) VerifyMinecraft(ctx context.Context, rawToken, minecraftUserna
 	}
 
 	if !ent.Authorized {
-		s.auditSvc.Log("auth.verify_mc.entitlement_denied", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
+		s.auditSvc.Log(audit.EventAuthVerifyMCEntitlementDenied, &account.ID, &device.ID, nil, &sourceIP, map[string]any{
 			"reason": ent.Reason,
 		})
 		return &VerifyMinecraftResult{
@@ -528,7 +528,7 @@ func (s *Service) VerifyMinecraft(ctx context.Context, rawToken, minecraftUserna
 
 	manifestURL, manifestSig, _ := s.resolveManifest(ctx, ent.LicenseID, ent.ContentChannel, ent.EnabledModules)
 
-	s.auditSvc.Log("auth.verify_mc.success", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
+	s.auditSvc.Log(audit.EventAuthVerifyMCSuccess, &account.ID, &device.ID, nil, &sourceIP, map[string]any{
 		"plan_tier": ent.PlanTier,
 	})
 
@@ -547,10 +547,12 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 	started := time.Now()
 	minecraftUsernameInput = strings.TrimSpace(minecraftUsernameInput)
 
-	log.Printf("[auth.verify_session] start ip=%s token_present=%t token=%s minecraft_input=%q",
+	// Never log raw token material (even truncated): these logs are aggregated off-box and
+	// surfaced via /admin/server-logs. token_present + the SHA-256 token_hash prefix below are
+	// enough to correlate a session without leaking the bearer credential.
+	log.Printf("[auth.verify_session] start ip=%s token_present=%t minecraft_input=%q",
 		sourceIP,
 		strings.TrimSpace(rawToken) != "",
-		shortToken(rawToken),
 		minecraftUsernameInput,
 	)
 
@@ -658,7 +660,7 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 				minecraftUsernameInput,
 			)
 
-			s.auditSvc.Log("auth.verify_session.fail", &sess.AccountID, &device.ID, nil, &sourceIP, map[string]any{
+			s.auditSvc.Log(audit.EventAuthVerifySessionFail, &sess.AccountID, &device.ID, nil, &sourceIP, map[string]any{
 				"reason":   "minecraft_username_mismatch",
 				"expected": ptrStringValue(device.MinecraftUsername),
 				"got":      minecraftUsernameInput,
@@ -705,7 +707,7 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 			account.Status,
 		)
 
-		s.auditSvc.Log("auth.verify_session.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
+		s.auditSvc.Log(audit.EventAuthVerifySessionFail, &account.ID, &device.ID, nil, &sourceIP, map[string]any{
 			"reason": "account_blocked",
 			"status": account.Status,
 		})
@@ -724,7 +726,7 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 			device.BindingStatus,
 		)
 
-		s.auditSvc.Log("auth.verify_session.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
+		s.auditSvc.Log(audit.EventAuthVerifySessionFail, &account.ID, &device.ID, nil, &sourceIP, map[string]any{
 			"reason": "device_blocked",
 			"status": device.BindingStatus,
 		})
@@ -744,7 +746,7 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 				return nil, err
 			}
 			device.HWIDHash = &hwidHash
-			s.auditSvc.Log("auth.verify_session.hwid_pinned", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
+			s.auditSvc.Log(audit.EventAuthVerifySessionHWIDPinned, &account.ID, &device.ID, nil, &sourceIP, map[string]any{
 				"hwid_prefix": shortHash(hwidHash),
 			})
 		} else if !strings.EqualFold(strings.TrimSpace(*device.HWIDHash), strings.TrimSpace(hwidHash)) {
@@ -752,7 +754,7 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 			// hardware change from a spoofing attempt. Recovery = admin device reset + re-enroll.
 			log.Printf("[auth.verify_session] hwid_mismatch ip=%s device_id=%s stored=%s got=%s",
 				sourceIP, device.ID, shortHash(strings.TrimSpace(*device.HWIDHash)), shortHash(strings.TrimSpace(hwidHash)))
-			s.auditSvc.Log("auth.verify_session.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
+			s.auditSvc.Log(audit.EventAuthVerifySessionFail, &account.ID, &device.ID, nil, &sourceIP, map[string]any{
 				"reason":        "hwid_mismatch",
 				"stored_prefix": shortHash(strings.TrimSpace(*device.HWIDHash)),
 				"got_prefix":    shortHash(strings.TrimSpace(hwidHash)),
@@ -793,7 +795,7 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 			ent.Reason,
 		)
 
-		s.auditSvc.Log("auth.verify_session.entitlement_denied", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
+		s.auditSvc.Log(audit.EventAuthVerifySessionEntitlementDenied, &account.ID, &device.ID, nil, &sourceIP, map[string]any{
 			"reason": ent.Reason,
 		})
 
@@ -851,7 +853,7 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 		)
 	}
 
-	s.auditSvc.Log("auth.verify_session.success", &account.ID, &device.ID, nil, &sourceIP, map[string]any{
+	s.auditSvc.Log(audit.EventAuthVerifySessionSuccess, &account.ID, &device.ID, nil, &sourceIP, map[string]any{
 		"plan_tier":          ent.PlanTier,
 		"minecraft_username": minecraftUsername,
 	})
@@ -944,14 +946,6 @@ func manifestIDFromURL(value string) string {
 		return value[idx+1:]
 	}
 	return value
-}
-
-func shortToken(raw string) string {
-	raw = strings.TrimSpace(raw)
-	if len(raw) <= 12 {
-		return raw
-	}
-	return raw[:6] + "..." + raw[len(raw)-6:]
 }
 
 func shortHash(raw string) string {

@@ -33,10 +33,17 @@ import (
 
 // RedeemRequest is the typed input to a redemption. Naming the fields here is what lets the
 // handler stop threading positional arguments into the transaction.
+//
+// Redemption is bound to a credential proof: the account to redeem onto is derived from a
+// verified Username/Password, never trusted from the caller. AccountID is intentionally NOT a
+// field — accepting a caller-supplied account id is the account-takeover vulnerability this
+// seam was hardened against (issue #1). The panel's own redeem path derives the account from an
+// authenticated panel session for the same reason.
 type RedeemRequest struct {
-	RawKey    string
-	AccountID string
-	SourceIP  string
+	RawKey   string
+	Username string
+	Password string
+	SourceIP string
 }
 
 // RedeemResult is the typed outcome of a successful redemption — exactly the values the
@@ -106,7 +113,6 @@ func computeNewExpiry(hasExisting bool, existing *time.Time, durationDays int) *
 // - Create/extend the account license (so auth works right away)
 // - Return the username + decrypted device_secret (base64) + plan_tier + expires_at
 func (r *Redemption) Redeem(ctx context.Context, req RedeemRequest) (RedeemResult, error) {
-	accountID := req.AccountID
 	sourceIP := req.SourceIP
 	keyHash := crypto.HashLicenseKey(req.RawKey)
 
@@ -116,19 +122,35 @@ func (r *Redemption) Redeem(ctx context.Context, req RedeemRequest) (RedeemResul
 	}
 	defer tx.Rollback(ctx)
 
-	// Account must exist and be active.
+	// Resolve the account from a proven credential, not a caller-supplied id. The account the
+	// key redeems onto (and whose device_secret the response returns) is whoever the verified
+	// username/password identifies — mirroring enrollment Handshake and the panel redeem path.
+	// A wrong username, wrong password, or blocked account all collapse to ErrBadCredentials so
+	// the endpoint is not a username-enumeration / account-existence oracle.
+	var accountID string
 	var username string
+	var passwordHash string
 	var accountStatus string
-	if err := tx.QueryRow(ctx, `SELECT username, status FROM accounts WHERE id = $1`, accountID).
-		Scan(&username, &accountStatus); err != nil {
+	if err := tx.QueryRow(ctx,
+		`SELECT id, username, password_hash, status FROM accounts WHERE username = $1`,
+		normalize(req.Username),
+	).Scan(&accountID, &username, &passwordHash, &accountStatus); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			r.auditSvc.Log("enroll.redeem.fail", &accountID, nil, nil, &sourceIP, map[string]any{"reason": "account_not_found"})
+			// Spend the same argon2 work as a real verify so a missing account isn't
+			// distinguishable by response time (user-enumeration oracle); same for blocked below.
+			crypto.DummyVerifyPassword()
+			r.auditSvc.Log(audit.EventEnrollRedeemFail, nil, nil, nil, &sourceIP, map[string]any{"reason": "account_not_found", "username": req.Username})
 			return RedeemResult{}, ErrBadCredentials
 		}
 		return RedeemResult{}, err
 	}
 	if accountStatus != "active" {
-		r.auditSvc.Log("enroll.redeem.fail", &accountID, nil, nil, &sourceIP, map[string]any{"reason": "account_blocked"})
+		crypto.DummyVerifyPassword()
+		r.auditSvc.Log(audit.EventEnrollRedeemFail, &accountID, nil, nil, &sourceIP, map[string]any{"reason": "account_blocked"})
+		return RedeemResult{}, ErrBadCredentials
+	}
+	if ok, err := crypto.VerifyPassword(req.Password, passwordHash); err != nil || !ok {
+		r.auditSvc.Log(audit.EventEnrollRedeemFail, &accountID, nil, nil, &sourceIP, map[string]any{"reason": "bad_credentials"})
 		return RedeemResult{}, ErrBadCredentials
 	}
 
@@ -144,13 +166,13 @@ func (r *Redemption) Redeem(ctx context.Context, req RedeemRequest) (RedeemResul
 		keyHash,
 	).Scan(&planTier, &durationDays, &status); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			r.auditSvc.Log("enroll.redeem.fail", &accountID, nil, nil, &sourceIP, map[string]any{"reason": "key_not_found"})
+			r.auditSvc.Log(audit.EventEnrollRedeemFail, &accountID, nil, nil, &sourceIP, map[string]any{"reason": "key_not_found"})
 			return RedeemResult{}, ErrKeyNotFound
 		}
 		return RedeemResult{}, err
 	}
 	if status != "available" {
-		r.auditSvc.Log("enroll.redeem.fail", &accountID, nil, nil, &sourceIP, map[string]any{"reason": "key_not_available", "status": status})
+		r.auditSvc.Log(audit.EventEnrollRedeemFail, &accountID, nil, nil, &sourceIP, map[string]any{"reason": "key_not_available", "status": status})
 		return RedeemResult{}, ErrKeyNotAvailable
 	}
 
@@ -190,7 +212,7 @@ func (r *Redemption) Redeem(ctx context.Context, req RedeemRequest) (RedeemResul
 		}
 	} else {
 		if bindingStatus != "unbound" {
-			r.auditSvc.Log("enroll.redeem.fail", &accountID, &deviceID, nil, &sourceIP, map[string]any{"reason": "already_enrolled", "status": bindingStatus})
+			r.auditSvc.Log(audit.EventEnrollRedeemFail, &accountID, &deviceID, nil, &sourceIP, map[string]any{"reason": "already_enrolled", "status": bindingStatus})
 			return RedeemResult{}, ErrAlreadyEnrolled
 		}
 		// Align enrollment_ip to the current request so auth/start won't IP-mismatch.
@@ -264,7 +286,7 @@ func (r *Redemption) Redeem(ctx context.Context, req RedeemRequest) (RedeemResul
 		return RedeemResult{}, err
 	}
 
-	r.auditSvc.Log("enroll.redeem.success", &accountID, &deviceID, nil, &sourceIP, map[string]any{"plan_tier": planTier, "duration_days": durationDays, "expires_at": newExpires})
+	r.auditSvc.Log(audit.EventEnrollRedeemSuccess, &accountID, &deviceID, nil, &sourceIP, map[string]any{"plan_tier": planTier, "duration_days": durationDays, "expires_at": newExpires})
 	return RedeemResult{
 		Username:     username,
 		DeviceSecret: base64.StdEncoding.EncodeToString(secretPlain),

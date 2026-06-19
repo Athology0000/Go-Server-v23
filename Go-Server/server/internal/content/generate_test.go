@@ -121,10 +121,10 @@ func TestEnsureLicenseBundlesGeneratesPerLicenseEnc(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected generated bundle: %v", err)
 	}
-	// Decrypts with the module key to a watermarked jar.
-	plain, err := ccrypto.DecryptAESGCM(key, enc)
+	// Decrypts with the per-license DERIVED key (not the raw server key) to a watermarked jar.
+	plain, err := ccrypto.DecryptAESGCM(DeriveLicenseKey(key, lic), enc)
 	if err != nil {
-		t.Fatalf("generated .enc must decrypt with the module key: %v", err)
+		t.Fatalf("generated .enc must decrypt with the derived per-license key: %v", err)
 	}
 	wmid := WatermarkID(pepper, lic)
 	if cb, ok := jarEntry(t, plain, "assets/.cbmark"); !ok || !strings.HasPrefix(cb, wmid+":") {

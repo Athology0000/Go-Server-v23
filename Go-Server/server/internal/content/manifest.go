@@ -16,6 +16,7 @@ import (
 
 	ccrypto "github.com/phantom/server/internal/crypto"
 	"github.com/phantom/server/internal/db"
+	"github.com/phantom/server/internal/entitlement"
 )
 
 type signedManifestPayload struct {
@@ -56,6 +57,55 @@ func SignManifest(signingKey []byte, m *db.ContentManifest) (string, error) {
 	return ccrypto.SignManifest(signingKey, signedPayloadOf(m))
 }
 
+// scopeManifestForEntitlement restricts a persisted (admin-created) manifest to what the caller is
+// actually entitled to, so a license holder who learns another channel/tier's manifest UUID cannot
+// read its module names, URLs, hashes or key. It is the by-ID counterpart to BuildStableManifest's
+// inline filtering and shares ModuleAllowed so the two cannot diverge:
+//
+//  1. Channel scoping: a manifest for a channel the caller is not on is rejected outright
+//     (ErrNotEntitled) rather than filtered, because cross-channel content is not "their" build at all.
+//  2. Per-module filtering: modules and native components the caller is not entitled to are dropped.
+//  3. Re-signing: filtering changes the Ed25519-signed payload, so the manifest is re-signed over the
+//     filtered bytes via SignManifest (the single signed-byte source of truth) — the original DB
+//     signature no longer matches the filtered modules and would fail client verification.
+//
+// The returned manifest is a copy; the input row is not mutated.
+func scopeManifestForEntitlement(m *db.ContentManifest, ent *entitlement.Result, signingKey []byte) (*db.ContentManifest, error) {
+	if m.Channel != ent.ContentChannel {
+		return nil, ErrNotEntitled
+	}
+
+	scoped := *m // copy; we replace the slices and signature below
+
+	modules := make([]db.ManifestModule, 0, len(m.Modules))
+	for _, mod := range m.Modules {
+		if ModuleAllowed(mod.Name, ent.EnabledModules) {
+			modules = append(modules, mod)
+		}
+	}
+	// Re-densify InitOrder so the loader's ordered load has no gaps after drops.
+	for i := range modules {
+		modules[i].InitOrder = i
+	}
+	scoped.Modules = modules
+
+	natives := make([]db.ManifestNative, 0, len(m.NativeComponents))
+	for _, n := range m.NativeComponents {
+		if ModuleAllowed(n.Name, ent.EnabledModules) {
+			natives = append(natives, n)
+		}
+	}
+	scoped.NativeComponents = natives
+
+	// The signed payload now differs from the stored row, so re-sign over the filtered bytes.
+	sig, err := SignManifest(signingKey, &scoped)
+	if err != nil {
+		return nil, err
+	}
+	scoped.Signature = sig
+	return &scoped, nil
+}
+
 // effectiveModulesDir returns the per-license content subtree (CONTENT_DIR/modules/<licenseId>) when
 // it exists, otherwise the shared CONTENT_DIR/modules. Per-license bundles are watermarked uniquely,
 // so a client served from its own subtree gets bundles (and manifest hashes) distinct from everyone
@@ -80,6 +130,19 @@ func BuildStableManifest(_ context.Context, contentDir, licenseID, baseURL, chan
 	entries, err := os.ReadDir(modulesDir)
 	if err != nil {
 		return nil, err
+	}
+
+	// The key that this license's .enc bundles were sealed under, and that is
+	// advertised (base64) in its signed manifest. When the license is served from
+	// its own per-license subtree, that is the DERIVED per-license key, so a manifest
+	// (and the bundles it covers) for one license is useless to another. When the
+	// license falls back to the SHARED CONTENT_DIR/modules (no subtree, or empty
+	// licenseID), those bundles are sealed under the raw server key, so we advertise
+	// the raw server key there. effectiveModulesDir already encodes that choice:
+	// a per-license subtree path ends in the licenseID.
+	contentKey := moduleKey
+	if licenseID != "" && modulesDir != filepath.Join(contentDir, "modules") {
+		contentKey = DeriveLicenseKey(moduleKey, licenseID)
 	}
 
 	baseURL = strings.TrimRight(baseURL, "/")
@@ -120,7 +183,7 @@ func BuildStableManifest(_ context.Context, contentDir, licenseID, baseURL, chan
 		// configured module key, so a wrong MODULE_ENCRYPTION_KEY fails loudly here
 		// instead of shipping a bundle every client would reject.
 		if strings.EqualFold(filepath.Ext(jarPath), ".enc") {
-			if _, decErr := ccrypto.DecryptAESGCM(moduleKey, raw); decErr != nil {
+			if _, decErr := ccrypto.DecryptAESGCM(contentKey, raw); decErr != nil {
 				return nil, fmt.Errorf("module %s does not decrypt with the configured module key: %w", entry.Name(), decErr)
 			}
 		}
@@ -167,7 +230,7 @@ func BuildStableManifest(_ context.Context, contentDir, licenseID, baseURL, chan
 		BuildID:          "stable-filesystem",
 		Channel:          channel,
 		MinLoaderVersion: "1",
-		ModuleKey:        base64.StdEncoding.EncodeToString(moduleKey),
+		ModuleKey:        base64.StdEncoding.EncodeToString(contentKey),
 		Modules:          modules,
 		NativeComponents: natives,
 		ExpiresAt:        expiresAt,

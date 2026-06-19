@@ -183,15 +183,6 @@ func main() {
 		})
 	})
 
-	pub.Post("/debug/body", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{
-			"ok":           true,
-			"content_type": c.Get("Content-Type"),
-			"body_len":     len(c.Body()),
-			"body":         string(c.Body()),
-		})
-	})
-
 	auth.RegisterRoutes(pub, authSvc, pool, auditSvc, cfg)
 	enrollment.RegisterRoutes(pub, enrollSvc, redemption, pool)
 	panel.RegisterRoutes(pub, pool, auditSvc, cfg.MasterKey)
