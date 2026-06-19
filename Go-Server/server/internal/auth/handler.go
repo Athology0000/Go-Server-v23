@@ -131,7 +131,7 @@ func handlePanelLogin(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.Handler
 			// Spend the same argon2 work as a real verify so timing doesn't reveal whether the
 			// email exists (user-enumeration oracle).
 			crypto.DummyVerifyPassword()
-			auditSvc.Log("panel.login.fail", nil, nil, nil, &ip, map[string]any{
+			auditSvc.Log(audit.EventPanelLoginFail, nil, nil, nil, &ip, map[string]any{
 				"reason": "account_not_found",
 				"email":  body.Email,
 			})
@@ -143,7 +143,7 @@ func handlePanelLogin(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.Handler
 		}
 
 		if account.Status == "banned" {
-			auditSvc.Log("panel.login.fail", &account.ID, nil, nil, &ip, map[string]any{
+			auditSvc.Log(audit.EventPanelLoginFail, &account.ID, nil, nil, &ip, map[string]any{
 				"reason": "banned",
 			})
 
@@ -155,7 +155,7 @@ func handlePanelLogin(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.Handler
 
 		ok, err := crypto.VerifyPassword(body.Password, account.PasswordHash)
 		if err != nil || !ok {
-			auditSvc.Log("panel.login.fail", &account.ID, nil, nil, &ip, map[string]any{
+			auditSvc.Log(audit.EventPanelLoginFail, &account.ID, nil, nil, &ip, map[string]any{
 				"reason": "bad_password",
 			})
 
@@ -174,7 +174,7 @@ func handlePanelLogin(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.Handler
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 
-		auditSvc.Log("panel.login.success", &account.ID, nil, nil, &ip, map[string]any{
+		auditSvc.Log(audit.EventPanelLoginSuccess, &account.ID, nil, nil, &ip, map[string]any{
 			"username": account.Username,
 		})
 

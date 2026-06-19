@@ -60,7 +60,7 @@ func handleApproveBuild(pool *pgxpool.Pool, auditSvc *audit.Service, promoter *f
 			return c.Status(409).JSON(fiber.Map{"error": "promote_failed", "message": err.Error()})
 		}
 
-		auditSvc.Log("admin.build.approve", nil, nil, adminNamePtr(c), ipPtr(c),
+		auditSvc.Log(audit.EventAdminBuildApprove, nil, nil, adminNamePtr(c), ipPtr(c),
 			map[string]any{"build_id": id, "module": b.Module})
 		return c.JSON(updated)
 	}
@@ -83,7 +83,7 @@ func handleDenyBuild(pool *pgxpool.Pool, auditSvc *audit.Service, promoter *forg
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 
-		auditSvc.Log("admin.build.deny", nil, nil, adminNamePtr(c), ipPtr(c),
+		auditSvc.Log(audit.EventAdminBuildDeny, nil, nil, adminNamePtr(c), ipPtr(c),
 			map[string]any{"build_id": id, "module": b.Module})
 		return c.JSON(updated)
 	}
