@@ -54,17 +54,17 @@ func (s *Service) Handshake(ctx context.Context, username, password, sourceIP st
 		// Match the argon2 cost of a real verify so a missing account isn't distinguishable by
 		// response time (user-enumeration oracle); same for the blocked branch below.
 		crypto.DummyVerifyPassword()
-		s.auditSvc.Log("enroll.handshake.fail", nil, nil, nil, &sourceIP, map[string]any{"reason": "account_not_found", "username": username})
+		s.auditSvc.Log(audit.EventEnrollHandshakeFail, nil, nil, nil, &sourceIP, map[string]any{"reason": "account_not_found", "username": username})
 		return "", ErrBadCredentials
 	}
 	if account.Status != "active" {
 		crypto.DummyVerifyPassword()
-		s.auditSvc.Log("enroll.handshake.fail", &account.ID, nil, nil, &sourceIP, map[string]any{"reason": "account_blocked"})
+		s.auditSvc.Log(audit.EventEnrollHandshakeFail, &account.ID, nil, nil, &sourceIP, map[string]any{"reason": "account_blocked"})
 		return "", ErrBadCredentials
 	}
 	ok, err := crypto.VerifyPassword(password, account.PasswordHash)
 	if err != nil || !ok {
-		s.auditSvc.Log("enroll.handshake.fail", &account.ID, nil, nil, &sourceIP, map[string]any{"reason": "bad_credentials"})
+		s.auditSvc.Log(audit.EventEnrollHandshakeFail, &account.ID, nil, nil, &sourceIP, map[string]any{"reason": "bad_credentials"})
 		return "", ErrBadCredentials
 	}
 	device, err := db.GetDeviceByAccountID(ctx, s.pool, account.ID)
@@ -86,17 +86,17 @@ func (s *Service) Handshake(ctx context.Context, username, password, sourceIP st
 		if err != nil {
 			return "", err
 		}
-		s.auditSvc.Log("enroll.handshake.device_created", &account.ID, &device.ID, nil, &sourceIP, nil)
+		s.auditSvc.Log(audit.EventEnrollHandshakeDeviceCreated, &account.ID, &device.ID, nil, &sourceIP, nil)
 	} else if err != nil {
-		s.auditSvc.Log("enroll.handshake.fail", &account.ID, nil, nil, &sourceIP, map[string]any{"reason": "device_lookup_error"})
+		s.auditSvc.Log(audit.EventEnrollHandshakeFail, &account.ID, nil, nil, &sourceIP, map[string]any{"reason": "device_lookup_error"})
 		return "", err
 	}
 	if device.BindingStatus != "unbound" {
-		s.auditSvc.Log("enroll.handshake.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{"reason": "device_already_bound", "status": device.BindingStatus})
+		s.auditSvc.Log(audit.EventEnrollHandshakeFail, &account.ID, &device.ID, nil, &sourceIP, map[string]any{"reason": "device_already_bound", "status": device.BindingStatus})
 		return "", ErrBadCredentials
 	}
 	if device.EnrollmentIP == nil || *device.EnrollmentIP != sourceIP {
-		s.auditSvc.Log("enroll.handshake.fail", &account.ID, &device.ID, nil, &sourceIP, map[string]any{"reason": "ip_mismatch"})
+		s.auditSvc.Log(audit.EventEnrollHandshakeFail, &account.ID, &device.ID, nil, &sourceIP, map[string]any{"reason": "ip_mismatch"})
 		return "", ErrIPMismatch
 	}
 	if err := db.MarkEnrolled(ctx, s.pool, device.ID); err != nil {
@@ -106,7 +106,7 @@ func (s *Service) Handshake(ctx context.Context, username, password, sourceIP st
 	if err != nil {
 		return "", err
 	}
-	s.auditSvc.Log("enroll.handshake.success", &account.ID, &device.ID, nil, &sourceIP, nil)
+	s.auditSvc.Log(audit.EventEnrollHandshakeSuccess, &account.ID, &device.ID, nil, &sourceIP, nil)
 	return base64.StdEncoding.EncodeToString(plain), nil
 }
 
