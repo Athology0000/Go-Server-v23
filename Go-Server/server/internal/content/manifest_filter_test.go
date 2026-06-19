@@ -32,7 +32,7 @@ func buildFor(t *testing.T, dir string, enabled []string) []string {
 		t.Fatal(err)
 	}
 	m, err := BuildStableManifest(context.Background(), dir, "", "https://example.test", "stable",
-		priv, make([]byte, 32), enabled)
+		priv, make([]byte, 32), enabled, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +50,7 @@ func TestManifestFiltersToEntitledModules(t *testing.T) {
 		t.Fatal(err)
 	}
 	m, err := BuildStableManifest(context.Background(), dir, "", "https://example.test", "stable",
-		priv, make([]byte, 32), []string{"autowalk"})
+		priv, make([]byte, 32), []string{"autowalk"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +94,7 @@ func TestManifestEmptyContentDirErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = BuildStableManifest(context.Background(), dir, "", "https://example.test", "stable",
-		priv, make([]byte, 32), []string{"*"})
+		priv, make([]byte, 32), []string{"*"}, nil)
 	if err == nil {
 		t.Fatal("expected an error for an empty content dir")
 	}

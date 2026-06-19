@@ -56,7 +56,7 @@ func TestBuildStableManifest_HashesServedCiphertext(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	m, err := BuildStableManifest(context.Background(), dir, "", "https://example.test", "stable", fixedSigningKey(), moduleKey, []string{"*"})
+	m, err := BuildStableManifest(context.Background(), dir, "", "https://example.test", "stable", fixedSigningKey(), moduleKey, []string{"*"}, nil)
 	if err != nil {
 		t.Fatalf("BuildStableManifest: %v", err)
 	}
@@ -111,7 +111,7 @@ func TestBuildStableManifest_WrongModuleKeyFails(t *testing.T) {
 	for i := range wrongKey {
 		wrongKey[i] = byte(255 - i)
 	}
-	if _, err := BuildStableManifest(context.Background(), dir, "", "https://example.test", "stable", fixedSigningKey(), wrongKey, []string{"*"}); err == nil {
+	if _, err := BuildStableManifest(context.Background(), dir, "", "https://example.test", "stable", fixedSigningKey(), wrongKey, []string{"*"}, nil); err == nil {
 		t.Fatal("expected BuildStableManifest to fail with a wrong module key, got nil error")
 	}
 }
@@ -136,7 +136,7 @@ func TestBuildStableManifest_SignatureVerifies(t *testing.T) {
 	}
 
 	priv := fixedSigningKey()
-	m, err := BuildStableManifest(context.Background(), dir, "", "https://example.test", "stable", priv, fixedModuleKey(), []string{"*"})
+	m, err := BuildStableManifest(context.Background(), dir, "", "https://example.test", "stable", priv, fixedModuleKey(), []string{"*"}, nil)
 	if err != nil {
 		t.Fatalf("BuildStableManifest: %v", err)
 	}
@@ -189,5 +189,35 @@ func TestSignedManifestPayload_GoldenBytes(t *testing.T) {
 	}
 	if string(got2) != `{"build_id":"stable-filesystem","channel":"stable","minimum_loader_version":"1","modules":[{"name":"phantom-autowalk","url":"https://example.test/content/module/phantom-autowalk","sha256":"abc123","required":false,"init_order":0}],"native_components":[],"expires_at_millis":1750000000000,"epoch":1750000000000}` {
 		t.Errorf("omitempty module_key not dropped: %s", string(got2))
+	}
+}
+
+// With deps, depends_on appears immediately after init_order within the module object (omitempty
+// keeps deps-less modules byte-identical, per the test above). This is the exact byte addition the
+// client's Java SignedManifestPayload and the C++ native canonicalizer must reproduce.
+func TestSignedManifestPayload_DependsOnGoldenBytes(t *testing.T) {
+	payload := signedManifestPayload{
+		BuildID:          "stable-filesystem",
+		Channel:          "stable",
+		MinLoaderVersion: "1",
+		Modules: []db.ManifestModule{{
+			Name:      "phantom-commission",
+			URL:       "https://example.test/content/module/phantom-commission",
+			SHA256:    "abc123",
+			Required:  false,
+			InitOrder: 0,
+			DependsOn: []string{"combat", "mining"},
+		}},
+		NativeComponents: []db.ManifestNative{},
+		ExpiresAtMillis:  1750000000000,
+		Epoch:            1750000000000,
+	}
+	got, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{"build_id":"stable-filesystem","channel":"stable","minimum_loader_version":"1","modules":[{"name":"phantom-commission","url":"https://example.test/content/module/phantom-commission","sha256":"abc123","required":false,"init_order":0,"depends_on":["combat","mining"]}],"native_components":[],"expires_at_millis":1750000000000,"epoch":1750000000000}`
+	if string(got) != want {
+		t.Errorf("depends_on signed bytes drift:\n got=%s\nwant=%s", string(got), want)
 	}
 }

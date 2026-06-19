@@ -73,6 +73,7 @@ func RegisterRoutes(app *fiber.App, pool *pgxpool.Pool, signingKey []byte, audit
 	// Entitlements
 	app.Post("/admin/entitlements", super, handleUpsertEntitlement(pool, auditSvc))
 	app.Get("/admin/entitlements/:plan", viewer, handleGetEntitlement(pool))
+	app.Post("/admin/modules", super, handleUpsertModuleMetadata(pool, auditSvc))
 	app.Post("/admin/accounts/:id/override", super, handleUpsertOverride(pool, auditSvc))
 	app.Delete("/admin/accounts/:id/override", super, handleDeleteOverride(pool, auditSvc))
 
@@ -387,6 +388,28 @@ func handleUpsertEntitlement(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.
 		tok := middleware.GetAdminToken(c)
 		auditSvc.Log("admin.entitlement.upsert", nil, nil, &tok.AdminUsername, nil,
 			map[string]any{"plan_tier": e.PlanTier})
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
+// handleUpsertModuleMetadata sets a module's declared dependencies (bare ids). The entitlement
+// resolver expands a license's module set by these edges, and BuildStableManifest stamps them into
+// the signed manifest for client enforcement.
+func handleUpsertModuleMetadata(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var body struct {
+			ModuleName string   `json:"module_name"`
+			DependsOn  []string `json:"depends_on"`
+		}
+		if err := c.BodyParser(&body); err != nil || body.ModuleName == "" {
+			return c.Status(400).JSON(fiber.Map{"error": "invalid_request"})
+		}
+		if err := db.UpsertModuleMetadata(c.Context(), pool, body.ModuleName, body.DependsOn); err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
+		}
+		tok := middleware.GetAdminToken(c)
+		auditSvc.Log("admin.module.upsert", nil, nil, &tok.AdminUsername, nil,
+			map[string]any{"module_name": body.ModuleName})
 		return c.JSON(fiber.Map{"status": "ok"})
 	}
 }

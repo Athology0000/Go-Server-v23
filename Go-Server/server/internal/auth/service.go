@@ -917,6 +917,10 @@ func (s *Service) resolveStableManifest(ctx context.Context, licenseID, channel 
 	if genErr := content.EnsureLicenseBundles(s.cfg.ContentDir, licenseID, s.cfg.ModuleEncryptionKey, s.cfg.ModuleWmSecret, s.cfg.ModuleWmPepper); genErr != nil {
 		return "", "", fmt.Errorf("generate license bundles: %w", genErr)
 	}
+	moduleDeps, err := db.GetAllModuleDeps(ctx, s.pool)
+	if err != nil {
+		return "", "", err
+	}
 	stableManifest, err := content.BuildStableManifest(
 		ctx,
 		s.cfg.ContentDir,
@@ -926,6 +930,7 @@ func (s *Service) resolveStableManifest(ctx context.Context, licenseID, channel 
 		s.cfg.ManifestSigningKey,
 		s.cfg.ModuleEncryptionKey,
 		enabledModules,
+		moduleDeps,
 	)
 	if err != nil {
 		return "", "", err

@@ -90,7 +90,11 @@ func (s *Service) GetStableManifest(ctx context.Context, accountID string) (*db.
 		return nil, err
 	}
 
-	return BuildStableManifest(ctx, s.contentDir, ent.LicenseID, s.baseURL, ent.ContentChannel, s.signingKey, s.moduleKey, ent.EnabledModules)
+	moduleDeps, err := db.GetAllModuleDeps(ctx, s.pool)
+	if err != nil {
+		return nil, err
+	}
+	return BuildStableManifest(ctx, s.contentDir, ent.LicenseID, s.baseURL, ent.ContentChannel, s.signingKey, s.moduleKey, ent.EnabledModules, moduleDeps)
 }
 
 func (s *Service) ModuleBytes(ctx context.Context, accountID, name string) ([]byte, string, error) {
