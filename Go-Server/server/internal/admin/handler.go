@@ -412,7 +412,7 @@ func handleUpsertModuleMetadata(pool *pgxpool.Pool, auditSvc *audit.Service) fib
 		}
 		tok := middleware.GetAdminToken(c)
 		auditSvc.Log("admin.module.upsert", nil, nil, &tok.AdminUsername, nil,
-			map[string]any{"module_name": body.ModuleName})
+			map[string]any{"module_name": body.ModuleName, "depends_on": body.DependsOn})
 		return c.JSON(fiber.Map{"status": "ok"})
 	}
 }

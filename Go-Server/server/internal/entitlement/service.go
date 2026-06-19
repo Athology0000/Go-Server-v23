@@ -98,13 +98,14 @@ func (s *Service) Resolve(ctx context.Context, accountID string) (*Result, error
 
 	// Transitively include each entitled module's declared dependencies, so a dependent (e.g.
 	// commission) is never delivered without the bundles it drives (combat/mining). Full-access
-	// tiers returned earlier with ["*"], so they never reach here; a missing module_metadata row
-	// (no edges) leaves the set unchanged.
-	if depMap, derr := db.GetAllModuleDeps(ctx, s.pool); derr == nil {
-		modules = ExpandDependencies(depMap, modules)
-	} else if !errors.Is(derr, pgx.ErrNoRows) {
+	// tiers returned earlier with ["*"], so they never reach here; an empty module_metadata table
+	// leaves the set unchanged. A DB error fails closed (propagated -> handler 500 -> the heartbeat
+	// lease keeps existing sessions alive), consistent with the entitlement-read posture above.
+	depMap, derr := db.GetAllModuleDeps(ctx, s.pool)
+	if derr != nil {
 		return nil, derr
 	}
+	modules = ExpandDependencies(depMap, modules)
 
 	return &Result{
 		Authorized:           true,
