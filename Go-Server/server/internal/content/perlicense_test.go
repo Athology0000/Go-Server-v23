@@ -64,11 +64,11 @@ func TestBuildStableManifestPerLicense(t *testing.T) {
 	writeEnc(t, filepath.Join(licDir, "phantom-autowalk.enc"), key, []byte("A-autowalk-distinct"))
 
 	ctx := context.Background()
-	mShared, err := BuildStableManifest(ctx, dir, "", "https://x", "stable", priv, key, []string{"*"})
+	mShared, err := BuildStableManifest(ctx, dir, "", "https://x", "stable", priv, key, []string{"*"}, nil)
 	if err != nil {
 		t.Fatalf("shared manifest: %v", err)
 	}
-	mA, err := BuildStableManifest(ctx, dir, "lic-A", "https://x", "stable", priv, key, []string{"*"})
+	mA, err := BuildStableManifest(ctx, dir, "lic-A", "https://x", "stable", priv, key, []string{"*"}, nil)
 	if err != nil {
 		t.Fatalf("lic-A manifest: %v", err)
 	}
