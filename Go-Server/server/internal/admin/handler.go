@@ -569,72 +569,15 @@ func handleRevokeAdminToken(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.H
 
 // ── Users (aggregated) ────────────────────────────────────────────────────────
 
-type userRow struct {
-	ID                string     `json:"id"`
-	Username          string     `json:"username"`
-	Email             *string    `json:"email"`
-	Plan              *string    `json:"plan"`
-	PlanExpiry        *time.Time `json:"planExpiry"`
-	HwidBound         bool       `json:"hwidBound"`
-	Hwid              *string    `json:"hwid"`
-	Banned            bool       `json:"banned"`
-	BannedReason      *string    `json:"bannedReason"`
-	CreatedAt         time.Time  `json:"createdAt"`
-	LastSeen          *time.Time `json:"lastSeen"`
-	MinecraftUsername *string    `json:"minecraftUsername"`
-}
-
-func scanUserRow(row interface{ Scan(...any) error }) (*userRow, error) {
-	u := &userRow{}
-	var status string
-	var hwidBound bool
-	err := row.Scan(
-		&u.ID, &u.Username, &u.Email, &status, &u.CreatedAt,
-		&u.Plan, &u.PlanExpiry,
-		&hwidBound, &u.MinecraftUsername, &u.LastSeen,
-	)
-	if err != nil {
-		return nil, err
-	}
-	u.Banned = status == "banned"
-	u.HwidBound = hwidBound
-	return u, nil
-}
-
-const userSelectSQL = `
-SELECT a.id, a.username, a.email, a.status, a.created_at,
-       l.plan_tier, l.expires_at,
-       (d.hwid_hash IS NOT NULL) AS hwid_bound,
-       d.minecraft_username, d.last_login_at
-FROM accounts a
-LEFT JOIN licenses l ON l.account_id = a.id AND l.status = 'active'
-LEFT JOIN devices d ON d.account_id = a.id`
-
 func handleListUsers(pool *pgxpool.Pool) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		q := c.Query("q")
 		limit := c.QueryInt("limit", 50)
 		offset := c.QueryInt("offset", 0)
 
-		rows, err := pool.Query(c.Context(),
-			userSelectSQL+`
-WHERE ($1 = '' OR a.username ILIKE '%'||$1||'%' OR COALESCE(a.email,'') ILIKE '%'||$1||'%')
-ORDER BY a.created_at DESC LIMIT $2 OFFSET $3`, q, limit, offset)
+		users, err := db.ListUsers(c.Context(), pool, q, limit, offset)
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
-		}
-		defer rows.Close()
-
-		var users []*userRow
-		for rows.Next() {
-			u, err := scanUserRow(rows)
-			if err != nil {
-				return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
-			}
-			users = append(users, u)
-		}
-		if users == nil {
-			users = []*userRow{}
 		}
 		return c.JSON(users)
 	}
@@ -642,9 +585,7 @@ ORDER BY a.created_at DESC LIMIT $2 OFFSET $3`, q, limit, offset)
 
 func handleGetUser(pool *pgxpool.Pool) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		row := pool.QueryRow(c.Context(),
-			userSelectSQL+" WHERE a.id = $1", c.Params("id"))
-		u, err := scanUserRow(row)
+		u, err := db.GetUser(c.Context(), pool, c.Params("id"))
 		if err != nil {
 			return c.Status(404).JSON(fiber.Map{"error": "not_found"})
 		}
