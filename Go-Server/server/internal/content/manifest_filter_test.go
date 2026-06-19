@@ -73,6 +73,36 @@ func TestManifestFiltersToEntitledModules(t *testing.T) {
 	}
 }
 
+// End-to-end: a non-nil moduleDeps map stamps DependsOn onto the right manifest module, keyed by the
+// bare id (EntitlementID strips "phantom-"). Other modules carry no deps (preserving signed-byte parity).
+func TestManifestStampsDependsOnFromMap(t *testing.T) {
+	dir := contentDirWith(t, "phantom.jar", "phantom-commission.jar", "phantom-combat.jar", "phantom-mining.jar")
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	deps := map[string][]string{"commission": {"combat", "mining"}}
+	m, err := BuildStableManifest(context.Background(), dir, "", "https://example.test", "stable",
+		priv, make([]byte, 32), []string{"*"}, deps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, mod := range m.Modules {
+		if mod.Name == "phantom-commission" {
+			found = true
+			if !reflect.DeepEqual(mod.DependsOn, []string{"combat", "mining"}) {
+				t.Errorf("phantom-commission DependsOn = %v, want [combat mining]", mod.DependsOn)
+			}
+		} else if len(mod.DependsOn) != 0 {
+			t.Errorf("module %s should carry no deps, got %v", mod.Name, mod.DependsOn)
+		}
+	}
+	if !found {
+		t.Fatal("phantom-commission not present in manifest")
+	}
+}
+
 func TestManifestWithoutCoreBundleSucceeds(t *testing.T) {
 	// The framework core ships INSIDE the client jar in this deployment model, so a content dir
 	// with only non-core module bundles is a valid deployment and must build a manifest (modules
