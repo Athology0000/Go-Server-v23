@@ -122,7 +122,10 @@ func effectiveModulesDir(contentDir, licenseID string) string {
 	return shared
 }
 
-func BuildStableManifest(_ context.Context, contentDir, licenseID, baseURL, channel string, signingKey, moduleKey []byte, enabledModules []string) (*db.ContentManifest, error) {
+// moduleDeps maps a bare module id to the bare ids it depends on (from module_metadata); it stamps
+// each manifest module's DependsOn so the signed manifest carries the dependency for client
+// enforcement. Pass nil to omit (modules then serialize byte-identically to the pre-deps format).
+func BuildStableManifest(_ context.Context, contentDir, licenseID, baseURL, channel string, signingKey, moduleKey []byte, enabledModules []string, moduleDeps map[string][]string) (*db.ContentManifest, error) {
 	modulesDir := effectiveModulesDir(contentDir, licenseID)
 	entries, err := os.ReadDir(modulesDir)
 	if err != nil {
@@ -188,10 +191,11 @@ func BuildStableManifest(_ context.Context, contentDir, licenseID, baseURL, chan
 		hash := sha256Hex(raw)
 		moduleName := strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
 		modules = append(modules, db.ManifestModule{
-			Name:     moduleName,
-			URL:      baseURL + "/content/module/" + url.PathEscape(moduleName),
-			SHA256:   hash,
-			Required: IsCoreModule(entry.Name()),
+			Name:      moduleName,
+			URL:       baseURL + "/content/module/" + url.PathEscape(moduleName),
+			SHA256:    hash,
+			Required:  IsCoreModule(entry.Name()),
+			DependsOn: moduleDeps[EntitlementID(entry.Name())],
 		})
 	}
 

@@ -331,18 +331,18 @@ func (r *Redemption) Redeem(ctx context.Context, req RedeemRequest) (RedeemResul
 			// Spend the same argon2 work as a real verify so a missing account isn't
 			// distinguishable by response time (user-enumeration oracle); same for blocked below.
 			crypto.DummyVerifyPassword()
-			r.auditSvc.Log("enroll.redeem.fail", nil, nil, nil, &sourceIP, map[string]any{"reason": "account_not_found", "username": req.Username})
+			r.auditSvc.Log(audit.EventEnrollRedeemFail, nil, nil, nil, &sourceIP, map[string]any{"reason": "account_not_found", "username": req.Username})
 			return RedeemResult{}, ErrBadCredentials
 		}
 		return RedeemResult{}, err
 	}
 	if accountStatus != "active" {
 		crypto.DummyVerifyPassword()
-		r.auditSvc.Log("enroll.redeem.fail", &accountID, nil, nil, &sourceIP, map[string]any{"reason": "account_blocked"})
+		r.auditSvc.Log(audit.EventEnrollRedeemFail, &accountID, nil, nil, &sourceIP, map[string]any{"reason": "account_blocked"})
 		return RedeemResult{}, ErrBadCredentials
 	}
 	if ok, err := crypto.VerifyPassword(req.Password, passwordHash); err != nil || !ok {
-		r.auditSvc.Log("enroll.redeem.fail", &accountID, nil, nil, &sourceIP, map[string]any{"reason": "bad_credentials"})
+		r.auditSvc.Log(audit.EventEnrollRedeemFail, &accountID, nil, nil, &sourceIP, map[string]any{"reason": "bad_credentials"})
 		return RedeemResult{}, ErrBadCredentials
 	}
 
@@ -357,11 +357,11 @@ func (r *Redemption) Redeem(ctx context.Context, req RedeemRequest) (RedeemResul
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrKeyNotFound):
-			r.auditSvc.Log("enroll.redeem.fail", &accountID, nil, nil, &sourceIP, map[string]any{"reason": "key_not_found"})
+			r.auditSvc.Log(audit.EventEnrollRedeemFail, &accountID, nil, nil, &sourceIP, map[string]any{"reason": "key_not_found"})
 		case errors.Is(err, ErrKeyNotAvailable):
-			r.auditSvc.Log("enroll.redeem.fail", &accountID, nil, nil, &sourceIP, map[string]any{"reason": "key_not_available"})
+			r.auditSvc.Log(audit.EventEnrollRedeemFail, &accountID, nil, nil, &sourceIP, map[string]any{"reason": "key_not_available"})
 		case errors.Is(err, ErrAlreadyEnrolled):
-			r.auditSvc.Log("enroll.redeem.fail", &accountID, nil, nil, &sourceIP, map[string]any{"reason": "already_enrolled"})
+			r.auditSvc.Log(audit.EventEnrollRedeemFail, &accountID, nil, nil, &sourceIP, map[string]any{"reason": "already_enrolled"})
 		}
 		return RedeemResult{}, err
 	}
@@ -371,7 +371,7 @@ func (r *Redemption) Redeem(ctx context.Context, req RedeemRequest) (RedeemResul
 	}
 
 	deviceID := res.DeviceID
-	r.auditSvc.Log("enroll.redeem.success", &accountID, &deviceID, nil, &sourceIP, map[string]any{"plan_tier": res.PlanTier, "duration_days": res.DurationDays, "expires_at": res.ExpiresAt})
+	r.auditSvc.Log(audit.EventEnrollRedeemSuccess, &accountID, &deviceID, nil, &sourceIP, map[string]any{"plan_tier": res.PlanTier, "duration_days": res.DurationDays, "expires_at": res.ExpiresAt})
 	return RedeemResult{
 		Username:     username,
 		DeviceSecret: res.DeviceSecret,

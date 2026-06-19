@@ -76,6 +76,7 @@ func RegisterRoutes(app *fiber.App, pool *pgxpool.Pool, signingKey []byte, audit
 	// Entitlements
 	app.Post("/admin/entitlements", super, handleUpsertEntitlement(pool, auditSvc))
 	app.Get("/admin/entitlements/:plan", viewer, handleGetEntitlement(pool))
+	app.Post("/admin/modules", super, handleUpsertModuleMetadata(pool, auditSvc))
 	app.Post("/admin/accounts/:id/override", super, handleUpsertOverride(pool, auditSvc))
 	app.Delete("/admin/accounts/:id/override", super, handleDeleteOverride(pool, auditSvc))
 
@@ -134,7 +135,7 @@ func handleCreateAccount(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.Hand
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 		tok := middleware.GetAdminToken(c)
-		auditSvc.Log("admin.account.create", &account.ID, nil, &tok.AdminUsername, nil,
+		auditSvc.Log(audit.EventAdminAccountCreate, &account.ID, nil, &tok.AdminUsername, nil,
 			map[string]any{"username": account.Username})
 		return c.Status(201).JSON(account)
 	}
@@ -175,7 +176,7 @@ func handleUpdateAccountStatus(pool *pgxpool.Pool, auditSvc *audit.Service) fibe
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 		tok := middleware.GetAdminToken(c)
-		auditSvc.Log("admin.account.status", &id, nil, &tok.AdminUsername, nil,
+		auditSvc.Log(audit.EventAdminAccountStatus, &id, nil, &tok.AdminUsername, nil,
 			map[string]any{"status": body.Status})
 		return c.JSON(fiber.Map{"status": "updated"})
 	}
@@ -188,7 +189,7 @@ func handleRevokeManifest(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.Han
 			return c.Status(404).JSON(fiber.Map{"error": "not_found", "id": id})
 		}
 		tok := middleware.GetAdminToken(c)
-		auditSvc.Log("admin.manifest.revoke", nil, nil, &tok.AdminUsername, nil,
+		auditSvc.Log(audit.EventAdminManifestRevoke, nil, nil, &tok.AdminUsername, nil,
 			map[string]any{"manifest_id": id})
 		return c.JSON(fiber.Map{"status": "revoked", "id": id})
 	}
@@ -239,7 +240,7 @@ func handleCreateLicense(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.Hand
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 		tok := middleware.GetAdminToken(c)
-		auditSvc.Log("admin.license.create", &body.AccountID, nil, &tok.AdminUsername, nil,
+		auditSvc.Log(audit.EventAdminLicenseCreate, &body.AccountID, nil, &tok.AdminUsername, nil,
 			map[string]any{"plan_tier": body.PlanTier})
 		return c.Status(201).JSON(license)
 	}
@@ -268,7 +269,7 @@ func handleUpdateLicenseStatus(pool *pgxpool.Pool, auditSvc *audit.Service) fibe
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 		tok := middleware.GetAdminToken(c)
-		auditSvc.Log("admin.license.status", nil, nil, &tok.AdminUsername, nil,
+		auditSvc.Log(audit.EventAdminLicenseStatus, nil, nil, &tok.AdminUsername, nil,
 			map[string]any{"license_id": id, "status": body.Status})
 		return c.JSON(fiber.Map{"status": "updated"})
 	}
@@ -311,7 +312,7 @@ func handleGenerateLicenseKeys(pool *pgxpool.Pool, auditSvc *audit.Service) fibe
 			}
 			keys = append(keys, raw)
 		}
-		auditSvc.Log("admin.license_keys.generate", nil, nil, &tok.AdminUsername, nil,
+		auditSvc.Log(audit.EventAdminLicenseKeysGenerate, nil, nil, &tok.AdminUsername, nil,
 			map[string]any{"plan_tier": body.PlanTier, "count": body.Count})
 		return c.Status(201).JSON(fiber.Map{"keys": keys})
 	}
@@ -324,7 +325,7 @@ func handleRevokeLicenseKey(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.H
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 		tok := middleware.GetAdminToken(c)
-		auditSvc.Log("admin.license_key.revoke", nil, nil, &tok.AdminUsername, nil,
+		auditSvc.Log(audit.EventAdminLicenseKeyRevoke, nil, nil, &tok.AdminUsername, nil,
 			map[string]any{"key_id": id})
 		return c.JSON(fiber.Map{"status": "revoked"})
 	}
@@ -349,7 +350,7 @@ func handleResetDevice(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.Handle
 		if err := db.ResetDeviceBinding(c.Context(), pool, id, tok.AdminUsername); err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
-		auditSvc.Log("admin.device.reset", nil, &id, &tok.AdminUsername, nil, nil)
+		auditSvc.Log(audit.EventAdminDeviceReset, nil, &id, &tok.AdminUsername, nil, nil)
 		return c.JSON(fiber.Map{"status": "reset"})
 	}
 }
@@ -367,7 +368,7 @@ func handleUpdateDeviceStatus(pool *pgxpool.Pool, auditSvc *audit.Service) fiber
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 		tok := middleware.GetAdminToken(c)
-		auditSvc.Log("admin.device.status", nil, &id, &tok.AdminUsername, nil,
+		auditSvc.Log(audit.EventAdminDeviceStatus, nil, &id, &tok.AdminUsername, nil,
 			map[string]any{"status": body.Status})
 		return c.JSON(fiber.Map{"status": "updated"})
 	}
@@ -388,8 +389,30 @@ func handleUpsertEntitlement(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 		tok := middleware.GetAdminToken(c)
-		auditSvc.Log("admin.entitlement.upsert", nil, nil, &tok.AdminUsername, nil,
+		auditSvc.Log(audit.EventAdminEntitlementUpsert, nil, nil, &tok.AdminUsername, nil,
 			map[string]any{"plan_tier": e.PlanTier})
+		return c.JSON(fiber.Map{"status": "ok"})
+	}
+}
+
+// handleUpsertModuleMetadata sets a module's declared dependencies (bare ids). The entitlement
+// resolver expands a license's module set by these edges, and BuildStableManifest stamps them into
+// the signed manifest for client enforcement.
+func handleUpsertModuleMetadata(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var body struct {
+			ModuleName string   `json:"module_name"`
+			DependsOn  []string `json:"depends_on"`
+		}
+		if err := c.BodyParser(&body); err != nil || body.ModuleName == "" {
+			return c.Status(400).JSON(fiber.Map{"error": "invalid_request"})
+		}
+		if err := db.UpsertModuleMetadata(c.Context(), pool, body.ModuleName, body.DependsOn); err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
+		}
+		tok := middleware.GetAdminToken(c)
+		auditSvc.Log("admin.module.upsert", nil, nil, &tok.AdminUsername, nil,
+			map[string]any{"module_name": body.ModuleName})
 		return c.JSON(fiber.Map{"status": "ok"})
 	}
 }
@@ -416,7 +439,7 @@ func handleUpsertOverride(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.Han
 		if err := db.UpsertPlanOverride(c.Context(), pool, &o); err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
-		auditSvc.Log("admin.override.upsert", &o.AccountID, nil, &tok.AdminUsername, nil, nil)
+		auditSvc.Log(audit.EventAdminOverrideUpsert, &o.AccountID, nil, &tok.AdminUsername, nil, nil)
 		return c.JSON(fiber.Map{"status": "ok"})
 	}
 }
@@ -428,7 +451,7 @@ func handleDeleteOverride(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.Han
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 		tok := middleware.GetAdminToken(c)
-		auditSvc.Log("admin.override.delete", &id, nil, &tok.AdminUsername, nil, nil)
+		auditSvc.Log(audit.EventAdminOverrideDelete, &id, nil, &tok.AdminUsername, nil, nil)
 		return c.JSON(fiber.Map{"status": "deleted"})
 	}
 }
@@ -479,7 +502,7 @@ func handleCreateManifest(pool *pgxpool.Pool, signingKey []byte, auditSvc *audit
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 		tok := middleware.GetAdminToken(c)
-		auditSvc.Log("admin.manifest.create", nil, nil, &tok.AdminUsername, nil,
+		auditSvc.Log(audit.EventAdminManifestCreate, nil, nil, &tok.AdminUsername, nil,
 			map[string]any{"build_id": body.BuildID, "channel": body.Channel})
 		return c.Status(201).JSON(created)
 	}
@@ -517,7 +540,7 @@ func handleRevokeSession(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.Hand
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 		tok := middleware.GetAdminToken(c)
-		auditSvc.Log("admin.session.revoke", nil, nil, &tok.AdminUsername, nil,
+		auditSvc.Log(audit.EventAdminSessionRevoke, nil, nil, &tok.AdminUsername, nil,
 			map[string]any{"session_id": id})
 		return c.JSON(fiber.Map{"status": "revoked"})
 	}
@@ -548,7 +571,7 @@ func handleCreateAdminToken(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.H
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 		tok := middleware.GetAdminToken(c)
-		auditSvc.Log("admin.token.create", nil, nil, &tok.AdminUsername, nil,
+		auditSvc.Log(audit.EventAdminTokenCreate, nil, nil, &tok.AdminUsername, nil,
 			map[string]any{"for": body.AdminUsername, "role": body.Role})
 		return c.Status(201).JSON(fiber.Map{"token": raw, "id": token.ID, "expires_at": token.ExpiresAt})
 	}
@@ -561,7 +584,7 @@ func handleRevokeAdminToken(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.H
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 		tok := middleware.GetAdminToken(c)
-		auditSvc.Log("admin.token.revoke", nil, nil, &tok.AdminUsername, nil,
+		auditSvc.Log(audit.EventAdminTokenRevoke, nil, nil, &tok.AdminUsername, nil,
 			map[string]any{"token_id": id})
 		return c.JSON(fiber.Map{"status": "revoked"})
 	}
@@ -569,72 +592,15 @@ func handleRevokeAdminToken(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.H
 
 // ── Users (aggregated) ────────────────────────────────────────────────────────
 
-type userRow struct {
-	ID                string     `json:"id"`
-	Username          string     `json:"username"`
-	Email             *string    `json:"email"`
-	Plan              *string    `json:"plan"`
-	PlanExpiry        *time.Time `json:"planExpiry"`
-	HwidBound         bool       `json:"hwidBound"`
-	Hwid              *string    `json:"hwid"`
-	Banned            bool       `json:"banned"`
-	BannedReason      *string    `json:"bannedReason"`
-	CreatedAt         time.Time  `json:"createdAt"`
-	LastSeen          *time.Time `json:"lastSeen"`
-	MinecraftUsername *string    `json:"minecraftUsername"`
-}
-
-func scanUserRow(row interface{ Scan(...any) error }) (*userRow, error) {
-	u := &userRow{}
-	var status string
-	var hwidBound bool
-	err := row.Scan(
-		&u.ID, &u.Username, &u.Email, &status, &u.CreatedAt,
-		&u.Plan, &u.PlanExpiry,
-		&hwidBound, &u.MinecraftUsername, &u.LastSeen,
-	)
-	if err != nil {
-		return nil, err
-	}
-	u.Banned = status == "banned"
-	u.HwidBound = hwidBound
-	return u, nil
-}
-
-const userSelectSQL = `
-SELECT a.id, a.username, a.email, a.status, a.created_at,
-       l.plan_tier, l.expires_at,
-       (d.hwid_hash IS NOT NULL) AS hwid_bound,
-       d.minecraft_username, d.last_login_at
-FROM accounts a
-LEFT JOIN licenses l ON l.account_id = a.id AND l.status = 'active'
-LEFT JOIN devices d ON d.account_id = a.id`
-
 func handleListUsers(pool *pgxpool.Pool) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		q := c.Query("q")
 		limit := c.QueryInt("limit", 50)
 		offset := c.QueryInt("offset", 0)
 
-		rows, err := pool.Query(c.Context(),
-			userSelectSQL+`
-WHERE ($1 = '' OR a.username ILIKE '%'||$1||'%' OR COALESCE(a.email,'') ILIKE '%'||$1||'%')
-ORDER BY a.created_at DESC LIMIT $2 OFFSET $3`, q, limit, offset)
+		users, err := db.ListUsers(c.Context(), pool, q, limit, offset)
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
-		}
-		defer rows.Close()
-
-		var users []*userRow
-		for rows.Next() {
-			u, err := scanUserRow(rows)
-			if err != nil {
-				return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
-			}
-			users = append(users, u)
-		}
-		if users == nil {
-			users = []*userRow{}
 		}
 		return c.JSON(users)
 	}
@@ -642,9 +608,7 @@ ORDER BY a.created_at DESC LIMIT $2 OFFSET $3`, q, limit, offset)
 
 func handleGetUser(pool *pgxpool.Pool) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		row := pool.QueryRow(c.Context(),
-			userSelectSQL+" WHERE a.id = $1", c.Params("id"))
-		u, err := scanUserRow(row)
+		u, err := db.GetUser(c.Context(), pool, c.Params("id"))
 		if err != nil {
 			return c.Status(404).JSON(fiber.Map{"error": "not_found"})
 		}
@@ -669,7 +633,7 @@ func handleBanUser(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.Handler {
 			Reason string `json:"reason"`
 		}
 		_ = c.BodyParser(&body)
-		auditSvc.Log("admin.user.ban", &id, nil, &tok.AdminUsername, nil,
+		auditSvc.Log(audit.EventAdminUserBan, &id, nil, &tok.AdminUsername, nil,
 			map[string]any{"reason": body.Reason})
 		return c.JSON(fiber.Map{"status": "banned"})
 	}
@@ -682,7 +646,7 @@ func handleUnbanUser(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.Handler 
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 		tok := middleware.GetAdminToken(c)
-		auditSvc.Log("admin.user.unban", &id, nil, &tok.AdminUsername, nil, nil)
+		auditSvc.Log(audit.EventAdminUserUnban, &id, nil, &tok.AdminUsername, nil, nil)
 		return c.JSON(fiber.Map{"status": "active"})
 	}
 }
@@ -705,7 +669,7 @@ func handleAddTime(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.Handler {
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 		tok := middleware.GetAdminToken(c)
-		auditSvc.Log("admin.user.add_time", &id, nil, &tok.AdminUsername, nil,
+		auditSvc.Log(audit.EventAdminUserAddTime, &id, nil, &tok.AdminUsername, nil,
 			map[string]any{"days": body.Days, "new_expiry": newExpiry})
 		return c.JSON(fiber.Map{"status": "ok", "new_expiry": newExpiry})
 	}
@@ -724,7 +688,7 @@ func handleUpgradePlan(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.Handle
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 		tok := middleware.GetAdminToken(c)
-		auditSvc.Log("admin.user.upgrade", &id, nil, &tok.AdminUsername, nil,
+		auditSvc.Log(audit.EventAdminUserUpgrade, &id, nil, &tok.AdminUsername, nil,
 			map[string]any{"plan": body.Plan})
 		return c.JSON(fiber.Map{"status": "ok", "plan": body.Plan})
 	}
@@ -807,7 +771,7 @@ func handleGenerateKey(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.Handle
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
-		auditSvc.Log("admin.key.generate", nil, nil, &tok.AdminUsername, nil,
+		auditSvc.Log(audit.EventAdminKeyGenerate, nil, nil, &tok.AdminUsername, nil,
 			map[string]any{"plan": body.Plan})
 		return c.Status(201).JSON(keyRow{
 			ID:            k.ID,
@@ -899,7 +863,7 @@ func handleActivityLog(pool *pgxpool.Pool) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		limit := c.QueryInt("limit", 100)
 		offset := c.QueryInt("offset", 0)
-		events, err := db.ListActivityLog(c.Context(), pool, limit, offset)
+		events, err := db.ListActivityLog(c.Context(), pool, audit.ActivityEventTypes(), limit, offset)
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}

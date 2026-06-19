@@ -96,6 +96,16 @@ func (s *Service) Resolve(ctx context.Context, accountID string) (*Result, error
 		features = applyOverride(features, override.AdditionalFeatures, override.RemovedFeatures)
 	}
 
+	// Transitively include each entitled module's declared dependencies, so a dependent (e.g.
+	// commission) is never delivered without the bundles it drives (combat/mining). Full-access
+	// tiers returned earlier with ["*"], so they never reach here; a missing module_metadata row
+	// (no edges) leaves the set unchanged.
+	if depMap, derr := db.GetAllModuleDeps(ctx, s.pool); derr == nil {
+		modules = ExpandDependencies(depMap, modules)
+	} else if !errors.Is(derr, pgx.ErrNoRows) {
+		return nil, derr
+	}
+
 	return &Result{
 		Authorized:           true,
 		LicenseID:            license.ID,
@@ -131,6 +141,30 @@ func fullAccessResult(planTier, contentChannel string, expiresAt *time.Time) *Re
 		ContentChannel:       contentChannel,
 		EntitlementExpiresAt: expiresAt,
 	}
+}
+
+// ExpandDependencies returns modules plus the transitive closure of their declared dependencies.
+// The traversal is cycle-safe (a visited guard, so a -> b -> a terminates), order-stable (inputs in
+// order, each followed by its newly discovered deps), and deduplicated. Modules with no edges (absent
+// from deps) contribute only themselves. A wildcard "*" has no edges and is returned unchanged.
+func ExpandDependencies(deps map[string][]string, modules []string) []string {
+	seen := make(map[string]bool, len(modules))
+	out := make([]string, 0, len(modules))
+	var visit func(string)
+	visit = func(m string) {
+		if seen[m] {
+			return
+		}
+		seen[m] = true
+		out = append(out, m)
+		for _, d := range deps[m] {
+			visit(d)
+		}
+	}
+	for _, m := range modules {
+		visit(m)
+	}
+	return out
 }
 
 func applyOverride(base, add, remove []string) []string {

@@ -66,7 +66,7 @@ func handleRedeemLicense(pool *pgxpool.Pool, auditSvc *audit.Service, masterKey 
 		}
 
 		if auditSvc != nil {
-			auditSvc.Log("panel.key.redeem.success", &sess.AccountID, nil, nil, &ip,
+			auditSvc.Log(audit.EventPanelKeyRedeemSuccess, &sess.AccountID, nil, nil, &ip,
 				map[string]any{"plan_tier": res.PlanTier, "duration_days": res.DurationDays, "expires_at": res.ExpiresAt})
 		}
 

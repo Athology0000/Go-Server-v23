@@ -13,11 +13,15 @@ import (
 var ErrManifestNotFound = errors.New("manifest not found")
 
 type ManifestModule struct {
-	Name      string `json:"name"`
-	URL       string `json:"url"`
-	SHA256    string `json:"sha256"`
-	Required  bool   `json:"required"`
-	InitOrder int    `json:"init_order"`
+	Name      string   `json:"name"`
+	URL       string   `json:"url"`
+	SHA256    string   `json:"sha256"`
+	Required  bool     `json:"required"`
+	InitOrder int      `json:"init_order"`
+	// DependsOn lists the bare ids of modules this one needs co-loaded (e.g. commission -> combat,
+	// mining). omitempty keeps modules without deps byte-identical in the signed payload; the client
+	// (Java + native) reproduces it and refuses to activate a module whose deps are absent.
+	DependsOn []string `json:"depends_on,omitempty"`
 }
 
 type ManifestNative struct {

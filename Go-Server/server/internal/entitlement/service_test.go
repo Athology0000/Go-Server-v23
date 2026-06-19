@@ -82,6 +82,35 @@ func TestFullAccessResultDefaultsAndTrimsChannel(t *testing.T) {
 	}
 }
 
+func TestExpandDependencies(t *testing.T) {
+	deps := map[string][]string{
+		"commission": {"combat", "mining"},
+		"combat":     {"rotation"}, // transitive chain
+		"loopA":      {"loopB"},    // cycle guard
+		"loopB":      {"loopA"},
+	}
+	cases := []struct {
+		name string
+		in   []string
+		want []string
+	}{
+		{"single dependent pulls deps", []string{"commission"}, []string{"commission", "combat", "rotation", "mining"}},
+		{"transitive chain", []string{"combat"}, []string{"combat", "rotation"}},
+		{"unknown module is a no-op", []string{"autowalk"}, []string{"autowalk"}},
+		{"cycle terminates", []string{"loopA"}, []string{"loopA", "loopB"}},
+		{"wildcard unchanged", []string{"*"}, []string{"*"}},
+		{"dedup across inputs", []string{"commission", "combat"}, []string{"commission", "combat", "rotation", "mining"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := ExpandDependencies(deps, tc.in)
+			if !equalStrings(got, tc.want) {
+				t.Errorf("ExpandDependencies(%v) = %v, want %v", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
 func equalStrings(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
