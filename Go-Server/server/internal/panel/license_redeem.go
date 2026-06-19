@@ -1,16 +1,15 @@
 package panel
 
 import (
-	"crypto/rand"
 	"errors"
 	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/phantom/server/internal/audit"
 	"github.com/phantom/server/internal/crypto"
+	"github.com/phantom/server/internal/enrollment"
 	"github.com/phantom/server/internal/middleware"
 )
 
@@ -37,7 +36,6 @@ func handleRedeemLicense(pool *pgxpool.Pool, auditSvc *audit.Service, masterKey 
 		}
 
 		ip := middleware.GetRealIP(c)
-		now := time.Now()
 
 		tx, err := pool.Begin(c.Context())
 		if err != nil {
@@ -45,125 +43,31 @@ func handleRedeemLicense(pool *pgxpool.Pool, auditSvc *audit.Service, masterKey 
 		}
 		defer tx.Rollback(c.Context())
 
-		// Lock the key row so concurrent redeems can't double-spend it.
-		keyHash := crypto.HashLicenseKey(req.Key)
-		var planTier string
-		var durationDays int
-		var status string
-		if err := tx.QueryRow(c.Context(),
-			`SELECT plan_tier, duration_days, status
-			 FROM license_keys
-			 WHERE key_hash = $1
-			 FOR UPDATE`,
-			keyHash,
-		).Scan(&planTier, &durationDays, &status); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
+		// The redemption rules — key lock+validate, the device unbound-guard, device create/seal,
+		// license create/extend, and the double-spend-guarded key mark — are the canonical
+		// enrollment redemption core (enrollment.RedeemOnTx). The panel is a thin adapter over it:
+		// it owns the tx and resolves the account from the authenticated panel session (never a
+		// caller-supplied id), and runs the core with BOTH enrollment-only knobs off — the panel
+		// does not advance the device to hwid_pending and does not open/return the device secret.
+		// Typed errors map to the panel's existing HTTP codes; behaviour is byte-identical to the
+		// previous inline implementation (the 409 device_not_redeemable guard included).
+		res, coreErr := enrollment.RedeemOnTx(c.Context(), tx, crypto.NewDeviceSecret(masterKey), sess.AccountID, req.Key, ip, enrollment.CoreOptions{})
+		if coreErr != nil {
+			switch {
+			case errors.Is(coreErr, enrollment.ErrKeyNotFound):
 				return c.Status(400).JSON(fiber.Map{"error": "invalid_key", "message": "Invalid key"})
+			case errors.Is(coreErr, enrollment.ErrKeyNotAvailable):
+				return c.Status(400).JSON(fiber.Map{"error": "key_unavailable", "message": "Key already used or revoked"})
+			case errors.Is(coreErr, enrollment.ErrAlreadyEnrolled):
+				return c.Status(409).JSON(fiber.Map{"error": "device_not_redeemable", "message": "Device is already enrolled"})
+			default:
+				return c.Status(500).JSON(fiber.Map{"error": "internal_error", "message": "Failed to redeem key"})
 			}
-			return c.Status(500).JSON(fiber.Map{"error": "internal_error", "message": "Failed to validate key"})
-		}
-		if status != "available" {
-			return c.Status(400).JSON(fiber.Map{"error": "key_unavailable", "message": "Key already used or revoked"})
-		}
-
-		// Ensure the account has an enrollment device secret.
-		// If a device already exists, we keep it (panel expects a single-device model right now)
-		// — but only if it is still unbound. This mirrors the canonical enrollment redemption
-		// (enrollment.Redemption.Redeem), which rejects a device whose binding_status != "unbound"
-		// (ErrAlreadyEnrolled). Without this guard a suspended/fully_bound device would silently
-		// reuse its secret and stack licenses/upgrades through the panel path.
-		var bindingStatus string
-		deviceErr := tx.QueryRow(c.Context(),
-			`SELECT binding_status FROM devices WHERE account_id = $1 LIMIT 1`,
-			sess.AccountID,
-		).Scan(&bindingStatus)
-		if deviceErr != nil && !errors.Is(deviceErr, pgx.ErrNoRows) {
-			return c.Status(500).JSON(fiber.Map{"error": "internal_error", "message": "Failed to check device status"})
-		}
-		if deviceErr == nil && bindingStatus != "unbound" {
-			return c.Status(409).JSON(fiber.Map{"error": "device_not_redeemable", "message": "Device is already enrolled"})
-		}
-		if errors.Is(deviceErr, pgx.ErrNoRows) {
-			secret := make([]byte, 32)
-			if _, err := rand.Read(secret); err != nil {
-				return c.Status(500).JSON(fiber.Map{"error": "internal_error", "message": "Failed to generate device secret"})
-			}
-			encrypted, err := crypto.EncryptAESGCM(masterKey, secret)
-			if err != nil {
-				return c.Status(500).JSON(fiber.Map{"error": "internal_error", "message": "Failed to encrypt device secret"})
-			}
-			if _, err := tx.Exec(c.Context(),
-				`INSERT INTO devices (account_id, enrollment_ip, device_secret_encrypted)
-				 VALUES ($1, $2, $3)`,
-				sess.AccountID, ip, encrypted,
-			); err != nil {
-				return c.Status(500).JSON(fiber.Map{"error": "internal_error", "message": "Failed to create device"})
-			}
-		}
-
-		// Create or extend the license on the account.
-		var existingExpires *time.Time
-		licenseErr := tx.QueryRow(c.Context(),
-			`SELECT expires_at
-			 FROM licenses
-			 WHERE account_id = $1
-			 FOR UPDATE`,
-			sess.AccountID,
-		).Scan(&existingExpires)
-		if licenseErr != nil && !errors.Is(licenseErr, pgx.ErrNoRows) {
-			return c.Status(500).JSON(fiber.Map{"error": "internal_error", "message": "Failed to load existing license"})
-		}
-
-		// duration_days <= 0 means "never expires" (lifetime).
-		var newExpires *time.Time
-		if licenseErr == nil && existingExpires == nil {
-			// Existing lifetime license: never downgrade.
-			newExpires = nil
-		} else if durationDays <= 0 {
-			newExpires = nil
-		} else {
-			base := now
-			if existingExpires != nil && existingExpires.After(now) {
-				base = *existingExpires
-			}
-			t := base.AddDate(0, 0, durationDays)
-			newExpires = &t
-		}
-
-		if errors.Is(licenseErr, pgx.ErrNoRows) {
-			if _, err := tx.Exec(c.Context(),
-				`INSERT INTO licenses (account_id, plan_tier, starts_at, expires_at)
-				 VALUES ($1, $2, $3, $4)`,
-				sess.AccountID, planTier, now, newExpires,
-			); err != nil {
-				return c.Status(500).JSON(fiber.Map{"error": "internal_error", "message": "Failed to create license"})
-			}
-		} else {
-			if _, err := tx.Exec(c.Context(),
-				`UPDATE licenses
-				 SET plan_tier = $1, status = 'active', expires_at = $2, updated_at = now()
-				 WHERE account_id = $3`,
-				planTier, newExpires, sess.AccountID,
-			); err != nil {
-				return c.Status(500).JSON(fiber.Map{"error": "internal_error", "message": "Failed to update license"})
-			}
-		}
-
-		// Mark the key as redeemed.
-		if tag, err := tx.Exec(c.Context(),
-			`UPDATE license_keys
-			 SET status = 'redeemed', redeemed_by = $1, redeemed_at = now(), enrollment_ip = $2
-			 WHERE key_hash = $3 AND status = 'available'`,
-			sess.AccountID, ip, keyHash,
-		); err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "internal_error", "message": "Failed to redeem key"})
-		} else if tag.RowsAffected() != 1 {
-			return c.Status(400).JSON(fiber.Map{"error": "key_unavailable", "message": "Key already used or revoked"})
 		}
 
 		if auditSvc != nil {
 			auditSvc.Log("panel.key.redeem.success", &sess.AccountID, nil, nil, &ip,
-				map[string]any{"plan_tier": planTier, "duration_days": durationDays, "expires_at": newExpires})
+				map[string]any{"plan_tier": res.PlanTier, "duration_days": res.DurationDays, "expires_at": res.ExpiresAt})
 		}
 
 		if err := tx.Commit(c.Context()); err != nil {
@@ -172,8 +76,8 @@ func handleRedeemLicense(pool *pgxpool.Pool, auditSvc *audit.Service, masterKey 
 
 		return c.JSON(fiber.Map{
 			"success": true,
-			"plan":    planTier,
-			"expiry":  newExpires,
+			"plan":    res.PlanTier,
+			"expiry":  res.ExpiresAt,
 		})
 	}
 }
