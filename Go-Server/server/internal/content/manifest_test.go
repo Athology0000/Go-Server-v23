@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	ccrypto "github.com/phantom/server/internal/crypto"
@@ -148,6 +149,49 @@ func TestBuildStableManifest_SignatureVerifies(t *testing.T) {
 	pub := priv.Public().(ed25519.PublicKey)
 	if !ccrypto.VerifyManifest(pub, signed, m.Signature) {
 		t.Error("manifest signature does not verify over the signed payload bytes")
+	}
+}
+
+// Full round-trip for the closure feature: BuildStableManifest stamps depends_on from the deps map,
+// the Ed25519 signature verifies over the exact signed bytes, AND depends_on is inside those signed
+// bytes (so a client/native reproducing the canonical form gets the same signature).
+func TestBuildStableManifest_SignatureVerifiesWithDependsOn(t *testing.T) {
+	dir := t.TempDir()
+	modulesDir := filepath.Join(dir, "modules")
+	if err := os.MkdirAll(modulesDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	enc, err := ccrypto.EncryptAESGCM(fixedModuleKey(), []byte("payload"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"phantom-commission.enc", "phantom-combat.enc", "phantom-mining.enc"} {
+		if err := os.WriteFile(filepath.Join(modulesDir, name), enc, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(modulesDir, "phantom.jar"), []byte("core"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	priv := fixedSigningKey()
+	deps := map[string][]string{"commission": {"combat", "mining"}}
+	m, err := BuildStableManifest(context.Background(), dir, "", "https://example.test", "stable",
+		priv, fixedModuleKey(), []string{"*"}, deps)
+	if err != nil {
+		t.Fatalf("BuildStableManifest: %v", err)
+	}
+
+	signed, err := json.Marshal(signedPayloadOf(m))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pub := priv.Public().(ed25519.PublicKey)
+	if !ccrypto.VerifyManifest(pub, signed, m.Signature) {
+		t.Fatal("manifest signature does not verify over the signed payload bytes")
+	}
+	if !strings.Contains(string(signed), `"depends_on":["combat","mining"]`) {
+		t.Errorf("depends_on not inside the signed bytes:\n%s", string(signed))
 	}
 }
 
