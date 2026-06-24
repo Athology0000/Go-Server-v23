@@ -346,10 +346,9 @@ func handleFinish(svc *Service) fiber.Handler {
 		ip := middleware.GetRealIP(c)
 
 		log.Printf(
-			"[auth.finish.route] request ip=%s username=%s minecraft_username=%q",
+			"[auth.finish.route] request ip=%s username=%s",
 			ip,
 			req.Username,
-			req.MinecraftUsername,
 		)
 
 		result, err := svc.Finish(c.Context(), req.Username, req.Proof, ip, req.MinecraftUsername)
@@ -383,9 +382,8 @@ func handleFinish(svc *Service) fiber.Handler {
 		}
 
 		log.Printf(
-			"[auth.finish.route] response ip=%s authorized=true username=%s account_id=%s plan_tier=%q expires_at=%v modules=%v features=%v manifest_url=%q manifest_sig_present=%t",
+			"[auth.finish.route] response ip=%s authorized=true account_id=%s plan_tier=%q expires_at=%v modules=%v features=%v manifest_url=%q manifest_sig_present=%t",
 			ip,
-			req.Username,
 			result.AccountID,
 			result.PlanTier,
 			result.EntitlementExpiresAt,
@@ -463,11 +461,14 @@ func handleVerifySession(svc *Service) fiber.Handler {
 
 		var req verifySessionRequest
 		if err := c.BodyParser(&req); err != nil {
+			// Never log the raw body here: a malformed-but-token-bearing payload
+			// (e.g. a trailing comma) would otherwise write the live session_token
+			// to stdout and the /admin/server-logs buffer. Length + error only.
 			log.Printf(
-				"[auth.verify_session.route] body_parse_failed ip=%s err=%v body=%s",
+				"[auth.verify_session.route] body_parse_failed ip=%s body_len=%d err=%v",
 				ip,
+				len(c.Body()),
 				err,
-				string(c.Body()),
 			)
 
 			return c.Status(400).JSON(fiber.Map{
@@ -484,10 +485,9 @@ func handleVerifySession(svc *Service) fiber.Handler {
 		minecraftUsername := strings.TrimSpace(req.MinecraftUsername)
 
 		log.Printf(
-			"[auth.verify_session.route] parsed ip=%s token_present=%t minecraft_username=%q",
+			"[auth.verify_session.route] parsed ip=%s token_present=%t",
 			ip,
 			rawToken != "",
-			minecraftUsername,
 		)
 
 		if rawToken == "" {
@@ -525,13 +525,11 @@ func handleVerifySession(svc *Service) fiber.Handler {
 		}
 
 		log.Printf(
-			"[auth.verify_session.route] response ip=%s status=%d authorized=%t alias=%s account_id=%s minecraft_username=%q modules=%v manifest_present=%t",
+			"[auth.verify_session.route] response ip=%s status=%d authorized=%t account_id=%s modules=%v manifest_present=%t",
 			ip,
 			status,
 			result.Authorized,
-			result.Username,
 			result.AccountID,
-			result.MinecraftUsername,
 			result.Modules,
 			result.ManifestURL != "",
 		)

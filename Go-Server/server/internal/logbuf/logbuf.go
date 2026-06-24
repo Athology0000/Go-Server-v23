@@ -22,6 +22,9 @@ func (b *Buffer) Write(p []byte) (n int, err error) {
 		if s == "" {
 			continue
 		}
+		// Scrub secrets before retaining the line — this buffer is served verbatim
+		// over HTTP at /admin/server-logs.
+		s = redactSecrets(s)
 		if len(b.lines) >= maxLines {
 			b.lines = b.lines[1:]
 		}
