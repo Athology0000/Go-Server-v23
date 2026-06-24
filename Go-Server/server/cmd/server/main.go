@@ -49,6 +49,15 @@ func main() {
 		log.Fatalf("config: %v", err)
 	}
 
+	// Parse the trusted-proxy ranges once for middleware.RealIP, which resolves
+	// the client IP as the rightmost X-Forwarded-For entry that is not one of
+	// these proxies (peeling Railway's hops). Fail fast on a bad CIDR rather than
+	// silently shrinking the trusted set.
+	trustedCIDRs, err := middleware.ParseTrustedCIDRs(trustedProxyRanges)
+	if err != nil {
+		log.Fatalf("trusted proxy ranges: %v", err)
+	}
+
 	log.Println("BOOTING PHANTOM SERVER VERSION: entitlement-workflow-v2-xff")
 	manifestPublicKey := base64.StdEncoding.EncodeToString(
 		ed25519.PrivateKey(cfg.ManifestSigningKey).Public().(ed25519.PublicKey),
@@ -137,17 +146,21 @@ func main() {
 	pub := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
 		BodyLimit:             cfg.BodyLimit,
-		// Behind Railway's proxy the TCP peer is a rotating CGNAT hop (100.64.x),
-		// so c.IP() must read the real client from X-Forwarded-For — otherwise the
-		// auth/start↔finish challenge IP-pin mismatches every request. Only XFF from
-		// a trusted (private/CGNAT) peer is honored; an untrusted peer falls back to
-		// RemoteAddr, so this can never let an internet client spoof its IP.
+		// The security-relevant client IP is resolved by middleware.RealIP
+		// (rightmost untrusted X-Forwarded-For entry, peeling trustedProxyRanges).
+		// These Fiber settings still govern the OTHER forwarded headers
+		// (X-Forwarded-Proto/Host via EnableTrustedProxyCheck) and make Fiber's own
+		// c.IP() a validated fallback. EnableIPValidation is set so c.IP() never
+		// returns the raw, unsplit header — but note c.IP() returns the LEFTMOST
+		// (client-settable) entry, which is why RealIP does its own rightmost
+		// resolution and is the single source GetRealIP reads.
 		ProxyHeader:             fiber.HeaderXForwardedFor,
 		EnableTrustedProxyCheck: true,
+		EnableIPValidation:      true,
 		TrustedProxies:          trustedProxyRanges,
 	})
 
-	pub.Use(middleware.RealIP())
+	pub.Use(middleware.RealIP(trustedCIDRs))
 
 	pub.Use(cors.New(cors.Config{
 		AllowOrigins: cfg.PublicCORSAllowOrigins,
@@ -202,10 +215,11 @@ func main() {
 		// Same trusted-proxy IP resolution as the public app (see pub config above).
 		ProxyHeader:             fiber.HeaderXForwardedFor,
 		EnableTrustedProxyCheck: true,
+		EnableIPValidation:      true,
 		TrustedProxies:          trustedProxyRanges,
 	})
 
-	adm.Use(middleware.RealIP())
+	adm.Use(middleware.RealIP(trustedCIDRs))
 
 	adm.Use(cors.New(cors.Config{
 		AllowOrigins: cfg.AdminCORSAllowOrigins,
