@@ -44,6 +44,7 @@ const (
 	EventAuthFinishEntitlementDenied        EventType = "auth.finish.entitlement_denied"
 	EventAuthHeartbeat                      EventType = "auth.heartbeat"
 	EventAuthHeartbeatEntitlementRevoked    EventType = "auth.heartbeat.entitlement_revoked"
+	EventAuthHeartbeatAccountBlocked        EventType = "auth.heartbeat.account_blocked"
 	EventAuthVerifyMCSuccess                EventType = "auth.verify_mc.success"
 	EventAuthVerifyMCFail                   EventType = "auth.verify_mc.fail"
 	EventAuthVerifyMCEntitlementDenied      EventType = "auth.verify_mc.entitlement_denied"

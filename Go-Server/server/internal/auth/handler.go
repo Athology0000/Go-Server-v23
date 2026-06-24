@@ -356,6 +356,7 @@ func handleFinish(svc *Service) fiber.Handler {
 		if errors.Is(err, ErrIPMismatch) ||
 			errors.Is(err, ErrBadProof) ||
 			errors.Is(err, ErrNoChallenge) ||
+			errors.Is(err, ErrDeviceBlocked) ||
 			errors.Is(err, ErrNotFound) {
 			return c.Status(401).JSON(fiber.Map{"error": "authentication_failed"})
 		}

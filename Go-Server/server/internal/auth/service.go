@@ -212,6 +212,27 @@ func (s *Service) Finish(ctx context.Context, username, proofHex, sourceIP, mine
 		return nil, ErrNotFound
 	}
 
+	// Re-apply the account/device gates that Start enforces. Start checks these
+	// when issuing the challenge, but state can change inside the (<=30s)
+	// challenge window: the account can be banned, or this very device can cross
+	// the 5-failed-attempt suspension threshold via a concurrent Finish. Without
+	// re-checking, Finish would mint a live session for a now-blocked principal
+	// (a TOCTOU on the session-creation gate). Re-check here so session creation
+	// is fail-closed.
+	if !db.AccountStatusActive(account.Status) {
+		s.auditSvc.Log(audit.EventAuthFinishFail, &account.ID, &device.ID, nil, &sourceIP, map[string]any{
+			"reason": "account_blocked",
+		})
+		return nil, ErrDeviceBlocked
+	}
+	if s.binding.IsBlocked(device) {
+		s.auditSvc.Log(audit.EventAuthFinishFail, &account.ID, &device.ID, nil, &sourceIP, map[string]any{
+			"reason": "device_blocked",
+			"status": device.BindingStatus,
+		})
+		return nil, ErrDeviceBlocked
+	}
+
 	ch, err := cache.ConsumeChallenge(ctx, s.pool, device.ID)
 	if err != nil {
 		s.auditSvc.Log(audit.EventAuthFinishFail, &account.ID, &device.ID, nil, &sourceIP, map[string]any{
@@ -373,6 +394,24 @@ func (s *Service) Heartbeat(ctx context.Context, sessionToken, sourceIP string, 
 	}
 
 	if !db.SessionLive(session, time.Now(), s.cfg.HeartbeatLivenessWindow) {
+		return nil, ErrSessionInvalid
+	}
+
+	// A banned/suspended account must lose its live session immediately. The
+	// content routes enforce this in SessionAuth, but the heartbeat path does not
+	// pass through that middleware, so enforce the same rule here using the
+	// account status JOINed by GetSessionByTokenHash. Revoke as well, so a ban
+	// applied via the generic PATCH /admin/accounts/:id/status route (which does
+	// not itself revoke sessions) takes effect at the next beat instead of
+	// surviving to the absolute expires_at cap.
+	if !db.AccountStatusActive(session.AccountStatus) {
+		if revokeErr := db.RevokeSession(ctx, s.pool, session.ID); revokeErr != nil {
+			log.Printf("[auth.heartbeat] revoke failed session_id=%s err=%v", session.ID, revokeErr)
+		}
+		s.auditSvc.Log(audit.EventAuthHeartbeatAccountBlocked, &session.AccountID, &session.DeviceID, nil, &sourceIP, map[string]any{
+			"session_id": session.ID,
+			"status":     session.AccountStatus,
+		})
 		return nil, ErrSessionInvalid
 	}
 

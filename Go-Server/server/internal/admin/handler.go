@@ -175,6 +175,18 @@ func handleUpdateAccountStatus(pool *pgxpool.Pool, auditSvc *audit.Service) fibe
 		if err := db.UpdateAccountStatus(c.Context(), pool, id, body.Status); err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
+		// Banning/suspending via this generic status route must also revoke live
+		// sessions, exactly like the dedicated ban endpoint (handleBanUser).
+		// Otherwise the account keeps an authorized game session until expires_at
+		// and panel access until its 30-day token lapses, despite the status flip.
+		if !db.AccountStatusActive(body.Status) {
+			if err := db.RevokeAccountSessions(c.Context(), pool, id); err != nil {
+				return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
+			}
+			if err := db.RevokePanelSessions(c.Context(), pool, id); err != nil {
+				return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
+			}
+		}
 		tok := middleware.GetAdminToken(c)
 		auditSvc.Log(audit.EventAdminAccountStatus, &id, nil, &tok.AdminUsername, nil,
 			map[string]any{"status": body.Status})
@@ -626,6 +638,11 @@ func handleBanUser(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.Handler {
 		// rejects banned accounts on the next request, but revoking now is instant
 		// and closes the cached-entitlement window.
 		if err := db.RevokeAccountSessions(c.Context(), pool, id); err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
+		}
+		// Likewise revoke panel (web) sessions so the 30-day panel token cannot
+		// keep authorizing panel routes after the ban.
+		if err := db.RevokePanelSessions(c.Context(), pool, id); err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 		tok := middleware.GetAdminToken(c)

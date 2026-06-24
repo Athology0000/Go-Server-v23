@@ -52,8 +52,10 @@ func SessionAuth(pool *pgxpool.Pool, strictIP bool, livenessWindow time.Duration
 		// A banned/suspended account must lose access immediately, even with a
 		// live session token and an unexpired license. Entitlement resolution
 		// only checks the license, so this is the gate that enforces account bans
-		// for the game client.
-		if session.AccountStatus == "banned" || session.AccountStatus == "suspended" {
+		// for the game client. db.AccountStatusActive is the single source of the
+		// rule (shared with /auth/heartbeat, /auth/finish, and the panel gate) and
+		// is fail-closed, so any non-"active" status is denied.
+		if !db.AccountStatusActive(session.AccountStatus) {
 			return c.Status(403).JSON(fiber.Map{
 				"error":   "account_" + session.AccountStatus,
 				"message": "Account " + session.AccountStatus,
