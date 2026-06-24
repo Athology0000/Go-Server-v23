@@ -60,6 +60,8 @@ func handleRedeemLicense(pool *pgxpool.Pool, auditSvc *audit.Service, masterKey 
 				return c.Status(400).JSON(fiber.Map{"error": "key_unavailable", "message": "Key already used or revoked"})
 			case errors.Is(coreErr, enrollment.ErrAlreadyEnrolled):
 				return c.Status(409).JSON(fiber.Map{"error": "device_not_redeemable", "message": "Device is already enrolled"})
+			case errors.Is(coreErr, enrollment.ErrLicenseLocked):
+				return c.Status(403).JSON(fiber.Map{"error": "license_locked", "message": "This license has been revoked or suspended; contact support"})
 			default:
 				return c.Status(500).JSON(fiber.Map{"error": "internal_error", "message": "Failed to redeem key"})
 			}

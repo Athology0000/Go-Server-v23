@@ -162,7 +162,7 @@ func TestRedeemOnTxSuccessExtendWithKnobs(t *testing.T) {
 		{contains: "FROM devices", row: fakeRow{vals: []any{"dev-9", "unbound", sealed}}},
 		{contains: "UPDATE devices SET enrollment_ip", tag: redeemedTag()},                   // ip re-align (knob)
 		{contains: "UPDATE devices SET binding_status = 'hwid_pending'", tag: redeemedTag()}, // advance (knob)
-		{contains: "FROM licenses", row: fakeRow{vals: []any{future}}},
+		{contains: "FROM licenses", row: fakeRow{vals: []any{future, "active"}}},
 		{contains: "UPDATE licenses", tag: redeemedTag()},
 		{contains: "UPDATE license_keys", tag: redeemedTag()},
 	}}

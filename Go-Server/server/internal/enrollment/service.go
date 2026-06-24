@@ -21,6 +21,10 @@ var (
 	ErrBadCredentials  = errors.New("bad credentials")
 	ErrNoLicense       = errors.New("no license on account")
 	ErrAlreadyEnrolled = errors.New("already enrolled")
+	// ErrLicenseLocked is returned when a redemption would extend a license that
+	// an admin has terminated (revoked/suspended). Redemption must not silently
+	// reactivate it; reactivation has to be an explicit admin action.
+	ErrLicenseLocked = errors.New("license revoked or suspended")
 )
 
 type Service struct {
