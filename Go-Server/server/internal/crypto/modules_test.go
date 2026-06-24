@@ -19,8 +19,17 @@ func TestProofValidatorAcceptsAndRejects(t *testing.T) {
 		t.Fatal("ProofValidator must accept the genuine HMAC proof")
 	}
 
-	// Tampered proof.
-	if pv.Valid(secret, challenge, good[:len(good)-1]+"0") {
+	// Tampered proof — flip the last hex nibble so the tamper always differs
+	// from the genuine MAC (appending a fixed digit was a no-op whenever the
+	// real proof already ended in that digit, making this test ~6% flaky).
+	tampered := []byte(good)
+	last := len(tampered) - 1
+	if tampered[last] == '0' {
+		tampered[last] = '1'
+	} else {
+		tampered[last] = '0'
+	}
+	if pv.Valid(secret, challenge, string(tampered)) {
 		t.Fatal("ProofValidator must reject a tampered proof")
 	}
 	// Wrong secret.
