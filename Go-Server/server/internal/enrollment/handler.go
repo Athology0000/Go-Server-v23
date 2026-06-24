@@ -60,7 +60,7 @@ func handleRedeem(redemption Redeemer) fiber.Handler {
 		// was a key-existence enumeration oracle (issue #6): it told an attacker which guessed
 		// keys exist and their state. The fine-grained distinction is kept server-side in
 		// audit.Log inside the redemption transaction; the client gets nothing to distinguish on.
-		if errors.Is(err, ErrKeyNotFound) || errors.Is(err, ErrKeyNotAvailable) || errors.Is(err, ErrAlreadyEnrolled) {
+		if errors.Is(err, ErrKeyNotFound) || errors.Is(err, ErrKeyNotAvailable) || errors.Is(err, ErrAlreadyEnrolled) || errors.Is(err, ErrLicenseLocked) {
 			return c.Status(400).JSON(fiber.Map{"error": "enrollment_failed"})
 		}
 		if errors.Is(err, ErrBadCredentials) || errors.Is(err, ErrIPMismatch) {

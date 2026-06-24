@@ -218,13 +218,14 @@ func RedeemOnTx(ctx context.Context, tx redeemTx, ds *crypto.DeviceSecret, accou
 	// Create or extend the license on the account.
 	now := time.Now()
 	var existingExpires *time.Time
+	var existingStatus string
 	licenseErr := tx.QueryRow(ctx,
-		`SELECT expires_at
+		`SELECT expires_at, status
 		 FROM licenses
 		 WHERE account_id = $1
 		 FOR UPDATE`,
 		accountID,
-	).Scan(&existingExpires)
+	).Scan(&existingExpires, &existingStatus)
 	if licenseErr != nil && !errors.Is(licenseErr, pgx.ErrNoRows) {
 		return CoreResult{}, licenseErr
 	}
@@ -239,6 +240,15 @@ func RedeemOnTx(ctx context.Context, tx redeemTx, ds *crypto.DeviceSecret, accou
 			return CoreResult{}, err
 		}
 	} else {
+		// Do not let a key redemption resurrect a license an admin has terminated.
+		// The FOR UPDATE above holds the row lock, so existingStatus is the
+		// authoritative current state. A naturally lapsed "expired" license still
+		// renews here (status flips back to 'active'); only the admin-applied
+		// terminal states block, so reactivating a revoked/suspended license stays
+		// an explicit admin action rather than a side effect of redeeming any key.
+		if licenseStatusBlocksRedemption(existingStatus) {
+			return CoreResult{}, ErrLicenseLocked
+		}
 		if _, err := tx.Exec(ctx,
 			`UPDATE licenses
 			 SET plan_tier = $1, status = 'active', expires_at = $2, updated_at = now()
@@ -273,6 +283,15 @@ func RedeemOnTx(ctx context.Context, tx redeemTx, ds *crypto.DeviceSecret, accou
 		res.DeviceSecret = base64.StdEncoding.EncodeToString(secretPlain)
 	}
 	return res, nil
+}
+
+// licenseStatusBlocksRedemption reports whether a license's current status
+// forbids a key redemption from extending/reactivating it. Only the admin-applied
+// terminal states block; a naturally lapsed "expired" license (and active/trial)
+// renews normally — renewal is the usual reason a user redeems a key. Kept pure
+// so the rule is asserted directly.
+func licenseStatusBlocksRedemption(status string) bool {
+	return status == "revoked" || status == "suspended"
 }
 
 // computeNewExpiry is the redemption's lifetime rule, kept pure so it can be asserted
@@ -362,6 +381,8 @@ func (r *Redemption) Redeem(ctx context.Context, req RedeemRequest) (RedeemResul
 			r.auditSvc.Log(audit.EventEnrollRedeemFail, &accountID, nil, nil, &sourceIP, map[string]any{"reason": "key_not_available"})
 		case errors.Is(err, ErrAlreadyEnrolled):
 			r.auditSvc.Log(audit.EventEnrollRedeemFail, &accountID, nil, nil, &sourceIP, map[string]any{"reason": "already_enrolled"})
+		case errors.Is(err, ErrLicenseLocked):
+			r.auditSvc.Log(audit.EventEnrollRedeemFail, &accountID, nil, nil, &sourceIP, map[string]any{"reason": "license_locked"})
 		}
 		return RedeemResult{}, err
 	}
