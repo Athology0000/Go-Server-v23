@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"time"
 
@@ -171,19 +170,16 @@ func (s *Service) NativePath(ctx context.Context, accountID, name string) (strin
 	}
 
 	safeName := filepath.Base(name)
-	nativeID := safeName
 
-	if ext := filepath.Ext(nativeID); ext != "" {
-		nativeID = nativeID[:len(nativeID)-len(ext)]
-	}
-
-	allowed :=
-		len(ent.NativeComponents) == 0 ||
-			slices.Contains(ent.NativeComponents, "*") ||
-			slices.Contains(ent.NativeComponents, safeName) ||
-			slices.Contains(ent.NativeComponents, nativeID)
-
-	if !allowed {
+	// Authorize the download through the SAME decision the signed manifest uses
+	// to filter natives (scopeManifestForEntitlement -> ModuleAllowed against
+	// enabled_modules), so a client can only download a native that its manifest
+	// actually lists. This is fail-closed: an entitlement with no enabled modules
+	// (e.g. the seeded "trial" tier) gets no natives. The previous gate keyed off
+	// native_components and treated an empty list as allow-all, which let
+	// restricted/trial tiers pull every native (phantom_auth.dll, the pathfinder)
+	// and could diverge from the manifest.
+	if !nativeDownloadAllowed(safeName, ent.EnabledModules) {
 		return "", ErrNotEntitled
 	}
 
@@ -194,4 +190,15 @@ func (s *Service) NativePath(ctx context.Context, accountID, name string) (strin
 	}
 
 	return path, nil
+}
+
+// nativeDownloadAllowed is the native-download authorization decision, factored
+// out so the security contract is unit-testable without a database. It delegates
+// to ModuleAllowed — the same predicate scopeManifestForEntitlement uses to
+// filter natives into the signed manifest — keyed on the caller's enabled
+// modules, so the manifest a client receives and what it may download can never
+// diverge. filepath.Base strips any path components from the requested name
+// before the check. Fail-closed: empty enabledModules authorizes no native.
+func nativeDownloadAllowed(name string, enabledModules []string) bool {
+	return ModuleAllowed(filepath.Base(name), enabledModules)
 }
