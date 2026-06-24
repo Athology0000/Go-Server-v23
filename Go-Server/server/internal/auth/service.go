@@ -656,11 +656,10 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 		return nil, err
 	}
 
-	log.Printf("[auth.verify_session] device_found ip=%s device_id=%s binding_status=%s minecraft_username=%q",
+	log.Printf("[auth.verify_session] device_found ip=%s device_id=%s binding_status=%s",
 		sourceIP,
 		device.ID,
 		device.BindingStatus,
-		ptrStringValue(device.MinecraftUsername),
 	)
 
 	if minecraftUsernameInput != "" {
@@ -680,11 +679,10 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 				return nil, err
 			}
 
-			log.Printf("[auth.verify_session] minecraft_bound ip=%s device_id=%s state_before=%d minecraft_username=%q",
+			log.Printf("[auth.verify_session] minecraft_bound ip=%s device_id=%s state_before=%d",
 				sourceIP,
 				device.ID,
 				stateBefore,
-				minecraftUsernameInput,
 			)
 
 			device.MinecraftUsername = &minecraftUsernameInput
@@ -732,10 +730,9 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 		return nil, err
 	}
 
-	log.Printf("[auth.verify_session] account_found ip=%s account_id=%s username=%s status=%s",
+	log.Printf("[auth.verify_session] account_found ip=%s account_id=%s status=%s",
 		sourceIP,
 		account.ID,
-		account.Username,
 		account.Status,
 	)
 
@@ -897,12 +894,10 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 		"minecraft_username": minecraftUsername,
 	})
 
-	log.Printf("[auth.verify_session] success ip=%s account_id=%s username=%s minecraft_bound=%t minecraft_username=%q modules=%v manifest_present=%t duration_ms=%d",
+	log.Printf("[auth.verify_session] success ip=%s account_id=%s minecraft_bound=%t modules=%v manifest_present=%t duration_ms=%d",
 		sourceIP,
 		account.ID,
-		account.Username,
 		minecraftUsername != "",
-		minecraftUsername,
 		modules,
 		manifestURL != "",
 		time.Since(started).Milliseconds(),
