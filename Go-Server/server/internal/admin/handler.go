@@ -420,6 +420,9 @@ func handleUpsertModuleMetadata(pool *pgxpool.Pool, auditSvc *audit.Service) fib
 			return c.Status(400).JSON(fiber.Map{"error": "invalid_request"})
 		}
 		if err := db.UpsertModuleMetadata(c.Context(), pool, body.ModuleName, body.DependsOn); err != nil {
+			if errors.Is(err, db.ErrInvalidModuleMetadata) {
+				return c.Status(400).JSON(fiber.Map{"error": "invalid_module_metadata", "detail": err.Error()})
+			}
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 		tok := middleware.GetAdminToken(c)
