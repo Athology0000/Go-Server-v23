@@ -111,6 +111,16 @@ func New(
 	}
 }
 
+// debugf emits a verbose per-request auth diagnostic only when AuthDebugLogs is
+// enabled (off in production by default). These are the success-path detail
+// dumps; errors, security denials, and rejection reasons are logged
+// unconditionally so production still records what matters.
+func (s *Service) debugf(format string, args ...any) {
+	if s.cfg.AuthDebugLogs {
+		log.Printf(format, args...)
+	}
+}
+
 func (s *Service) Start(ctx context.Context, username, minecraftUsername, sourceIP string) (*StartResult, error) {
 	account, err := db.GetAccountByUsername(ctx, s.pool, normalize(username))
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -589,7 +599,7 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 	// Never log raw token material (even truncated): these logs are aggregated off-box and
 	// surfaced via /admin/server-logs. token_present + the SHA-256 token_hash prefix below are
 	// enough to correlate a session without leaking the bearer credential.
-	log.Printf("[auth.verify_session] start ip=%s token_present=%t minecraft_input=%q",
+	s.debugf("[auth.verify_session] start ip=%s token_present=%t minecraft_input=%q",
 		sourceIP,
 		strings.TrimSpace(rawToken) != "",
 		minecraftUsernameInput,
@@ -601,7 +611,7 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 		return nil, ErrSessionInvalid
 	}
 
-	log.Printf("[auth.verify_session] token_hash_ok ip=%s token_hash=%s",
+	s.debugf("[auth.verify_session] token_hash_ok ip=%s token_hash=%s",
 		sourceIP,
 		shortHash(tokenHash),
 	)
@@ -616,7 +626,7 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 		return nil, ErrSessionInvalid
 	}
 
-	log.Printf("[auth.verify_session] session_found ip=%s session_id=%s account_id=%s device_id=%s revoked=%t expires_at=%s now=%s",
+	s.debugf("[auth.verify_session] session_found ip=%s session_id=%s account_id=%s device_id=%s revoked=%t expires_at=%s now=%s",
 		sourceIP,
 		sess.ID,
 		sess.AccountID,
@@ -656,7 +666,7 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 		return nil, err
 	}
 
-	log.Printf("[auth.verify_session] device_found ip=%s device_id=%s binding_status=%s",
+	s.debugf("[auth.verify_session] device_found ip=%s device_id=%s binding_status=%s",
 		sourceIP,
 		device.ID,
 		device.BindingStatus,
@@ -679,7 +689,7 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 				return nil, err
 			}
 
-			log.Printf("[auth.verify_session] minecraft_bound ip=%s device_id=%s state_before=%d",
+			s.debugf("[auth.verify_session] minecraft_bound ip=%s device_id=%s state_before=%d",
 				sourceIP,
 				device.ID,
 				stateBefore,
@@ -712,7 +722,7 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 			// Already bound to this name — nothing to persist.
 
 		default: // UsernameNoop: unbound/blocked/unknown state at this seam.
-			log.Printf("[auth.verify_session] minecraft_bind_skipped ip=%s device_id=%s status=%s",
+			s.debugf("[auth.verify_session] minecraft_bind_skipped ip=%s device_id=%s status=%s",
 				sourceIP,
 				device.ID,
 				device.BindingStatus,
@@ -730,7 +740,7 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 		return nil, err
 	}
 
-	log.Printf("[auth.verify_session] account_found ip=%s account_id=%s status=%s",
+	s.debugf("[auth.verify_session] account_found ip=%s account_id=%s status=%s",
 		sourceIP,
 		account.ID,
 		account.Status,
@@ -812,7 +822,7 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 		return nil, err
 	}
 
-	log.Printf("[auth.verify_session] entitlement_result ip=%s account_id=%s authorized=%t reason=%q plan=%s modules=%v features=%v channel=%s expires_at=%v",
+	s.debugf("[auth.verify_session] entitlement_result ip=%s account_id=%s authorized=%t reason=%q plan=%s modules=%v features=%v channel=%s expires_at=%v",
 		sourceIP,
 		account.ID,
 		ent.Authorized,
@@ -844,7 +854,7 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 	manifestURL, manifestSig, manifestErr := s.resolveManifest(ctx, ent.LicenseID, ent.ContentChannel, ent.EnabledModules)
 	if manifestErr == nil {
 
-		log.Printf("[auth.verify_session] manifest_found ip=%s account_id=%s channel=%s manifest_id=%s manifest_url=%s signature_present=%t",
+		s.debugf("[auth.verify_session] manifest_found ip=%s account_id=%s channel=%s manifest_id=%s manifest_url=%s signature_present=%t",
 			sourceIP,
 			account.ID,
 			ent.ContentChannel,
@@ -894,7 +904,7 @@ func (s *Service) VerifySession(ctx context.Context, rawToken, sourceIP, minecra
 		"minecraft_username": minecraftUsername,
 	})
 
-	log.Printf("[auth.verify_session] success ip=%s account_id=%s minecraft_bound=%t modules=%v manifest_present=%t duration_ms=%d",
+	s.debugf("[auth.verify_session] success ip=%s account_id=%s minecraft_bound=%t modules=%v manifest_present=%t duration_ms=%d",
 		sourceIP,
 		account.ID,
 		minecraftUsername != "",
