@@ -942,13 +942,21 @@ func handleAdminSetup(pool *pgxpool.Pool, adminAPISecret string) fiber.Handler {
 		}
 
 		username := strings.ToLower(strings.TrimSpace(body.Username))
-		account, err := db.GetAccountByUsername(c.Context(), pool, username)
+		// Bootstrap must only ever CREATE the first admin, never re-key an existing
+		// account. The old code overwrote an existing account's password here, so an
+		// ADMIN_API_SECRET holder could seize ANY existing user (and bind super_admin
+		// to it) during a no-active-admin-token window — an account takeover. Refuse
+		// instead; reactivating/recovering an existing account is an explicit admin
+		// action, not a side effect of bootstrap.
+		if _, lookupErr := db.GetAccountByUsername(c.Context(), pool, username); lookupErr == nil {
+			return c.Status(409).JSON(fiber.Map{
+				"error":   "account_exists",
+				"message": "Account already exists; bootstrap only creates the first admin",
+			})
+		}
+
+		account, err := db.CreateAccount(c.Context(), pool, username, hash, nil)
 		if err != nil {
-			account, err = db.CreateAccount(c.Context(), pool, username, hash, nil)
-			if err != nil {
-				return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
-			}
-		} else if err := db.UpdateAccountPassword(c.Context(), pool, account.ID, hash); err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 
