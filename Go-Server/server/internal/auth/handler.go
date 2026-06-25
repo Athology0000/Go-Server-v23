@@ -345,7 +345,7 @@ func handleFinish(svc *Service) fiber.Handler {
 
 		ip := middleware.GetRealIP(c)
 
-		log.Printf(
+		svc.debugf(
 			"[auth.finish.route] request ip=%s username=%s",
 			ip,
 			req.Username,
@@ -381,7 +381,7 @@ func handleFinish(svc *Service) fiber.Handler {
 			})
 		}
 
-		log.Printf(
+		svc.debugf(
 			"[auth.finish.route] response ip=%s authorized=true account_id=%s plan_tier=%q expires_at=%v modules=%v features=%v manifest_url=%q manifest_sig_present=%t",
 			ip,
 			result.AccountID,
@@ -452,7 +452,7 @@ func handleVerifySession(svc *Service) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		ip := middleware.GetRealIP(c)
 
-		log.Printf(
+		svc.debugf(
 			"[auth.verify_session.route] request ip=%s content_type=%s body_len=%d",
 			ip,
 			c.Get("Content-Type"),
@@ -484,7 +484,7 @@ func handleVerifySession(svc *Service) fiber.Handler {
 
 		minecraftUsername := strings.TrimSpace(req.MinecraftUsername)
 
-		log.Printf(
+		svc.debugf(
 			"[auth.verify_session.route] parsed ip=%s token_present=%t",
 			ip,
 			rawToken != "",
@@ -524,7 +524,7 @@ func handleVerifySession(svc *Service) fiber.Handler {
 			status = 403
 		}
 
-		log.Printf(
+		svc.debugf(
 			"[auth.verify_session.route] response ip=%s status=%d authorized=%t account_id=%s modules=%v manifest_present=%t",
 			ip,
 			status,

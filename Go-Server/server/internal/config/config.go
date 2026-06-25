@@ -30,6 +30,7 @@ type Config struct {
 	StrictSessionIP         bool
 	HwidTofuEnabled         bool
 	AppEnv                  string
+	AuthDebugLogs           bool
 	AllowPublicRegistration bool
 	PublicCORSAllowOrigins  string
 	AdminCORSAllowOrigins   string
@@ -100,6 +101,7 @@ func Load() (*Config, error) {
 		// deliberately removed; this re-enables it (pin-on-first-sight, compare after) only when set.
 		HwidTofuEnabled:         getEnvOr("HWID_TOFU_ENABLED", "false") == "true",
 		AppEnv:                  appEnv,
+		AuthDebugLogs:           resolveAuthDebugLogs(appEnv, getEnvOr("AUTH_DEBUG_LOGS", "")),
 		AllowPublicRegistration: getEnvOr("ALLOW_PUBLIC_REGISTRATION", "") == "true",
 		PublicCORSAllowOrigins:  publicOrigins,
 		AdminCORSAllowOrigins:   adminOrigins,
