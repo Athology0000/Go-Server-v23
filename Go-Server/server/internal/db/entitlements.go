@@ -7,12 +7,11 @@ import (
 )
 
 type Entitlement struct {
-	PlanTier         string    `json:"plan_tier"`
-	EnabledFeatures  []string  `json:"enabled_features"`
-	EnabledModules   []string  `json:"enabled_modules"`
-	NativeComponents []string  `json:"native_components"`
-	ContentChannel   string    `json:"content_channel"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	PlanTier        string    `json:"plan_tier"`
+	EnabledFeatures []string  `json:"enabled_features"`
+	EnabledModules  []string  `json:"enabled_modules"`
+	ContentChannel  string    `json:"content_channel"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 type PlanOverride struct {
@@ -30,10 +29,10 @@ type PlanOverride struct {
 
 func GetEntitlement(ctx context.Context, pool *pgxpool.Pool, planTier string) (*Entitlement, error) {
 	row := pool.QueryRow(ctx,
-		`SELECT plan_tier, enabled_features, enabled_modules, native_components, content_channel, updated_at
+		`SELECT plan_tier, enabled_features, enabled_modules, content_channel, updated_at
 		 FROM entitlements WHERE plan_tier = $1`, planTier)
 	e := &Entitlement{}
-	err := row.Scan(&e.PlanTier, &e.EnabledFeatures, &e.EnabledModules, &e.NativeComponents, &e.ContentChannel, &e.UpdatedAt)
+	err := row.Scan(&e.PlanTier, &e.EnabledFeatures, &e.EnabledModules, &e.ContentChannel, &e.UpdatedAt)
 	return e, err
 }
 
@@ -50,15 +49,14 @@ func GetPlanOverride(ctx context.Context, pool *pgxpool.Pool, accountID string) 
 
 func UpsertEntitlement(ctx context.Context, pool *pgxpool.Pool, e *Entitlement) error {
 	_, err := pool.Exec(ctx,
-		`INSERT INTO entitlements (plan_tier, enabled_features, enabled_modules, native_components, content_channel)
-		 VALUES ($1, $2, $3, $4, $5)
+		`INSERT INTO entitlements (plan_tier, enabled_features, enabled_modules, content_channel)
+		 VALUES ($1, $2, $3, $4)
 		 ON CONFLICT (plan_tier) DO UPDATE SET
 		   enabled_features = EXCLUDED.enabled_features,
 		   enabled_modules = EXCLUDED.enabled_modules,
-		   native_components = EXCLUDED.native_components,
 		   content_channel = EXCLUDED.content_channel,
 		   updated_at = now()`,
-		e.PlanTier, e.EnabledFeatures, e.EnabledModules, e.NativeComponents, e.ContentChannel)
+		e.PlanTier, e.EnabledFeatures, e.EnabledModules, e.ContentChannel)
 	return err
 }
 

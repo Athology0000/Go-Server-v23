@@ -1,0 +1,11 @@
+-- Drop the vestigial entitlements.native_components column. PR #10 moved native-download
+-- authorization onto enabled_modules (content/service.go nativeDownloadAllowed -> ModuleAllowed),
+-- so this column became write-only with zero authorization consumers.
+--
+-- NOTE: this drops ONLY the ENTITLEMENT column. The separate, live content_manifests.native_components
+-- (the Ed25519-signed manifest's native-DLL list) is a different column and is unaffected.
+--
+-- Forward-only: the data was write-only and meaningless, so there is no practical DOWN. The seed
+-- migrations 001/005/007 still create + populate this column and run BEFORE this drop on a from-empty
+-- replay, so leaving them intact keeps replay correct — only the final state loses the column.
+ALTER TABLE entitlements DROP COLUMN IF EXISTS native_components;
