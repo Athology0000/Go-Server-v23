@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	ccrypto "github.com/phantom/server/internal/crypto"
+	"golang.org/x/sync/singleflight"
 )
 
 // Server-side per-client generation: the server holds the (obfuscated) plaintext module jars and, on a
@@ -113,10 +114,24 @@ func addManifestHeader(manifest []byte, key, value string) []byte {
 // If it is absent (a subtree generated under the OLD single global key, before this change) or its
 // scheme does not match keyDerivationScheme, the stale subtree's .enc bundles are wiped and
 // regenerated under the derived key rather than served undecryptable.
+// bundleGroup serializes and coalesces per-license bundle generation. Keyed on licenseID, two
+// concurrent first-sight requests for the SAME license collapse onto ONE generation — so the
+// manifest hash can never desync from the served .enc, and evictStaleScheme can never delete a
+// bundle another goroutine is mid-write on — while distinct licenses still generate in parallel.
+// This is the ONLY writer of CONTENT_DIR/modules/<lic>/, so the lock is total for that subtree.
+var bundleGroup singleflight.Group
+
 func EnsureLicenseBundles(contentDir, licenseID string, moduleKey []byte, wmSecret, wmPepper string) error {
 	if licenseID == "" || wmSecret == "" {
 		return nil // not configured for per-license generation; serve whatever is already on disk
 	}
+	_, err, _ := bundleGroup.Do(licenseID, func() (any, error) {
+		return nil, ensureLicenseBundlesLocked(contentDir, licenseID, moduleKey, wmSecret, wmPepper)
+	})
+	return err
+}
+
+func ensureLicenseBundlesLocked(contentDir, licenseID string, moduleKey []byte, wmSecret, wmPepper string) error {
 	jarsDir := filepath.Join(contentDir, "_jars")
 	entries, err := os.ReadDir(jarsDir)
 	if err != nil {
@@ -158,7 +173,7 @@ func EnsureLicenseBundles(contentDir, licenseID string, moduleKey []byte, wmSecr
 		if err != nil {
 			return err
 		}
-		if err := os.WriteFile(encPath, enc, 0o644); err != nil {
+		if err := writeFileAtomic(encPath, enc, 0o644); err != nil {
 			return err
 		}
 		generatedAny = true
@@ -216,6 +231,24 @@ func evictStaleScheme(licDir string) error {
 // writeSchemeMarker records the current key-derivation scheme for licDir.
 func writeSchemeMarker(licDir string) error {
 	return os.WriteFile(filepath.Join(licDir, schemeMarkerName), []byte(keyDerivationScheme+"\n"), 0o644)
+}
+
+// writeFileAtomic writes data to a hidden temp file in the SAME directory as path, then os.Renames
+// it into place — so a concurrent reader (manifest build at manifest.go / module download at
+// service.go) only ever observes the complete old file or the complete new file, never a torn,
+// half-written one. Same-volume os.Rename is atomic (POSIX; Windows MoveFileEx REPLACE_EXISTING).
+// The temp suffix is .tmp (not .enc), so evictStaleScheme and the manifest scan both ignore it.
+// Mirrors internal/forge/promote.go's temp+rename publication.
+func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
+	tmp := filepath.Join(filepath.Dir(path), "."+filepath.Base(path)+".tmp")
+	if err := os.WriteFile(tmp, data, perm); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	return nil
 }
 
 // appendLedger records "wmid=licenseId" in CONTENT_DIR/watermark-map.json if not already present, so
