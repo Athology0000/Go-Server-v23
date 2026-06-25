@@ -56,14 +56,3 @@ func HasActiveAdminToken(ctx context.Context, pool *pgxpool.Pool) (bool, error) 
 		)`).Scan(&exists)
 	return exists, err
 }
-
-func GetHighestAdminRole(ctx context.Context, pool *pgxpool.Pool, adminUsername string) (string, error) {
-	var role string
-	err := pool.QueryRow(ctx,
-		`SELECT role FROM admin_tokens
-		 WHERE admin_username = $1 AND revoked = false AND expires_at > now()
-		 ORDER BY CASE role WHEN 'super_admin' THEN 3 WHEN 'support' THEN 2 ELSE 1 END DESC
-		 LIMIT 1`,
-		adminUsername).Scan(&role)
-	return role, err
-}

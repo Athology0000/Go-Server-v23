@@ -570,6 +570,16 @@ func handleCreateAdminToken(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.H
 		if err := c.BodyParser(&body); err != nil || body.AdminUsername == "" || body.Role == "" {
 			return c.Status(400).JSON(fiber.Map{"error": "invalid_request"})
 		}
+		if !validAdminRole(body.Role) {
+			return c.Status(400).JSON(fiber.Map{"error": "invalid_request", "message": "role must be super_admin, support, or viewer"})
+		}
+		// Normalize once: the token's admin_username and the account whose admin_role we bind must
+		// agree on casing, since accounts are stored lowercase and the API-auth role cap looks the
+		// account up by the token's admin_username.
+		adminUsername := strings.ToLower(strings.TrimSpace(body.AdminUsername))
+		if adminUsername == "" {
+			return c.Status(400).JSON(fiber.Map{"error": "invalid_request"})
+		}
 		if body.ExpiresIn <= 0 {
 			body.ExpiresIn = 90
 		}
@@ -578,13 +588,20 @@ func handleCreateAdminToken(pool *pgxpool.Pool, auditSvc *audit.Service) fiber.H
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 		expiresAt := time.Now().Add(time.Duration(body.ExpiresIn) * 24 * time.Hour)
-		token, err := db.CreateAdminToken(c.Context(), pool, hash, body.AdminUsername, body.Role, expiresAt)
+		token, err := db.CreateAdminToken(c.Context(), pool, hash, adminUsername, body.Role, expiresAt)
 		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
+		}
+		// Bind the issued role to the account as its authoritative admin role for login (L2): the
+		// session role at /admin/auth/login is read from accounts.admin_role, so issuing a lower-role
+		// token now demotes and a stale higher token can't re-grant. A username with no account row
+		// (RowsAffected 0) still gets a working API bearer token; there is just no login role to bind.
+		if _, err := db.SetAccountAdminRole(c.Context(), pool, adminUsername, body.Role); err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
 		}
 		tok := middleware.GetAdminToken(c)
 		auditSvc.Log(audit.EventAdminTokenCreate, nil, nil, &tok.AdminUsername, nil,
-			map[string]any{"for": body.AdminUsername, "role": body.Role})
+			map[string]any{"for": adminUsername, "role": body.Role})
 		return c.Status(201).JSON(fiber.Map{"token": raw, "id": token.ID, "expires_at": token.ExpiresAt})
 	}
 }
@@ -829,9 +846,15 @@ func handleAdminLogin(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(401).JSON(fiber.Map{"error": "authentication_failed", "message": "Invalid username or password"})
 		}
 
-		role, err := db.GetHighestAdminRole(c.Context(), pool, account.Username)
+		boundRole, _, err := db.LookupAccountAdminRole(c.Context(), pool, account.Username)
 		if err != nil {
-			return c.Status(401).JSON(fiber.Map{"error": "authentication_failed"})
+			return c.Status(500).JSON(fiber.Map{"error": "internal_error"})
+		}
+		role, allowed := resolveAdminLoginRole(boundRole)
+		if !allowed {
+			// Correct password but the account has no bound admin role — not an admin. Deny with the
+			// same opaque message as a bad password so this isn't an admin-account oracle.
+			return c.Status(401).JSON(fiber.Map{"error": "authentication_failed", "message": "Invalid username or password"})
 		}
 
 		raw, hash, err := crypto.GenerateToken()
@@ -968,6 +991,11 @@ func handleAdminSetup(pool *pgxpool.Pool, adminAPISecret string) fiber.Handler {
 		expiresAt := time.Now().Add(365 * 24 * time.Hour * 10)
 		_, err = db.CreateAdminToken(c.Context(), pool, tokenHash, account.Username, "super_admin", expiresAt)
 		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "seed_failed"})
+		}
+		// Bind the bootstrap admin's authoritative login role (L2). Without this the first admin
+		// could never log in: login reads accounts.admin_role, not the token pile.
+		if _, err := db.SetAccountAdminRole(c.Context(), pool, account.Username, "super_admin"); err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "seed_failed"})
 		}
 
