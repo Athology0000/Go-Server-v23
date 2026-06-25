@@ -64,8 +64,9 @@ Environment variables required by the server:
 - `MANIFEST_SIGNING_KEY` — base64, 64 bytes.
 - `DB_URL`
 - `ADMIN_API_SECRET`
-- Optional: `PUBLIC_PORT`, `ADMIN_PORT`, `CONTENT_DIR`, `BASE_URL`, `STRICT_SESSION_IP`, `APP_ENV`, `AUTH_DEBUG_LOGS`.
+- Optional: `PUBLIC_PORT`, `ADMIN_PORT`, `CONTENT_DIR`, `BASE_URL`, `STRICT_SESSION_IP`, `APP_ENV`, `AUTH_DEBUG_LOGS`, `AUDIT_RETENTION_DAYS`.
   - `AUTH_DEBUG_LOGS` (`true`/`false`) toggles the verbose per-request `[auth.verify_session]`/`[auth.finish]` success-path diagnostics. Defaults off in production (`APP_ENV=production`), on elsewhere; set explicitly to debug a prod incident without changing `APP_ENV`. Errors, security denials, and rejection reasons are always logged regardless.
+  - `AUDIT_RETENTION_DAYS` (integer, default `90`) — the background sweeper deletes `audit_log` rows (which hold email-adjacent identifiers + IP) older than this many days, alongside expired `sessions`/`panel_sessions`. A `0`/negative value is clamped back to `90` (a 0-day retention would reap recent rows).
 
 The config loader will panic if required env vars are missing.
 
