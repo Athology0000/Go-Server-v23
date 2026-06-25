@@ -18,7 +18,6 @@ type Result struct {
 	PlanTier             string
 	EnabledModules       []string
 	EnabledFeatures      []string
-	NativeComponents     []string
 	ContentChannel       string
 	EntitlementExpiresAt *time.Time
 }
@@ -84,8 +83,6 @@ func (s *Service) Resolve(ctx context.Context, accountID string) (*Result, error
 	copy(modules, ent.EnabledModules)
 	features := make([]string, len(ent.EnabledFeatures))
 	copy(features, ent.EnabledFeatures)
-	nativeComponents := make([]string, len(ent.NativeComponents))
-	copy(nativeComponents, ent.NativeComponents)
 
 	override, err := db.GetPlanOverride(ctx, s.pool, accountID)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
@@ -113,7 +110,6 @@ func (s *Service) Resolve(ctx context.Context, accountID string) (*Result, error
 		PlanTier:             license.PlanTier,
 		EnabledModules:       modules,
 		EnabledFeatures:      features,
-		NativeComponents:     nativeComponents,
 		ContentChannel:       contentChannel,
 		EntitlementExpiresAt: license.ExpiresAt,
 	}, nil
@@ -138,7 +134,6 @@ func fullAccessResult(planTier, contentChannel string, expiresAt *time.Time) *Re
 		PlanTier:             planTier,
 		EnabledModules:       []string{"*"},
 		EnabledFeatures:      []string{"*"},
-		NativeComponents:     []string{"*"},
 		ContentChannel:       contentChannel,
 		EntitlementExpiresAt: expiresAt,
 	}

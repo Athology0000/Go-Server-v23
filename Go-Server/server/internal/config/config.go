@@ -36,6 +36,7 @@ type Config struct {
 	AdminCORSAllowOrigins   string
 	BodyLimit               int
 	SessionTTLHours         int
+	AuditRetentionDays      int
 	HeartbeatLivenessWindow time.Duration
 	MigrationsDir           string
 
@@ -108,7 +109,11 @@ func Load() (*Config, error) {
 		// Absolute session cap (NOT rolling). Heartbeats no longer extend this;
 		// liveness is governed by HeartbeatLivenessWindow. Default 12h so a normal
 		// play session is never kicked mid-game.
-		SessionTTLHours:         getEnvIntOr("SESSION_TTL_HOURS", 12),
+		SessionTTLHours: getEnvIntOr("SESSION_TTL_HOURS", 12),
+		// Audit-log + expired-session retention. The background sweeper deletes audit rows
+		// (email + IP) older than this many days. Clamped below: a 0/negative value would
+		// reap recent rows, so it falls back to the 90-day default.
+		AuditRetentionDays:      getEnvIntOr("AUDIT_RETENTION_DAYS", 90),
 		HeartbeatLivenessWindow: time.Duration(getEnvIntOr("HEARTBEAT_LIVENESS_WINDOW_SECONDS", 900)) * time.Second,
 		BodyLimit:               getEnvIntOr("BODY_LIMIT_BYTES", 10*1024*1024),
 		MigrationsDir:           getEnvOr("MIGRATIONS_DIR", "./migrations"),
@@ -144,6 +149,13 @@ func Load() (*Config, error) {
 
 	if cfg.AppEnv == "production" && !strings.HasPrefix(cfg.BaseURL, "https://") {
 		return nil, fmt.Errorf("BASE_URL must use https:// in production")
+	}
+
+	// Audit retention must be positive — a 0/negative value would make the sweeper delete
+	// recent (or all) audit rows. Fall back to the 90-day default (mirrors the `every <= 0`
+	// defaulting in StartSweeper).
+	if cfg.AuditRetentionDays <= 0 {
+		cfg.AuditRetentionDays = 90
 	}
 
 	return cfg, nil

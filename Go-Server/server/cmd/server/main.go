@@ -77,7 +77,7 @@ func main() {
 
 	// Ephemeral state (rate-limit counters + auth challenges) lives in Postgres now — no Redis
 	// dependency. This background sweep reaps expired rows.
-	cache.StartSweeper(ctx, pool, 5*time.Minute)
+	cache.StartSweeper(ctx, pool, 5*time.Minute, cfg.AuditRetentionDays)
 
 	entSvc := entitlement.New(pool)
 	auditSvc := audit.New(pool)

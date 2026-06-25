@@ -57,7 +57,7 @@ func TestFullAccessResult(t *testing.T) {
 	if !r.Authorized {
 		t.Fatal("full access must be authorized")
 	}
-	for _, lst := range [][]string{r.EnabledModules, r.EnabledFeatures, r.NativeComponents} {
+	for _, lst := range [][]string{r.EnabledModules, r.EnabledFeatures} {
 		if len(lst) != 1 || lst[0] != "*" {
 			t.Fatalf("full access lists must be [\"*\"], got %v", lst)
 		}
